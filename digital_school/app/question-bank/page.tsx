@@ -3974,6 +3974,279 @@ function DescriptiveQuestionForm({
   );
 }
 
+function CMAQuestionForm({
+  parts,
+  setParts,
+}: {
+  parts: any[];
+  setParts: (parts: any[]) => void;
+}) {
+  return (
+    <div className="space-y-4 border p-4 rounded-xl bg-cyan-50/20 dark:bg-cyan-950/10 border-cyan-200 dark:border-cyan-800">
+      <div className="flex justify-between items-center">
+        <h4 className="font-bold text-sm text-cyan-900 dark:text-cyan-200 flex items-center gap-2">
+          <span className="px-2 py-0.5 bg-cyan-600 text-white rounded text-xs font-mono">CMA</span>
+          Constructed Answer Sub-Parts
+        </h4>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            setParts([
+              ...parts,
+              {
+                id: `p${parts.length + 1}`,
+                label: String.fromCharCode(97 + parts.length),
+                prompt: '',
+                fieldType: 'decimal',
+                expectedAnswer: '',
+                tolerance: 0.05,
+                unit: '',
+                marks: 2,
+              },
+            ])
+          }
+        >
+          <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Sub-Part
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        {parts.map((p, idx) => (
+          <div key={idx} className="p-3 border rounded-lg bg-background space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-xs text-foreground">Part {idx + 1} ({p.label || `Part ${idx + 1}`})</span>
+              {parts.length > 1 && (
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setParts(parts.filter((_, i) => i !== idx))}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Part Label</Label>
+                <Input value={p.label || ''} onChange={e => { const next = [...parts]; next[idx].label = e.target.value; setParts(next); }} placeholder="e.g. a, b, 1" className="h-8 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs">Field Type</Label>
+                <Select value={p.fieldType || 'decimal'} onValueChange={v => { const next = [...parts]; next[idx].fieldType = v; setParts(next); }}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="numeric">Numeric / Decimal</SelectItem>
+                    <SelectItem value="integer">Integer</SelectItem>
+                    <SelectItem value="expression">Symbolic Formula</SelectItem>
+                    <SelectItem value="fraction">Fraction</SelectItem>
+                    <SelectItem value="text">Text / String</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Marks</Label>
+                <Input type="number" value={p.marks || 1} onChange={e => { const next = [...parts]; next[idx].marks = Number(e.target.value); setParts(next); }} className="h-8 text-xs" />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Field Prompt / Question Text</Label>
+              <Input value={p.prompt || p.label || ''} onChange={e => { const next = [...parts]; next[idx].prompt = e.target.value; setParts(next); }} placeholder="e.g. Horizontal velocity component" className="h-8 text-xs" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Expected Key</Label>
+                <Input value={p.expectedAnswer ?? p.correctAnswer ?? ''} onChange={e => { const next = [...parts]; next[idx].expectedAnswer = e.target.value; next[idx].correctAnswer = e.target.value; setParts(next); }} placeholder="e.g. 17.32" className="h-8 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs">Tolerance (±)</Label>
+                <Input type="number" step="0.01" value={p.tolerance ?? 0.05} onChange={e => { const next = [...parts]; next[idx].tolerance = Number(e.target.value); setParts(next); }} placeholder="0.05" className="h-8 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs">Unit (Optional)</Label>
+                <Input value={p.unit || ''} onChange={e => { const next = [...parts]; next[idx].unit = e.target.value; setParts(next); }} placeholder="e.g. m/s, s" className="h-8 text-xs" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MPCQuestionForm({
+  scenario,
+  setScenario,
+  stages,
+  setStages,
+}: {
+  scenario: string;
+  setScenario: (s: string) => void;
+  stages: any[];
+  setStages: (st: any[]) => void;
+}) {
+  return (
+    <div className="space-y-4 border p-4 rounded-xl bg-indigo-50/20 dark:bg-indigo-950/10 border-indigo-200 dark:border-indigo-800">
+      <div className="flex justify-between items-center">
+        <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+          <span className="px-2 py-0.5 bg-indigo-600 text-white rounded text-xs font-mono">MPC</span>
+          Multi-Step Problem Chain Stages
+        </h4>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            setStages([
+              ...stages,
+              {
+                id: `s${stages.length + 1}`,
+                stageTitle: `Stage ${stages.length + 1}`,
+                expectedAnswer: '',
+                tolerance: 0.05,
+                formula: '',
+                marks: 2,
+              },
+            ])
+          }
+        >
+          <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Stage
+        </Button>
+      </div>
+
+      <div>
+        <Label className="text-xs font-bold text-indigo-800 dark:text-indigo-300">Problem Scenario Context</Label>
+        <Textarea value={scenario} onChange={e => setScenario(e.target.value)} placeholder="Describe the physical/mathematical scenario for all stages..." rows={2} className="text-xs" />
+      </div>
+
+      <div className="space-y-3">
+        {stages.map((st, idx) => (
+          <div key={idx} className="p-3 border rounded-lg bg-background space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-xs text-foreground">Stage {idx + 1}</span>
+              {stages.length > 1 && (
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setStages(stages.filter((_, i) => i !== idx))}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Stage Title / Question</Label>
+                <Input value={st.stageTitle || st.text || ''} onChange={e => { const next = [...stages]; next[idx].stageTitle = e.target.value; next[idx].text = e.target.value; setStages(next); }} placeholder="e.g. Calculate acceleration" className="h-8 text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs">Marks</Label>
+                <Input type="number" value={st.marks || 2} onChange={e => { const next = [...stages]; next[idx].marks = Number(e.target.value); setStages(next); }} className="h-8 text-xs" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Expected Key</Label>
+                <Input value={st.expectedAnswer ?? ''} onChange={e => { const next = [...stages]; next[idx].expectedAnswer = e.target.value; setStages(next); }} placeholder="e.g. 5" className="h-8 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs">Tolerance (±)</Label>
+                <Input type="number" step="0.01" value={st.tolerance ?? 0.05} onChange={e => { const next = [...stages]; next[idx].tolerance = Number(e.target.value); setStages(next); }} className="h-8 text-xs font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs">EPH Formula (Optional)</Label>
+                <Input value={st.formula || ''} onChange={e => { const next = [...stages]; next[idx].formula = e.target.value; setStages(next); }} placeholder="e.g. 0.5 * 1200 * (prev * 8)^2" className="h-8 text-xs font-mono" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DRQuestionForm({
+  expectedAnswer,
+  setExpectedAnswer,
+  reasonOptions,
+  setReasonOptions,
+  confidenceTracking,
+  setConfidenceTracking,
+}: {
+  expectedAnswer: string;
+  setExpectedAnswer: (val: string) => void;
+  reasonOptions: any[];
+  setReasonOptions: (opts: any[]) => void;
+  confidenceTracking: boolean;
+  setConfidenceTracking: (val: boolean) => void;
+}) {
+  return (
+    <div className="space-y-4 border p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border-purple-200 dark:border-purple-800">
+      <h4 className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
+        <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-xs font-mono">DR</span>
+        Diagnostic Reasoning Configuration
+      </h4>
+
+      <div className="p-3 border rounded-lg bg-background space-y-2">
+        <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part A: Correct Answer Key</Label>
+        <Input value={expectedAnswer} onChange={e => setExpectedAnswer(e.target.value)} placeholder="e.g. 42 or Option B text" className="h-8 text-xs font-mono" />
+      </div>
+
+      <div className="p-3 border rounded-lg bg-background space-y-3">
+        <div className="flex justify-between items-center">
+          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part B: Conceptual Justification Options</Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              setReasonOptions([
+                ...reasonOptions,
+                { id: `r${reasonOptions.length + 1}`, text: '', isCorrect: false }
+              ])
+            }
+          >
+            <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Reason Option
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {reasonOptions.map((opt, idx) => (
+            <div key={idx} className="flex items-center gap-2 p-2 border rounded bg-slate-50 dark:bg-slate-900/50">
+              <Checkbox
+                checked={!!opt.isCorrect}
+                onCheckedChange={ch => {
+                  const next = reasonOptions.map((o, i) => ({ ...o, isCorrect: i === idx ? !!ch : false }));
+                  setReasonOptions(next);
+                }}
+              />
+              <span className="font-bold text-xs shrink-0">{String.fromCharCode(65 + idx)}.</span>
+              <Input
+                value={opt.text || ''}
+                onChange={e => {
+                  const next = [...reasonOptions];
+                  next[idx].text = e.target.value;
+                  setReasonOptions(next);
+                }}
+                placeholder={`Reason option ${String.fromCharCode(65 + idx)}...`}
+                className="h-8 text-xs flex-1"
+              />
+              {reasonOptions.length > 1 && (
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setReasonOptions(reasonOptions.filter((_, i) => i !== idx))}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 p-3 border rounded-lg bg-background">
+        <Checkbox checked={confidenceTracking} onCheckedChange={ch => setConfidenceTracking(!!ch)} id="dr-conf-chk" />
+        <Label htmlFor="dr-conf-chk" className="text-xs cursor-pointer font-medium">Enable Part C Self-Confidence Meter (Certain / Probably / Unsure)</Label>
+      </div>
+    </div>
+  );
+}
+
 interface QuestionFormProps {
   initialData?: Question | null;
   onSave: (savedQuestion: Question) => void;
@@ -4033,6 +4306,28 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     { id: 'C', text: '' }
   ]);
   const [matches, setMatches] = useState<Record<string, string>>(initialData?.matches || {});
+  const [cmaParts, setCmaParts] = useState<any[]>(
+    (initialData?.parts || (initialData as any)?.cmaParts || initialData?.subQuestions)
+      ? ((initialData?.parts || (initialData as any)?.cmaParts || initialData?.subQuestions) as any[])
+      : [{ id: 'p1', label: 'a', prompt: 'Sub-part A prompt', fieldType: 'decimal', expectedAnswer: '0', tolerance: 0.05, unit: '', marks: 2 }]
+  );
+  const [scenario, setScenario] = useState<string>((initialData as any)?.scenario || '');
+  const [mpcStages, setMpcStages] = useState<any[]>(
+    ((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions)
+      ? (((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions) as any[])
+      : [{ id: 's1', stageTitle: 'Stage 1 prompt', expectedAnswer: '0', tolerance: 0.05, formula: '', marks: 2 }]
+  );
+  const [reasonOptions, setReasonOptions] = useState<any[]>(
+    ((initialData as any)?.reasonOptions || initialData?.subQuestions || initialData?.options)
+      ? (((initialData as any)?.reasonOptions || initialData?.subQuestions || initialData?.options) as any[])
+      : [
+        { id: 'r1', text: 'Correct conceptual justification option', isCorrect: true },
+        { id: 'r2', text: 'Common misconception or incorrect reasoning', isCorrect: false }
+      ]
+  );
+  const [confidenceTracking, setConfidenceTracking] = useState<boolean>(
+    (initialData as any)?.confidenceTracking !== false
+  );
   const [explanation, setExplanation] = useState((initialData as any)?.explanation || '');
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [isUploading, setIsUploading] = useState(false);
@@ -4292,9 +4587,16 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           isCorrect: opt.isCorrect
         })),
         image: sq.image || undefined
-      })) : type === 'DESCRIPTIVE' ? descriptiveParts : null,
+      })) : type === 'DESCRIPTIVE' ? descriptiveParts : type === 'CMA' ? cmaParts : type === 'MPC' ? mpcStages : type === 'DR' ? reasonOptions : null,
+      parts: type === 'CMA' ? cmaParts : null,
+      cmaParts: type === 'CMA' ? cmaParts : null,
+      scenario: type === 'MPC' ? scenario : null,
+      stages: type === 'MPC' ? mpcStages : null,
+      mpcStages: type === 'MPC' ? mpcStages : null,
+      reasonOptions: type === 'DR' ? reasonOptions : null,
+      confidenceTracking: type === 'DR' ? confidenceTracking : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
-        type === 'INT' ? correctAnswer.toString() : null,
+        type === 'INT' ? correctAnswer.toString() : type === 'DR' ? modelAnswer.trim() : null,
       assertion: type === 'AR' ? assertion.trim() : null,
       reason: type === 'AR' ? reason.trim() : null,
       correctOption: type === 'AR' ? correctOption : null,
@@ -4809,6 +5111,22 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 handleFieldImageUpload={handleFieldImageUpload}
               />
             )}
+            {type === 'CMA' && (
+              <CMAQuestionForm parts={cmaParts} setParts={setCmaParts} />
+            )}
+            {type === 'MPC' && (
+              <MPCQuestionForm scenario={scenario} setScenario={setScenario} stages={mpcStages} setStages={setMpcStages} />
+            )}
+            {type === 'DR' && (
+              <DRQuestionForm
+                expectedAnswer={modelAnswer}
+                setExpectedAnswer={setModelAnswer}
+                reasonOptions={reasonOptions}
+                setReasonOptions={setReasonOptions}
+                confidenceTracking={confidenceTracking}
+                setConfidenceTracking={setConfidenceTracking}
+              />
+            )}
           </motion.div></AnimatePresence>
 
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -5172,7 +5490,54 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   ))}
                 </div>
               )}
-            </div>
+              {type === 'CMA' && (
+                <div className="mt-4 pt-3 border-t border-cyan-200 dark:border-cyan-800 space-y-2">
+                  <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">CMA CONSTRUCTED SUB-PARTS</Badge>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {cmaParts.map((p, pIdx) => (
+                      <div key={pIdx} className="p-2 border rounded bg-background text-xs space-y-1">
+                        <div className="font-bold text-foreground">Part {p.label || (pIdx + 1)}: {p.prompt}</div>
+                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                          Key: {p.expectedAnswer ?? '—'} {p.unit ? `(${p.unit})` : ''} {p.tolerance ? `[±${p.tolerance}]` : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {type === 'MPC' && (
+                <div className="mt-4 pt-3 border-t border-indigo-200 dark:border-indigo-800 space-y-2">
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">MPC STAGES</Badge>
+                  {scenario && <p className="text-xs italic text-muted-foreground">{scenario}</p>}
+                  <div className="space-y-1.5">
+                    {mpcStages.map((st, sIdx) => (
+                      <div key={sIdx} className="p-2 border rounded bg-background flex justify-between items-center text-xs">
+                        <span className="font-bold">Stage {sIdx + 1}: {st.stageTitle}</span>
+                        <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{st.expectedAnswer}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {type === 'DR' && (
+                <div className="mt-4 pt-3 border-t border-purple-200 dark:border-purple-800 space-y-2">
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">DIAGNOSTIC REASONING</Badge>
+                  <div className="p-2 border rounded bg-background text-xs space-y-2">
+                    <div><strong>Part A Key:</strong> <span className="font-mono font-bold text-purple-600">{modelAnswer || '—'}</span></div>
+                    <div>
+                      <strong className="text-muted-foreground">Part B Reasons:</strong>
+                      {reasonOptions.map((opt, rIdx) => (
+                        <div key={rIdx} className={`p-1 rounded mt-1 text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 font-bold text-emerald-900 dark:text-emerald-200' : ''}`}>
+                          {String.fromCharCode(65 + rIdx)}. {opt.text} {opt.isCorrect ? '✓' : ''}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              </div>
           </Card>
         </div>
       </div >
