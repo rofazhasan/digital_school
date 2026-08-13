@@ -228,7 +228,7 @@ export default function PrintSheetPage() {
   }
 
   // Organize questions for QuestionPaper / AnswerQuestionPaper standard view
-  const objectiveQuestions = normalizedQuestionsList.filter((q: any) => ['MCQ', 'MC', 'INT', 'AR', 'SMCQ', 'MTF'].includes(q.type));
+  const objectiveQuestions = normalizedQuestionsList.filter((q: any) => ['MCQ', 'MC', 'INT', 'AR', 'SMCQ', 'MTF', 'CMA', 'MPC', 'DR'].includes(q.type));
 
   const formattedQuestions = {
     mcq: normalizedQuestionsList.filter((q: any) => q.type === 'MCQ' || q.type === 'MC'),
@@ -238,6 +238,9 @@ export default function PrintSheetPage() {
     cq: normalizedQuestionsList.filter((q: any) => q.type === 'CQ'),
     sq: normalizedQuestionsList.filter((q: any) => q.type === 'SQ'),
     mtf: normalizedQuestionsList.filter((q: any) => q.type === 'MTF'),
+    cma: normalizedQuestionsList.filter((q: any) => q.type === 'CMA'),
+    mpc: normalizedQuestionsList.filter((q: any) => q.type === 'MPC'),
+    dr: normalizedQuestionsList.filter((q: any) => q.type === 'DR'),
     descriptive: normalizedQuestionsList.filter((q: any) => q.type === 'DESCRIPTIVE'),
     smcq: normalizedQuestionsList.filter((q: any) => q.type === 'SMCQ'),
     allObjective: objectiveQuestions

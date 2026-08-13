@@ -344,7 +344,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           {question.difficulty}
         </Badge>
         <Badge variant="outline">{question.marks} Marks</Badge>
-        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(question.type || '') && question.negativeMarks && (
+        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
@@ -596,7 +596,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(q.type)), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -611,7 +611,7 @@ export default function ExamBuilderPage() {
 
   const mcqMarks = useMemo(() => selectedMCQQuestions.reduce((total, q) => total + q.marks, 0), [selectedMCQQuestions]);
 
-  // Total marks is sum of required CQ + required SQ + all MCQ
+  // Total marks is sum of required CQ + required SQ + all MCQ/Objective/Multi-step
   const currentMarks = useMemo(() => cqMarks + sqMarks + mcqMarks, [cqMarks, sqMarks, mcqMarks]);
 
   // Validation logic
@@ -642,8 +642,8 @@ export default function ExamBuilderPage() {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return false;
     }
 
-    // For MCQ/Objective questions, check if adding would exceed total marks
-    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(question.type)) {
+    // For MCQ/Objective/Multi-step questions, check if adding would exceed total marks
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -662,7 +662,7 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(question.type)) {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
       return `Add ${question.type} Question`;
     }
@@ -975,7 +975,7 @@ export default function ExamBuilderPage() {
           }
 
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
-          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(q.type);
+          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(q.type);
           const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
 
           if (isObjective && negativePercentage > 0) {
@@ -1290,7 +1290,7 @@ export default function ExamBuilderPage() {
                                       })}
                                     </ul>
                                   )}
-                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(setQ.type || '') && setQ.negativeMarks && (
+                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(setQ.type || '') && setQ.negativeMarks && (
                                     <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                                       -{setQ.negativeMarks} marks
                                     </div>
