@@ -245,6 +245,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
     const descriptives = questions.descriptive || [];
+    const cmas = questions.cma || [];
+    const mpcs = questions.mpc || [];
+    const drs = questions.dr || [];
 
     const allObjective = questions.allObjective && questions.allObjective.length > 0
       ? questions.allObjective
@@ -254,7 +257,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
         ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
         ...(questions.mtf || []).map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() })),
-        ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' }))
+        ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' })),
+        ...(cmas.map(q => ({ ...q, type: 'CMA' }))),
+        ...(mpcs.map(q => ({ ...q, type: 'MPC' }))),
+        ...(drs.map(q => ({ ...q, type: 'DR' })))
       ];
 
     const objectiveTotal = allObjective.reduce((sum, q) => {
@@ -537,13 +543,13 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline dynamic>{cleanupMath(q.questionText || q.text || '')}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="grid grid-cols-2 gap-3 border border-black/30 p-3 rounded ml-4 bg-gray-50/50">
                             {parts.map((part: any, pIdx: number) => (
                               <div key={pIdx} className="flex items-center gap-2 border-b border-dashed border-gray-300 pb-1">
-                                <span className="font-semibold text-xs"><UniversalMathJax inline>{part.label || part.prompt || part.text || `Part ${pIdx+1}`}</UniversalMathJax>:</span>
+                                <span className="font-semibold text-xs"><UniversalMathJax inline dynamic>{cleanupMath(part.label || part.prompt || part.text || `Part ${pIdx+1}`)}</UniversalMathJax>:</span>
                                 <span className="inline-block min-w-[120px] border border-black/40 bg-white h-6 rounded px-2 text-xs"></span>
                                 {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
                               </div>
@@ -558,12 +564,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || (isEn ? 'Multi-Step Problem Chain' : 'বহু-ধাপী সমস্যা শৃঙ্খল')}</UniversalMathJax></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline dynamic>{cleanupMath(q.questionText || q.text || (isEn ? 'Multi-Step Problem Chain' : 'বহু-ধাপী সমস্যা শৃঙ্খল'))}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           {q.scenario && q.scenario !== q.questionText && (
                             <div className="p-2 border-l-2 border-black bg-gray-50 italic text-xs mb-3 ml-4">
-                              <UniversalMathJax inline>{q.scenario}</UniversalMathJax>
+                              <UniversalMathJax inline dynamic>{cleanupMath(q.scenario)}</UniversalMathJax>
                             </div>
                           )}
                           <div className="space-y-3 ml-4">
@@ -571,7 +577,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               <div key={sIdx} className="p-2 border border-black/30 rounded text-xs flex items-center justify-between">
                                 <div>
                                   <span className="font-bold text-indigo-700 mr-2">Stage {sIdx+1}:</span>
-                                  <span><UniversalMathJax inline>{stage.stageTitle || stage.prompt || stage.text || stage.question || ''}</UniversalMathJax></span>
+                                  <span><UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || '')}</UniversalMathJax></span>
                                 </div>
                                 <div className="border border-black/40 bg-white min-w-[140px] h-6 rounded px-2 flex items-center text-[10px] text-gray-400">
                                   {isEn ? 'Answer space...' : 'উত্তর লিখুন...'}
@@ -588,7 +594,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline dynamic>{cleanupMath(q.questionText || q.text || '')}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-4 space-y-2 text-xs">
@@ -602,7 +608,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                 {reasonOpts.map((opt: any, rIdx: number) => (
                                   <div key={rIdx} className="flex items-center gap-2">
                                     <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3">{String.fromCharCode(65 + rIdx)}</span>
-                                    <span><UniversalMathJax inline>{opt.text || opt.question || ''}</UniversalMathJax></span>
+                                    <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || opt.question || '')}</UniversalMathJax></span>
                                   </div>
                                 ))}
                               </div>
