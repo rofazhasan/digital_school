@@ -48,7 +48,7 @@ import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'SRA' | 'DR';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'SRA' | 'SDR' | 'DR';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
@@ -997,7 +997,7 @@ export default function QuestionBankPage() {
       .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
       .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
       .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter)
-      .filter((q: Question) => typeFilter === "all" || q.type === typeFilter)
+      .filter((q: Question) => typeFilter === "all" || (typeFilter === "SDR" || typeFilter === "SRA" || typeFilter === "DR" ? (String(q.type) === "SRA" || String(q.type) === "SDR" || String(q.type) === "DR") : q.type === typeFilter))
       .filter((q: Question) => topicFilter === "" || (q.topic || '').toLowerCase().includes(topicFilter.toLowerCase()))
       .filter((q: Question) => {
         if (!dateRange || !dateRange.from) return true;
@@ -1230,7 +1230,7 @@ export default function QuestionBankPage() {
                               <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                               <SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem>
                               <SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem>
-                              <SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem>
+                              <SelectItem value="SDR">SDR (Structured Diagnostic Reasoning)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
                               <SelectItem value="SMCQ">SMCQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
@@ -5221,7 +5221,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="SRA">SRA (Structured Reasoning Assembly)</SelectItem><SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="SRA">SDR (Structured Diagnostic Reasoning / SRA)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -6140,7 +6140,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
 
               {type === 'DR' && (
                 <div className="mt-4 pt-3 border-t border-purple-200 dark:border-purple-800 space-y-2">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">DIAGNOSTIC REASONING</Badge>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">STRUCTURED DIAGNOSTIC REASONING (SDR)</Badge>
                   <div className="p-2 border rounded bg-background text-xs space-y-2">
                     <div><strong>Part A Key:</strong> <span className="font-mono font-bold text-purple-600">{modelAnswer || '—'}</span></div>
                     <div>
@@ -6462,7 +6462,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                     {/* DR Reasoning preview */}
                     {q.type === 'DR' && (
                       <div className="mt-3 space-y-2 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs">
-                        <p className="font-semibold text-purple-900 dark:text-purple-300">Diagnostic Reasoning (DR):</p>
+                        <p className="font-semibold text-purple-900 dark:text-purple-300">Structured Diagnostic Reasoning (SDR):</p>
                         <div className="space-y-1 bg-background p-2 border rounded">
                           <div><span className="font-bold">Part A Key:</span> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{(q as any).expectedAnswer || q.modelAnswer || '—'}</span></div>
                           <div className="font-bold text-muted-foreground mt-1">Part B Justification Options:</div>
@@ -7045,7 +7045,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                 <p>• <strong>Model Answer vs Explanation:</strong> Model Answer is the official answer key (required for INT, SQ, & DR Part A). Explanation is optional teacher notes/rationale.</p>
                 <p>• <strong>CMA (Constructed Multi-Answer):</strong> Set Type = <code>CMA</code>. Fill Sub 1-10 Text (part labels), Sub 1-10 Marks, & Sub 1-10 Model Answer (key values/expressions).</p>
                 <p>• <strong>MPC (Multi-Step Problem Chain):</strong> Set Type = <code>MPC</code>. Fill Sub 1-10 Text (stage titles), Sub 1-10 Marks, & Sub 1-10 Model Answer. Set Sub X Depends On & Sub X Formula for Error Propagation (EPH).</p>
-                <p>• <strong>DR (Diagnostic Reasoning):</strong> Set Type = <code>DR</code>. Fill Question Text & Model Answer (Part A). Fill Sub 1-4 Text (Part B justification reasons) & mark correct reason via Sub X Correct = TRUE (or Correct Option = A/B).</p>
+                <p>• <strong>SDR (Structured Diagnostic Reasoning / SRA):</strong> Set Type = <code>SRA</code> or <code>SDR</code>. Fill Question Text & Model Answer (Part A). Fill Sub 1-4 Text (Part B justification reasons) & mark correct reason via Sub X Correct = TRUE (or Correct Option = A/B).</p>
               </div>
             </div>
 

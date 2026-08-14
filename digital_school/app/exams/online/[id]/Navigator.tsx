@@ -41,7 +41,7 @@ const NavButton = memo(({
       return true;
     }
     const t = (type || "").toLowerCase();
-    if (['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'dr'].includes(t)) {
+    if (['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'sdr', 'sra', 'dr'].includes(t)) {
       return Object.keys(answers).some(key => key.startsWith(`${questionId}_`));
     }
     return false;

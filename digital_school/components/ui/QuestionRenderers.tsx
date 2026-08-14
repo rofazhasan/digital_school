@@ -711,7 +711,9 @@ export function SRARenderer({
   );
 }
 
-// Backward-compatible alias for any legacy DR references
+// Backward-compatible alias for any legacy DR or SDR references
+export const SDRRenderer = SRARenderer;
+export type SDRRendererProps = SRARendererProps;
 export const DRRenderer = SRARenderer;
 export type DRRendererProps = SRARendererProps;
 

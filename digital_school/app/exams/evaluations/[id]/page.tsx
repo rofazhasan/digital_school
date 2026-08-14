@@ -256,7 +256,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc' | 'dr'>('all');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc' | 'sdr'>('all');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -1759,9 +1759,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return exam?.questions || [];
   }, [currentStudent, exam]);
 
-  const filteredQuestions = activeQuestions?.filter(q =>
-    questionTypeFilter === 'all' || q?.type?.toLowerCase() === questionTypeFilter.toLowerCase()
-  ) || [];
+  const filteredQuestions = activeQuestions?.filter(q => {
+    if (questionTypeFilter === 'all') return true;
+    const qType = (q?.type || '').toLowerCase();
+    if (questionTypeFilter === 'sdr') {
+      return qType === 'sdr' || qType === 'sra' || qType === 'dr';
+    }
+    return qType === questionTypeFilter.toLowerCase();
+  }) || [];
 
 
 
@@ -2861,7 +2866,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
                     <div className="flex flex-wrap gap-2">
-                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'dr'] as const).map((type) => (
+                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'sdr'] as const).map((type) => (
                         <Button
                           key={type}
                           variant={questionTypeFilter === type ? 'default' : 'outline'}
@@ -2872,7 +2877,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           }}
                           className="capitalize px-4 flex-1 sm:flex-none"
                         >
-                          {type === 'all' ? 'All Questions' : type.toUpperCase()}
+                          {type === 'all' ? 'All Questions' : (type === 'sdr' ? 'SDR' : type.toUpperCase())}
                         </Button>
                       ))}
                     </div>
@@ -3226,7 +3231,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         currentQuestion?.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
                                           'bg-yellow-100 text-yellow-800'
                                     }>
-                                      {(currentQuestion?.type || "unknown").toUpperCase()}
+                                      {((currentQuestion?.type || "unknown").toUpperCase() === 'DR' || (currentQuestion?.type || "unknown").toUpperCase() === 'SRA') ? 'SDR' : (currentQuestion?.type || "unknown").toUpperCase()}
                                     </Badge>
                                     <div className="flex flex-col items-end gap-1">
                                       <div className="text-sm text-muted-foreground">
@@ -4316,7 +4321,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <div>
                                   <h4 className="font-semibold mb-2">Grading:</h4>
                                   <div className="flex items-center gap-4">
-                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
+                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'sra', 'sdr', 'dr'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="flex flex-col gap-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-gray-600">Auto-graded:</span>

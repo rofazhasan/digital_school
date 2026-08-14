@@ -531,7 +531,7 @@ export default function ExamBuilderPage() {
       const queryParams: any = {
         page: '1',
         limit: '10000', // Fetch all matching
-        ...(filters.type && { type: filters.type }),
+        ...(filters.type && { type: filters.type === 'SDR' ? 'SRA' : filters.type }),
         ...(filters.difficulty && { difficulty: filters.difficulty }),
         ...(filters.subject && { subject: filters.subject }),
         ...(filters.topic && { topic: filters.topic }),
@@ -645,7 +645,7 @@ export default function ExamBuilderPage() {
     }
 
     // For MCQ/Objective/Multi-step questions, check if adding would exceed total marks
-    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(question.type)) {
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -664,9 +664,9 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(question.type)) {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
-      return `Add ${question.type} Question`;
+      return `Add ${question.type === 'SRA' || question.type === 'DR' ? 'SDR' : question.type} Question`;
     }
 
     return 'Add Question';
@@ -977,7 +977,7 @@ export default function ExamBuilderPage() {
           }
 
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
-          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(q.type);
+          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(q.type);
           const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
 
           if (isObjective && negativePercentage > 0) {
@@ -1095,7 +1095,7 @@ export default function ExamBuilderPage() {
                         <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                         <SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem>
                         <SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem>
-                        <SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem>
+                        <SelectItem value="SDR">SDR (Structured Diagnostic Reasoning)</SelectItem>
                         <SelectItem value="CQ">CQ</SelectItem>
                         <SelectItem value="SQ">SQ</SelectItem>
                         <SelectItem value="SMCQ">SMCQ (Stem MCQ)</SelectItem>
@@ -1414,7 +1414,7 @@ export default function ExamBuilderPage() {
                           )}
                           {(q.type === 'SRA' || q.type === 'DR') && (
                             <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
-                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Structured Reasoning Assembly (SRA):</span>
+                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Structured Diagnostic Reasoning (SDR):</span>
                               {(((q as any).components || (q as any).sraComponents || [])).length > 0 ? (
                                 <div className="space-y-1.5">
                                   {(((q as any).components || (q as any).sraComponents || [])).map((comp: any, cIdx: number) => (

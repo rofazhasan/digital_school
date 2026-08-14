@@ -3233,7 +3233,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           {/* SRA / DR Model Answer Breakdown */}
                                           {(type === 'SRA' || type === 'DR') && (
                                             <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-2 text-slate-800 dark:text-slate-200">
-                                              <span className="font-bold text-amber-700 dark:text-amber-400">SRA Structured Reasoning Solution:</span>
+                                              <span className="font-bold text-amber-700 dark:text-amber-400">Structured Diagnostic Reasoning (SDR) Solution:</span>
                                               {((question as any).components || (question as any).sraComponents || []).length > 0 ? (
                                                 ((question as any).components || (question as any).sraComponents || []).map((c: any, cIdx: number) => (
                                                   <div key={cIdx} className="pl-2 border-l-2 border-amber-500/30 space-y-0.5">

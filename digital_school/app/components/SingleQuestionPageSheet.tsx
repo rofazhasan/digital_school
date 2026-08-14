@@ -49,8 +49,9 @@ const QUESTION_TYPE_LABELS_BN: Record<string, string> = {
   SMCQ: "বহুনির্বাচনী (উদ্দীপকভিত্তিক)",
   CMA: "মাল্টি-পার্ট গাণিতিক (CMA)",
   MPC: "বহু-ধাপ সমস্যা চেইন (MPC)",
-  SRA: "কাঠামোগত যুক্তি সমাবেশ (SRA)",
-  DR: "ডায়াগনস্টিক যুক্তি (DR)",
+  SRA: "কাঠামোগত যুক্তি সমাবেশ (SDR)",
+  SDR: "কাঠামোগত ডায়াগনস্টিক যুক্তি (SDR)",
+  DR: "কাঠামোগত ডায়াগনস্টিক যুক্তি (SDR)",
   DESCRIPTIVE: "বর্ণনামূলক"
 };
 
@@ -65,8 +66,9 @@ const QUESTION_TYPE_LABELS_EN: Record<string, string> = {
   SMCQ: "Stem MCQ",
   CMA: "Constructed Multi-Answer",
   MPC: "Multi-Step Problem Chain",
-  SRA: "Structured Reasoning Assembly",
-  DR: "Diagnostic Reasoning",
+  SRA: "Structured Diagnostic Reasoning (SDR)",
+  SDR: "Structured Diagnostic Reasoning (SDR)",
+  DR: "Structured Diagnostic Reasoning (SDR)",
   DESCRIPTIVE: "Descriptive"
 };
 
@@ -744,7 +746,7 @@ export default function SingleQuestionPageSheet({
                         {qTypeKey === 'DR' && (
                           <div className="space-y-2 mt-3 p-3 bg-purple-50/50 border border-purple-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
                             <span className="font-bold text-purple-900 block mb-1">
-                              {isBn ? 'ডায়াগনস্টিক রিজনিং (DR):' : 'Diagnostic Reasoning (DR):'}
+                              {isBn ? 'কাঠামোগত ডায়াগনস্টিক রিজনিং (SDR):' : 'Structured Diagnostic Reasoning (SDR):'}
                             </span>
                             <div className="p-2 bg-white border border-purple-200 rounded space-y-2 text-xs">
                               <div className="flex items-center gap-2">

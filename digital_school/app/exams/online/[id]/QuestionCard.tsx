@@ -124,7 +124,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
   let type = (question.type || question.questionType || "").toLowerCase();
   if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
   if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
-  if (type === 'diagnostic_reasoning' || type === 'diagnostic-reasoning') type = 'dr';
+  if (type === 'diagnostic_reasoning' || type === 'diagnostic-reasoning' || type === 'sra' || type === 'dr') type = 'sdr';
   const text = question.text || question.questionText || question.scenario || "(No text)";
   const userAnswer = answer;
   const showResult = submitted && result;
@@ -143,7 +143,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border uppercase">
-                {type}
+                {type === 'sdr' || type === 'sra' || type === 'dr' ? 'SDR' : type.toUpperCase()}
               </Badge>
               <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
                 {question.marks} Point{Number(question.marks) !== 1 && 's'}
@@ -397,7 +397,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
               />
             )}
 
-            {(type === "sra" || type === "dr") && (
+            {(type === "sdr" || type === "sra" || type === "dr") && (
               <SRARenderer
                 question={question}
                 value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
