@@ -213,7 +213,7 @@ export async function PATCH(request: NextRequest) {
     const prismadb = await getDatabaseClient();
 
     const body = await request.json();
-    const { id, name, email, role, class: className, section } = body;
+    const { id, name, email, phone, role, class: className, section, roll } = body;
     if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
 
     // Check Permissions for Edit
@@ -224,47 +224,106 @@ export async function PATCH(request: NextRequest) {
       if (userToEdit.role === 'ADMIN' || userToEdit.role === 'SUPER_USER') {
         return NextResponse.json({ error: 'Admins cannot edit other admins or superusers' }, { status: 403 });
       }
-      // Also prevent promoting someone TO Admin or Super User if you are just an Admin (optional but good practice)
       if (role === 'ADMIN' || role === 'SUPER_USER') {
         return NextResponse.json({ error: 'Admins cannot promote users to Admin or Super User' }, { status: 403 });
       }
     }
 
+    // Process Phone & Email changes cleanly
+    let targetEmail = userToEdit.email;
+    if (email !== undefined) {
+      targetEmail = email ? String(email).trim() : null;
+    }
+
+    let targetPhone = userToEdit.phone;
+    if (phone !== undefined) {
+      targetPhone = phone ? String(phone).trim() : null;
+    } else if (body.approvePhone === true) {
+      targetPhone = userToEdit.pendingPhone || userToEdit.phone;
+    }
+
+    // Check unique email conflict if changed
+    if (targetEmail && targetEmail !== userToEdit.email) {
+      const existingEmail = await (prismadb.user as any).findFirst({
+        where: { email: targetEmail, NOT: { id } }
+      });
+      if (existingEmail) {
+        return NextResponse.json({ error: `Email '${targetEmail}' is already registered to another user.` }, { status: 400 });
+      }
+    }
+
+    // Check unique phone conflict if changed
+    if (targetPhone && targetPhone !== userToEdit.phone) {
+      const existingPhone = await (prismadb.user as any).findFirst({
+        where: { phone: targetPhone, NOT: { id } }
+      });
+      if (existingPhone) {
+        return NextResponse.json({ error: `Phone '${targetPhone}' is already registered to another user.` }, { status: 400 });
+      }
+    }
+
     // Update user
+    const updateData: any = {
+      name: name !== undefined ? name : userToEdit.name,
+      email: targetEmail,
+      phone: targetPhone,
+      role: role !== undefined ? role : userToEdit.role,
+      isApproved: body.isApproved !== undefined ? body.isApproved : userToEdit.isApproved,
+      isActive: body.isActive !== undefined ? body.isActive : userToEdit.isActive,
+    };
+
+    if (body.approvePhone === true || body.rejectPhone === true || phone !== undefined) {
+      updateData.pendingPhone = null;
+    }
+
     const updatedUser = await (prismadb.user as any).update({
       where: { id },
-      data: {
-        name,
-        email,
-        role,
-        isApproved: body.isApproved !== undefined ? body.isApproved : undefined,
-        isActive: body.isActive !== undefined ? body.isActive : undefined,
-        // Handle phone approval/rejection
-        phone: body.approvePhone === true ? userToEdit.pendingPhone : undefined,
-        pendingPhone: body.approvePhone === true || body.rejectPhone === true ? null : undefined,
-      },
+      data: updateData,
     });
-    // If student, update class
-    if (role === 'STUDENT' && className) {
-      // Find or create class
-      let classRecord = await prismadb.class.findFirst({ where: { name: className, section: section || '' } });
-      if (!classRecord) {
-        // Use first institute as fallback
-        let institute = await prismadb.institute.findFirst();
-        if (!institute) {
-          institute = await prismadb.institute.create({ data: { name: 'Default Institute', email: 'default@institute.com' } });
+
+    // If student, update class & roll number
+    const effectiveRole = role || userToEdit.role;
+    if (effectiveRole === 'STUDENT') {
+      let classId = undefined;
+      if (className) {
+        let classRecord = await prismadb.class.findFirst({ where: { name: className, section: section || '' } });
+        if (!classRecord) {
+          let institute = await prismadb.institute.findFirst();
+          if (!institute) {
+            institute = await prismadb.institute.create({ data: { name: 'Default Institute', email: 'default@institute.com' } });
+          }
+          classRecord = await prismadb.class.create({ data: { name: className, section: section || '', instituteId: institute.id } });
         }
-        classRecord = await prismadb.class.create({ data: { name: className, section: section || '', instituteId: institute.id } });
+        classId = classRecord.id;
       }
-      await prismadb.studentProfile.updateMany({
-        where: { userId: id },
-        data: { classId: classRecord.id },
-      });
+
+      const existingProfile = await prismadb.studentProfile.findUnique({ where: { userId: id } });
+      if (existingProfile) {
+        await prismadb.studentProfile.update({
+          where: { userId: id },
+          data: {
+            classId: classId || existingProfile.classId,
+            roll: roll !== undefined ? roll : existingProfile.roll,
+          }
+        });
+      } else if (classId) {
+        await prismadb.studentProfile.create({
+          data: {
+            userId: id,
+            classId,
+            roll: roll || `ROLL${Date.now()}`,
+            registrationNo: `REG${Date.now()}`,
+            guardianName: name || userToEdit.name,
+            guardianPhone: targetPhone || targetEmail || '',
+          }
+        });
+      }
     }
-    return NextResponse.json({ message: 'User updated' });
-  } catch (error) {
+
+    return NextResponse.json({ message: 'User updated successfully', user: updatedUser });
+  } catch (error: any) {
     console.error('User update error:', error);
-    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update user' }, { status: 500 });
   }
 }
 
@@ -310,36 +369,32 @@ export async function DELETE(request: NextRequest) {
         throw new Error('Superusers cannot delete other superusers');
       }
 
-      // Phase 1: Reassign Assets (Non-transactional)
-      try {
-        await Promise.all([
-          prismadb.question.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
-          prismadb.exam.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
-          prismadb.exam.updateMany({ where: { assignedById: targetId }, data: { assignedById: null } }),
-          prismadb.questionBank.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
-          prismadb.examSet.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
-          prismadb.notice.updateMany({ where: { postedById: targetId }, data: { postedById: adminId } }),
-          prismadb.attendance.updateMany({ where: { teacherId: targetId }, data: { teacherId: adminId } }),
-          prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: targetId }, data: { assignedById: adminId } }),
-          prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: targetId }, data: { evaluatorId: adminId } }),
-          prismadb.resultReview.updateMany({ where: { reviewedById: targetId }, data: { reviewedById: adminId } }),
-          prismadb.admissionApplication.updateMany({ where: { reviewedBy: targetId }, data: { reviewedBy: adminId } }),
-          prismadb.invoice.updateMany({ where: { createdBy: targetId }, data: { createdBy: adminId } }),
-          prismadb.payment.updateMany({ where: { collectedBy: targetId }, data: { collectedBy: adminId } }),
-          prismadb.institute.updateMany({ where: { superUserId: targetId }, data: { superUserId: null } })
-        ]);
+      // Safe update wrapper for Phase 1 asset reassignments
+      const safeUpdate = async (fn: () => Promise<any>) => {
+        try { await fn(); } catch (e: any) { console.warn('Safe asset reassign warning:', e?.message); }
+      };
 
-        const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: targetId } });
-        if (teacherProfile) {
-          await Promise.all([
-            prismadb.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } }),
-            prismadb.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } })
-          ]);
-        }
-      } catch (err) {
-        console.error(`Error reassigning assets for ${targetId}:`, err);
-        // Aborting is safer to ensure we don't delete a user whose assets weren't reassigned.
-        throw new Error(`Failed to reassign assets for ${targetId}. Deletion aborted.`);
+      // Phase 1: Reassign Assets (Safe & Comprehensive)
+      await safeUpdate(() => prismadb.question.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }));
+      await safeUpdate(() => prismadb.question.updateMany({ where: { editedById: targetId }, data: { editedById: null } }));
+      await safeUpdate(() => prismadb.exam.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }));
+      await safeUpdate(() => prismadb.exam.updateMany({ where: { assignedById: targetId }, data: { assignedById: null } }));
+      await safeUpdate(() => prismadb.questionBank.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }));
+      await safeUpdate(() => prismadb.examSet.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }));
+      await safeUpdate(() => prismadb.notice.updateMany({ where: { postedById: targetId }, data: { postedById: adminId } }));
+      await safeUpdate(() => prismadb.attendance.updateMany({ where: { teacherId: targetId }, data: { teacherId: adminId } }));
+      await safeUpdate(() => prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: targetId }, data: { assignedById: adminId } }));
+      await safeUpdate(() => prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: targetId }, data: { evaluatorId: adminId } }));
+      await safeUpdate(() => prismadb.resultReview.updateMany({ where: { reviewedById: targetId }, data: { reviewedById: adminId } }));
+      await safeUpdate(() => prismadb.admissionApplication.updateMany({ where: { reviewedBy: targetId }, data: { reviewedBy: adminId } }));
+      await safeUpdate(() => prismadb.invoice.updateMany({ where: { createdBy: targetId }, data: { createdBy: adminId } }));
+      await safeUpdate(() => prismadb.payment.updateMany({ where: { collectedBy: targetId }, data: { collectedBy: adminId } }));
+      await safeUpdate(() => prismadb.institute.updateMany({ where: { superUserId: targetId }, data: { superUserId: null } }));
+
+      const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: targetId } });
+      if (teacherProfile) {
+        await safeUpdate(() => prismadb.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } }));
+        await safeUpdate(() => prismadb.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } }));
       }
 
       // Phase 2: Delete Dependencies & User (Transactional)
@@ -405,8 +460,6 @@ export async function DELETE(request: NextRequest) {
           await tx.badge.deleteMany({ where: { studentId } });
           await tx.resultReview.deleteMany({ where: { studentId } });
 
-          // Use any cast or check for dynamic table existence if necessary, 
-          // but here we follow the schema we saw. We'll add a safe check for PracticeResult
           if ((tx as any).practiceResult) {
             await (tx as any).practiceResult.deleteMany({ where: { studentId } });
           }

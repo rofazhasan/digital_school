@@ -14,6 +14,7 @@ import * as XLSX from 'xlsx';
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 type User = {
     id: string;
@@ -79,9 +80,12 @@ export default function AdminUsersPage() {
     // Password Visibility State
     const [showPassword, setShowPassword] = useState(false);
 
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
     // Permissions
     const canDelete = (targetUser: User) => {
-        if (activeUserRole === 'SUPER_USER') return targetUser.id !== users.find(u => u.role === 'SUPER_USER')?.id;
+        if (currentUserId && targetUser.id === currentUserId) return false;
+        if (activeUserRole === 'SUPER_USER') return true;
         if (activeUserRole === 'ADMIN') return targetUser.role !== 'ADMIN' && targetUser.role !== 'SUPER_USER';
         return false;
     };
@@ -133,7 +137,10 @@ export default function AdminUsersPage() {
         fetch("/api/user")
             .then(res => res.ok ? res.json() : { error: 'Failed to fetch user' })
             .then(data => {
-                if (data.user) setActiveUserRole(data.user.role);
+                if (data.user) {
+                    setActiveUserRole(data.user.role);
+                    setCurrentUserId(data.user.id);
+                }
             })
             .catch(err => console.error("Error fetching current user:", err));
 
@@ -300,10 +307,12 @@ export default function AdminUsersPage() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to update user');
+            toast.success("User updated successfully!");
             await refreshUsers();
             setEditUser(null);
         } catch (err: any) {
             setError(err.message || 'Failed to update user');
+            toast.error(err.message || 'Failed to update user');
         } finally {
             setLoading(false);
         }
@@ -317,10 +326,13 @@ export default function AdminUsersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, isApproved: true, isActive: true })
             });
-            if (!res.ok) throw new Error('Failed to approve user');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to approve user');
+            toast.success("User approved!");
             await refreshUsers();
         } catch (err: any) {
             setError(err.message);
+            toast.error(err.message || 'Failed to approve user');
         } finally {
             setLoading(false);
         }
@@ -334,10 +346,13 @@ export default function AdminUsersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, approvePhone: true })
             });
-            if (!res.ok) throw new Error('Failed to approve phone change');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to approve phone change');
+            toast.success("Phone number change approved!");
             await refreshUsers();
         } catch (err: any) {
             setError(err.message);
+            toast.error(err.message || 'Failed to approve phone change');
         } finally {
             setLoading(false);
         }
@@ -351,26 +366,31 @@ export default function AdminUsersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, rejectPhone: true })
             });
-            if (!res.ok) throw new Error('Failed to reject phone change');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to reject phone change');
+            toast.success("Phone number change rejected.");
             await refreshUsers();
         } catch (err: any) {
             setError(err.message);
+            toast.error(err.message || 'Failed to reject phone change');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteUser = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this user?")) return;
+        if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
         setLoading(true);
         setError(null);
         try {
             const res = await fetch(`/api/user?id=${id}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to delete user');
+            toast.success("User deleted successfully!");
             await refreshUsers();
         } catch (err: any) {
             setError(err.message || 'Failed to delete user');
+            toast.error(err.message || 'Failed to delete user');
         } finally {
             setLoading(false);
         }
