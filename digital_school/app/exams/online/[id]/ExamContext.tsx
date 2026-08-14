@@ -196,7 +196,10 @@ export function ExamContextProvider({
     const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], dr: [], other: [] };
 
     exam.questions.forEach((q: any) => {
-      const type = (q.type || q.questionType || '').toLowerCase();
+      let type = (q.type || q.questionType || '').toLowerCase();
+      if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
+      if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
+      if (type === 'diagnostic_reasoning' || type === 'diagnostic-reasoning') type = 'dr';
       if (grouped[type]) grouped[type].push(q);
       else grouped.other.push(q);
     });

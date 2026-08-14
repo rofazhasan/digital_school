@@ -41,12 +41,16 @@ export function CMARenderer({
   showFeedback = false,
   evalResult
 }: CMARendererProps) {
-  const parts = question.parts || [];
+  let rawParts = question?.parts || (question as any)?.cmaParts || (question as any)?.subQuestions || (question as any)?.sub_questions || [];
+  if (typeof rawParts === 'string') {
+    try { rawParts = JSON.parse(rawParts); } catch { rawParts = []; }
+  }
+  const parts: any[] = Array.isArray(rawParts) ? rawParts : [];
 
   const handlePartChange = (partId: string, val: string) => {
     if (disabled || !onChange) return;
     onChange({
-      ...value,
+      ...(value || {}),
       [partId]: val
     });
   };
@@ -54,16 +58,20 @@ export function CMARenderer({
   return (
     <div className="space-y-4">
       {parts.length === 0 ? (
-        <p className="text-sm text-gray-500 italic">No answer fields configured for this question.</p>
+        <p className="text-sm text-amber-600 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
+          No input parts configured for this CMA question.
+        </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {parts.map((part) => {
-            const partVal = value[part.id] ?? '';
-            const res = evalResult?.partResults?.[part.id];
+          {parts.map((part, idx) => {
+            const partId = part.id || part.key || part.name || `part_${idx}`;
+            const partVal = value?.[partId] ?? value?.[part.label] ?? '';
+            const res = evalResult?.partResults?.[partId] || evalResult?.partResults?.[part.label];
+            const partLabel = part.label || part.prompt || part.text || part.question || `Part ${idx + 1}`;
             
             return (
               <div
-                key={part.id}
+                key={partId}
                 className={`p-3 rounded-xl border transition-all ${
                   showFeedback && res
                     ? res.isCorrect
@@ -74,7 +82,7 @@ export function CMARenderer({
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    <UniversalMathJax inline dynamic>{cleanupMath(part.label || (part as any).prompt || (part as any).text || '')}</UniversalMathJax>
+                    <UniversalMathJax inline dynamic>{cleanupMath(partLabel)}</UniversalMathJax>
                   </Label>
                   <div className="flex items-center gap-1.5">
                     {part.unit && (
@@ -89,11 +97,11 @@ export function CMARenderer({
                 </div>
 
                 <Input
-                  type={part.type === 'integer' || part.type === 'decimal' ? 'number' : 'text'}
+                  type={part.type === 'integer' || part.type === 'decimal' || part.type === 'number' ? 'number' : 'text'}
                   step={part.type === 'decimal' ? 'any' : '1'}
                   placeholder={part.type === 'expression' ? 'e.g. (2x+1)/(x^2+3)' : 'Enter value...'}
                   value={partVal}
-                  onChange={(e) => handlePartChange(part.id, e.target.value)}
+                  onChange={(e) => handlePartChange(partId, e.target.value)}
                   disabled={disabled}
                   className="bg-white dark:bg-slate-950 text-sm rounded-lg"
                 />
@@ -101,7 +109,7 @@ export function CMARenderer({
                 {showFeedback && res && (
                   <div className="mt-2 text-xs flex items-center justify-between">
                     <span className={res.isCorrect ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
-                      {res.isCorrect ? '✓ Correct' : `✗ Incorrect (Expected: ${part.expectedAnswer})`}
+                      {res.isCorrect ? '✓ Correct' : `✗ Incorrect (Expected: ${part.expectedAnswer || part.modelAnswer})`}
                     </span>
                     <span className="text-slate-400 font-mono">
                       {res.earned} / {res.max}m
@@ -148,92 +156,105 @@ export function MPCRenderer({
   showFeedback = false,
   evalResult
 }: MPCRendererProps) {
-  const stages = question.stages || [];
+  let rawStages = question?.stages || (question as any)?.mpcStages || (question as any)?.subQuestions || (question as any)?.sub_questions || [];
+  if (typeof rawStages === 'string') {
+    try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
+  }
+  const stages: any[] = Array.isArray(rawStages) ? rawStages : [];
+  const scenario = question.scenario || (question as any).text || (question as any).questionText || '';
 
   const handleStageChange = (stageId: string, val: string) => {
     if (disabled || !onChange) return;
     onChange({
-      ...value,
+      ...(value || {}),
       [stageId]: val
     });
   };
 
   return (
     <div className="space-y-4">
-      {question.scenario && (
+      {scenario && question.scenario && (
         <Card className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800 text-sm text-indigo-950 dark:text-indigo-200">
           <p className="font-semibold text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
             Problem Scenario
           </p>
-          <div><UniversalMathJax inline dynamic>{cleanupMath(question.scenario)}</UniversalMathJax></div>
+          <div><UniversalMathJax inline dynamic>{cleanupMath(scenario)}</UniversalMathJax></div>
         </Card>
       )}
 
-      <div className="space-y-3">
-        {stages.map((stage, idx) => {
-          const stageVal = value[stage.id] ?? '';
-          const res = evalResult?.stageResults?.[stage.id];
+      {stages.length === 0 ? (
+        <p className="text-sm text-amber-600 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
+          No stages configured for this MPC problem.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {stages.map((stage, idx) => {
+            const stageId = stage.id || stage.key || stage.name || `stage_${idx}`;
+            const stageVal = value?.[stageId] ?? value?.[stage.stageTitle] ?? '';
+            const res = evalResult?.stageResults?.[stageId] || evalResult?.stageResults?.[stage.stageTitle];
+            const stageTitle = stage.stageTitle || stage.prompt || stage.text || stage.question || `Stage ${idx + 1}`;
 
-          return (
-            <div
-              key={stage.id}
-              className={`p-4 rounded-xl border relative transition-all ${
-                showFeedback && res
-                  ? res.isCorrectDirectly
-                    ? 'border-emerald-500/50 bg-emerald-500/5'
-                    : res.isCorrectWithPropagatedError
-                    ? 'border-amber-500/50 bg-amber-500/5'
-                    : 'border-rose-500/50 bg-rose-500/5'
-                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs font-bold flex items-center justify-center">
-                    {idx + 1}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || (stage as any).prompt || (stage as any).text || (stage as any).question || '')}</UniversalMathJax>
-                  </span>
+            return (
+              <div
+                key={stageId}
+                className={`p-4 rounded-xl border relative transition-all ${
+                  showFeedback && res
+                    ? res.isCorrectDirectly
+                      ? 'border-emerald-500/50 bg-emerald-500/5'
+                      : res.isCorrectWithPropagatedError
+                      ? 'border-amber-500/50 bg-amber-500/5'
+                      : 'border-rose-500/50 bg-rose-500/5'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs font-bold flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      <UniversalMathJax inline dynamic>{cleanupMath(stageTitle)}</UniversalMathJax>
+                    </span>
+                  </div>
+                  {stage.marks && (
+                    <Badge variant="outline" className="text-xs">
+                      {stage.marks} Marks
+                    </Badge>
+                  )}
                 </div>
-                {stage.marks && (
-                  <Badge variant="outline" className="text-xs">
-                    {stage.marks} Marks
-                  </Badge>
+
+                <Input
+                  type="text"
+                  placeholder="Enter stage answer..."
+                  value={stageVal}
+                  onChange={(e) => handleStageChange(stageId, e.target.value)}
+                  disabled={disabled}
+                  className="bg-slate-50 dark:bg-slate-950 text-sm rounded-lg"
+                />
+
+                {showFeedback && res && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                    {res.isCorrectDirectly ? (
+                      <span className="text-emerald-600 font-semibold">✓ Exact Correct</span>
+                    ) : res.isCorrectWithPropagatedError ? (
+                      <span className="text-amber-600 font-semibold">
+                        ⚠ Correct methodology (error propagated from previous stage)
+                      </span>
+                    ) : (
+                      <span className="text-rose-600 font-semibold">
+                        ✗ Incorrect (Expected: {stage.expectedAnswer || stage.modelAnswer})
+                      </span>
+                    )}
+                    <span className="text-slate-400 font-mono">
+                      {res.earned} / {res.max}m
+                    </span>
+                  </div>
                 )}
               </div>
-
-              <Input
-                type="text"
-                placeholder="Enter stage answer..."
-                value={stageVal}
-                onChange={(e) => handleStageChange(stage.id, e.target.value)}
-                disabled={disabled}
-                className="bg-slate-50 dark:bg-slate-950 text-sm rounded-lg"
-              />
-
-              {showFeedback && res && (
-                <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                  {res.isCorrectDirectly ? (
-                    <span className="text-emerald-600 font-semibold">✓ Exact Correct</span>
-                  ) : res.isCorrectWithPropagatedError ? (
-                    <span className="text-amber-600 font-semibold">
-                      ⚠ Correct methodology (error propagated from previous stage)
-                    </span>
-                  ) : (
-                    <span className="text-rose-600 font-semibold">
-                      ✗ Incorrect (Expected: {stage.expectedAnswer})
-                    </span>
-                  )}
-                  <span className="text-slate-400 font-mono">
-                    {res.earned} / {res.max}m
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -272,22 +293,28 @@ export function DRRenderer({
   showFeedback = false,
   evalResult
 }: DRRendererProps) {
-  const reasonOpts = question.reasonOptions || [];
+  let rawReasons = question?.reasonOptions || (question as any)?.reasons || (question as any)?.options || (question as any)?.reason_options || (question as any)?.subQuestions || [];
+  if (typeof rawReasons === 'string') {
+    try { rawReasons = JSON.parse(rawReasons); } catch { rawReasons = []; }
+  }
+  const reasonOpts: any[] = Array.isArray(rawReasons) ? rawReasons : [];
 
   const handleAnswerChange = (ans: string) => {
     if (disabled || !onChange) return;
-    onChange({ ...value, answer: ans });
+    onChange({ ...(value || {}), answer: ans });
   };
 
   const handleReasonSelect = (reasonId: string) => {
     if (disabled || !onChange) return;
-    onChange({ ...value, reasonId });
+    onChange({ ...(value || {}), reasonId });
   };
 
   const handleConfidenceSelect = (conf: 'Certain' | 'Probably' | 'Unsure') => {
     if (disabled || !onChange) return;
-    onChange({ ...value, confidence: conf });
+    onChange({ ...(value || {}), confidence: conf });
   };
+
+  const partAOptions: any[] = (question as any).partAOptions || (question as any).mainOptions || [];
 
   return (
     <div className="space-y-5">
@@ -296,14 +323,40 @@ export function DRRenderer({
         <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Part A — Answer Construction
         </Label>
-        <Input
-          type={question.answerType === 'decimal' || question.answerType === 'integer' ? 'number' : 'text'}
-          placeholder="Enter your final answer..."
-          value={value.answer ?? ''}
-          onChange={(e) => handleAnswerChange(e.target.value)}
-          disabled={disabled}
-          className="bg-white dark:bg-slate-950 text-sm"
-        />
+
+        {partAOptions.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {partAOptions.map((opt, idx) => {
+              const optVal = typeof opt === 'object' ? (opt.text || opt.label || opt.value) : String(opt);
+              const optId = typeof opt === 'object' ? (opt.id || optVal) : optVal;
+              const isSelected = String(value?.answer || '').trim() === String(optId).trim() || String(value?.answer || '').trim() === String(optVal).trim();
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleAnswerChange(optId)}
+                  disabled={disabled}
+                  className={`p-2.5 rounded-lg border text-sm text-left transition-all ${
+                    isSelected
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-950 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <UniversalMathJax inline dynamic>{cleanupMath(optVal)}</UniversalMathJax>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <Input
+            type={question.answerType === 'decimal' || question.answerType === 'integer' || (question as any).type === 'number' ? 'number' : 'text'}
+            placeholder="Enter your final answer..."
+            value={value?.answer ?? ''}
+            onChange={(e) => handleAnswerChange(e.target.value)}
+            disabled={disabled}
+            className="bg-white dark:bg-slate-950 text-sm"
+          />
+        )}
       </div>
 
       {/* Part B: Conceptual Reasoning */}
@@ -313,35 +366,41 @@ export function DRRenderer({
         </Label>
         <p className="text-xs text-slate-500">Select the principle/reasoning that supports your answer above:</p>
 
-        <div className="space-y-2">
-          {reasonOpts.map((opt) => {
-            const isSelected = value.reasonId === opt.id || value.reasonId === opt.text;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleReasonSelect(opt.id)}
-                disabled={disabled}
-                className={`w-full text-left p-3 rounded-lg border text-sm transition-all flex items-start gap-2.5 ${
-                  isSelected
-                    ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center flex-shrink-0 ${
+        {reasonOpts.length === 0 ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400 italic">No reasoning options configured for this question.</p>
+        ) : (
+          <div className="space-y-2">
+            {reasonOpts.map((opt, idx) => {
+              const optId = opt.id || opt.key || opt.text || `reason_${idx}`;
+              const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || opt.question || `Reason ${idx + 1}`);
+              const isSelected = value?.reasonId === optId || value?.reasonId === optText;
+              return (
+                <button
+                  key={optId}
+                  type="button"
+                  onClick={() => handleReasonSelect(optId)}
+                  disabled={disabled}
+                  className={`w-full text-left p-3 rounded-lg border text-sm transition-all flex items-start gap-2.5 ${
                     isSelected
-                      ? 'border-indigo-600 bg-indigo-600 text-white'
-                      : 'border-slate-300 dark:border-slate-700'
+                      ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                </div>
-                <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || '')}</UniversalMathJax></span>
-              </button>
-            );
-          })}
-        </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-600 text-white'
+                        : 'border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <span><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Part C: Confidence Level Tracking */}
@@ -357,7 +416,7 @@ export function DRRenderer({
               onClick={() => handleConfidenceSelect(conf)}
               disabled={disabled}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                value.confidence === conf
+                value?.confidence === conf
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
               }`}

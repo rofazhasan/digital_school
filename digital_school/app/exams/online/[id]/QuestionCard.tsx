@@ -121,7 +121,10 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
-  const type = (question.type || question.questionType || "").toLowerCase();
+  let type = (question.type || question.questionType || "").toLowerCase();
+  if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
+  if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
+  if (type === 'diagnostic_reasoning' || type === 'diagnostic-reasoning') type = 'dr';
   const text = question.text || question.questionText || question.scenario || "(No text)";
   const userAnswer = answer;
   const showResult = submitted && result;
