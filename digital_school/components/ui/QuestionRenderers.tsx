@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { UniversalMathJax } from '@/app/components/UniversalMathJax';
 import { cleanupMath } from '@/lib/utils';
+import { Sparkles, HelpCircle, Info } from 'lucide-react';
 
 // ==========================================
 // 1. CMA (Constructed Multi-Answer) Renderer
@@ -57,6 +56,19 @@ export function CMARenderer({
 
   return (
     <div className="space-y-4">
+      {/* Student Expression Syntax Helper */}
+      {!disabled && !showFeedback && (
+        <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60 text-xs text-indigo-950 dark:text-indigo-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+            <Sparkles className="w-3.5 h-3.5" /> How to enter your answers:
+          </div>
+          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+            Fill in each answer field below. For mathematical expressions, powers, or fractions:
+            use <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold text-indigo-700 dark:text-indigo-300">^</code> for powers (e.g. <code className="font-mono">x^2</code> or <code className="font-mono">10^5</code>), <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold text-indigo-700 dark:text-indigo-300">/</code> for fractions (e.g. <code className="font-mono">(2x+1)/(x-3)</code>), and <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold text-indigo-700 dark:text-indigo-300">*</code> for multiplication.
+          </p>
+        </div>
+      )}
+
       {parts.length === 0 ? (
         <p className="text-sm text-amber-600 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
           No input parts configured for this CMA question.
@@ -72,7 +84,7 @@ export function CMARenderer({
             return (
               <div
                 key={partId}
-                className={`p-3 rounded-xl border transition-all ${
+                className={`p-3.5 rounded-xl border transition-all ${
                   showFeedback && res
                     ? res.isCorrect
                       ? 'border-emerald-500/50 bg-emerald-500/5'
@@ -180,6 +192,18 @@ export function MPCRenderer({
           </p>
           <div><UniversalMathJax inline dynamic>{cleanupMath(scenario)}</UniversalMathJax></div>
         </Card>
+      )}
+
+      {/* Student Expression Syntax Helper */}
+      {!disabled && !showFeedback && (
+        <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-900/60 text-xs text-indigo-950 dark:text-indigo-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+            <Sparkles className="w-3.5 h-3.5" /> Multi-Step Problem Guide:
+          </div>
+          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+            Answer each step in order. If you make a calculation error in Stage 1, continue calculating Stage 2 based on your Stage 1 result — you will still receive method credit! Use <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold">^</code> for powers (e.g. <code className="font-mono">10^3</code>).
+          </p>
+        </div>
       )}
 
       {stages.length === 0 ? (
@@ -293,9 +317,12 @@ export function DRRenderer({
   showFeedback = false,
   evalResult
 }: DRRendererProps) {
-  let rawReasons = question?.reasonOptions || (question as any)?.reasons || (question as any)?.options || (question as any)?.reason_options || (question as any)?.subQuestions || [];
+  let rawReasons = question?.reasonOptions || (question as any)?.reasons || (question as any)?.options || (question as any)?.reason_options || (question as any)?.subQuestions || (question as any)?.sub_questions || [];
   if (typeof rawReasons === 'string') {
     try { rawReasons = JSON.parse(rawReasons); } catch { rawReasons = []; }
+  }
+  if (rawReasons && typeof rawReasons === 'object' && !Array.isArray(rawReasons)) {
+    rawReasons = (rawReasons as any).options || (rawReasons as any).reasons || (rawReasons as any).reasonOptions || [];
   }
   const reasonOpts: any[] = Array.isArray(rawReasons) ? rawReasons : [];
 
@@ -318,6 +345,20 @@ export function DRRenderer({
 
   return (
     <div className="space-y-5">
+      {/* Student Answering Instruction Banner */}
+      {!disabled && !showFeedback && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1.5">
+          <div className="font-bold text-sm flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+            <Sparkles className="w-4 h-4" /> How to Answer Diagnostic Reasoning (DR) Questions:
+          </div>
+          <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300 leading-relaxed">
+            <li><strong>Part A (Answer Construction):</strong> Enter your calculated numerical value, mathematical expression, or option choice. Use <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold">^</code> for powers (e.g., <code className="font-mono">x^2</code>) and <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold">/</code> for fractions.</li>
+            <li><strong>Part B (Principle & Justification):</strong> Select the scientific or mathematical principle that justifies your Part A answer.</li>
+            <li><strong>Part C (Confidence Level):</strong> Select your confidence level (Certain, Probably, or Unsure).</li>
+          </ol>
+        </div>
+      )}
+
       {/* Part A: Main Answer */}
       <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
         <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -350,7 +391,7 @@ export function DRRenderer({
         ) : (
           <Input
             type={question.answerType === 'decimal' || question.answerType === 'integer' || (question as any).type === 'number' ? 'number' : 'text'}
-            placeholder="Enter your final answer..."
+            placeholder="Enter your final answer (e.g. 15, x^2+3, 4.5)..."
             value={value?.answer ?? ''}
             onChange={(e) => handleAnswerChange(e.target.value)}
             disabled={disabled}
@@ -367,13 +408,15 @@ export function DRRenderer({
         <p className="text-xs text-slate-500">Select the principle/reasoning that supports your answer above:</p>
 
         {reasonOpts.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400 italic">No reasoning options configured for this question.</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900">
+            No reasoning options configured for this DR question.
+          </p>
         ) : (
           <div className="space-y-2">
             {reasonOpts.map((opt, idx) => {
               const optId = opt.id || opt.key || opt.text || `reason_${idx}`;
-              const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || opt.question || `Reason ${idx + 1}`);
-              const isSelected = value?.reasonId === optId || value?.reasonId === optText;
+              const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || opt.question || opt.prompt || `Reason ${idx + 1}`);
+              const isSelected = value?.reasonId === optId || value?.reasonId === optText || String(value?.reasonId || '').trim() === String(optId).trim();
               return (
                 <button
                   key={optId}
@@ -382,7 +425,7 @@ export function DRRenderer({
                   disabled={disabled}
                   className={`w-full text-left p-3 rounded-lg border text-sm transition-all flex items-start gap-2.5 ${
                     isSelected
-                      ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200'
+                      ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20'
                       : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
                   }`}
                 >

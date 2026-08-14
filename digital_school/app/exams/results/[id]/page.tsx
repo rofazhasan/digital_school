@@ -2750,11 +2750,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
 
                                     {/* Question Text (for non-SMCQ) */}
-                                    {type !== 'SMCQ' && (
-                                      <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
-                                        <UniversalMathJax dynamic>{cleanupMath(question.questionText || "")}</UniversalMathJax>
-                                      </div>
-                                    )}
+                                     {type === 'AR' ? (
+                                       <div className="space-y-4 mb-8">
+                                         {question.questionText && (
+                                           <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                                             <UniversalMathJax dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                           </div>
+                                         )}
+                                         <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-200 dark:border-indigo-800 flex flex-col gap-2">
+                                           <Badge className="bg-indigo-600 text-white w-fit px-2 py-0.5 text-[10px] font-bold uppercase">Assertion (A)</Badge>
+                                           <div className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                             <UniversalMathJax inline dynamic>{cleanupMath((question as any).assertion || question.questionText || "")}</UniversalMathJax>
+                                           </div>
+                                         </div>
+                                         <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-800 flex flex-col gap-2">
+                                           <Badge className="bg-purple-600 dark:bg-purple-500 text-white w-fit px-2 py-0.5 text-[10px] font-bold uppercase">Reason (R)</Badge>
+                                           <div className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                             <UniversalMathJax inline dynamic>{cleanupMath((question as any).reason || "")}</UniversalMathJax>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     ) : type !== 'SMCQ' ? (
+                                       <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
+                                         <UniversalMathJax dynamic>{cleanupMath(question.questionText || "")}</UniversalMathJax>
+                                       </div>
+                                     ) : null}
 
                                     {/* SMCQ Scenario Rendering */}
                                     {type === 'SMCQ' && (
@@ -3143,8 +3163,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     ) : null}
 
-                                    {/* Restoration: Objective Explanation Section */}
-                                    {(question.explanation || (question as any).explanationImage) && (
+                                    {/* Objective Explanation & Model Answer Breakdown Section */}
+                                    {(question.explanation || (question as any).explanationImage || type === 'CMA' || type === 'MPC' || type === 'DR') && (
                                       <div className="mt-6 p-5 rounded-3xl bg-amber-500/[0.03] dark:bg-amber-500/[0.05] border border-amber-500/10 dark:border-amber-500/20 shadow-sm relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/10 transition-colors" />
                                         <div className="relative z-10 space-y-3">
@@ -3152,8 +3172,55 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                                               <Sparkles className="w-3.5 h-3.5" />
                                             </div>
-                                            <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">Explanation / ব্যাখ্যা</h5>
+                                            <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">Solution & Model Answer Explanation / ব্যাখ্যা</h5>
                                           </div>
+
+                                          {/* CMA Model Answer Breakdown */}
+                                          {type === 'CMA' && (
+                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-1.5 text-slate-800 dark:text-slate-200">
+                                              <span className="font-bold text-amber-700 dark:text-amber-400">CMA Model Answers:</span>
+                                              {((question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []).map((p: any, pIdx: number) => (
+                                                <div key={pIdx} className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
+                                                  <span>Part {p.label || pIdx + 1} ({p.prompt || p.text || 'Answer'}):</span>
+                                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{p.expectedAnswer || p.modelAnswer || 'N/A'} {p.unit || ''}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {/* MPC Model Answer Breakdown */}
+                                          {type === 'MPC' && (
+                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-1.5 text-slate-800 dark:text-slate-200">
+                                              <span className="font-bold text-amber-700 dark:text-amber-400">MPC Stage Model Solutions:</span>
+                                              {((question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []).map((s: any, sIdx: number) => (
+                                                <div key={sIdx} className="flex flex-col gap-0.5 pl-2 border-l-2 border-amber-500/30">
+                                                  <div className="flex items-center justify-between">
+                                                    <span>Stage {sIdx + 1} ({s.stageTitle || s.prompt || 'Step'}):</span>
+                                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{s.expectedAnswer || s.modelAnswer || 'N/A'}</span>
+                                                  </div>
+                                                  {s.formula && <span className="text-[10px] text-slate-500 font-mono">Formula: {s.formula}</span>}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {/* DR Model Answer Breakdown */}
+                                          {type === 'DR' && (
+                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-1.5 text-slate-800 dark:text-slate-200">
+                                              <span className="font-bold text-amber-700 dark:text-amber-400">DR Conceptual Solution:</span>
+                                              <div className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
+                                                <span>Part A Model Answer:</span>
+                                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{(question as any).expectedAnswer || (question as any).modelAnswer || 'N/A'}</span>
+                                              </div>
+                                              <div className="pl-2 border-l-2 border-amber-500/30">
+                                                <span className="text-slate-500">Part B Correct Principle:</span>
+                                                <div className="font-medium text-slate-900 dark:text-slate-100 mt-0.5">
+                                                  {((question as any).reasonOptions || (question as any).reasons || (question as any).options || []).find((r: any) => r.isCorrect)?.text || 'Correct Principle Selected'}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+
                                           <div className="pl-4 border-l-2 border-amber-500/20">
                                             {question.explanation && (
                                               <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
