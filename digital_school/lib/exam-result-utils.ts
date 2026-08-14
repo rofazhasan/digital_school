@@ -97,15 +97,16 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
 
         hasAtLeastOneCorrect = selected.some((idx: number) => Boolean(options[idx]?.isCorrect));
     } else if (type === 'CMA') {
-        const parts = question.parts || question.cmaParts || [];
+        const parts = question.parts || question.cmaParts || question.subQuestions || question.sub_questions || [];
         if (question.partResults && typeof question.partResults === 'object') {
             hasAtLeastOneCorrect = Object.values(question.partResults).some((p: any) => Boolean(p?.isCorrect));
         } else if (studentAnswer && typeof studentAnswer === 'object') {
             hasAtLeastOneCorrect = parts.some((p: any) => {
-                const sVal = String(studentAnswer[p.id] ?? studentAnswer[p.label] ?? '').trim().toLowerCase();
-                const eVal = String(p.expectedAnswer ?? '').trim().toLowerCase();
+                const pId = p.id || p.key || p.name || p.label;
+                const sVal = String(studentAnswer[pId] ?? studentAnswer[p.label] ?? '').trim().toLowerCase();
+                const eVal = String(p.expectedAnswer ?? p.modelAnswer ?? '').trim().toLowerCase();
                 if (!sVal || !eVal) return false;
-                if (p.type === 'decimal' || (p.tolerance !== undefined && !isNaN(Number(eVal)))) {
+                if (p.type === 'decimal' || p.fieldType === 'decimal' || (p.tolerance !== undefined && !isNaN(Number(eVal)))) {
                     const tol = Number(p.tolerance) || 0.01;
                     return Math.abs(parseFloat(sVal) - parseFloat(eVal)) <= tol;
                 }
@@ -113,13 +114,14 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
             });
         }
     } else if (type === 'MPC') {
-        const stages = question.stages || question.mpcStages || [];
+        const stages = question.stages || question.mpcStages || question.subQuestions || question.sub_questions || [];
         if (question.stageResults && typeof question.stageResults === 'object') {
             hasAtLeastOneCorrect = Object.values(question.stageResults).some((s: any) => Boolean(s?.isCorrectDirectly || s?.isCorrectWithPropagatedError));
         } else if (studentAnswer && typeof studentAnswer === 'object') {
             hasAtLeastOneCorrect = stages.some((s: any) => {
-                const sVal = parseFloat(String(studentAnswer[s.id] ?? ''));
-                const eVal = parseFloat(String(s.expectedAnswer ?? ''));
+                const sId = s.id || s.key || s.name || s.stageTitle;
+                const sVal = parseFloat(String(studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? ''));
+                const eVal = parseFloat(String(s.expectedAnswer ?? s.modelAnswer ?? ''));
                 const tol = Number(s.tolerance) || 0.01;
                 return !isNaN(sVal) && !isNaN(eVal) && Math.abs(sVal - eVal) <= tol;
             });
@@ -128,10 +130,11 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
         if (typeof question.answerCorrect === 'boolean' || typeof question.reasonCorrect === 'boolean') {
             hasAtLeastOneCorrect = Boolean(question.answerCorrect || question.reasonCorrect);
         } else if (studentAnswer) {
-            const expAns = String(question.expectedAnswer ?? '').trim().toLowerCase();
+            const expAns = String(question.expectedAnswer ?? question.modelAnswer ?? '').trim().toLowerCase();
             const stuAns = String(studentAnswer.answer ?? '').trim().toLowerCase();
             const isAnsOk = Boolean(stuAns && expAns && stuAns === expAns);
-            const selectedReason = (question.reasonOptions || []).find((r: any) => r.id === studentAnswer.reasonId || r.text === studentAnswer.reasonId);
+            const reasonOpts = question.reasonOptions || question.reasons || question.options || question.reason_options || question.subQuestions || [];
+            const selectedReason = reasonOpts.find((r: any) => r.id === studentAnswer.reasonId || r.text === studentAnswer.reasonId);
             const isReasonOk = Boolean(selectedReason?.isCorrect);
             hasAtLeastOneCorrect = isAnsOk || isReasonOk;
         }

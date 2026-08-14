@@ -311,6 +311,76 @@ function auditCompleteLifecycle() {
   const statusUnanswered = evaluateQuestionResultStatus({ ...qMcSample, studentAnswer: null, awardedMarks: 0 });
   testAssert(statusUnanswered === "UNANSWERED", `Section Filter Audit: Unattempted -> UNANSWERED, got ${statusUnanswered}`);
 
+  // 12. END-TO-END MAPPING & RESULT DISPLAY CATEGORIZATION AUDIT FOR CMA, MPC, DR
+  // CMA Result mapping:
+  const cmaFullStatus = evaluateQuestionResultStatus({
+    type: "CMA",
+    marks: 4,
+    awardedMarks: 4,
+    studentAnswer: { p1: "17.32", p2: "2.04" },
+    parts: cma.parts
+  });
+  testAssert(cmaFullStatus === "CORRECT", `CMA Result Mapping: Full correct answer maps to CORRECT on result page`);
+
+  const cmaPartialStatus = evaluateQuestionResultStatus({
+    type: "CMA",
+    marks: 4,
+    awardedMarks: 2,
+    studentAnswer: { p1: "17.32", p2: "9.99" },
+    parts: cma.parts
+  });
+  testAssert(cmaPartialStatus === "PARTIAL", `CMA Result Mapping: Partial answer (1/2 correct) maps to PARTIAL on result page`);
+
+  const cmaWrongStatus = evaluateQuestionResultStatus({
+    type: "CMA",
+    marks: 4,
+    awardedMarks: 0,
+    studentAnswer: { p1: "0.00", p2: "0.00" },
+    parts: cma.parts
+  });
+  testAssert(cmaWrongStatus === "WRONG", `CMA Result Mapping: Completely wrong answer maps to WRONG on result page`);
+
+  // MPC Result mapping:
+  const mpcFullStatus = evaluateQuestionResultStatus({
+    type: "MPC",
+    marks: 6,
+    awardedMarks: 6,
+    studentAnswer: { s1: "6", s2: "12", s3: "144" },
+    stages: mpc.stages
+  });
+  testAssert(mpcFullStatus === "CORRECT", `MPC Result Mapping: Exact solution maps to CORRECT on result page`);
+
+  const mpcEPHStatus = evaluateQuestionResultStatus({
+    type: "MPC",
+    marks: 6,
+    awardedMarks: 4,
+    studentAnswer: { s1: "5", s2: "20", s3: "400" },
+    stages: mpc.stages,
+    stageResults: mpcEPH.stageResults
+  });
+  testAssert(mpcEPHStatus === "PARTIAL", `MPC Result Mapping: Error propagation method credit maps to PARTIAL on result page`);
+
+  // DR Result mapping:
+  const drMasteryStatus = evaluateQuestionResultStatus({
+    type: "DR",
+    marks: 3,
+    awardedMarks: 3,
+    studentAnswer: { answer: "Pressure Increases", reasonId: "r1", confidence: "Certain" },
+    reasonOptions: dr.reasonOptions,
+    expectedAnswer: dr.expectedAnswer
+  });
+  testAssert(drMasteryStatus === "CORRECT", `DR Result Mapping: Full Mastery maps to CORRECT on result page`);
+
+  const drSlipStatus = evaluateQuestionResultStatus({
+    type: "DR",
+    marks: 3,
+    awardedMarks: 1,
+    studentAnswer: { answer: "Wrong Answer", reasonId: "r1", confidence: "Certain" },
+    reasonOptions: dr.reasonOptions,
+    expectedAnswer: dr.expectedAnswer
+  });
+  testAssert(drSlipStatus === "PARTIAL", `DR Result Mapping: Execution Slip (correct reason only) maps to PARTIAL on result page`);
+
   console.log("--------------------------------------------------------------------------");
   console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT CHECKS PASSED CLEANLY!`);
   console.log("--------------------------------------------------------------------------");
