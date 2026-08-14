@@ -73,6 +73,10 @@ import { verifyAdminAction } from "@/lib/native/auth";
 import { Capacitor } from "@capacitor/core";
 import { ShieldCheck, Battery, Wifi, Scan } from "lucide-react";
 import { scanDocument } from "@/lib/native/scanner";
+import { CMARenderer, MPCRenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
+import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
 
 // --- Constants & Utilities ---
 const MCQ_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
@@ -1832,6 +1836,60 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     const type = (question?.type || '').toLowerCase();
 
     try {
+      if (type === 'cma') {
+        const cmaRes = evaluateCMAQuestion(question as any, answer as any);
+        let qMark = cmaRes.score;
+        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+          const parts = (question as any).parts || (question as any).cmaParts || [];
+          const maxM = cmaRes.maxScore || Number(question.marks) || 1;
+          const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
+          let wrongPenalty = 0;
+          for (const part of parts) {
+            const pRes = cmaRes.partResults?.[part.id];
+            if (pRes && !pRes.isCorrect) {
+              const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
+              wrongPenalty += (partMax * exam.mcqNegativeMarking) / 100;
+            }
+          }
+          qMark = Math.round((cmaRes.score - wrongPenalty) * 100) / 100;
+        }
+        return qMark;
+      }
+
+      if (type === 'mpc') {
+        const mpcRes = evaluateMPCQuestion(question as any, answer as any);
+        let qMark = mpcRes.score;
+        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+          const stages = (question as any).stages || (question as any).mpcStages || [];
+          const maxM = mpcRes.maxScore || Number(question.marks) || 1;
+          const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
+          let wrongPenalty = 0;
+          for (const stage of stages) {
+            const sRes = mpcRes.stageResults?.[stage.id];
+            if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
+              const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
+              wrongPenalty += (stageMax * exam.mcqNegativeMarking) / 100;
+            }
+          }
+          qMark = Math.round((mpcRes.score - wrongPenalty) * 100) / 100;
+        }
+        return qMark;
+      }
+
+      if (type === 'dr') {
+        const drRes = evaluateDRQuestion(question as any, answer as any);
+        let qMark = drRes.score;
+        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+          const maxM = drRes.maxScore || Number(question.marks) || 1;
+          const halfMark = maxM / 2;
+          let wrongPenalty = 0;
+          if (!drRes.answerCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
+          if (!drRes.reasonCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
+          qMark = Math.round((drRes.score - wrongPenalty) * 100) / 100;
+        }
+        return qMark;
+      }
+
       if (type === 'mcq') {
         const userAnswer = answer;
         let isCorrect = false;
@@ -2800,7 +2858,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
                     <div className="flex flex-wrap gap-2">
-                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive'] as const).map((type) => (
+                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'dr'] as const).map((type) => (
                         <Button
                           key={type}
                           variant={questionTypeFilter === type ? 'default' : 'outline'}
@@ -2833,25 +2891,25 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
-                          {/* MCQ Marks */}
+                          {/* MCQ / Objective Marks */}
                           <div className="flex items-center justify-between p-3 bg-blue-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <CheckSquare className="h-4 w-4 text-blue-600" />
-                              <span className="font-medium text-blue-800">MCQ</span>
+                              <span className="font-medium text-blue-800">Objective</span>
                             </div>
                             <div className="text-right">
                               <div className="text-lg font-bold text-blue-600">
                                 {(() => {
                                   const dbMcqMarks = currentStudent?.result?.mcqMarks;
                                   const calculatedMcqMarks = exam?.questions
-                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))
+                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(q?.type?.toLowerCase() || ''))
                                     ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers), 0) ?? 0;
 
                                   return dbMcqMarks != null ? dbMcqMarks : calculatedMcqMarks;
                                 })()}
                               </div>
                               <div className="text-xs text-blue-600">
-                                / {exam?.questions?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
+                                / {exam?.questions?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
                               </div>
                             </div>
                           </div>
@@ -4176,8 +4234,47 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   )}
 
+                                  {(currentQuestion?.type || "").toLowerCase() === "cma" && (
+                                    <div className="mb-4">
+                                      <CMARenderer
+                                        question={currentQuestion}
+                                        value={currentAnswer || {}}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        showFeedback={true}
+                                        evalResult={evaluateCMAQuestion(currentQuestion as any, currentAnswer)}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {(currentQuestion?.type || "").toLowerCase() === "mpc" && (
+                                    <div className="mb-4">
+                                      <MPCRenderer
+                                        question={currentQuestion}
+                                        value={currentAnswer || {}}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        showFeedback={true}
+                                        evalResult={evaluateMPCQuestion(currentQuestion as any, currentAnswer)}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {(currentQuestion?.type || "").toLowerCase() === "dr" && (
+                                    <div className="mb-4">
+                                      <DRRenderer
+                                        question={currentQuestion}
+                                        value={currentAnswer || {}}
+                                        onChange={() => {}}
+                                        disabled={true}
+                                        showFeedback={true}
+                                        evalResult={evaluateDRQuestion(currentQuestion as any, currentAnswer)}
+                                      />
+                                    </div>
+                                  )}
+
                                   {/* Correct Answer (Non-MCQ or if options missing) */}
-                                  {(currentQuestion?.type !== 'mcq' || !currentQuestion?.options) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
+                                  {!['mcq', 'cma', 'mpc', 'dr'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
                                     <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
                                       <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
                                         <CheckCircle className="h-4 w-4" />
@@ -4216,7 +4313,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <div>
                                   <h4 className="font-semibold mb-2">Grading:</h4>
                                   <div className="flex items-center gap-4">
-                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
+                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="flex flex-col gap-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-gray-600">Auto-graded:</span>
