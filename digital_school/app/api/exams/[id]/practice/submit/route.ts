@@ -148,7 +148,7 @@ export async function POST(
                 if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
-            } else if (type === 'SRA' || type === 'DR') {
+            } else if (type === 'SRA' || type === 'SDR' || type === 'DR') {
                 const result = evaluateSRAQuestion(question, studentAnswer);
                 questionScore = Number(result.score) || 0;
                 if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {

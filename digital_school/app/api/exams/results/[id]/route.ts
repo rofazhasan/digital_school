@@ -318,7 +318,7 @@ export async function GET(
       // to avoid stale pre-saved marks from a different examSet mapping.
       // For manual-graded types (CQ, SQ, SMCQ), trust pre-saved marks.
       const preSavedMarks = (studentAnswers as any)[`${questionId}_marks`];
-      const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'CMA', 'MPC', 'DR'].includes(type);
+      const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(type);
       let calculatedMarks: number | undefined = isObjectiveType ? undefined : preSavedMarks;
 
       if (calculatedMarks === undefined || calculatedMarks === null) {
@@ -436,7 +436,7 @@ export async function GET(
             }
             calculatedMarks = qMark;
           }
-        } else if (type === 'SRA' || type === 'DR') {
+        } else if (type === 'SRA' || type === 'SDR' || type === 'DR') {
           let parsedAns = studentAnswer;
           if (typeof parsedAns === 'string') {
             try { parsedAns = JSON.parse(parsedAns); } catch {}

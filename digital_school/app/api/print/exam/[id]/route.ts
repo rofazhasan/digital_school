@@ -301,7 +301,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       stages: Array.isArray(q.stages) ? q.stages : (Array.isArray(q.mpcStages) ? q.mpcStages : (Array.isArray(q.subQuestions) ? q.subQuestions : [])),
     }));
 
-    const sra = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'SRA' || (q.type || "").toUpperCase() === 'DR').map((q: any) => ({
+    const sra = questionsArr.filter((q: any) => ['SRA', 'SDR', 'DR'].includes((q.type || "").toUpperCase())).map((q: any) => ({
       ...q,
       q: q.questionText,
       components: Array.isArray(q.components) ? q.components : (Array.isArray(q.sraComponents) ? q.sraComponents : (Array.isArray(q.subQuestions) ? q.subQuestions : [])),
@@ -312,7 +312,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     // Create an ordered list of all objective questions to preserve original sequence
     const orderedObjective = questionsArr
-      .filter((q: any) => ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'SMCQ', 'CMA', 'MPC', 'SRA', 'DR'].includes((q.type || "").toUpperCase()))
+      .filter((q: any) => ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'SMCQ', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes((q.type || "").toUpperCase()))
       .map((q: any) => {
         const type = (q.type || "").toUpperCase();
         if (type === 'MCQ') {
@@ -339,7 +339,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         if (type === 'MPC') {
           return mpc.find((m: any) => m.id === q.id) || q;
         }
-        if (type === 'SRA') {
+        if (type === 'SRA' || type === 'SDR') {
           return sra.find((m: any) => m.id === q.id) || q;
         }
         if (type === 'DR') {

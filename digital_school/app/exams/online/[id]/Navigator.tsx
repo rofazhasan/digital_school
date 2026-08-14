@@ -37,12 +37,15 @@ const NavButton = memo(({
   const isAnswered = useMemo(() => {
     const val = answers[questionId];
     if (val !== undefined && val !== null && val !== '') {
-      if (typeof val === 'object') return Object.keys(val).length > 0;
+      if (Array.isArray(val)) return val.length > 0;
+      if (typeof val === 'object') {
+        return Object.values(val).some(v => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).trim() !== ''));
+      }
       return true;
     }
     const t = (type || "").toLowerCase();
     if (['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'sdr', 'sra', 'dr'].includes(t)) {
-      return Object.keys(answers).some(key => key.startsWith(`${questionId}_`));
+      return Object.keys(answers).some(key => key.startsWith(`${questionId}_`) && answers[key] !== undefined && answers[key] !== null && String(answers[key]).trim() !== '');
     }
     return false;
   }, [answers, questionId, type]);
