@@ -33,7 +33,8 @@
     "de:all": "npx tsx scripts/data-engineering-manager.ts all",
     "de:snapshot": "npx tsx scripts/data-engineering-manager.ts snapshot",
     "de:warehouse": "npx tsx scripts/data-engineering-manager.ts warehouse",
-    "de:ai-build": "npx tsx scripts/data-engineering-manager.ts ai-build"
+    "de:ai-build": "npx tsx scripts/data-engineering-manager.ts ai-build",
+    "migrate:sra": "npx tsx scripts/migrate-dr-to-sra.ts"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "8.0.0",
