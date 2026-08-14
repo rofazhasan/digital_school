@@ -45,7 +45,7 @@ async function migrateDRToSRA() {
         }
       });
       migratedCount++;
-      console.log(`  -> Migrated to SRA with ${sraStructure.components.length} components.`);
+      console.log(`  -> Migrated to SRA with ${sraStructure.components?.length || 0} components.`);
     }
 
     console.log(`\n✅ Successfully migrated ${migratedCount} questions from DR to SRA.`);
