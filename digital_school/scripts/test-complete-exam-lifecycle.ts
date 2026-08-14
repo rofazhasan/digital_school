@@ -1,6 +1,7 @@
 import { evaluateCMAQuestion } from '../lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '../lib/evaluation/mpcEvaluation';
 import { evaluateDRQuestion } from '../lib/evaluation/drEvaluation';
+import { evaluateMCQuestion } from '../lib/evaluation/mcEvaluation';
 
 // Complete 9-Question Type Sample Exam Payload
 export const SAMPLE_9_TYPE_EXAM = {
@@ -281,6 +282,14 @@ function auditCompleteLifecycle() {
 
   const drKnowledgeGap = evaluateDRQuestion(dr as any, { answer: "Wrong Answer", reasonId: "r2", confidence: "Certain" });
   testAssert(drKnowledgeGap.diagnosticTag === "KNOWLEDGE_GAP" || drKnowledgeGap.diagnosticTag === "STRONG_MISCONCEPTION", "DR Audit: Wrong Answer + Wrong Reason = KNOWLEDGE_GAP");
+
+  // 10. MC ALL WRONG NEGATIVE PENALTY AUDIT
+  const mcAllWrong = evaluateMCQuestion(
+    { options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: true }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }], marks: 4 },
+    { selectedOptions: [2, 3] }, // selected 2 wrong choices, 0 correct choices
+    { negativeMarking: 25, partialMarking: true, hasAttempted: true }
+  );
+  testAssert(mcAllWrong === -2, `MC Audit: All wrong selections result in negative penalty (-2), got ${mcAllWrong}`);
 
   console.log("--------------------------------------------------------------------------");
   console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT CHECKS PASSED CLEANLY!`);

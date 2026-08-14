@@ -81,7 +81,7 @@ export function evaluateMCQuestion(
     // Apply negative marking for wrong selections
     const wrongPenalty = wrongSelected * (settings.negativeMarking / 100) * question.marks;
 
-    const finalScore = Math.max(0, partialMarks - wrongPenalty);
+    const finalScore = partialMarks - wrongPenalty;
 
     // Round to 2 decimal places
     return Math.round(finalScore * 100) / 100;
