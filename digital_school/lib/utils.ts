@@ -146,8 +146,22 @@ export function applyFormatting(text: string | null | undefined): string {
 export function cleanupMath(text: string | null | undefined): string {
   if (!text) return "";
 
+  let raw = text.trim();
+
+  // Auto-delimit raw math/chemical expressions missing $...$
+  if (!raw.includes('$')) {
+    const hasMathTokens = /\\(frac|sqrt|cdot|times|pm|pi|alpha|beta|theta|gamma|Delta|omega|sigma|partial|int|sum|infty|text|mathrm|mathbf)|(\^[0-9a-zA-Z+-]+)|(\^\{[^{}]+\})|(_[0-9a-zA-Z+-]+)|(_{0,1}\{[^{}]+\})/i.test(raw);
+    if (hasMathTokens) {
+      // Format ion charges & simple powers before wrapping: e.g. D^2+ -> D^{2+}
+      raw = raw.replace(/\^\{?\s*(\d+)\s*([+-])\s*\}?/g, '^{$1$2}');
+      raw = raw.replace(/\^\{?\s*([+-])\s*(\d+)\s*\}?/g, '^{$2$1}');
+      raw = raw.replace(/([a-zA-Z0-9])\^([0-9a-zA-Z+-]+)/g, '$1^{$2}');
+      raw = `$${raw}$`;
+    }
+  }
+
   // 1. Normalize brackets: \[...\] -> $$...$$ and \(...\) -> $...$
-  let normalized = text
+  let normalized = raw
     .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$')
     .replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 

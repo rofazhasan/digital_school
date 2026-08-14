@@ -166,7 +166,21 @@ export function evaluateCMAChildPart(
     }
 
     // 6. Default INT / NUMERIC / EXPRESSION / TEXT Child
-    const isEquiv = areExpressionsEquivalent(studentStr, expectedStr, tol);
+    let isEquiv = areExpressionsEquivalent(studentStr, expectedStr, tol);
+
+    if (!isEquiv && (part.acceptedAnswers || part.aliases)) {
+        const aliases = Array.isArray(part.acceptedAnswers || part.aliases)
+            ? (part.acceptedAnswers || part.aliases) as string[]
+            : String(part.acceptedAnswers || part.aliases).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+        
+        for (const alias of aliases) {
+            if (areExpressionsEquivalent(studentStr, alias, tol)) {
+                isEquiv = true;
+                break;
+            }
+        }
+    }
+
     return { isCorrect: isEquiv, isAttempted: true, status: isEquiv ? 'CORRECT' : 'INCORRECT', earnedRatio: isEquiv ? 1 : 0 };
 }
 
