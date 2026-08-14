@@ -59,7 +59,11 @@ export function evaluateMPCQuestion(
     question: MPCQuestion,
     studentAnswer: MPCAnswer
 ): MPCEvaluationResult {
-    const stages = question.stages || question.mpcStages || [];
+    let rawStages = question.stages || question.mpcStages || (question as any).subQuestions || (question as any).sub_questions || [];
+    if (typeof rawStages === 'string') {
+        try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
+    }
+    const stages: MPCStage[] = Array.isArray(rawStages) ? rawStages : [];
     const maxMarks = Number(question.marks) || stages.reduce((acc, s) => acc + (Number(s.marks) || 0), 0) || 1;
 
     if (stages.length === 0) {
@@ -87,7 +91,7 @@ export function evaluateMPCQuestion(
     for (let i = 0; i < stages.length; i++) {
         const stage = stages[i];
         const stageMax = (Number(stage.marks) || 1) / totalWeight * maxMarks;
-        const studentValRaw = studentAnswer ? studentAnswer[stage.id] : undefined;
+        const studentValRaw = studentAnswer ? (studentAnswer[stage.id] ?? studentAnswer[stage.stageTitle] ?? (stage as any).key ?? (stage as any).name ?? studentAnswer[`stage_${i}`]) : undefined;
         const studentNum = parseFloat(String(studentValRaw ?? ''));
 
         const expectedNum = parseFloat(String(stage.expectedAnswer ?? ''));

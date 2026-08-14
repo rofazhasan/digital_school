@@ -3061,8 +3061,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                                   // Visual labels
                                                   const vlLeft = toBengaliNumerals(lIdx + 1);
-                                                  const vStudentRight = studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
-                                                  const vCorrectRight = correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
+                                                  const vStudentRight = studentRightIdx !== undefined && studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
+                                                  const vCorrectRight = correctRightIdx !== undefined && correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
 
                                                   // Row styling
                                                   const rowClass = isMatchCorrect
@@ -3106,60 +3106,69 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     ) : type === 'CMA' ? (
                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
-                                        <CMARenderer
-                                          question={{
+                                        {(() => {
+                                          const parsedVal = typeof question.studentAnswer === 'string'
+                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
+                                            : (question.studentAnswer || {});
+                                          const cmaQ = {
                                             id: question.id,
                                             text: question.questionText || (question as any).text,
                                             marks: question.marks || 1,
                                             parts: (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []
-                                          }}
-                                          value={(question.studentAnswer as any) || {}}
-                                          showFeedback={true}
-                                          evalResult={evaluateCMAQuestion({
-                                            id: question.id,
-                                            text: question.questionText || (question as any).text,
-                                            marks: question.marks || 1,
-                                            parts: (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []
-                                          } as any, (question.studentAnswer as any) || {})}
-                                        />
+                                          };
+                                          return (
+                                            <CMARenderer
+                                              question={cmaQ}
+                                              value={parsedVal}
+                                              showFeedback={true}
+                                              evalResult={evaluateCMAQuestion(cmaQ as any, parsedVal)}
+                                            />
+                                          );
+                                        })()}
                                       </div>
                                     ) : type === 'MPC' ? (
                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
-                                        <MPCRenderer
-                                          question={{
+                                        {(() => {
+                                          const parsedVal = typeof question.studentAnswer === 'string'
+                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
+                                            : (question.studentAnswer || {});
+                                          const mpcQ = {
                                             id: question.id,
                                             text: question.questionText || (question as any).text,
                                             scenario: (question as any).scenario,
                                             stages: (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []
-                                          }}
-                                          value={(question.studentAnswer as any) || {}}
-                                          showFeedback={true}
-                                          evalResult={evaluateMPCQuestion({
-                                            id: question.id,
-                                            text: question.questionText || (question as any).text,
-                                            scenario: (question as any).scenario,
-                                            stages: (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []
-                                          } as any, (question.studentAnswer as any) || {})}
-                                        />
+                                          };
+                                          return (
+                                            <MPCRenderer
+                                              question={mpcQ}
+                                              value={parsedVal}
+                                              showFeedback={true}
+                                              evalResult={evaluateMPCQuestion(mpcQ as any, parsedVal)}
+                                            />
+                                          );
+                                        })()}
                                       </div>
                                     ) : type === 'DR' ? (
                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
-                                        <DRRenderer
-                                          question={{
+                                        {(() => {
+                                          const parsedVal = typeof question.studentAnswer === 'string'
+                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
+                                            : (question.studentAnswer || {});
+                                          const drQ = {
                                             id: question.id,
                                             text: question.questionText || (question as any).text,
                                             expectedAnswer: (question as any).expectedAnswer || (question as any).modelAnswer,
-                                            reasonOptions: (question as any).reasonOptions || (question as any).subQuestions || (question as any).options || []
-                                          }}
-                                          value={(question.studentAnswer as any) || {}}
-                                          showFeedback={true}
-                                          evalResult={evaluateDRQuestion({
-                                            id: question.id,
-                                            text: question.questionText || (question as any).text,
-                                            expectedAnswer: (question as any).expectedAnswer || (question as any).modelAnswer,
-                                            reasonOptions: (question as any).reasonOptions || (question as any).subQuestions || (question as any).options || []
-                                          } as any, (question.studentAnswer as any) || {})}
-                                        />
+                                            reasonOptions: (question as any).reasonOptions || (question as any).reasons || (question as any).options || (question as any).reason_options || (question as any).subQuestions || []
+                                          };
+                                          return (
+                                            <DRRenderer
+                                              question={drQ}
+                                              value={parsedVal}
+                                              showFeedback={true}
+                                              evalResult={evaluateDRQuestion(drQ as any, parsedVal)}
+                                            />
+                                          );
+                                        })()}
                                       </div>
                                     ) : null}
 

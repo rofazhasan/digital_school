@@ -51,13 +51,17 @@ export function evaluateDRQuestion(
     studentAnswer: DRAnswer
 ): DREvaluationResult {
     const maxMarks = Number(question.marks) || 1;
-    const studentAnsRaw = studentAnswer?.answer;
-    const studentReasonId = studentAnswer?.reasonId;
-    const confidenceStr = (studentAnswer?.confidence || 'Certain').toLowerCase();
+    let parsedAns: any = studentAnswer;
+    if (typeof parsedAns === 'string') {
+        try { parsedAns = JSON.parse(parsedAns); } catch {}
+    }
+    const studentAnsRaw = parsedAns?.answer ?? parsedAns;
+    const studentReasonId = parsedAns?.reasonId;
+    const confidenceStr = String(parsedAns?.confidence || 'Certain').toLowerCase();
     const isHighConfidence = confidenceStr === 'certain' || confidenceStr === 'high';
 
     let isAnswerCorrect = false;
-    const expectedStr = String(question.expectedAnswer ?? '').trim();
+    const expectedStr = String(question.expectedAnswer ?? (question as any).modelAnswer ?? (question as any).answer ?? '').trim();
     const studentStr = String(studentAnsRaw ?? '').trim();
 
     if (question.answerType === 'decimal' || (question.tolerance !== undefined && !isNaN(Number(expectedStr)))) {
@@ -71,7 +75,16 @@ export function evaluateDRQuestion(
         isAnswerCorrect = studentStr.toLowerCase() === expectedStr.toLowerCase();
     }
 
-    const selectedReason = (question.reasonOptions || []).find(r => r.id === studentReasonId || r.text === studentReasonId);
+    let rawReasons = question.reasonOptions || (question as any).reasons || (question as any).options || (question as any).reason_options || (question as any).subQuestions || [];
+    if (typeof rawReasons === 'string') {
+        try { rawReasons = JSON.parse(rawReasons); } catch { rawReasons = []; }
+    }
+    if (rawReasons && typeof rawReasons === 'object' && !Array.isArray(rawReasons)) {
+        rawReasons = (rawReasons as any).options || (rawReasons as any).reasons || (rawReasons as any).reasonOptions || [];
+    }
+    const reasonOpts: DRReasonOption[] = Array.isArray(rawReasons) ? rawReasons : [];
+
+    const selectedReason = reasonOpts.find(r => r.id === studentReasonId || r.text === studentReasonId || String(r.id).trim() === String(studentReasonId).trim());
     const isReasonCorrect = Boolean(selectedReason?.isCorrect);
 
     let earned = 0;

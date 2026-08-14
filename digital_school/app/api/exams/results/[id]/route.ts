@@ -380,20 +380,25 @@ export async function GET(
           const hasMatchSet = studentAnswer && (Array.isArray((studentAnswer as any).matches) ? (studentAnswer as any).matches.length > 0 : Object.keys(studentAnswer as any).length > 0);
           calculatedMarks = hasMatchSet ? evaluateMTFQuestion(question, studentAnswer || {}).score : 0;
         } else if (type === 'CMA') {
-          const hasAttempt = studentAnswer !== undefined && studentAnswer !== null && (typeof studentAnswer === 'object' ? Object.values(studentAnswer).some(v => v !== undefined && v !== null && v !== '') : studentAnswer !== '');
+          let parsedAns = studentAnswer;
+          if (typeof parsedAns === 'string') {
+            try { parsedAns = JSON.parse(parsedAns); } catch {}
+          }
+          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const cmaRes = evaluateCMAQuestion(question as any, studentAnswer || {});
+            const cmaRes = evaluateCMAQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
             let qMark = cmaRes.score;
             if (!cmaRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-              const parts = (question as any).parts || (question as any).cmaParts || [];
+              const parts = (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || [];
               const maxM = cmaRes.maxScore || Number(question.marks) || 1;
               const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
               let wrongPenalty = 0;
               for (const part of parts) {
-                const pRes = cmaRes.partResults?.[part.id];
-                if (pRes && !pRes.isCorrect) {
+                const partId = part.id || part.key || part.name || part.label;
+                const pRes = cmaRes.partResults?.[partId] || cmaRes.partResults?.[part.label];
+                if (!pRes || !pRes.isCorrect) {
                   const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
                   wrongPenalty += (partMax * exam.mcqNegativeMarking) / 100;
                 }
@@ -403,20 +408,25 @@ export async function GET(
             calculatedMarks = qMark;
           }
         } else if (type === 'MPC') {
-          const hasAttempt = studentAnswer !== undefined && studentAnswer !== null && (typeof studentAnswer === 'object' ? Object.values(studentAnswer).some(v => v !== undefined && v !== null && v !== '') : studentAnswer !== '');
+          let parsedAns = studentAnswer;
+          if (typeof parsedAns === 'string') {
+            try { parsedAns = JSON.parse(parsedAns); } catch {}
+          }
+          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const mpcRes = evaluateMPCQuestion(question as any, studentAnswer || {});
+            const mpcRes = evaluateMPCQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
             let qMark = mpcRes.score;
             if (!mpcRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-              const stages = (question as any).stages || (question as any).mpcStages || [];
+              const stages = (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || [];
               const maxM = mpcRes.maxScore || Number(question.marks) || 1;
               const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
               let wrongPenalty = 0;
               for (const stage of stages) {
-                const sRes = mpcRes.stageResults?.[stage.id];
-                if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
+                const stageId = stage.id || stage.key || stage.name || stage.stageTitle;
+                const sRes = mpcRes.stageResults?.[stageId] || mpcRes.stageResults?.[stage.stageTitle];
+                if (!sRes || (!sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError)) {
                   const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
                   wrongPenalty += (stageMax * exam.mcqNegativeMarking) / 100;
                 }
@@ -426,11 +436,15 @@ export async function GET(
             calculatedMarks = qMark;
           }
         } else if (type === 'DR') {
-          const hasAttempt = studentAnswer !== undefined && studentAnswer !== null && (typeof studentAnswer === 'object' ? Object.values(studentAnswer).some(v => v !== undefined && v !== null && v !== '') : studentAnswer !== '');
+          let parsedAns = studentAnswer;
+          if (typeof parsedAns === 'string') {
+            try { parsedAns = JSON.parse(parsedAns); } catch {}
+          }
+          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const drRes = evaluateDRQuestion(question as any, studentAnswer || {});
+            const drRes = evaluateDRQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
             let qMark = drRes.score;
             if (!drRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
               const maxM = drRes.maxScore || Number(question.marks) || 1;

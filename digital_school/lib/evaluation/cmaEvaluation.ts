@@ -46,7 +46,11 @@ export function evaluateCMAQuestion(
     question: CMAQuestion,
     studentAnswer: CMAAnswer
 ): CMAEvaluationResult {
-    const parts = question.parts || question.cmaParts || [];
+    let rawParts = question.parts || question.cmaParts || (question as any).subQuestions || (question as any).sub_questions || [];
+    if (typeof rawParts === 'string') {
+        try { rawParts = JSON.parse(rawParts); } catch { rawParts = []; }
+    }
+    const parts: CMAPart[] = Array.isArray(rawParts) ? rawParts : [];
     const maxMarks = Number(question.marks) || parts.reduce((acc, p) => acc + (Number(p.marks) || 0), 0) || 1;
     
     if (parts.length === 0) {
@@ -67,7 +71,7 @@ export function evaluateCMAQuestion(
 
     for (const part of parts) {
         const partMax = (Number(part.marks) || 1) / totalPartsWeight * maxMarks;
-        const rawStudentVal = studentAnswer ? (studentAnswer[part.id] ?? studentAnswer[part.label]) : undefined;
+        const rawStudentVal = studentAnswer ? (studentAnswer[part.id] ?? studentAnswer[part.label] ?? (part as any).name ?? (part as any).prompt ?? studentAnswer[`part_${parts.indexOf(part)}`]) : undefined;
         let isCorrect = false;
         
         const expectedStr = String(part.expectedAnswer ?? '').trim();
