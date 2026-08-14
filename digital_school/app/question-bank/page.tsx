@@ -4058,13 +4058,25 @@ function CMAQuestionForm({
 
             <div>
               <Label className="text-xs">Question Text / Field Prompt</Label>
-              <Input value={p.prompt || p.label || p.question || ''} onChange={e => { const next = [...parts]; next[idx].prompt = e.target.value; next[idx].question = e.target.value; setParts(next); }} placeholder="e.g. Calculate horizontal velocity component" className="h-8 text-xs" />
+              <Input value={p.prompt || p.label || p.question || ''} onChange={e => { const next = [...parts]; next[idx].prompt = e.target.value; next[idx].question = e.target.value; setParts(next); }} placeholder="e.g. Calculate horizontal velocity component ($v_x$)" className="h-8 text-xs" />
+              {(p.prompt || p.question) && (
+                <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-sans">
+                  <span className="font-bold text-[10px] text-teal-600 uppercase">Math Output:</span>
+                  <UniversalMathJax inline dynamic>{cleanupMath(p.prompt || p.question)}</UniversalMathJax>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <div>
                 <Label className="text-xs">Expected Key / Answer</Label>
-                <Input value={p.expectedAnswer ?? p.correctAnswer ?? p.modelAnswer ?? ''} onChange={e => { const next = [...parts]; next[idx].expectedAnswer = e.target.value; next[idx].correctAnswer = e.target.value; setParts(next); }} placeholder="e.g. 17.32 or Option text" className="h-8 text-xs font-mono" />
+                <Input value={p.expectedAnswer ?? p.correctAnswer ?? p.modelAnswer ?? ''} onChange={e => { const next = [...parts]; next[idx].expectedAnswer = e.target.value; next[idx].correctAnswer = e.target.value; setParts(next); }} placeholder="e.g. 17.32 or \frac{1}{2}" className="h-8 text-xs font-mono" />
+                {(p.expectedAnswer ?? p.correctAnswer) && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-sans">
+                    <span className="font-bold text-[10px] text-teal-600 uppercase">Key Preview:</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(String(p.expectedAnswer ?? p.correctAnswer))}</UniversalMathJax>
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Tolerance (±)</Label>
@@ -4164,6 +4176,12 @@ function MPCQuestionForm({
       <div>
         <Label className="text-xs font-bold text-indigo-800 dark:text-indigo-300">Problem Scenario Context</Label>
         <Textarea value={scenario} onChange={e => setScenario(e.target.value)} placeholder="Describe the physical/mathematical scenario for all stages..." rows={2} className="text-xs" />
+        {scenario && (
+          <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-sans">
+            <span className="font-bold text-[10px] text-indigo-600 uppercase">Scenario Math Output:</span>
+            <UniversalMathJax inline dynamic>{cleanupMath(scenario)}</UniversalMathJax>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -4181,7 +4199,13 @@ function MPCQuestionForm({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <div>
                 <Label className="text-xs">Stage Title / Question</Label>
-                <Input value={st.stageTitle || st.text || ''} onChange={e => { const next = [...stages]; next[idx].stageTitle = e.target.value; next[idx].text = e.target.value; setStages(next); }} placeholder="e.g. Calculate acceleration" className="h-8 text-xs" />
+                <Input value={st.stageTitle || st.text || ''} onChange={e => { const next = [...stages]; next[idx].stageTitle = e.target.value; next[idx].text = e.target.value; setStages(next); }} placeholder="e.g. Calculate acceleration ($a$)" className="h-8 text-xs" />
+                {(st.stageTitle || st.text) && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-sans">
+                    <span className="font-bold text-[10px] text-indigo-600 uppercase">Stage Math Output:</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(st.stageTitle || st.text)}</UniversalMathJax>
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Predecessor Dependency (dependsOn)</Label>
@@ -4216,7 +4240,13 @@ function MPCQuestionForm({
               </div>
               <div>
                 <Label className="text-xs">Expected Key</Label>
-                <Input value={st.expectedAnswer ?? ''} onChange={e => { const next = [...stages]; next[idx].expectedAnswer = e.target.value; setStages(next); }} placeholder="e.g. 5" className="h-8 text-xs font-mono" />
+                <Input value={st.expectedAnswer ?? ''} onChange={e => { const next = [...stages]; next[idx].expectedAnswer = e.target.value; setStages(next); }} placeholder="e.g. 5 or \sqrt{25}" className="h-8 text-xs font-mono" />
+                {st.expectedAnswer && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-1 font-sans">
+                    <span className="font-bold text-[10px] text-indigo-600 uppercase">Key Preview:</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(String(st.expectedAnswer))}</UniversalMathJax>
+                  </div>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Tolerance (±)</Label>

@@ -261,7 +261,6 @@ function auditCompleteLifecycle() {
 
   // Student makes mistake in Stage 1 (s1 = 5 instead of 6), but correctly calculates s2 = 5 * 4 = 20 and s3 = 0.5 * 2 * 20^2 = 400
   const mpcEPH = evaluateMPCQuestion(mpc as any, { s1: 5, s2: 20, s3: 400 });
-  console.log("DEBUG mpcEPH:", JSON.stringify(mpcEPH, null, 2));
   testAssert(
     mpcEPH.stageResults["s1"].earned === 0 &&
     mpcEPH.stageResults["s2"].isCorrectWithPropagatedError &&
@@ -272,9 +271,11 @@ function auditCompleteLifecycle() {
 
   // 9. DR EVALUATION & COGNITIVE DIAGNOSTIC MATRIX AUDIT
   const dr = SAMPLE_9_TYPE_EXAM.questions.dr[0];
-  const drMastery = evaluateDRQuestion(dr as any, { answer: "Pressure Increases", reasonId: "r1", confidence: "Certain" });
-  console.log("DEBUG drMastery:", drMastery);
-  testAssert(drMastery.diagnosticTag === "MASTERY" && drMastery.score === 3, "DR Audit: Answer + Reason + Certain = MASTERY");
+  const drMastery = evaluateDRQuestion(dr as any, { answer: 'pressure increases', reasonId: 'r1', confidence: 'Certain' });
+  testAssert(
+    drMastery.diagnosticTag === 'MASTERY' && drMastery.score === 3,
+    "DR Audit: Answer + Reason + Certain = MASTERY"
+  );
 
   const drMisconception = evaluateDRQuestion(dr as any, { answer: "Pressure Increases", reasonId: "r2", confidence: "Certain" });
   testAssert(drMisconception.diagnosticTag === "MISCONCEPTION" || drMisconception.diagnosticTag === "GUESS", "DR Audit: Answer + Wrong Reason = MISCONCEPTION / GUESS");

@@ -3190,8 +3190,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <span className="font-bold text-amber-700 dark:text-amber-400">CMA Model Answers:</span>
                                               {((question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []).map((p: any, pIdx: number) => (
                                                 <div key={pIdx} className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
-                                                  <span>Part {p.label || pIdx + 1} ({p.prompt || p.text || 'Answer'}):</span>
-                                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{p.expectedAnswer || p.modelAnswer || 'N/A'} {p.unit || ''}</span>
+                                                  <span>Part {p.label || pIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(p.prompt || p.text || 'Answer')}</UniversalMathJax>):</span>
+                                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(String(p.expectedAnswer || p.modelAnswer || 'N/A'))}</UniversalMathJax> {p.unit || ''}
+                                                  </span>
                                                 </div>
                                               ))}
                                             </div>
@@ -3204,8 +3206,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               {((question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []).map((s: any, sIdx: number) => (
                                                 <div key={sIdx} className="flex flex-col gap-0.5 pl-2 border-l-2 border-amber-500/30">
                                                   <div className="flex items-center justify-between">
-                                                    <span>Stage {sIdx + 1} ({s.stageTitle || s.prompt || 'Step'}):</span>
-                                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{s.expectedAnswer || s.modelAnswer || 'N/A'}</span>
+                                                    <span>Stage {sIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(s.stageTitle || s.prompt || 'Step')}</UniversalMathJax>):</span>
+                                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                      <UniversalMathJax inline dynamic>{cleanupMath(String(s.expectedAnswer || s.modelAnswer || 'N/A'))}</UniversalMathJax>
+                                                    </span>
                                                   </div>
                                                   {s.formula && <span className="text-[10px] text-slate-500 font-mono">Formula: {s.formula}</span>}
                                                 </div>
@@ -3219,12 +3223,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <span className="font-bold text-amber-700 dark:text-amber-400">DR Conceptual Solution:</span>
                                               <div className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
                                                 <span>Part A Model Answer:</span>
-                                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{(question as any).expectedAnswer || (question as any).modelAnswer || 'N/A'}</span>
+                                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(String((question as any).expectedAnswer || (question as any).modelAnswer || 'N/A'))}</UniversalMathJax>
+                                                </span>
                                               </div>
                                               <div className="pl-2 border-l-2 border-amber-500/30">
                                                 <span className="text-slate-500">Part B Correct Principle:</span>
                                                 <div className="font-medium text-slate-900 dark:text-slate-100 mt-0.5">
-                                                  {((question as any).reasonOptions || (question as any).reasons || (question as any).options || []).find((r: any) => r.isCorrect)?.text || 'Correct Principle Selected'}
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(((question as any).reasonOptions || (question as any).reasons || (question as any).options || []).find((r: any) => r.isCorrect)?.text || 'Correct Principle Selected')}</UniversalMathJax>
                                                 </div>
                                               </div>
                                             </div>

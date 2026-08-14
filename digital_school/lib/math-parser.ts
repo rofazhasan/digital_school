@@ -32,10 +32,22 @@ export function normalizeExpression(rawExpr: string): string {
   // 5. Remove LaTeX spacing commands and brackets
   expr = expr.replace(/\\left|\\right|\\!|\\,|\\;|\\:/g, '');
 
-  // 6. Normalize implicit multiplication:
-  // e.g. "2x" -> "2*x", "ma" -> "m*a", "3(a+b)" -> "3*(a+b)", "(x+1)(x-1)" -> "(x+1)*(x-1)"
+  // 6. Protect math functions and multi-letter variables with numbers/underscores (e.g. sqrt, sin, cos, prev, s1, p2, stage_1)
+  const mathFunctions = ['sqrt', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'abs', 'prev'];
+  const wordTokens = Array.from(new Set(expr.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || []))
+    .filter(w => mathFunctions.includes(w.toLowerCase()) || /[0-9_]/.test(w));
+
+  const placeholders: Record<string, string> = {};
+  wordTokens.forEach((word, idx) => {
+    const ph = `__${idx}__`;
+    placeholders[ph] = word;
+    expr = expr.replace(new RegExp(`(?<![a-zA-Z0-9_])${word}(?![a-zA-Z0-9_])`, 'g'), ph);
+  });
+
+  // 7. Normalize implicit multiplication:
+  // e.g. "2x" -> "2*x", "3(a+b)" -> "3*(a+b)", "(x+1)(x-1)" -> "(x+1)*(x-1)"
   expr = expr.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
-  
+
   let prevMul = '';
   while (expr !== prevMul) {
     prevMul = expr;
@@ -47,7 +59,12 @@ export function normalizeExpression(rawExpr: string): string {
   expr = expr.replace(/\)\s*\(/g, ')*(');
   expr = expr.replace(/\)\s*([a-zA-Z])/g, ')*$1');
 
-  // 7. Clean whitespace around operators
+  // Restore protected word tokens
+  Object.entries(placeholders).forEach(([ph, word]) => {
+    expr = expr.replace(new RegExp(ph, 'g'), word);
+  });
+
+  // 8. Clean whitespace around operators
   expr = expr.replace(/\s+/g, '');
 
   return expr;
@@ -86,25 +103,25 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
   try {
     let text = String(expr || '').trim();
 
-    // 1. Substitute variables FIRST (e.g. prev, s1, part1, etc.)
+    // 1. Normalize implicit multiplication & LaTeX FIRST (e.g. 2x -> 2*x, \frac{a}{b} -> (a)/(b))
+    text = normalizeExpression(text);
+
+    // 2. Substitute variables (e.g. prev, s1, part1, x, y, etc.)
     const sortedVars = Object.entries(vars).sort((a, b) => b[0].length - a[0].length);
     for (const [varName, val] of sortedVars) {
-      const regex = new RegExp(`\\b${varName}\\b`, 'g');
+      const regex = new RegExp(`(?<![a-zA-Z_])${varName}(?![a-zA-Z0-9_])`, 'g');
       const valStr = (typeof val === 'number' && val < 0) ? `(${val})` : String(val);
       text = text.replace(regex, valStr);
     }
 
-    // 2. Normalize the expression after variable substitution
-    let norm = normalizeExpression(text);
-
     // 3. Convert powers ^ to ** JS exponentiation
-    norm = norm.replace(/\^/g, '**');
+    let norm = text.replace(/\^/g, '**');
 
     // 4. Convert sqrt to Math.sqrt
     norm = norm.replace(/sqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
 
-    // Sanitize string to allow only numbers, operators, Math.pow, Math.sqrt
-    if (/[^0-9\.\+\-\*\/\(\)\,\sMath\.powsqrt]/.test(norm)) {
+    // Sanitize string to allow only numbers, operators, Math.pow, Math.sqrt, hyphens
+    if (/[^0-9\.\+\*\/\(\)\,\sMath\.powsqrt\-]/ .test(norm)) {
       return null;
     }
 
