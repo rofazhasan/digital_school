@@ -41,6 +41,10 @@ export const hasStudentAnswered = (
         return sqs.some((sq: any) => isAnswerValueValid(sq.studentAnswer));
     }
 
+    if (studentAnswer && typeof studentAnswer === 'object' && !Array.isArray(studentAnswer)) {
+        return Object.values(studentAnswer).some(v => isAnswerValueValid(v));
+    }
+
     // For all other types
     return isAnswerValueValid(studentAnswer);
 };

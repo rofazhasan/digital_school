@@ -47,7 +47,8 @@ import {
   Image as ImageIcon,
   Info,
   AlignLeft,
-  Activity
+  Activity,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -1902,9 +1903,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const mtfQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
   const intQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
   const smcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SMCQ') || [];
+  const cmaQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CMA') || [];
+  const mpcQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MPC') || [];
+  const drQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'DR') || [];
   const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'DESCRIPTIVE') || [];
   const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
-  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions];
+  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions, ...cmaQuestions, ...mpcQuestions, ...drQuestions];
 
   // Re-calculate awarded marks on the fly to avoid "zero-score" errors for descriptive/creative parts
   const recalculatedCqMarks = cqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
@@ -2663,7 +2667,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-12">
                       {/* 1. OBJECTIVE SECTION (Unified MCQ, MC, MTF, AR, INT, SMCQ) */}
                       {(() => {
-                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC', 'SMCQ'];
+                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'];
                         const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
@@ -2727,9 +2731,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-[10px] font-black italic px-3 py-1 rounded-full shadow-sm">
-                                          {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
-                                        </Badge>
+                                        {isCorrect ? (
+                                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                            <CheckCircle className="w-3.5 h-3.5" />
+                                            <span>Correct (+{Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
+                                          </Badge>
+                                        ) : isPartial ? (
+                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                            <AlertCircle className="w-3.5 h-3.5" />
+                                            <span>Partial Credit (+{Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
+                                          </Badge>
+                                        ) : hasAns ? (
+                                          <Badge className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                            <XCircle className="w-3.5 h-3.5" />
+                                            <span>
+                                              Wrong ({Number(question.awardedMarks) < 0 ? `${Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')} penalty` : `0`}/{question.marks})
+                                            </span>
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold text-xs px-3.5 py-1 rounded-full border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
+                                            Unanswered (0/{question.marks})
+                                          </Badge>
+                                        )}
                                       </div>
                                     </div>
 
