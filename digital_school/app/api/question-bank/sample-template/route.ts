@@ -326,11 +326,13 @@ export async function GET(req: any) {
             });
             // SAMPLE DR
             templateSheet.addRow({
-                type: "DR", className: sampleClass, subject: "Physics", topic: "Newton's Laws", difficulty: "MEDIUM", marks: 5,
-                questionText: "A car moves with constant velocity. What is its acceleration?",
-                modelAnswer: "0",
-                objSub1Text: "Velocity is constant, therefore dv/dt = 0", objSub1Marks: 5, objSub1Correct: "A",
-                explanation: "Constant velocity means change in velocity is zero."
+                type: "DR", className: sampleClass, subject: "Biology", topic: "Renal System", difficulty: "MEDIUM", marks: 5,
+                questionText: "What is the structural and functional unit of the human kidney?",
+                canonicalAnswer: "NEPHRON",
+                acceptedAnswers: "nephron, নেফ্রন, functional unit of kidney",
+                drSubtype: "TEXT",
+                objSub1Text: "Nephrons filter blood and produce urine in the renal cortex and medulla", objSub1Marks: 5, objSub1Correct: "A",
+                explanation: "Each human kidney contains approximately 1 million nephrons."
             });
         }
 

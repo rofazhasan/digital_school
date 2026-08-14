@@ -33,9 +33,17 @@ export function normalizeExpression(rawExpr: string): string {
   expr = expr.replace(/\\left|\\right|\\!|\\,|\\;|\\:/g, '');
 
   // 6. Normalize implicit multiplication:
-  // e.g. "2x" -> "2*x", "3(a+b)" -> "3*(a+b)", "(x+1)(x-1)" -> "(x+1)*(x-1)"
+  // e.g. "2x" -> "2*x", "ma" -> "m*a", "3(a+b)" -> "3*(a+b)", "(x+1)(x-1)" -> "(x+1)*(x-1)"
   expr = expr.replace(/(\d+)([a-zA-Z])/g, '$1*$2');
+  
+  let prevMul = '';
+  while (expr !== prevMul) {
+    prevMul = expr;
+    expr = expr.replace(/([a-zA-Z])([a-zA-Z])/g, '$1*$2');
+  }
+
   expr = expr.replace(/(\d+)\s*\(/g, '$1*(');
+  expr = expr.replace(/([a-zA-Z])\s*\(/g, '$1*(');
   expr = expr.replace(/\)\s*\(/g, ')*(');
   expr = expr.replace(/\)\s*([a-zA-Z])/g, ')*$1');
 
@@ -112,9 +120,10 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
 /**
  * Dynamic Algorithm to check if two mathematical / algebraic expressions are equivalent.
  * 1. Checks direct string equality (case-insensitive & whitespace-free).
- * 2. Checks normalized string equality.
- * 3. Evaluates algebraic equivalence across sample points (e.g. x = 2.5, 5.1).
- * 4. Checks numeric float tolerance (e.g., ±0.05).
+ * 2. Handles equation symmetry (LHS = RHS vs RHS = LHS).
+ * 3. Checks normalized string equality.
+ * 4. Evaluates algebraic equivalence across sample points (e.g. x = 2.5, 5.1).
+ * 5. Checks numeric float tolerance (e.g., ±0.05).
  */
 export function areExpressionsEquivalent(
   studentExpr: string | number,
@@ -130,6 +139,18 @@ export function areExpressionsEquivalent(
 
   // 1. Direct equality
   if (stuStr.toLowerCase() === expStr.toLowerCase()) return true;
+
+  // 2. Equation Symmetry Check (e.g. F = ma vs ma = F)
+  if (stuStr.includes('=') && expStr.includes('=')) {
+    const stuParts = stuStr.split('=').map(s => s.trim());
+    const expParts = expStr.split('=').map(s => s.trim());
+
+    if (stuParts.length === 2 && expParts.length === 2) {
+      const directEquiv = areExpressionsEquivalent(stuParts[0], expParts[0], tolerance) && areExpressionsEquivalent(stuParts[1], expParts[1], tolerance);
+      const flippedEquiv = areExpressionsEquivalent(stuParts[0], expParts[1], tolerance) && areExpressionsEquivalent(stuParts[1], expParts[0], tolerance);
+      if (directEquiv || flippedEquiv) return true;
+    }
+  }
 
   // 2. Direct numeric comparison with tolerance for purely numeric strings
   if (/^[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?$/.test(stuStr) && /^[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?$/.test(expStr)) {

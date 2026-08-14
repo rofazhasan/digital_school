@@ -94,6 +94,7 @@ export function evaluateMPCQuestion(
         const stage = stages[i];
         const stageMax = (Number(stage.marks) || 1) / totalWeight * maxMarks;
         const studentValRaw = studentAnswer ? (studentAnswer[stage.id] ?? studentAnswer[stage.stageTitle] ?? (stage as any).key ?? (stage as any).name ?? studentAnswer[`stage_${i}`]) : undefined;
+        const isAttempted = studentValRaw !== undefined && studentValRaw !== null && String(studentValRaw).trim() !== '' && String(studentValRaw).trim() !== 'No answer provided';
         const studentNum = parseFloat(String(studentValRaw ?? ''));
 
         const expectedNum = parseFloat(String(stage.expectedAnswer ?? ''));
@@ -102,19 +103,21 @@ export function evaluateMPCQuestion(
         let isCorrectDirectly = false;
         let isCorrectWithPropagatedError = false;
 
-        // 1. Direct Evaluation against key
-        const expectedStr = String(stage.expectedAnswer ?? '').trim();
-        const studentStr = String(studentValRaw ?? '').trim();
-        isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
+        if (isAttempted) {
+            // 1. Direct Evaluation against key
+            const expectedStr = String(stage.expectedAnswer ?? '').trim();
+            const studentStr = String(studentValRaw ?? '').trim();
+            isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
-        // 2. Error Propagation Evaluation if direct check failed & dependency exists
-        if (!isCorrectDirectly && stage.dependsOnStageId) {
-            const prevStageId = stage.dependsOnStageId;
-            const prevStudentVal = parseFloat(String(studentAnswer ? studentAnswer[prevStageId] : ''));
-            if (!isNaN(prevStudentVal)) {
-                const dynamicTarget = computeDynamicTarget(stage.formula, prevStudentVal);
-                if (dynamicTarget !== null && !isNaN(studentNum)) {
-                    isCorrectWithPropagatedError = Math.abs(studentNum - dynamicTarget) <= tol;
+            // 2. Error Propagation Evaluation if direct check failed & dependency exists
+            if (!isCorrectDirectly && stage.dependsOnStageId) {
+                const prevStageId = stage.dependsOnStageId;
+                const prevStudentVal = parseFloat(String(studentAnswer ? studentAnswer[prevStageId] : ''));
+                if (!isNaN(prevStudentVal)) {
+                    const dynamicTarget = computeDynamicTarget(stage.formula, prevStudentVal);
+                    if (dynamicTarget !== null && !isNaN(studentNum)) {
+                        isCorrectWithPropagatedError = Math.abs(studentNum - dynamicTarget) <= tol;
+                    }
                 }
             }
         }
@@ -125,11 +128,13 @@ export function evaluateMPCQuestion(
         stageResults[stage.id] = {
             isCorrectDirectly,
             isCorrectWithPropagatedError,
+            isAttempted,
+            status: isAttempted ? (isCorrectDirectly || isCorrectWithPropagatedError ? 'CORRECT' : 'INCORRECT') : 'UNANSWERED',
             earned: Math.round(earned * 100) / 100,
             max: Math.round(stageMax * 100) / 100,
             studentVal: studentValRaw ?? 'N/A',
             expectedVal: stage.expectedAnswer
-        };
+        } as any;
     }
 
     const finalScore = Math.round(totalEarned * 100) / 100;

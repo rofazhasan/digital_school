@@ -74,24 +74,29 @@ export function evaluateCMAQuestion(
     for (const part of parts) {
         const partMax = (Number(part.marks) || 1) / totalPartsWeight * maxMarks;
         const rawStudentVal = studentAnswer ? (studentAnswer[part.id] ?? studentAnswer[part.label] ?? (part as any).name ?? (part as any).prompt ?? studentAnswer[`part_${parts.indexOf(part)}`]) : undefined;
+        const isAttempted = rawStudentVal !== undefined && rawStudentVal !== null && String(rawStudentVal).trim() !== '' && String(rawStudentVal).trim() !== 'No answer provided';
         let isCorrect = false;
         
-        const expectedStr = String(part.expectedAnswer ?? '').trim();
+        const expectedStr = String(part.expectedAnswer ?? (part as any).modelAnswer ?? '').trim();
         const studentStr = String(rawStudentVal ?? '').trim();
 
-        const tol = Number(part.tolerance) || 0.01;
-        isCorrect = areExpressionsEquivalent(studentStr, expectedStr, tol);
+        if (isAttempted) {
+            const tol = Number(part.tolerance) || 0.01;
+            isCorrect = areExpressionsEquivalent(studentStr, expectedStr, tol);
+        }
 
         const earned = isCorrect ? partMax : 0;
         if (isCorrect) totalEarned += earned;
 
         partResults[part.id] = {
             isCorrect,
+            isAttempted,
+            status: isAttempted ? (isCorrect ? 'CORRECT' : 'INCORRECT') : 'UNANSWERED',
             earned: Math.round(earned * 100) / 100,
             max: Math.round(partMax * 100) / 100,
             studentVal: rawStudentVal ?? 'N/A',
-            expectedVal: part.expectedAnswer
-        };
+            expectedVal: part.expectedAnswer || (part as any).modelAnswer
+        } as any;
     }
 
     const finalScore = Math.round(totalEarned * 100) / 100;

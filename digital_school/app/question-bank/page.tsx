@@ -4173,6 +4173,24 @@ function DRQuestionForm({
   setReasonOptions,
   confidenceTracking,
   setConfidenceTracking,
+  drSubtype,
+  setDrSubtype,
+  acceptedAnswers,
+  setAcceptedAnswers,
+  toleranceType,
+  setToleranceType,
+  toleranceValue,
+  setToleranceValue,
+  expectedUnit,
+  setExpectedUnit,
+  unitRequired,
+  setUnitRequired,
+  orderSensitive,
+  setOrderSensitive,
+  caseSensitive,
+  setCaseSensitive,
+  allowBengali,
+  setAllowBengali,
 }: {
   expectedAnswer: string;
   setExpectedAnswer: (val: string) => void;
@@ -4180,41 +4198,153 @@ function DRQuestionForm({
   setReasonOptions: (opts: any[]) => void;
   confidenceTracking: boolean;
   setConfidenceTracking: (val: boolean) => void;
+  drSubtype: 'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST';
+  setDrSubtype: (val: 'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST') => void;
+  acceptedAnswers: string;
+  setAcceptedAnswers: (val: string) => void;
+  toleranceType: 'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE';
+  setToleranceType: (val: 'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE') => void;
+  toleranceValue: number;
+  setToleranceValue: (val: number) => void;
+  expectedUnit: string;
+  setExpectedUnit: (val: string) => void;
+  unitRequired: boolean;
+  setUnitRequired: (val: boolean) => void;
+  orderSensitive: boolean;
+  setOrderSensitive: (val: boolean) => void;
+  caseSensitive: boolean;
+  setCaseSensitive: (val: boolean) => void;
+  allowBengali: boolean;
+  setAllowBengali: (val: boolean) => void;
 }) {
   return (
     <div className="space-y-4 border p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border-purple-200 dark:border-purple-800">
       <h4 className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
         <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-xs font-mono">DR</span>
-        Diagnostic Reasoning Configuration
+        Deterministic DR Autograder Configuration
       </h4>
 
       {/* Question Maker Setup Guidance Banner */}
       <div className="p-3.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1.5">
         <div className="font-bold text-xs flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
-          <Sparkles className="w-4 h-4 text-purple-600" /> Question Creator Setup Guide for DR Questions:
+          <Sparkles className="w-4 h-4 text-purple-600" /> Production-Grade DR Autograder Setup Guide:
         </div>
         <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-          <li><strong>Part A (Answer Key):</strong> Type the expected numerical value, expression (e.g. <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">x^2+1</code>), or string key for Part A.</li>
-          <li><strong>Part B (Principle & Justifications):</strong> Add 2 to 4 conceptual principles explaining *why* Part A is true. Check the box for the single correct principle.</li>
-          <li><strong>Part C (Confidence Level):</strong> Leave confidence tracking enabled to calculate student Mastery, Misconception, and Execution Slip diagnostic tags!</li>
+          <li><strong>Autograder Subtype:</strong> Select TEXT, NUMERIC, SYMBOLIC, SET, or LIST. Zero AI is used at submission time.</li>
+          <li><strong>Part A Answer Key:</strong> Set the canonical key (e.g. <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">NEPHRON</code>, <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">9.8</code>, <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">F=ma</code>).</li>
+          <li><strong>Accepted Aliases:</strong> Add accepted Bangla, English, or synonym answers (comma or newline separated).</li>
+          <li><strong>Part B Justifications:</strong> Add conceptual reasoning options with 1 checked as correct principle.</li>
         </ul>
       </div>
 
-      <div className="p-3 border rounded-lg bg-background space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part A: Correct Answer Key / Expression</Label>
-          {expectedAnswer && (
-            <span className="text-xs font-mono font-bold text-purple-600 dark:text-purple-400">
-              Preview: <UniversalMathJax inline dynamic>{cleanupMath(expectedAnswer)}</UniversalMathJax>
-            </span>
-          )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border rounded-lg bg-background">
+        <div>
+          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">DR Autograder Subtype</Label>
+          <Select value={drSubtype} onValueChange={(v: any) => setDrSubtype(v)}>
+            <SelectTrigger className="h-8 text-xs font-semibold mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TEXT">TEXT (Short Text & Canonical Aliases)</SelectItem>
+              <SelectItem value="NUMERIC">NUMERIC (Decimal / Scientific / Tolerance / Units)</SelectItem>
+              <SelectItem value="SYMBOLIC">SYMBOLIC (Algebraic / Math Notation)</SelectItem>
+              <SelectItem value="SET">SET (Order-Insensitive Set)</SelectItem>
+              <SelectItem value="LIST">LIST (Order-Sensitive Sequence)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Input
-          value={expectedAnswer}
-          onChange={e => setExpectedAnswer(e.target.value)}
-          placeholder="e.g. 42 or (2x+1)/(x^2+3) or Option B text"
-          className="h-8 text-xs font-mono"
+
+        <div>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Canonical Answer Key</Label>
+            {expectedAnswer && (
+              <span className="text-[11px] font-mono font-bold text-purple-600 dark:text-purple-400">
+                Preview: <UniversalMathJax inline dynamic>{cleanupMath(expectedAnswer)}</UniversalMathJax>
+              </span>
+            )}
+          </div>
+          <Input
+            value={expectedAnswer}
+            onChange={e => setExpectedAnswer(e.target.value)}
+            placeholder="e.g. NEPHRON, 9.8, F=ma, or A,B,C"
+            className="h-8 text-xs font-mono mt-1"
+          />
+        </div>
+      </div>
+
+      {/* Accepted Answers / Aliases */}
+      <div className="p-3 border rounded-lg bg-background space-y-1.5">
+        <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Accepted Answer Variations / Aliases (Comma or Newline separated)</Label>
+        <Textarea
+          value={acceptedAnswers}
+          onChange={e => setAcceptedAnswers(e.target.value)}
+          placeholder="e.g. nephron, নেফ্রন, functional unit of kidney"
+          rows={2}
+          className="text-xs font-mono"
         />
+        <p className="text-[10px] text-muted-foreground">Any student answer matching a normalized alias will be graded as CORRECT.</p>
+      </div>
+
+      {/* Subtype-Specific Options: Numeric Tolerance & Units */}
+      {drSubtype === 'NUMERIC' && (
+        <div className="p-3 border rounded-lg bg-background space-y-3">
+          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Numeric Tolerance & Unit Settings</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-[11px] text-muted-foreground">Tolerance Type</Label>
+              <Select value={toleranceType} onValueChange={(v: any) => setToleranceType(v)}>
+                <SelectTrigger className="h-8 text-xs font-semibold mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ABSOLUTE">ABSOLUTE (± Value)</SelectItem>
+                  <SelectItem value="RELATIVE">RELATIVE (Ratio)</SelectItem>
+                  <SelectItem value="PERCENTAGE">PERCENTAGE (%)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-[11px] text-muted-foreground">Tolerance Value</Label>
+              <Input
+                type="number"
+                step="any"
+                value={toleranceValue}
+                onChange={e => setToleranceValue(parseFloat(e.target.value) || 0)}
+                placeholder="e.g. 0.01 or 5"
+                className="h-8 text-xs font-mono mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] text-muted-foreground">Expected Unit (e.g. m/s^2)</Label>
+              <Input
+                value={expectedUnit}
+                onChange={e => setExpectedUnit(e.target.value)}
+                placeholder="e.g. m/s^2, kg, J"
+                className="h-8 text-xs font-mono mt-1"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox checked={unitRequired} onCheckedChange={ch => setUnitRequired(!!ch)} id="dr-unit-chk" />
+            <Label htmlFor="dr-unit-chk" className="text-xs cursor-pointer">Require Unit Match for Full Marks</Label>
+          </div>
+        </div>
+      )}
+
+      {/* Flags & Toggle Controls */}
+      <div className="flex flex-wrap items-center gap-4 p-3 border rounded-lg bg-background text-xs">
+        <div className="flex items-center gap-2">
+          <Checkbox checked={allowBengali} onCheckedChange={ch => setAllowBengali(!!ch)} id="dr-bn-chk" />
+          <Label htmlFor="dr-bn-chk" className="cursor-pointer">Bengali Digits Auto-Normalizer (০-৯ → 0-9)</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox checked={caseSensitive} onCheckedChange={ch => setCaseSensitive(!!ch)} id="dr-case-chk" />
+          <Label htmlFor="dr-case-chk" className="cursor-pointer">Case Sensitive Match</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Checkbox checked={confidenceTracking} onCheckedChange={ch => setConfidenceTracking(!!ch)} id="dr-conf-chk" />
+          <Label htmlFor="dr-conf-chk" className="cursor-pointer">Part C Confidence Meter</Label>
+        </div>
       </div>
 
       <div className="p-3 border rounded-lg bg-background space-y-3">
@@ -4254,7 +4384,7 @@ function DRQuestionForm({
                     next[idx].text = e.target.value;
                     setReasonOptions(next);
                   }}
-                  placeholder={`Reason option ${String.fromCharCode(65 + idx)} text (MathJax allowed, e.g. x^2)...`}
+                  placeholder={`Reason option ${String.fromCharCode(65 + idx)} text...`}
                   className="h-8 text-xs flex-1"
                 />
                 {reasonOptions.length > 1 && (
@@ -4272,11 +4402,6 @@ function DRQuestionForm({
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 p-3 border rounded-lg bg-background">
-        <Checkbox checked={confidenceTracking} onCheckedChange={ch => setConfidenceTracking(!!ch)} id="dr-conf-chk" />
-        <Label htmlFor="dr-conf-chk" className="text-xs cursor-pointer font-medium">Enable Part C Self-Confidence Meter (Certain / Probably / Unsure)</Label>
       </div>
     </div>
   );
@@ -4362,6 +4487,35 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   );
   const [confidenceTracking, setConfidenceTracking] = useState<boolean>(
     (initialData as any)?.confidenceTracking !== false
+  );
+  const [drSubtype, setDrSubtype] = useState<'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST'>(
+    (initialData as any)?.drSubtype || 'TEXT'
+  );
+  const [acceptedAnswers, setAcceptedAnswers] = useState<string>(
+    Array.isArray((initialData as any)?.acceptedAnswers)
+      ? (initialData as any)?.acceptedAnswers.join(', ')
+      : (initialData as any)?.acceptedAnswers || (initialData as any)?.aliases || ''
+  );
+  const [toleranceType, setToleranceType] = useState<'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE'>(
+    (initialData as any)?.toleranceType || 'ABSOLUTE'
+  );
+  const [toleranceValue, setToleranceValue] = useState<number>(
+    Number((initialData as any)?.toleranceValue ?? (initialData as any)?.tolerance ?? 0.01)
+  );
+  const [expectedUnit, setExpectedUnit] = useState<string>(
+    (initialData as any)?.expectedUnit || ''
+  );
+  const [unitRequired, setUnitRequired] = useState<boolean>(
+    Boolean((initialData as any)?.unitRequired)
+  );
+  const [orderSensitive, setOrderSensitive] = useState<boolean>(
+    (initialData as any)?.orderSensitive !== false
+  );
+  const [caseSensitive, setCaseSensitive] = useState<boolean>(
+    Boolean((initialData as any)?.caseSensitive)
+  );
+  const [allowBengali, setAllowBengali] = useState<boolean>(
+    (initialData as any)?.allowBengali !== false
   );
   const [explanation, setExplanation] = useState((initialData as any)?.explanation || '');
   const [images, setImages] = useState<string[]>(initialData?.images || []);
@@ -4630,6 +4784,17 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       mpcStages: type === 'MPC' ? mpcStages : null,
       reasonOptions: type === 'DR' ? reasonOptions : null,
       confidenceTracking: type === 'DR' ? confidenceTracking : null,
+      drSubtype: type === 'DR' ? drSubtype : null,
+      canonicalAnswer: type === 'DR' ? modelAnswer.trim() : null,
+      acceptedAnswers: type === 'DR' ? acceptedAnswers : null,
+      aliases: type === 'DR' ? acceptedAnswers : null,
+      toleranceType: type === 'DR' ? toleranceType : null,
+      toleranceValue: type === 'DR' ? toleranceValue : null,
+      expectedUnit: type === 'DR' ? expectedUnit : null,
+      unitRequired: type === 'DR' ? unitRequired : null,
+      orderSensitive: type === 'DR' ? orderSensitive : null,
+      caseSensitive: type === 'DR' ? caseSensitive : null,
+      allowBengali: type === 'DR' ? allowBengali : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
         type === 'INT' ? correctAnswer.toString() : type === 'DR' ? modelAnswer.trim() : null,
       assertion: type === 'AR' ? assertion.trim() : null,
@@ -5160,6 +5325,24 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 setReasonOptions={setReasonOptions}
                 confidenceTracking={confidenceTracking}
                 setConfidenceTracking={setConfidenceTracking}
+                drSubtype={drSubtype}
+                setDrSubtype={setDrSubtype}
+                acceptedAnswers={acceptedAnswers}
+                setAcceptedAnswers={setAcceptedAnswers}
+                toleranceType={toleranceType}
+                setToleranceType={setToleranceType}
+                toleranceValue={toleranceValue}
+                setToleranceValue={setToleranceValue}
+                expectedUnit={expectedUnit}
+                setExpectedUnit={setExpectedUnit}
+                unitRequired={unitRequired}
+                setUnitRequired={setUnitRequired}
+                orderSensitive={orderSensitive}
+                setOrderSensitive={setOrderSensitive}
+                caseSensitive={caseSensitive}
+                setCaseSensitive={setCaseSensitive}
+                allowBengali={allowBengali}
+                setAllowBengali={setAllowBengali}
               />
             )}
           </motion.div></AnimatePresence>

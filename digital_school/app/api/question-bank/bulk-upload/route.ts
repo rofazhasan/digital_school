@@ -263,8 +263,27 @@ async function validateAndMapRow(row: any, classes: any[]) {
             }
             if (data.subQuestions.length === 0) throw new Error("MPC requires at least one Stage (Sub 1 Text & Sub 1 Model Answer)");
         } else if (data.type === 'DR') {
-            const mainAnswer = data.modelAnswer || s(getValue(row, ["Correct Answer", "Answer", "Result"]));
+            const mainAnswer = data.modelAnswer || s(getValue(row, ["Canonical Answer", "Model Answer", "Correct Answer", "Answer", "Result"]));
             if (!mainAnswer) throw new Error("DR question requires a Model Answer for Part A");
+
+            const drSubtypeRaw = s(getValue(row, ["DR Subtype", "Subtype", "DR Type"])).toUpperCase();
+            const drSubtype = ['TEXT', 'NUMERIC', 'SYMBOLIC', 'SET', 'LIST'].includes(drSubtypeRaw) ? drSubtypeRaw : 'TEXT';
+            const acceptedAnswers = s(getValue(row, ["Accepted Answers", "Aliases", "Accepted Variations"]));
+            const toleranceTypeRaw = s(getValue(row, ["Tolerance Type"])).toUpperCase();
+            const toleranceType = ['ABSOLUTE', 'RELATIVE', 'PERCENTAGE'].includes(toleranceTypeRaw) ? toleranceTypeRaw : 'ABSOLUTE';
+            const toleranceValue = n(getValue(row, ["Tolerance Value", "Tolerance"])) || 0.01;
+            const expectedUnit = s(getValue(row, ["Expected Unit", "Unit"]));
+            const unitRequiredRaw = s(getValue(row, ["Unit Required"]));
+            const unitRequired = unitRequiredRaw.toUpperCase() === 'TRUE' || unitRequiredRaw === '1';
+
+            (data as any).drSubtype = drSubtype;
+            (data as any).canonicalAnswer = mainAnswer;
+            (data as any).acceptedAnswers = acceptedAnswers;
+            (data as any).aliases = acceptedAnswers;
+            (data as any).toleranceType = toleranceType;
+            (data as any).toleranceValue = toleranceValue;
+            (data as any).expectedUnit = expectedUnit;
+            (data as any).unitRequired = unitRequired;
 
             const reasonOpts: Array<{ id: string; text: string; isCorrect: boolean }> = [];
             const correctReasonOptRaw = s(getValue(row, ["Correct Option", "Correct Answer", "Sub 1 Correct", "Correct Reason"])).toUpperCase();
