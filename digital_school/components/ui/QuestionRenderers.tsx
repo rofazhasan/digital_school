@@ -354,196 +354,355 @@ export function MPCRenderer({
 }
 
 // ==========================================
-// 3. DR (Diagnostic Reasoning) Renderer
+// 3. SRA (Structured Reasoning Assembly) Renderer
 // ==========================================
-export interface DRRendererProps {
+export interface SRARendererProps {
   question: {
     id: string;
     text?: string;
-    expectedAnswer?: string | number;
-    answerType?: string;
-    reasonOptions?: Array<{
-      id: string;
-      text: string;
-      isCorrect?: boolean;
-    }>;
+    questionText?: string;
+    stem?: string;
+    marks?: number;
+    components?: any[];
+    sraComponents?: any[];
+    reasoningGraph?: any;
+    reasonOptions?: any[]; // legacy fallback
+    expectedAnswer?: any; // legacy fallback
   };
-  value?: {
-    answer?: string | number;
-    reasonId?: string;
-    confidence?: 'Certain' | 'Probably' | 'Unsure';
-  };
-  onChange?: (val: { answer?: string | number; reasonId?: string; confidence?: 'Certain' | 'Probably' | 'Unsure' }) => void;
+  value?: Record<string, any>;
+  onChange?: (val: Record<string, any>) => void;
   disabled?: boolean;
   showFeedback?: boolean;
   evalResult?: any;
 }
 
-export function DRRenderer({
+export function SRARenderer({
   question,
   value = {},
   onChange,
   disabled = false,
   showFeedback = false,
   evalResult
-}: DRRendererProps) {
-  let rawReasons = question?.reasonOptions || (question as any)?.reasons || (question as any)?.options || (question as any)?.reason_options || (question as any)?.subQuestions || (question as any)?.sub_questions || [];
-  if (typeof rawReasons === 'string') {
-    try { rawReasons = JSON.parse(rawReasons); } catch { rawReasons = []; }
+}: SRARendererProps) {
+  // Extract components or adapt legacy DR question
+  let rawComponents = question?.components || (question as any)?.sraComponents || (question as any)?.subQuestions || [];
+  if (typeof rawComponents === 'string') {
+    try { rawComponents = JSON.parse(rawComponents); } catch { rawComponents = []; }
   }
-  if (rawReasons && typeof rawReasons === 'object' && !Array.isArray(rawReasons)) {
-    rawReasons = (rawReasons as any).options || (rawReasons as any).reasons || (rawReasons as any).reasonOptions || [];
+
+  // If no components array exists, synthesize from legacy DR structure
+  if (!Array.isArray(rawComponents) || rawComponents.length === 0) {
+    const rawReasons = question?.reasonOptions || (question as any)?.reasons || (question as any)?.options || [];
+    const reasons = Array.isArray(rawReasons) ? rawReasons : [];
+    rawComponents = [
+      {
+        id: 'answer',
+        kind: 'CONSTRUCT',
+        label: 'Step 1: Construct Solution',
+        expectedAnswer: question?.expectedAnswer,
+        marks: 2
+      },
+      {
+        id: 'evidence',
+        kind: 'EVIDENCE_SELECT',
+        label: 'Step 2: Select Conceptual Justification',
+        selectMode: 'SINGLE',
+        evidenceOptions: reasons.map((r: any, idx: number) => ({
+          id: r.id || `r_${idx}`,
+          text: typeof r === 'string' ? r : (r.text || r.question || r.label || `Reason ${idx + 1}`),
+          isCorrect: Boolean(r.isCorrect || r.correct)
+        })),
+        marks: 1
+      }
+    ];
   }
-  const reasonOpts: any[] = Array.isArray(rawReasons) ? rawReasons : [];
 
-  const handleAnswerChange = (ans: string) => {
+  const components: any[] = Array.isArray(rawComponents) ? rawComponents : [];
+
+  const handleComponentChange = (compId: string, compVal: any) => {
     if (disabled || !onChange) return;
-    onChange({ ...(value || {}), answer: ans });
+    onChange({ ...(value || {}), [compId]: compVal });
   };
 
-  const handleReasonSelect = (reasonId: string) => {
+  const moveOrderItem = (compId: string, currentOrder: string[], fromIndex: number, toIndex: number) => {
     if (disabled || !onChange) return;
-    onChange({ ...(value || {}), reasonId });
+    if (toIndex < 0 || toIndex >= currentOrder.length) return;
+    const newOrder = [...currentOrder];
+    const [moved] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, moved);
+    handleComponentChange(compId, newOrder);
   };
-
-  const handleConfidenceSelect = (conf: 'Certain' | 'Probably' | 'Unsure') => {
-    if (disabled || !onChange) return;
-    onChange({ ...(value || {}), confidence: conf });
-  };
-
-  const partAOptions: any[] = (question as any).partAOptions || (question as any).mainOptions || [];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Student Answering Instruction Banner */}
       {!disabled && !showFeedback && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1.5">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-950 dark:text-indigo-200 space-y-1.5 shadow-xs">
           <div className="font-bold text-sm flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-            <Sparkles className="w-4 h-4" /> How to Answer Diagnostic Reasoning (DR) Questions:
+            <Sparkles className="w-4 h-4" /> Structured Reasoning Assembly (SRA)
           </div>
-          <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-300 leading-relaxed">
-            <li><strong>Part A (Answer Construction):</strong> Enter your calculated numerical value, mathematical expression, or option choice. Use <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold">^</code> for powers (e.g., <code className="font-mono">x^2</code>) and <code className="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded font-mono font-bold">/</code> for fractions.</li>
-            <li><strong>Part B (Principle & Justification):</strong> Select the scientific or mathematical principle that justifies your Part A answer.</li>
-            <li><strong>Part C (Confidence Level):</strong> Select your confidence level (Certain, Probably, or Unsure).</li>
-          </ol>
+          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+            Construct your answer logically by assembling machine-checkable steps (calculation, evidence selection, logical relations, and procedural ordering).
+          </p>
         </div>
       )}
 
-      {/* Part A: Main Answer */}
-      <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
-        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          Part A — Answer Construction
-        </Label>
+      {/* Render SRA Components in sequence */}
+      <div className="space-y-5">
+        {components.map((comp: any, cIdx: number) => {
+          const compId = comp.id || `comp_${cIdx}`;
+          const kind = String(comp.kind || comp.type || 'CONSTRUCT').toUpperCase();
+          const compVal = value?.[compId] ?? (typeof value === 'object' ? value?.[compId] : undefined);
+          const compMarks = comp.marks || 1;
+          const compResult = evalResult?.componentResults?.[compId];
 
-        {partAOptions.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            {partAOptions.map((opt, idx) => {
-              const optVal = typeof opt === 'object' ? (opt.text || opt.label || opt.value) : String(opt);
-              const optId = typeof opt === 'object' ? (opt.id || optVal) : optVal;
-              const isSelected = String(value?.answer || '').trim() === String(optId).trim() || String(value?.answer || '').trim() === String(optVal).trim();
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleAnswerChange(optId)}
-                  disabled={disabled}
-                  className={`p-2.5 rounded-lg border text-sm text-left transition-all ${
-                    isSelected
-                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-950 dark:text-indigo-200'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  <UniversalMathJax inline dynamic>{cleanupMath(optVal)}</UniversalMathJax>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <LiveExpressionInput
-            placeholder="Enter your final answer or math expression (e.g. 15, x^2+3, 4.5)..."
-            value={value?.answer ?? ''}
-            onChange={(val) => handleAnswerChange(val)}
-            disabled={disabled}
-          />
-        )}
-      </div>
-
-      {/* Part B: Conceptual Reasoning */}
-      <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
-        <Label className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-          Part B — Principle & Justification
-        </Label>
-        <p className="text-xs text-slate-500">Select the principle/reasoning that supports your answer above:</p>
-
-        {reasonOpts.length === 0 ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400 italic bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900">
-            No reasoning options configured for this DR question.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {reasonOpts.map((opt, idx) => {
-              const optId = opt.id || opt.key || opt.text || `reason_${idx}`;
-              const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || opt.question || opt.prompt || `Reason ${idx + 1}`);
-              const isSelected = value?.reasonId === optId || value?.reasonId === optText || String(value?.reasonId || '').trim() === String(optId).trim();
-              return (
-                <button
-                  key={optId}
-                  type="button"
-                  onClick={() => handleReasonSelect(optId)}
-                  disabled={disabled}
-                  className={`w-full text-left p-3 rounded-lg border text-sm transition-all flex items-start gap-2.5 ${
-                    isSelected
-                      ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center flex-shrink-0 ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-600 text-white'
-                        : 'border-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                  </div>
-                  <span><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Part C: Confidence Level Tracking */}
-      <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-          Confidence Level:
-        </span>
-        <div className="flex items-center gap-2">
-          {(['Certain', 'Probably', 'Unsure'] as const).map((conf) => (
-            <button
-              key={conf}
-              type="button"
-              onClick={() => handleConfidenceSelect(conf)}
-              disabled={disabled}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                value?.confidence === conf
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
-              }`}
+          return (
+            <div
+              key={compId}
+              className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-xs transition-all"
             >
-              {conf}
-            </button>
-          ))}
-        </div>
+              {/* Component Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center">
+                    {cIdx + 1}
+                  </span>
+                  <span className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                    <UniversalMathJax inline dynamic>{cleanupMath(comp.label || comp.prompt || `Step ${cIdx + 1}: ${kind}`)}</UniversalMathJax>
+                  </span>
+                </div>
+                <Badge variant="outline" className="text-[10px] font-semibold text-slate-500">
+                  [{compMarks} Marks]
+                </Badge>
+              </div>
+
+              {/* A. CONSTRUCT, INTERMEDIATE_CONSTRUCT, CONCLUSION */}
+              {(kind === 'CONSTRUCT' || kind === 'INTERMEDIATE_CONSTRUCT' || kind === 'CONCLUSION') && (
+                <div className="space-y-2">
+                  {comp.prompt && comp.prompt !== comp.label && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      <UniversalMathJax inline dynamic>{cleanupMath(comp.prompt)}</UniversalMathJax>
+                    </p>
+                  )}
+                  {comp.allowedAnswers && Array.isArray(comp.allowedAnswers) && comp.allowedAnswers.length > 0 && comp.fieldType === 'text_from_allowed_set' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {comp.allowedAnswers.map((token: string, tIdx: number) => {
+                        const isSelected = String(typeof compVal === 'object' && compVal !== null ? compVal.value : compVal).trim() === token.trim();
+                        return (
+                          <button
+                            key={tIdx}
+                            type="button"
+                            onClick={() => handleComponentChange(compId, token)}
+                            disabled={disabled}
+                            className={`p-2.5 rounded-lg border text-xs text-left transition-all ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-950 dark:text-indigo-200 ring-1 ring-indigo-500'
+                                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            <UniversalMathJax inline dynamic>{cleanupMath(token)}</UniversalMathJax>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <LiveExpressionInput
+                          placeholder={`Enter ${comp.label || 'constructed value'} (e.g. 15, x^2, 4.5)...`}
+                          value={typeof compVal === 'object' && compVal !== null ? (compVal.value ?? '') : (compVal ?? '')}
+                          onChange={(val) => handleComponentChange(compId, val)}
+                          disabled={disabled}
+                        />
+                      </div>
+                      {comp.unit && (
+                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                          {comp.unit}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* B. EVIDENCE_SELECT */}
+              {kind === 'EVIDENCE_SELECT' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">
+                    {comp.selectMode === 'SINGLE' ? 'Select the single most relevant statement:' : 'Select all relevant statements:'}
+                  </p>
+                  <div className="space-y-1.5">
+                    {(comp.evidenceOptions || []).map((opt: any, oIdx: number) => {
+                      const optId = String(opt.id || `opt_${oIdx}`);
+                      const isSingle = comp.selectMode === 'SINGLE';
+                      const selectedIds: string[] = Array.isArray(compVal)
+                        ? compVal.map(String)
+                        : (compVal && typeof compVal === 'object' && Array.isArray(compVal.selectedEvidenceIds)
+                          ? compVal.selectedEvidenceIds.map(String)
+                          : (compVal ? [String(compVal.selectedId || compVal)] : []));
+
+                      const isSelected = selectedIds.includes(optId);
+
+                      const toggleSelect = () => {
+                        if (disabled) return;
+                        if (isSingle) {
+                          handleComponentChange(compId, [optId]);
+                        } else {
+                          const updated = isSelected
+                            ? selectedIds.filter(id => id !== optId)
+                            : [...selectedIds, optId];
+                          handleComponentChange(compId, updated);
+                        }
+                      };
+
+                      return (
+                        <button
+                          key={optId}
+                          type="button"
+                          onClick={toggleSelect}
+                          disabled={disabled}
+                          className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all flex items-start gap-2.5 ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 font-medium text-indigo-950 dark:text-indigo-200 ring-1 ring-indigo-500/20'
+                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div
+                            className={`w-4 h-4 ${isSingle ? 'rounded-full' : 'rounded'} border mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-600 text-white'
+                                : 'border-slate-300 dark:border-slate-700'
+                            }`}
+                          >
+                            {isSelected && (isSingle ? <div className="w-1.5 h-1.5 rounded-full bg-white" /> : <span className="text-[10px] leading-none">✓</span>)}
+                          </div>
+                          <span className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(opt.text || `Option ${oIdx + 1}`)}</UniversalMathJax></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* C. RELATION (Source -> Relation -> Target) */}
+              {kind === 'RELATION' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">Build or select the logical relationship:</p>
+                  <div className="space-y-2">
+                    {(comp.relationOptions || comp.expectedRelations || [{ source: 'Fact A', target: 'Fact B', relation: 'IMPLIES' }]).map((rel: any, rIdx: number) => {
+                      const relationsList = comp.allowedRelations || ['IMPLIES', 'CAUSES', 'EQUIVALENT_TO', 'LEADS_TO', 'REQUIRES'];
+                      const currentRelations: any[] = Array.isArray(compVal) ? compVal : (compVal?.relations || []);
+                      const selectedRel = currentRelations[rIdx]?.relation || currentRelations[0]?.relation || 'IMPLIES';
+
+                      return (
+                        <div key={rIdx} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center gap-2 text-xs">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 bg-white dark:bg-slate-900 border rounded">
+                            <UniversalMathJax inline dynamic>{cleanupMath(rel.source || 'Premise')}</UniversalMathJax>
+                          </span>
+                          <select
+                            disabled={disabled}
+                            value={selectedRel}
+                            onChange={(e) => {
+                              const updated = [{ source: rel.source, target: rel.target, relation: e.target.value }];
+                              handleComponentChange(compId, updated);
+                            }}
+                            className="bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-bold px-2 py-1 rounded text-xs"
+                          >
+                            {relationsList.map((op: string) => (
+                              <option key={op} value={op}>
+                                ── {op} ──▶
+                              </option>
+                            ))}
+                          </select>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 bg-white dark:bg-slate-900 border rounded">
+                            <UniversalMathJax inline dynamic>{cleanupMath(rel.target || 'Conclusion')}</UniversalMathJax>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* D. ORDER (Step-by-step reasoning sequence) */}
+              {kind === 'ORDER' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">Arrange the reasoning steps in logical chronological sequence (use arrows to reorder):</p>
+                  {(() => {
+                    const defaultOrder = (comp.sequenceItems || comp.items || []).map((it: any) => it.id);
+                    const currentOrder: any[] = Array.isArray(compVal) ? compVal : (compVal?.order || defaultOrder);
+                    const itemMap = new Map((comp.sequenceItems || comp.items || []).map((it: any) => [it.id, it.text]));
+
+                    return (
+                      <div className="space-y-1.5">
+                        {currentOrder.map((itemVal, posIdx) => {
+                          const itemId = typeof itemVal === 'string' ? itemVal : (itemVal?.id || String(itemVal));
+                          const itemText = itemMap.get(itemId) || (typeof itemVal === 'object' && itemVal !== null ? itemVal.text : itemId);
+
+                          return (
+                            <div
+                              key={itemId || posIdx}
+                              className="flex items-center gap-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                            >
+                              <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold flex items-center justify-center text-[10px] shrink-0">
+                                {posIdx + 1}
+                              </span>
+                              <span className="flex-1 font-medium text-slate-800 dark:text-slate-200">
+                                <UniversalMathJax inline dynamic>{cleanupMath(String(itemText || ''))}</UniversalMathJax>
+                              </span>
+                            {!disabled && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={posIdx === 0}
+                                  onClick={() => moveOrderItem(compId, currentOrder, posIdx, posIdx - 1)}
+                                  className="w-6 h-6 rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200 disabled:opacity-30 hover:bg-slate-100"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={posIdx === currentOrder.length - 1}
+                                  onClick={() => moveOrderItem(compId, currentOrder, posIdx, posIdx + 1)}
+                                  className="w-6 h-6 rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200 disabled:opacity-30 hover:bg-slate-100"
+                                >
+                                  ▼
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                </div>
+              )}
+
+              {/* Component Feedback */}
+              {showFeedback && compResult && (
+                <div className={`p-2.5 rounded-lg border text-xs flex items-center justify-between ${
+                  compResult.status === 'CORRECT'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 text-emerald-900 dark:text-emerald-200'
+                    : (compResult.status === 'PARTIAL'
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 text-amber-900 dark:text-amber-200'
+                      : 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 text-rose-900 dark:text-rose-200')
+                }`}>
+                  <span className="font-semibold">{compResult.feedback}</span>
+                  <span className="font-mono font-bold">[{compResult.earnedMarks} / {compResult.maxMarks}m]</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Feedback Overlay */}
+      {/* Overall Feedback */}
       {showFeedback && evalResult && (
         <Card className="p-3.5 border text-xs space-y-1 bg-slate-900 text-white dark:bg-slate-950">
           <div className="flex items-center justify-between font-bold">
-            <span>Diagnostic Tag: {evalResult.diagnosticTag}</span>
-            <span>Score: {evalResult.score} / {evalResult.maxScore}m</span>
+            <span>Diagnostics: {evalResult.diagnosticTags?.join(', ') || 'Evaluated'}</span>
+            <span>Total: {evalResult.score} / {evalResult.maxScore}m</span>
           </div>
           <p className="text-slate-300">{evalResult.feedback}</p>
         </Card>
@@ -551,3 +710,8 @@ export function DRRenderer({
     </div>
   );
 }
+
+// Backward-compatible alias for any legacy DR references
+export const DRRenderer = SRARenderer;
+export type DRRendererProps = SRARendererProps;
+

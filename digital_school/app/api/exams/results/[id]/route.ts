@@ -9,6 +9,7 @@ import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
 import { evaluateCMAQuestion } from '@/lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '@/lib/evaluation/mpcEvaluation';
 import { evaluateDRQuestion } from '@/lib/evaluation/drEvaluation';
+import { evaluateSRAQuestion } from '@/lib/evaluation/sraEvaluation';
 import { Prisma, QuestionType } from '@prisma/client';
 
 interface ProcessedQuestion {
@@ -435,7 +436,7 @@ export async function GET(
             }
             calculatedMarks = qMark;
           }
-        } else if (type === 'DR') {
+        } else if (type === 'SRA' || type === 'DR') {
           let parsedAns = studentAnswer;
           if (typeof parsedAns === 'string') {
             try { parsedAns = JSON.parse(parsedAns); } catch {}
@@ -444,15 +445,17 @@ export async function GET(
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const drRes = evaluateDRQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
-            let qMark = drRes.score;
-            if (!drRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-              const maxM = drRes.maxScore || Number(question.marks) || 1;
+            const sraRes = evaluateSRAQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
+            let qMark = sraRes.score;
+            const negRate = Number(exam.mcqNegativeMarking || 0);
+            if (!sraRes.isCorrect && negRate > 0) {
+              const maxM = sraRes.maxScore || Number(question.marks) || 1;
               const halfMark = maxM / 2;
               let wrongPenalty = 0;
-              if (!drRes.answerCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-              if (!drRes.reasonCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-              qMark = Math.round((drRes.score - wrongPenalty) * 100) / 100;
+              Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
+                if (cr.status === 'INCORRECT') wrongPenalty += (halfMark * negRate) / 100;
+              });
+              qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
             }
             calculatedMarks = qMark;
           }

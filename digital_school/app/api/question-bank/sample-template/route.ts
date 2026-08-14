@@ -47,11 +47,12 @@ export async function GET(req: any) {
             ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer' (for part answer), and 'Sub X Explanation' (for part rationale)."],
             ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem). Use 'Sub X Text', 'Sub X Marks', 'Sub X Option A-D', and 'Sub X Correct Option' for parts."],
             ["", ""],
-            ["ADVANCED OBJECTIVE TYPES INSTRUCTION GUIDE (AI & HUMAN COMPATIBLE)", "CRITICAL SPECIFICATIONS FOR CMA, MPC, AND DR"],
+            ["ADVANCED OBJECTIVE TYPES INSTRUCTION GUIDE (AI & HUMAN COMPATIBLE)", "CRITICAL SPECIFICATIONS FOR SRA, CMA, MPC, AND DR"],
+            ["SRA (Structured Reasoning Assembly)", "1. Set Type = 'SRA'. 2. Fill 'Question Text' (problem stem/scenario). 3. For Step 1 (Construct/Intermediate): Fill 'Sub 1 Text' (step prompt), 'Sub 1 Marks', 'Sub 1 Model Answer' (exact formula/number), 'Sub 1 Type' ('construct'). 4. For Step 2 (Evidence/Rule Selection): Fill 'Sub 2 Text' (evidence selection prompt), 'Sub 2 Option A-D' (reasoning statements/laws), 'Sub 2 Correct Option' (correct rule e.g., 'A'). Fully deterministic autograding without AI/NLP."],
             ["CMA (Constructed Multi-Answer)", "1. Set Type = 'CMA'. 2. Fill 'Question Text' (problem description). 3. For each sub-part (Sub 1, Sub 2, etc.): Fill 'Sub X Text' (field label/prompt e.g., 'Velocity (m/s)'), 'Sub X Marks' (part marks), and 'Sub X Model Answer' (exact key e.g., '20' or '2*v0*sin(theta)/g'). 4. Optional: 'Sub X Type' (integer, decimal, expression, fraction, text; default is decimal), 'Sub X Tolerance' (e.g., 0.05), 'Sub X Unit' (e.g., 'm/s')."],
             ["MPC (Multi-Step Problem Chain)", "1. Set Type = 'MPC'. 2. Fill 'Question Text' (scenario stem). 3. For each stage (Sub 1, Sub 2, etc.): Fill 'Sub X Text' (stage title e.g., 'Stage 1: Calculate acceleration'), 'Sub X Marks', and 'Sub X Model Answer' (stage key e.g., '10'). 4. Optional Error Propagation (EPH): 'Sub X Depends On' (e.g., 's1' or '1') and 'Sub X Formula' (dynamic target formula e.g., '0.5 * 1200 * (prev * 8)^2'). If Stage 1 is wrong, Stage 2 evaluates methodology dynamically via this formula so students aren't double-penalized!"],
-            ["DR (Diagnostic Reasoning)", "1. Set Type = 'DR'. 2. Fill 'Question Text' (Part A question stem) and 'Model Answer' (Part A key value). 3. For Part B Reason choices: Fill 'Sub 1 Text', 'Sub 2 Text', 'Sub 3 Text', etc. with justification statements. 4. Specify the correct justification reason via 'Sub X Correct' = 'TRUE' (or set 'Correct Option' = 'A', 'B', 'C', or '1', '2', '3'). The system auto-maps student responses to 7 Cognitive Diagnostic Tags (MASTERY, MISCONCEPTION, EXECUTION_SLIP, etc.)."],
-            ["AI QUESTION GENERATION NOTE", "When generating questions via AI or scripts: Always output Type as 'CMA', 'MPC', or 'DR'. For CMA & MPC, populate 'subQuestions' array with { label/stageTitle, marks, modelAnswer, type, tolerance, unit, dependsOnStageId, formula }. For DR, populate Part A 'modelAnswer' and 'reasonOptions' array with { id, text, isCorrect }."],
+            ["DR (Diagnostic Reasoning - Legacy)", "1. Set Type = 'DR' or 'SRA'. 2. Fill 'Question Text' (Part A question stem) and 'Model Answer' (Part A key value). 3. For Part B Reason choices: Fill 'Sub 1 Text', 'Sub 2 Text', 'Sub 3 Text', etc. with justification statements. 4. Specify the correct justification reason via 'Sub X Correct' = 'TRUE' (or set 'Correct Option' = 'A', 'B', 'C', or '1', '2', '3'). The system auto-maps student responses to 7 Cognitive Diagnostic Tags (MASTERY, MISCONCEPTION, EXECUTION_SLIP, etc.)."],
+            ["AI QUESTION GENERATION NOTE", "When generating questions via AI or scripts: Always output Type as 'SRA', 'CMA', 'MPC', or 'DR'. For SRA, populate 'components' array with { id, kind, label, prompt, expectedAnswer, options, scoring }. For CMA & MPC, populate 'subQuestions' array with { label/stageTitle, marks, modelAnswer, type, tolerance, unit, dependsOnStageId, formula }."],
         ];
 
         const descriptiveGuide = [
@@ -267,14 +268,25 @@ export async function GET(req: any) {
             }
         }
 
-        const sampleClass = classNames[0] || "Class 10";
+        const sampleClass = classNames[0] || "Class 10 - A";
 
         // Add Samples based on mode
         if (mode === 'objective' || mode === 'all') {
             templateSheet.addRow({
-                type: "MCQ", className: sampleClass, subject: "Physics", topic: "Light", difficulty: "EASY", marks: 1,
-                questionText: "What is the speed of light?", optionA: "3e8 m/s", optionB: "2e8 m/s", optionC: "1e8 m/s",
-                correctOption: "A", explanation: "Speed of light in vacuum is approx 300,000 km/s."
+                type: "MCQ", className: sampleClass, subject: "Physics", topic: "Kinematics", difficulty: "EASY", marks: 1,
+                questionText: "What is the unit of force in SI system?", optionA: "Newton", optionB: "Joule", optionC: "Watt", optionD: "Pascal",
+                correctOption: "A", explanation: "1 Newton = 1 kg*m/s^2"
+            });
+            templateSheet.addRow({
+                type: "MC", className: sampleClass, subject: "Physics", topic: "Forces", difficulty: "MEDIUM", marks: 2,
+                questionText: "Which of the following are vector quantities?", optionA: "Velocity", optionB: "Speed", optionC: "Acceleration", optionD: "Mass",
+                correctOption: "A, C", explanation: "Velocity and acceleration have both magnitude and direction."
+            });
+            templateSheet.addRow({
+                type: "AR", className: sampleClass, subject: "Chemistry", topic: "Bonding", difficulty: "MEDIUM", marks: 2,
+                questionText: "Assertion and Reason on ionic bonding:",
+                assertion: "NaCl has a high melting point.", reason: "Strong electrostatic forces exist between ions.",
+                correctOption: "1", explanation: "Both A and R are true, and R is the correct explanation of A."
             });
             templateSheet.addRow({
                 type: "MTF", className: sampleClass, subject: "GK", topic: "Capitals", difficulty: "MEDIUM", marks: 5,
@@ -314,7 +326,7 @@ export async function GET(req: any) {
                 questionText: "A body moves from rest with acceleration 4 m/s² for 5 seconds.",
                 objSub1Text: "Velocity (m/s)", objSub1Marks: 2, objSub1ModelAnswer: "20",
                 objSub2Text: "Displacement (m)", objSub2Marks: 3, objSub2ModelAnswer: "50",
-                explanation: "v = u + at = 0 + 4*5 = 20 m/s; s = ut + 0.5at² = 0 + 0.5*4*25 = 50m"
+                explanation: "Multi-step chain with Error Propagation Protection."
             });
             // SAMPLE MPC
             templateSheet.addRow({
@@ -323,6 +335,17 @@ export async function GET(req: any) {
                 objSub1Text: "Stage 1: Calculate acceleration", objSub1Marks: 5, objSub1ModelAnswer: "10",
                 objSub2Text: "Stage 2: Calculate velocity after 5 sec", objSub2Marks: 5, objSub2ModelAnswer: "50",
                 explanation: "Multi-step chain with Error Propagation Protection."
+            });
+            // SAMPLE SRA
+            templateSheet.addRow({
+                type: "SRA", className: sampleClass, subject: "Physics", topic: "Work & Energy", difficulty: "HARD", marks: 4,
+                questionText: "A block of mass 2 kg moving at 3 m/s on a frictionless table comes to rest against a spring.",
+                modelAnswer: "9",
+                objSub1Text: "Step 1: Calculate the kinetic energy of the block in Joules", objSub1Marks: 2, objSub1ModelAnswer: "9",
+                objSub2Text: "Step 2: Select the governing physical principle", objSub2Marks: 2, 
+                objSub2A: "Conservation of Mechanical Energy (E_k = 1/2 mv^2)", objSub2B: "Newton's Third Law (F_1 = -F_2)", objSub2C: "Law of Gravitation", objSub2D: "Ohm's Law",
+                objSub2Correct: "A",
+                explanation: "E_k = 0.5 * 2 * (3)^2 = 9 J. The total initial kinetic energy converts into elastic potential energy without dissipation."
             });
             // SAMPLE DR
             templateSheet.addRow({

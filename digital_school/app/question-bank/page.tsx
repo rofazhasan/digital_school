@@ -48,7 +48,7 @@ import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'DR';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'SRA' | 'DR';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
@@ -4264,244 +4264,466 @@ function MPCQuestionForm({
   );
 }
 
-function DRQuestionForm({
-  expectedAnswer,
-  setExpectedAnswer,
-  reasonOptions,
-  setReasonOptions,
-  confidenceTracking,
-  setConfidenceTracking,
-  drSubtype,
-  setDrSubtype,
-  acceptedAnswers,
-  setAcceptedAnswers,
-  toleranceType,
-  setToleranceType,
-  toleranceValue,
-  setToleranceValue,
-  expectedUnit,
-  setExpectedUnit,
-  unitRequired,
-  setUnitRequired,
-  orderSensitive,
-  setOrderSensitive,
-  caseSensitive,
-  setCaseSensitive,
-  allowBengali,
-  setAllowBengali,
+function SRAQuestionForm({
+  components,
+  setComponents,
 }: {
-  expectedAnswer: string;
-  setExpectedAnswer: (val: string) => void;
-  reasonOptions: any[];
-  setReasonOptions: (opts: any[]) => void;
-  confidenceTracking: boolean;
-  setConfidenceTracking: (val: boolean) => void;
-  drSubtype: 'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST';
-  setDrSubtype: (val: 'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST') => void;
-  acceptedAnswers: string;
-  setAcceptedAnswers: (val: string) => void;
-  toleranceType: 'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE';
-  setToleranceType: (val: 'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE') => void;
-  toleranceValue: number;
-  setToleranceValue: (val: number) => void;
-  expectedUnit: string;
-  setExpectedUnit: (val: string) => void;
-  unitRequired: boolean;
-  setUnitRequired: (val: boolean) => void;
-  orderSensitive: boolean;
-  setOrderSensitive: (val: boolean) => void;
-  caseSensitive: boolean;
-  setCaseSensitive: (val: boolean) => void;
-  allowBengali: boolean;
-  setAllowBengali: (val: boolean) => void;
+  components: any[];
+  setComponents: (comps: any[]) => void;
 }) {
+  const addComponent = (kind: string = 'CONSTRUCT') => {
+    const nextIdx = components.length + 1;
+    const newComp: any = {
+      id: `step_${nextIdx}_${Date.now().toString(36).slice(-4)}`,
+      kind,
+      label: `Step ${nextIdx}: ${kind === 'CONSTRUCT' ? 'Constructed Calculation' : kind === 'EVIDENCE_SELECT' ? 'Evidence / Rule Selection' : kind === 'ORDER' ? 'Sequence Order' : kind === 'RELATION' ? 'Logical Relationship' : 'Intermediate Step'}`,
+      prompt: '',
+      marks: 2,
+    };
+
+    if (kind === 'CONSTRUCT' || kind === 'INTERMEDIATE_CONSTRUCT' || kind === 'CONCLUSION') {
+      newComp.expectedAnswer = '';
+      newComp.evaluationMode = 'NUMERIC';
+      newComp.tolerance = 0.01;
+      newComp.unit = '';
+    } else if (kind === 'EVIDENCE_SELECT') {
+      newComp.scoring = 'ALL_OR_NOTHING';
+      newComp.multiSelect = false;
+      newComp.options = [
+        { id: `opt_1`, text: '', isCorrect: true },
+        { id: `opt_2`, text: '', isCorrect: false },
+        { id: `opt_3`, text: '', isCorrect: false }
+      ];
+    } else if (kind === 'ORDER') {
+      newComp.scoring = 'ALL_OR_NOTHING';
+      newComp.items = [
+        { id: 'item_1', text: '' },
+        { id: 'item_2', text: '' },
+        { id: 'item_3', text: '' }
+      ];
+      newComp.correctOrder = ['item_1', 'item_2', 'item_3'];
+    }
+
+    setComponents([...components, newComp]);
+  };
+
+  const removeComponent = (idx: number) => {
+    setComponents(components.filter((_, i) => i !== idx));
+  };
+
+  const moveComponent = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= components.length) return;
+    const updated = [...components];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    setComponents(updated);
+  };
+
+  const updateComp = (idx: number, patch: any) => {
+    const updated = [...components];
+    updated[idx] = { ...updated[idx], ...patch };
+    setComponents(updated);
+  };
+
+  const applyPreset = (presetKey: string) => {
+    if (presetKey === 'physics_work_energy') {
+      setComponents([
+        {
+          id: 'step_1_calc',
+          kind: 'CONSTRUCT',
+          label: 'Step 1: Calculate Kinetic Energy',
+          prompt: 'Calculate the kinetic energy of a 2 kg block at 3 m/s in Joules:',
+          expectedAnswer: '9',
+          unit: 'J',
+          marks: 2,
+          tolerance: 0.01,
+          evaluationMode: 'NUMERIC'
+        },
+        {
+          id: 'step_2_evidence',
+          kind: 'EVIDENCE_SELECT',
+          label: 'Step 2: Select Governing Conservation Law',
+          prompt: 'Select the primary physical principle explaining energy conservation:',
+          marks: 2,
+          scoring: 'ALL_OR_NOTHING',
+          options: [
+            { id: 'opt_1', text: 'E_k = \\frac{1}{2}mv^2 \\text{ and mechanical energy is conserved}', isCorrect: true },
+            { id: 'opt_2', text: 'Newton\'s 3rd Law \\vec{F}_{12} = -\\vec{F}_{21}', isCorrect: false },
+            { id: 'opt_3', text: 'Ohm\'s Law V = IR', isCorrect: false }
+          ]
+        }
+      ]);
+    } else if (presetKey === 'chemistry_stoichiometry') {
+      setComponents([
+        {
+          id: 'step_1_balance',
+          kind: 'EVIDENCE_SELECT',
+          label: 'Step 1: Balanced Reaction Equation',
+          prompt: 'Select the correctly balanced chemical equation for water synthesis:',
+          marks: 2,
+          scoring: 'ALL_OR_NOTHING',
+          options: [
+            { id: 'opt_1', text: '2H_2 + O_2 \\rightarrow 2H_2O', isCorrect: true },
+            { id: 'opt_2', text: 'H_2 + O_2 \\rightarrow H_2O', isCorrect: false },
+            { id: 'opt_3', text: 'H_2 + 2O_2 \\rightarrow 2H_2O_2', isCorrect: false }
+          ]
+        },
+        {
+          id: 'step_2_moles',
+          kind: 'CONSTRUCT',
+          label: 'Step 2: Calculate Produced Moles of Water',
+          prompt: 'If 4 moles of H_2 react with excess O_2, how many moles of H_2O are formed?',
+          expectedAnswer: '4',
+          unit: 'mol',
+          marks: 2,
+          tolerance: 0.01,
+          evaluationMode: 'NUMERIC'
+        }
+      ]);
+    } else if (presetKey === 'biology_sequence') {
+      setComponents([
+        {
+          id: 'step_1_order',
+          kind: 'ORDER',
+          label: 'Step 1: Biological Process Order',
+          prompt: 'Arrange the stages of Mitosis in correct chronological sequence:',
+          marks: 4,
+          scoring: 'ALL_OR_NOTHING',
+          items: [
+            { id: 'item_prophase', text: 'Prophase (Chromosome condensation)' },
+            { id: 'item_metaphase', text: 'Metaphase (Equatorial alignment)' },
+            { id: 'item_anaphase', text: 'Anaphase (Sister chromatid separation)' },
+            { id: 'item_telophase', text: 'Telophase (Nuclear envelope reformation)' }
+          ],
+          correctOrder: ['item_prophase', 'item_metaphase', 'item_anaphase', 'item_telophase']
+        }
+      ]);
+    }
+  };
+
   return (
     <div className="space-y-4 border p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border-purple-200 dark:border-purple-800">
-      <h4 className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
-        <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-xs font-mono">DR</span>
-        Deterministic DR Autograder Configuration
-      </h4>
-
-      {/* Question Maker Setup Guidance Banner */}
-      <div className="p-3.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1.5">
-        <div className="font-bold text-xs flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
-          <Sparkles className="w-4 h-4 text-purple-600" /> Production-Grade DR Autograder Setup Guide:
-        </div>
-        <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-          <li><strong>Autograder Subtype:</strong> Select TEXT, NUMERIC, SYMBOLIC, SET, or LIST. Zero AI is used at submission time.</li>
-          <li><strong>Part A Answer Key:</strong> Set the canonical key (e.g. <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">NEPHRON</code>, <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">9.8</code>, <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">F=ma</code>).</li>
-          <li><strong>Accepted Aliases:</strong> Add accepted Bangla, English, or synonym answers (comma or newline separated).</li>
-          <li><strong>Part B Justifications:</strong> Add conceptual reasoning options with 1 checked as correct principle.</li>
-        </ul>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border rounded-lg bg-background">
-        <div>
-          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">DR Autograder Subtype</Label>
-          <Select value={drSubtype} onValueChange={(v: any) => setDrSubtype(v)}>
-            <SelectTrigger className="h-8 text-xs font-semibold mt-1">
-              <SelectValue />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
+          <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-xs font-mono">SRA</span>
+          Structured Reasoning Assembly (100% Deterministic Autograder)
+        </h4>
+        <div className="flex items-center gap-2">
+          <Select onValueChange={applyPreset}>
+            <SelectTrigger className="h-8 text-xs font-semibold bg-background">
+              <SelectValue placeholder="Quick PCMB Preset..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="TEXT">TEXT (Short Text & Canonical Aliases)</SelectItem>
-              <SelectItem value="NUMERIC">NUMERIC (Decimal / Scientific / Tolerance / Units)</SelectItem>
-              <SelectItem value="SYMBOLIC">SYMBOLIC (Algebraic / Math Notation)</SelectItem>
-              <SelectItem value="SET">SET (Order-Insensitive Set)</SelectItem>
-              <SelectItem value="LIST">LIST (Order-Sensitive Sequence)</SelectItem>
+              <SelectItem value="physics_work_energy">Physics: Calculation + Principle</SelectItem>
+              <SelectItem value="chemistry_stoichiometry">Chemistry: Reaction + Moles</SelectItem>
+              <SelectItem value="biology_sequence">Biology: Sequential Order</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Canonical Answer Key</Label>
-            {expectedAnswer && (
-              <span className="text-[11px] font-mono font-bold text-purple-600 dark:text-purple-400">
-                Preview: <UniversalMathJax inline dynamic>{cleanupMath(expectedAnswer)}</UniversalMathJax>
-              </span>
-            )}
-          </div>
-          <Input
-            value={expectedAnswer}
-            onChange={e => setExpectedAnswer(e.target.value)}
-            placeholder="e.g. NEPHRON, 9.8, F=ma, or A,B,C"
-            className="h-8 text-xs font-mono mt-1"
-          />
-        </div>
-      </div>
-
-      {/* Accepted Answers / Aliases */}
-      <div className="p-3 border rounded-lg bg-background space-y-1.5">
-        <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Accepted Answer Variations / Aliases (Comma or Newline separated)</Label>
-        <Textarea
-          value={acceptedAnswers}
-          onChange={e => setAcceptedAnswers(e.target.value)}
-          placeholder="e.g. nephron, নেফ্রন, functional unit of kidney"
-          rows={2}
-          className="text-xs font-mono"
-        />
-        <p className="text-[10px] text-muted-foreground">Any student answer matching a normalized alias will be graded as CORRECT.</p>
-      </div>
-
-      {/* Subtype-Specific Options: Numeric Tolerance & Units */}
-      {drSubtype === 'NUMERIC' && (
-        <div className="p-3 border rounded-lg bg-background space-y-3">
-          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Numeric Tolerance & Unit Settings</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <Label className="text-[11px] text-muted-foreground">Tolerance Type</Label>
-              <Select value={toleranceType} onValueChange={(v: any) => setToleranceType(v)}>
-                <SelectTrigger className="h-8 text-xs font-semibold mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ABSOLUTE">ABSOLUTE (± Value)</SelectItem>
-                  <SelectItem value="RELATIVE">RELATIVE (Ratio)</SelectItem>
-                  <SelectItem value="PERCENTAGE">PERCENTAGE (%)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-[11px] text-muted-foreground">Tolerance Value</Label>
-              <Input
-                type="number"
-                step="any"
-                value={toleranceValue}
-                onChange={e => setToleranceValue(parseFloat(e.target.value) || 0)}
-                placeholder="e.g. 0.01 or 5"
-                className="h-8 text-xs font-mono mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-[11px] text-muted-foreground">Expected Unit (e.g. m/s^2)</Label>
-              <Input
-                value={expectedUnit}
-                onChange={e => setExpectedUnit(e.target.value)}
-                placeholder="e.g. m/s^2, kg, J"
-                className="h-8 text-xs font-mono mt-1"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <Checkbox checked={unitRequired} onCheckedChange={ch => setUnitRequired(!!ch)} id="dr-unit-chk" />
-            <Label htmlFor="dr-unit-chk" className="text-xs cursor-pointer">Require Unit Match for Full Marks</Label>
-          </div>
-        </div>
-      )}
-
-      {/* Flags & Toggle Controls */}
-      <div className="flex flex-wrap items-center gap-4 p-3 border rounded-lg bg-background text-xs">
-        <div className="flex items-center gap-2">
-          <Checkbox checked={allowBengali} onCheckedChange={ch => setAllowBengali(!!ch)} id="dr-bn-chk" />
-          <Label htmlFor="dr-bn-chk" className="cursor-pointer">Bengali Digits Auto-Normalizer (০-৯ → 0-9)</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox checked={caseSensitive} onCheckedChange={ch => setCaseSensitive(!!ch)} id="dr-case-chk" />
-          <Label htmlFor="dr-case-chk" className="cursor-pointer">Case Sensitive Match</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox checked={confidenceTracking} onCheckedChange={ch => setConfidenceTracking(!!ch)} id="dr-conf-chk" />
-          <Label htmlFor="dr-conf-chk" className="cursor-pointer">Part C Confidence Meter</Label>
-        </div>
-      </div>
-
-      <div className="p-3 border rounded-lg bg-background space-y-3">
-        <div className="flex justify-between items-center">
-          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part B: Conceptual Justification Options</Label>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              setReasonOptions([
-                ...reasonOptions,
-                { id: `r${reasonOptions.length + 1}`, text: '', isCorrect: false }
-              ])
-            }
-          >
-            <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Reason Option
+          <Button type="button" size="sm" onClick={() => addComponent('CONSTRUCT')} className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white">
+            <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Step
           </Button>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          {reasonOptions.map((opt, idx) => (
-            <div key={idx} className="flex flex-col gap-1 p-2.5 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={!!opt.isCorrect}
-                  onCheckedChange={ch => {
-                    const next = reasonOptions.map((o, i) => ({ ...o, isCorrect: i === idx ? !!ch : false }));
-                    setReasonOptions(next);
-                  }}
-                />
-                <span className="font-bold text-xs shrink-0">{String.fromCharCode(65 + idx)}.</span>
+      {/* Info Guide */}
+      <div className="p-3.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1.5">
+        <div className="font-bold text-xs flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+          <Sparkles className="w-4 h-4 text-purple-600" /> SRA Multi-Component Autograder Architecture:
+        </div>
+        <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+          Students construct logical reasoning sequences from machine-checkable components: <strong>Calculations / Formulations (CONSTRUCT)</strong>, <strong>Law / Evidence Selection (EVIDENCE_SELECT)</strong>, <strong>Step Ordering (ORDER)</strong>, or <strong>Relational Links (RELATION)</strong>. Full LaTeX MathJax support is active across all fields without any AI dependencies.
+        </p>
+      </div>
+
+      {/* Components List */}
+      <div className="space-y-4">
+        {components.map((comp, idx) => (
+          <div key={comp.id || idx} className="p-4 border rounded-xl bg-background space-y-3 shadow-sm relative">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2 flex-1">
+                <span className="h-6 w-6 rounded-full bg-purple-600 text-white flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                  {idx + 1}
+                </span>
                 <Input
-                  value={opt.text || ''}
-                  onChange={e => {
-                    const next = [...reasonOptions];
-                    next[idx].text = e.target.value;
-                    setReasonOptions(next);
-                  }}
-                  placeholder={`Reason option ${String.fromCharCode(65 + idx)} text...`}
-                  className="h-8 text-xs flex-1"
+                  value={comp.label || ''}
+                  onChange={e => updateComp(idx, { label: e.target.value })}
+                  placeholder={`Step ${idx + 1} Title (e.g. Step 1: Calculate Energy)`}
+                  className="h-8 text-xs font-bold"
                 />
-                {reasonOptions.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setReasonOptions(reasonOptions.filter((_, i) => i !== idx))}>
+              </div>
+
+              <div className="flex items-center gap-1 ml-2">
+                <Select value={comp.kind || 'CONSTRUCT'} onValueChange={k => updateComp(idx, { kind: k })}>
+                  <SelectTrigger className="h-8 text-xs font-semibold w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CONSTRUCT">CONSTRUCT (Value / Expr)</SelectItem>
+                    <SelectItem value="EVIDENCE_SELECT">EVIDENCE_SELECT (Rules)</SelectItem>
+                    <SelectItem value="ORDER">ORDER (Sequence)</SelectItem>
+                    <SelectItem value="RELATION">RELATION (Graph Edge)</SelectItem>
+                    <SelectItem value="INTERMEDIATE_CONSTRUCT">INTERMEDIATE (Step)</SelectItem>
+                    <SelectItem value="CONCLUSION">CONCLUSION (Deduction)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={comp.marks || 1}
+                    onChange={e => updateComp(idx, { marks: Number(e.target.value) })}
+                    className="h-8 w-16 text-xs text-center font-bold"
+                    placeholder="Marks"
+                  />
+                  <span className="text-xs text-muted-foreground mr-1">pts</span>
+                </div>
+
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveComponent(idx, idx - 1)}>
+                  ▲
+                </Button>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === components.length - 1} onClick={() => moveComponent(idx, idx + 1)}>
+                  ▼
+                </Button>
+                {components.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => removeComponent(idx)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
-              {opt.text && (
-                <div className="pl-7 text-[11px] text-slate-500 flex items-center gap-1">
-                  <span className="font-bold text-[10px] text-purple-600 uppercase">Math Output:</span>
-                  <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+            </div>
+
+            {/* Prompt */}
+            <div>
+              <Label className="text-xs font-semibold">Step Prompt / Problem Description</Label>
+              <Input
+                value={comp.prompt || ''}
+                onChange={e => updateComp(idx, { prompt: e.target.value })}
+                placeholder="Enter prompt for this reasoning step..."
+                className="h-8 text-xs mt-1"
+              />
+              {comp.prompt && (
+                <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <span className="font-bold text-[10px] text-purple-600 uppercase">Preview:</span>
+                  <UniversalMathJax inline dynamic>{cleanupMath(comp.prompt)}</UniversalMathJax>
                 </div>
               )}
             </div>
-          ))}
-        </div>
+
+            {/* CONSTRUCT / INTERMEDIATE / CONCLUSION specifics */}
+            {(comp.kind === 'CONSTRUCT' || comp.kind === 'INTERMEDIATE_CONSTRUCT' || comp.kind === 'CONCLUSION' || !comp.kind) && (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40">
+                <div className="sm:col-span-2">
+                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Expected Answer Key</Label>
+                  <Input
+                    value={comp.expectedAnswer || ''}
+                    onChange={e => updateComp(idx, { expectedAnswer: e.target.value })}
+                    placeholder="e.g. 9.8, \\frac{1}{2}mv^2, or 42"
+                    className="h-8 text-xs font-mono mt-1"
+                  />
+                  {comp.expectedAnswer && (
+                    <div className="text-[11px] font-mono text-purple-600 dark:text-purple-400 mt-1">
+                      Render: <UniversalMathJax inline dynamic>{cleanupMath(String(comp.expectedAnswer))}</UniversalMathJax>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs">Tolerance (±)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={comp.tolerance ?? 0.01}
+                    onChange={e => updateComp(idx, { tolerance: parseFloat(e.target.value) || 0 })}
+                    className="h-8 text-xs font-mono mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Unit (optional)</Label>
+                  <Input
+                    value={comp.unit || ''}
+                    onChange={e => updateComp(idx, { unit: e.target.value })}
+                    placeholder="e.g. m/s, J, N"
+                    className="h-8 text-xs font-mono mt-1"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* EVIDENCE_SELECT specifics */}
+            {comp.kind === 'EVIDENCE_SELECT' && (
+              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">
+                    Reasoning / Law Options (Check the correct principle)
+                  </Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      const opts = comp.options || [];
+                      updateComp(idx, {
+                        options: [...opts, { id: `opt_${opts.length + 1}`, text: '', isCorrect: false }]
+                      });
+                    }}
+                  >
+                    <PlusCircle className="h-3 w-3 mr-1" /> Add Option
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {(comp.options || []).map((opt: any, optIdx: number) => (
+                    <div key={opt.id || optIdx} className="flex flex-col gap-1 p-2 border rounded bg-background">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={!!opt.isCorrect}
+                          onCheckedChange={ch => {
+                            const nextOpts = (comp.options || []).map((o: any, i: number) => ({
+                              ...o,
+                              isCorrect: comp.multiSelect ? (i === optIdx ? !!ch : o.isCorrect) : (i === optIdx ? !!ch : false)
+                            }));
+                            updateComp(idx, { options: nextOpts });
+                          }}
+                        />
+                        <span className="font-bold text-xs">{String.fromCharCode(65 + optIdx)}.</span>
+                        <Input
+                          value={opt.text || ''}
+                          onChange={e => {
+                            const nextOpts = [...(comp.options || [])];
+                            nextOpts[optIdx] = { ...nextOpts[optIdx], text: e.target.value };
+                            updateComp(idx, { options: nextOpts });
+                          }}
+                          placeholder={`Option ${String.fromCharCode(65 + optIdx)} text or LaTeX formula...`}
+                          className="h-8 text-xs flex-1"
+                        />
+                        {(comp.options || []).length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-red-500"
+                            onClick={() => {
+                              updateComp(idx, {
+                                options: (comp.options || []).filter((_: any, i: number) => i !== optIdx)
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      {opt.text && (
+                        <div className="pl-6 text-[11px] text-muted-foreground flex items-center gap-1">
+                          <span className="font-bold text-[10px] text-purple-600 uppercase">Math:</span>
+                          <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ORDER specifics */}
+            {comp.kind === 'ORDER' && (
+              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">
+                    Sequence Steps (Define items in their correct sequential order)
+                  </Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      const items = comp.items || [];
+                      const newItemId = `item_${items.length + 1}`;
+                      const nextItems = [...items, { id: newItemId, text: '' }];
+                      updateComp(idx, {
+                        items: nextItems,
+                        correctOrder: nextItems.map((it: any) => it.id)
+                      });
+                    }}
+                  >
+                    <PlusCircle className="h-3 w-3 mr-1" /> Add Sequence Step
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {(comp.items || []).map((it: any, itIdx: number) => (
+                    <div key={it.id || itIdx} className="flex items-center gap-2 p-2 border rounded bg-background">
+                      <span className="font-bold text-xs w-6">{itIdx + 1}.</span>
+                      <Input
+                        value={it.text || ''}
+                        onChange={e => {
+                          const nextItems = [...(comp.items || [])];
+                          nextItems[itIdx] = { ...nextItems[itIdx], text: e.target.value };
+                          updateComp(idx, { items: nextItems });
+                        }}
+                        placeholder={`Sequence step ${itIdx + 1} description...`}
+                        className="h-8 text-xs flex-1"
+                      />
+                      {(comp.items || []).length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-red-500"
+                          onClick={() => {
+                            const nextItems = (comp.items || []).filter((_: any, i: number) => i !== itIdx);
+                            updateComp(idx, {
+                              items: nextItems,
+                              correctOrder: nextItems.map((item: any) => item.id)
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
+  );
+}
+
+// Backward-compatibility wrapper for legacy DR
+function DRQuestionForm(props: any) {
+  const components = [
+    {
+      id: 'step_1_answer',
+      kind: 'CONSTRUCT',
+      label: 'Part A: Direct Solution',
+      expectedAnswer: props.expectedAnswer,
+      tolerance: props.toleranceValue || 0.01,
+      unit: props.expectedUnit,
+      marks: 2,
+    },
+    {
+      id: 'step_2_reasons',
+      kind: 'EVIDENCE_SELECT',
+      label: 'Part B: Conceptual Justification',
+      marks: 3,
+      options: props.reasonOptions || []
+    }
+  ];
+
+  return (
+    <SRAQuestionForm
+      components={components}
+      setComponents={(comps: any[]) => {
+        const c1 = comps[0];
+        const c2 = comps[1];
+        if (c1 && props.setExpectedAnswer) props.setExpectedAnswer(c1.expectedAnswer || '');
+        if (c2 && props.setReasonOptions) props.setReasonOptions(c2.options || []);
+      }}
+    />
   );
 }
 
@@ -4574,6 +4796,36 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     ((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions)
       ? (((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions) as any[])
       : [{ id: 's1', stageTitle: 'Stage 1 prompt', expectedAnswer: '0', tolerance: 0.05, formula: '', marks: 2 }]
+  );
+  const [sraComponents, setSraComponents] = useState<any[]>(
+    ((initialData as any)?.components || (initialData as any)?.sraComponents || initialData?.subQuestions)
+      ? (((initialData as any)?.components || (initialData as any)?.sraComponents || initialData?.subQuestions) as any[])
+      : [
+          {
+            id: 'step_1_calc',
+            kind: 'CONSTRUCT',
+            label: 'Step 1: Calculate Energy / Value',
+            prompt: 'Calculate the primary physical value or formula output:',
+            expectedAnswer: '9',
+            unit: 'J',
+            marks: 2,
+            tolerance: 0.01,
+            evaluationMode: 'NUMERIC'
+          },
+          {
+            id: 'step_2_evidence',
+            kind: 'EVIDENCE_SELECT',
+            label: 'Step 2: Governing Law / Principle Selection',
+            prompt: 'Select the primary physical principle explaining this phenomenon:',
+            marks: 2,
+            scoring: 'ALL_OR_NOTHING',
+            options: [
+              { id: 'opt_1', text: 'E_k = \\frac{1}{2}mv^2', isCorrect: true },
+              { id: 'opt_2', text: 'F = ma', isCorrect: false },
+              { id: 'opt_3', text: 'V = IR', isCorrect: false }
+            ]
+          }
+        ]
   );
   const [reasonOptions, setReasonOptions] = useState<any[]>(
     ((initialData as any)?.reasonOptions || initialData?.subQuestions || initialData?.options)
@@ -4884,12 +5136,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           isCorrect: opt.isCorrect
         })),
         image: sq.image || undefined
-      })) : type === 'DESCRIPTIVE' ? descriptiveParts : type === 'CMA' ? cmaParts : type === 'MPC' ? mpcStages : type === 'DR' ? reasonOptions : null,
+      })) : type === 'DESCRIPTIVE' ? descriptiveParts : type === 'CMA' ? cmaParts : type === 'MPC' ? mpcStages : type === 'SRA' ? sraComponents : type === 'DR' ? reasonOptions : null,
       parts: type === 'CMA' ? cmaParts : null,
       cmaParts: type === 'CMA' ? cmaParts : null,
       scenario: type === 'MPC' ? scenario : null,
       stages: type === 'MPC' ? mpcStages : null,
       mpcStages: type === 'MPC' ? mpcStages : null,
+      components: type === 'SRA' ? sraComponents : null,
+      sraComponents: type === 'SRA' ? sraComponents : null,
       reasonOptions: type === 'DR' ? reasonOptions : null,
       confidenceTracking: type === 'DR' ? confidenceTracking : null,
       drSubtype: type === 'DR' ? drSubtype : null,
@@ -4904,7 +5158,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       caseSensitive: type === 'DR' ? caseSensitive : null,
       allowBengali: type === 'DR' ? allowBengali : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
-        type === 'INT' ? correctAnswer.toString() : type === 'DR' ? modelAnswer.trim() : null,
+        type === 'INT' ? correctAnswer.toString() : (type === 'DR' || type === 'SRA') ? (modelAnswer.trim() || (sraComponents[0]?.expectedAnswer ? String(sraComponents[0].expectedAnswer) : null)) : null,
       assertion: type === 'AR' ? assertion.trim() : null,
       reason: type === 'AR' ? reason.trim() : null,
       correctOption: type === 'AR' ? correctOption : null,
@@ -4967,7 +5221,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="SRA">SRA (Structured Reasoning Assembly)</SelectItem><SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -5425,6 +5679,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             {type === 'MPC' && (
               <MPCQuestionForm scenario={scenario} setScenario={setScenario} stages={mpcStages} setStages={setMpcStages} />
             )}
+            {type === 'SRA' && (
+              <SRAQuestionForm
+                components={sraComponents}
+                setComponents={setSraComponents}
+              />
+            )}
             {type === 'DR' && (
               <DRQuestionForm
                 expectedAnswer={modelAnswer}
@@ -5841,6 +6101,37 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                       <div key={sIdx} className="p-2 border rounded bg-background flex justify-between items-center text-xs">
                         <span className="font-bold">Stage {sIdx + 1}: {st.stageTitle}</span>
                         <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{st.expectedAnswer}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {type === 'SRA' && (
+                <div className="mt-4 pt-3 border-t border-purple-200 dark:border-purple-800 space-y-2">
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">STRUCTURED REASONING ASSEMBLY</Badge>
+                  <div className="space-y-2">
+                    {sraComponents.map((comp, cIdx) => (
+                      <div key={cIdx} className="p-2 border rounded bg-background text-xs space-y-1">
+                        <div className="flex justify-between font-bold">
+                          <span>{comp.label || `Step ${cIdx + 1}`} ({comp.kind || 'CONSTRUCT'}):</span>
+                          <span className="text-purple-600 font-mono">{comp.marks || 1} pts</span>
+                        </div>
+                        {comp.prompt && <p className="text-muted-foreground">{comp.prompt}</p>}
+                        {comp.expectedAnswer && (
+                          <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                            Key: {String(comp.expectedAnswer)} {comp.unit || ''}
+                          </div>
+                        )}
+                        {comp.options && (
+                          <div className="space-y-0.5 pt-1">
+                            {comp.options.map((opt: any, oIdx: number) => (
+                              <div key={oIdx} className={`p-1 rounded text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 font-bold' : ''}`}>
+                                {String.fromCharCode(65 + oIdx)}. {opt.text} {opt.isCorrect ? '✓' : ''}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

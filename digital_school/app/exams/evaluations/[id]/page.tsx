@@ -73,10 +73,11 @@ import { verifyAdminAction } from "@/lib/native/auth";
 import { Capacitor } from "@capacitor/core";
 import { ShieldCheck, Battery, Wifi, Scan } from "lucide-react";
 import { scanDocument } from "@/lib/native/scanner";
-import { CMARenderer, MPCRenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { CMARenderer, MPCRenderer, SRARenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
 import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
+import { evaluateSRAQuestion } from "@/lib/evaluation/sraEvaluation";
 
 // --- Constants & Utilities ---
 const MCQ_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
@@ -1876,16 +1877,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         return qMark;
       }
 
-      if (type === 'dr') {
-        const drRes = evaluateDRQuestion(question as any, answer as any);
-        let qMark = drRes.score;
-        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-          const maxM = drRes.maxScore || Number(question.marks) || 1;
+      if (type === 'sra' || type === 'dr') {
+        const sraRes = evaluateSRAQuestion(question as any, answer as any);
+        let qMark = sraRes.score;
+        const negRate = Number(exam?.mcqNegativeMarking || 0);
+        if (negRate > 0) {
+          const maxM = sraRes.maxScore || Number(question.marks) || 1;
           const halfMark = maxM / 2;
           let wrongPenalty = 0;
-          if (!drRes.answerCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-          if (!drRes.reasonCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-          qMark = Math.round((drRes.score - wrongPenalty) * 100) / 100;
+          Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
+            if (cr.status === 'INCORRECT') wrongPenalty += (halfMark * negRate) / 100;
+          });
+          qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
         }
         return qMark;
       }
@@ -4260,15 +4263,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   )}
 
-                                  {(currentQuestion?.type || "").toLowerCase() === "dr" && (
+                                  {((currentQuestion?.type || "").toLowerCase() === "sra" || (currentQuestion?.type || "").toLowerCase() === "dr") && (
                                     <div className="mb-4">
-                                      <DRRenderer
+                                      <SRARenderer
                                         question={currentQuestion}
                                         value={currentAnswer || {}}
                                         onChange={() => {}}
                                         disabled={true}
                                         showFeedback={true}
-                                        evalResult={evaluateDRQuestion(currentQuestion as any, currentAnswer)}
+                                        evalResult={evaluateSRAQuestion(currentQuestion as any, currentAnswer)}
                                       />
                                     </div>
                                   )}

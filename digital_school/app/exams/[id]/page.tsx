@@ -30,7 +30,7 @@ import { CMARenderer, MPCRenderer, DRRenderer } from '@/components/ui/QuestionRe
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'DR';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'SRA' | 'DR';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -57,6 +57,8 @@ interface Question {
   sub_questions?: any[];
   parts?: any[];
   stages?: any[];
+  components?: any[];
+  sraComponents?: any[];
   reasonOptions?: any[];
   images?: string[];
   modelAnswer?: string;
@@ -344,7 +346,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           {question.difficulty}
         </Badge>
         <Badge variant="outline">{question.marks} Marks</Badge>
-        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(question.type || '') && question.negativeMarks && (
+        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'SRA', 'DR'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
@@ -596,7 +598,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(q.type)), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'DR'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -1410,24 +1412,39 @@ export default function ExamBuilderPage() {
                               ))}
                             </div>
                           )}
-                          {q.type === 'DR' && (
+                          {(q.type === 'SRA' || q.type === 'DR') && (
                             <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
-                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Diagnostic Reasoning (DR):</span>
-                              <div className="text-slate-700 dark:text-slate-300">
-                                <strong>Part A Answer Key:</strong> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{q.expectedAnswer || q.modelAnswer || '—'}</span>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="font-semibold text-slate-500">Part B Justification Options:</span>
-                                {(((q as any).reasonOptions || (q as any).reasons || q.subQuestions || q.options) || []).map((rOpt: any, rIdx: number) => {
-                                  const rText = typeof rOpt === 'string' ? rOpt : (rOpt.text || rOpt.label || rOpt.question);
-                                  const isCor = typeof rOpt === 'object' && !!rOpt.isCorrect;
-                                  return (
-                                    <div key={rIdx} className={`p-1.5 rounded border text-[11px] ${isCor ? 'bg-green-50 dark:bg-green-950/40 border-green-300 font-bold text-green-800 dark:text-green-200' : 'bg-white dark:bg-slate-900 border-slate-200'}`}>
-                                      {String.fromCharCode(65 + rIdx)}. <UniversalMathJax inline>{cleanupMath(rText)}</UniversalMathJax> {isCor && '✓'}
+                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Structured Reasoning Assembly (SRA):</span>
+                              {(((q as any).components || (q as any).sraComponents || [])).length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {(((q as any).components || (q as any).sraComponents || [])).map((comp: any, cIdx: number) => (
+                                    <div key={cIdx} className="p-1.5 rounded bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 flex items-center justify-between text-[11px]">
+                                      <span className="font-semibold text-slate-800 dark:text-slate-200">{comp.label || `Step ${cIdx + 1}`}:</span>
+                                      <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">
+                                        {comp.expectedAnswer ? String(comp.expectedAnswer) : (comp.correctOrder ? `Order [${comp.correctOrder.join(', ')}]` : `[${comp.kind || 'Step'}]`)}
+                                      </span>
                                     </div>
-                                  );
-                                })}
-                              </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="text-slate-700 dark:text-slate-300">
+                                    <strong>Part A Answer Key:</strong> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{q.expectedAnswer || q.modelAnswer || '—'}</span>
+                                  </div>
+                                  <div className="space-y-1 mt-1">
+                                    <span className="font-semibold text-slate-500">Part B Justification Options:</span>
+                                    {(((q as any).reasonOptions || (q as any).reasons || q.subQuestions || q.options) || []).map((rOpt: any, rIdx: number) => {
+                                      const rText = typeof rOpt === 'string' ? rOpt : (rOpt.text || rOpt.label || rOpt.question);
+                                      const isCor = typeof rOpt === 'object' && !!rOpt.isCorrect;
+                                      return (
+                                        <div key={rIdx} className={`p-1.5 rounded border text-[11px] ${isCor ? 'bg-green-50 dark:bg-green-950/40 border-green-300 font-bold text-green-800 dark:text-green-200' : 'bg-white dark:bg-slate-900 border-slate-200'}`}>
+                                          {String.fromCharCode(65 + rIdx)}. <UniversalMathJax inline>{cleanupMath(rText)}</UniversalMathJax> {isCor && '✓'}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                           {q.type === 'CMA' && (

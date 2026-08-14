@@ -7,6 +7,7 @@ import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEv
 import { evaluateCMAQuestion } from "./evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "./evaluation/mpcEvaluation";
 import { evaluateDRQuestion } from "./evaluation/drEvaluation";
+import { evaluateSRAQuestion } from "./evaluation/sraEvaluation";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
@@ -486,20 +487,39 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 }
                 questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
-            } else if (type === 'DR') {
+            } else if (type === 'SRA') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
-                const drRes = evaluateDRQuestion(question as any, studentAnswer as any);
-                let qMark = drRes.score;
-                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    const maxM = drRes.maxScore || Number(question.marks) || 1;
-                    const halfMark = maxM / 2;
+                const sraRes = evaluateSRAQuestion(question as any, studentAnswer as any);
+                let qMark = sraRes.score;
+                const negRate = Number(exam.mcqNegativeMarking || 0);
+                if (negRate > 0) {
                     let wrongPenalty = 0;
-                    if (!drRes.answerCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-                    if (!drRes.reasonCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
-                    qMark = Math.round((drRes.score - wrongPenalty) * 100) / 100;
+                    Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
+                        if (cr.status === 'INCORRECT') {
+                            const compMax = (Number(cr.maxMarks) || 1);
+                            wrongPenalty += (compMax * negRate) / 100;
+                        }
+                    });
+                    qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
                 }
                 questionScore = qMark;
-                res = { score: questionScore, type, isCorrect: drRes.isCorrect, diagnosticTag: drRes.diagnosticTag };
+                res = { score: questionScore, type, isCorrect: sraRes.isCorrect, componentResults: sraRes.componentResults, diagnosticTags: sraRes.diagnosticTags };
+            } else if (type === 'DR') {
+                if (studentAnswer === undefined || studentAnswer === null) continue;
+                const sraRes = evaluateSRAQuestion(question as any, studentAnswer as any);
+                let qMark = sraRes.score;
+                const negRate = Number(exam.mcqNegativeMarking || 0);
+                if (negRate > 0) {
+                    const maxM = sraRes.maxScore || Number(question.marks) || 1;
+                    const halfMark = maxM / 2;
+                    let wrongPenalty = 0;
+                    Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
+                        if (cr.status === 'INCORRECT') wrongPenalty += (halfMark * negRate) / 100;
+                    });
+                    qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
+                }
+                questionScore = qMark;
+                res = { score: questionScore, type, isCorrect: sraRes.isCorrect, diagnosticTags: sraRes.diagnosticTags };
             }
 
             if (res) {

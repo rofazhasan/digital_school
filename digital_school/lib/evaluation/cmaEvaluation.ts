@@ -10,7 +10,7 @@ export interface CMAPart {
     label?: string;
     prompt?: string;
     question?: string;
-    type?: 'integer' | 'decimal' | 'expression' | 'fraction' | 'text' | 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'DR' | string;
+    type?: 'integer' | 'decimal' | 'expression' | 'fraction' | 'text' | 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'SRA' | 'DR' | string;
     marks: number;
     expectedAnswer?: number | string;
     correctAnswer?: number | string;
@@ -106,7 +106,20 @@ export function evaluateCMAChildPart(
         return { isCorrect: false, isAttempted: true, status: 'INCORRECT', earnedRatio: 0 };
     }
 
-    // 3. DR Child
+    // 3. SRA Child
+    if (childType === 'SRA') {
+        const isMatch = studentStr.toLowerCase() === expectedStr.toLowerCase() ||
+            areExpressionsEquivalent(studentStr, expectedStr, tol);
+        return {
+            isCorrect: isMatch,
+            isAttempted: true,
+            status: isMatch ? 'CORRECT' : 'INCORRECT',
+            matchedBy: 'SRA',
+            earnedRatio: isMatch ? 1 : 0
+        };
+    }
+
+    // 4. DR Legacy Child
     if (childType === 'DR') {
         const drRes = gradeDRResponse(studentStr, {
             canonicalAnswer: expectedStr,

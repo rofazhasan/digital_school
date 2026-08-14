@@ -183,13 +183,21 @@ export function areExpressionsEquivalent(
     return true;
   }
 
-  // 4. Sample point evaluation for variable expressions (e.g. x, y, a, b)
-  const varNames = Array.from(new Set([...stuStr.match(/[a-zA-Z]/g) || [], ...expStr.match(/[a-zA-Z]/g) || []]));
+  // 4. Sample point evaluation for variable expressions (e.g. x, y, a, b, m, v, F, etc.)
+  const normStuForVars = normalizeExpression(stuStr);
+  const normExpForVars = normalizeExpression(expStr);
+  const varNames = Array.from(new Set([
+    ...(normStuForVars.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || []),
+    ...(normExpForVars.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [])
+  ])).filter(w => !['sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'abs', 'Math', 'pow'].includes(w));
   
   if (varNames.length > 0) {
+    const primes1 = [2.3, 3.7, 1.9, 4.1, 5.3, 2.9, 3.1, 4.7];
+    const primes2 = [5.1, 1.7, 3.3, 2.7, 4.3, 1.3, 5.7, 2.1];
+
     const sampleSets = [
-      { x: 2, y: 3, a: 2, b: 4, t: 1.5 },
-      { x: 5.5, y: 1.2, a: 3, b: 7, t: 3.2 }
+      varNames.reduce((acc, v, i) => ({ ...acc, [v]: primes1[i % primes1.length] }), {} as Record<string, number>),
+      varNames.reduce((acc, v, i) => ({ ...acc, [v]: primes2[i % primes2.length] }), {} as Record<string, number>)
     ];
 
     let allSamplesMatch = true;

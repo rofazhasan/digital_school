@@ -126,6 +126,12 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 return !isNaN(sVal) && !isNaN(eVal) && Math.abs(sVal - eVal) <= tol;
             });
         }
+    } else if (type === 'SRA') {
+        if (question.componentResults && typeof question.componentResults === 'object') {
+            hasAtLeastOneCorrect = Object.values(question.componentResults).some((cr: any) => cr.status === 'CORRECT' || cr.status === 'PARTIAL' || Number(cr.earnedMarks) > 0);
+        } else if (studentAnswer && typeof studentAnswer === 'object') {
+            hasAtLeastOneCorrect = Object.keys(studentAnswer).length > 0;
+        }
     } else if (type === 'DR') {
         if (typeof question.answerCorrect === 'boolean' || typeof question.reasonCorrect === 'boolean') {
             hasAtLeastOneCorrect = Boolean(question.answerCorrect || question.reasonCorrect);

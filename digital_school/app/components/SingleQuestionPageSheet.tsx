@@ -46,7 +46,11 @@ const QUESTION_TYPE_LABELS_BN: Record<string, string> = {
   AR: "দৃঢ়োক্তি-কারণ",
   MTF: "মিলকরণ",
   INT: "পূর্ণসংখ্যার উত্তর",
-  SMCQ: "উদ্দীপক বহুনির্বাচনী",
+  SMCQ: "বহুনির্বাচনী (উদ্দীপকভিত্তিক)",
+  CMA: "মাল্টি-পার্ট গাণিতিক (CMA)",
+  MPC: "বহু-ধাপ সমস্যা চেইন (MPC)",
+  SRA: "কাঠামোগত যুক্তি সমাবেশ (SRA)",
+  DR: "ডায়াগনস্টিক যুক্তি (DR)",
   DESCRIPTIVE: "বর্ণনামূলক"
 };
 
@@ -59,6 +63,10 @@ const QUESTION_TYPE_LABELS_EN: Record<string, string> = {
   MTF: "Matching",
   INT: "Integer Answer",
   SMCQ: "Stem MCQ",
+  CMA: "Constructed Multi-Answer",
+  MPC: "Multi-Step Problem Chain",
+  SRA: "Structured Reasoning Assembly",
+  DR: "Diagnostic Reasoning",
   DESCRIPTIVE: "Descriptive"
 };
 

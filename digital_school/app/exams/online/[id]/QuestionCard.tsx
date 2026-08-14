@@ -21,10 +21,10 @@ import { compressImage } from "./performance-utils";
 import { ZoomableImage, QuestionImageGallery } from "./question-types/shared";
 import { MCQOption, MCOption } from "./question-types/MCQSection";
 import { MTFGrid } from "./question-types/MTFSection";
+import { IntNumericSection } from "./question-types/IntNumericSection";
 import { DebouncedTextarea, DebouncedInput } from "./question-types/SubjectiveSection";
 import { DescriptiveSection } from "./question-types/DescriptiveSection";
-import { IntNumericSection } from "./question-types/IntNumericSection";
-import { CMARenderer, MPCRenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { CMARenderer, MPCRenderer, SRARenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
 
 // Lazy components
 const CameraCapture = lazy(() => import("./CameraCapture"));
@@ -397,8 +397,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
               />
             )}
 
-            {type === "dr" && (
-              <DRRenderer
+            {(type === "sra" || type === "dr") && (
+              <SRARenderer
                 question={question}
                 value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
                 onChange={onAnswerChange}

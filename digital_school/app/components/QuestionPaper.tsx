@@ -93,6 +93,7 @@ interface QuestionPaperProps {
     smcq?: any[];
     cma?: any[];
     mpc?: any[];
+    sra?: any[];
     dr?: any[];
     allObjective?: any[];
   };
@@ -247,6 +248,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const descriptives = questions.descriptive || [];
     const cmas = questions.cma || [];
     const mpcs = questions.mpc || [];
+    const sras = questions.sra || [];
     const drs = questions.dr || [];
 
     const allObjective = questions.allObjective && questions.allObjective.length > 0
@@ -260,7 +262,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' })),
         ...(cmas.map(q => ({ ...q, type: 'CMA' }))),
         ...(mpcs.map(q => ({ ...q, type: 'MPC' }))),
-        ...(drs.map(q => ({ ...q, type: 'DR' })))
+        ...(sras.map((q: any) => ({ ...q, type: 'SRA' }))),
+        ...(drs.map((q: any) => ({ ...q, type: 'DR' })))
       ];
 
     const objectiveTotal = allObjective.reduce((sum, q) => {
@@ -589,31 +592,98 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       );
                     }
 
-                    if (q.type?.toUpperCase() === 'DR') {
+                    if (q.type?.toUpperCase() === 'SRA' || q.type?.toUpperCase() === 'DR') {
+                      const components = q.components || q.sraComponents || [];
                       const reasonOpts = q.reasonOptions || q.subQuestions || q.options || [];
+
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
                             <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline dynamic>{cleanupMath(q.questionText || q.text || '')}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
-                          <div className="ml-4 space-y-2 text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-indigo-800">Part A Answer:</span>
-                              <span className="inline-block min-w-[160px] border border-black/40 bg-white h-6 rounded px-2"></span>
-                            </div>
-                            <div>
-                              <span className="font-bold text-indigo-800">Part B Conceptual Justification:</span>
-                              <div className="space-y-1 mt-1 pl-2">
-                                {reasonOpts.map((opt: any, rIdx: number) => (
-                                  <div key={rIdx} className="flex items-center gap-2">
-                                    <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3">{String.fromCharCode(65 + rIdx)}</span>
-                                    <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || opt.question || '')}</UniversalMathJax></span>
+                          
+                          {components.length > 0 ? (
+                            <div className="ml-4 space-y-3 text-xs">
+                              {components.map((comp: any, cIdx: number) => (
+                                <div key={cIdx} className="space-y-1.5 p-2 rounded border border-black/10 bg-slate-50/50">
+                                  <div className="flex justify-between font-bold text-indigo-900 text-[11px]">
+                                    <span>{comp.label || `Step ${cIdx + 1}`}:</span>
+                                    <span>[{comp.marks || 1} pts]</span>
                                   </div>
-                                ))}
+                                  {comp.prompt && (
+                                    <div className="text-gray-800">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(comp.prompt)}</UniversalMathJax>
+                                    </div>
+                                  )}
+                                  
+                                  {/* CONSTRUCT answer space */}
+                                  {(comp.kind === 'CONSTRUCT' || comp.kind === 'INTERMEDIATE_CONSTRUCT' || comp.kind === 'CONCLUSION' || !comp.kind) && (
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <span className="text-[11px] font-semibold text-gray-600">Answer:</span>
+                                      <span className="inline-block min-w-[140px] border border-black/40 bg-white h-6 rounded px-2"></span>
+                                      {comp.unit && <span className="text-[11px] font-mono text-gray-500">{comp.unit}</span>}
+                                    </div>
+                                  )}
+
+                                  {/* EVIDENCE_SELECT options */}
+                                  {comp.kind === 'EVIDENCE_SELECT' && (
+                                    <div className="space-y-1 pt-1 pl-2">
+                                      {(comp.options || []).map((opt: any, oIdx: number) => (
+                                        <div key={oIdx} className="flex items-center gap-2">
+                                          <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3 shrink-0">
+                                            {String.fromCharCode(65 + oIdx)}
+                                          </span>
+                                          <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || '')}</UniversalMathJax></span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* ORDER items */}
+                                  {comp.kind === 'ORDER' && (
+                                    <div className="space-y-1 pt-1">
+                                      <div className="grid grid-cols-1 gap-1 pl-2">
+                                        {(comp.items || []).map((it: any, iIdx: number) => (
+                                          <div key={iIdx} className="text-[11px]">
+                                            <span className="font-bold mr-1">({iIdx + 1})</span>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(it.text || '')}</UniversalMathJax>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="flex items-center gap-1 pt-1 text-[11px] font-semibold">
+                                        <span>Order:</span>
+                                        {(comp.items || []).map((_: any, sIdx: number) => (
+                                          <React.Fragment key={sIdx}>
+                                            <span className="inline-block w-8 h-5 border border-black/40 bg-white rounded text-center"></span>
+                                            {sIdx < (comp.items || []).length - 1 && <span>→</span>}
+                                          </React.Fragment>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="ml-4 space-y-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-indigo-800">Part A Answer:</span>
+                                <span className="inline-block min-w-[160px] border border-black/40 bg-white h-6 rounded px-2"></span>
+                              </div>
+                              <div>
+                                <span className="font-bold text-indigo-800">Part B Conceptual Justification:</span>
+                                <div className="space-y-1 mt-1 pl-2">
+                                  {reasonOpts.map((opt: any, rIdx: number) => (
+                                    <div key={rIdx} className="flex items-center gap-2">
+                                      <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3">{String.fromCharCode(65 + rIdx)}</span>
+                                      <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || opt.question || '')}</UniversalMathJax></span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     }

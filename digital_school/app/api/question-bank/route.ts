@@ -49,6 +49,8 @@ const questionSchema = z.object({
     stages: z.array(z.any()).optional().nullable(),
     mpcStages: z.array(z.any()).optional().nullable(),
     scenario: z.string().optional().nullable(),
+    components: z.array(z.any()).optional().nullable(),
+    sraComponents: z.array(z.any()).optional().nullable(),
     reasonOptions: z.array(z.any()).optional().nullable(),
     confidenceTracking: z.boolean().optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
