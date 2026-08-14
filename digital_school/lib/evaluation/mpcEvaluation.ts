@@ -1,3 +1,5 @@
+import { areExpressionsEquivalent } from '../math-parser';
+
 // MPC (Multi-Step Problem Chain) Question Evaluation Logic
 // Evaluates sequential problem stages with dependency-aware scoring and Error Propagation Handling.
 
@@ -101,11 +103,9 @@ export function evaluateMPCQuestion(
         let isCorrectWithPropagatedError = false;
 
         // 1. Direct Evaluation against key
-        if (!isNaN(studentNum) && !isNaN(expectedNum)) {
-            isCorrectDirectly = Math.abs(studentNum - expectedNum) <= tol;
-        } else if (String(studentValRaw || '').trim().toLowerCase() === String(stage.expectedAnswer || '').trim().toLowerCase()) {
-            isCorrectDirectly = true;
-        }
+        const expectedStr = String(stage.expectedAnswer ?? '').trim();
+        const studentStr = String(studentValRaw ?? '').trim();
+        isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
         // 2. Error Propagation Evaluation if direct check failed & dependency exists
         if (!isCorrectDirectly && stage.dependsOnStageId) {

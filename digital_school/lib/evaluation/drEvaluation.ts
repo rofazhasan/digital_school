@@ -1,5 +1,4 @@
-// DR (Diagnostic Reasoning) Question Evaluation Logic
-// Evaluates Answer + Justification Reason + Confidence Matrix.
+import { areExpressionsEquivalent } from '../math-parser';
 
 export interface DRReasonOption {
     id: string;
@@ -64,16 +63,8 @@ export function evaluateDRQuestion(
     const expectedStr = String(question.expectedAnswer ?? (question as any).modelAnswer ?? (question as any).answer ?? '').trim();
     const studentStr = String(studentAnsRaw ?? '').trim();
 
-    if (question.answerType === 'decimal' || (question.tolerance !== undefined && !isNaN(Number(expectedStr)))) {
-        const expNum = parseFloat(expectedStr);
-        const stuNum = parseFloat(studentStr);
-        const tol = Number(question.tolerance) || 0.01;
-        if (!isNaN(expNum) && !isNaN(stuNum)) {
-            isAnswerCorrect = Math.abs(stuNum - expNum) <= tol;
-        }
-    } else {
-        isAnswerCorrect = studentStr.toLowerCase() === expectedStr.toLowerCase();
-    }
+    const tol = Number(question.tolerance) || 0.01;
+    isAnswerCorrect = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
     let rawReasons = question.reasonOptions || (question as any).reasons || (question as any).options || (question as any).reason_options || (question as any).subQuestions || [];
     if (typeof rawReasons === 'string') {

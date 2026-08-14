@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { LiveExpressionInput } from "@/components/ui/QuestionRenderers";
+
 interface IntNumericSectionProps {
     question: any;
     userAnswer: any;
@@ -21,22 +23,16 @@ export const IntNumericSection = ({
     onAnswerChange
 }: IntNumericSectionProps) => {
     const showResult = submitted;
-    const currentVal = userAnswer?.answer ?? userAnswer ?? "";
+    const currentVal = typeof userAnswer === 'object' && userAnswer !== null ? (userAnswer.answer ?? '') : (userAnswer ?? "");
     const correctVal = question.correctAnswer || question.modelAnswer || question.correct || question.answer;
-    const isCorrect = Number(currentVal) === Number(correctVal);
 
     return (
         <div className="space-y-4 text-left">
-            <Input
-                type="number"
+            <LiveExpressionInput
                 value={currentVal}
-                onChange={(e) => onAnswerChange({ answer: parseInt(e.target.value) || 0 })}
+                onChange={(val) => onAnswerChange({ answer: val })}
                 disabled={disabled || submitted}
-                className={cn(
-                    "w-full max-w-xs text-xl font-bold p-8 border-2 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-left",
-                    showResult && (isCorrect ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-rose-500 bg-rose-50 text-rose-900")
-                )}
-                placeholder="Enter integer answer..."
+                placeholder="Enter answer or math expression..."
             />
             {showResult && (
                 <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-left">

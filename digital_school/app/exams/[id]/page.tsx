@@ -1410,6 +1410,52 @@ export default function ExamBuilderPage() {
                               ))}
                             </div>
                           )}
+                          {q.type === 'DR' && (
+                            <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
+                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Diagnostic Reasoning (DR):</span>
+                              <div className="text-slate-700 dark:text-slate-300">
+                                <strong>Part A Answer Key:</strong> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{q.expectedAnswer || q.modelAnswer || '—'}</span>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="font-semibold text-slate-500">Part B Justification Options:</span>
+                                {(((q as any).reasonOptions || (q as any).reasons || q.subQuestions || q.options) || []).map((rOpt: any, rIdx: number) => {
+                                  const rText = typeof rOpt === 'string' ? rOpt : (rOpt.text || rOpt.label || rOpt.question);
+                                  const isCor = typeof rOpt === 'object' && !!rOpt.isCorrect;
+                                  return (
+                                    <div key={rIdx} className={`p-1.5 rounded border text-[11px] ${isCor ? 'bg-green-50 dark:bg-green-950/40 border-green-300 font-bold text-green-800 dark:text-green-200' : 'bg-white dark:bg-slate-900 border-slate-200'}`}>
+                                      {String.fromCharCode(65 + rIdx)}. <UniversalMathJax inline>{cleanupMath(rText)}</UniversalMathJax> {isCor && '✓'}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {q.type === 'CMA' && (
+                            <div className="mt-3 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs space-y-2">
+                              <span className="font-bold text-indigo-900 dark:text-indigo-300 uppercase text-[10px]">Constructed Multi-Answer Parts:</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {(((q as any).parts || (q as any).cmaParts || q.subQuestions) || []).map((part: any, pIdx: number) => (
+                                  <div key={pIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px]">
+                                    <div className="font-bold">{part.label || `Part ${pIdx + 1}`}: {part.prompt || part.text || ''}</div>
+                                    <div className="text-emerald-600 dark:text-emerald-400 font-mono">Answer: {part.expectedAnswer || part.modelAnswer} {part.unit || ''}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {q.type === 'MPC' && (
+                            <div className="mt-3 p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs space-y-2">
+                              <span className="font-bold text-blue-900 dark:text-blue-300 uppercase text-[10px]">Multi-Step Problem Chain Stages:</span>
+                              <div className="space-y-1.5">
+                                {(((q as any).stages || (q as any).mpcStages || q.subQuestions) || []).map((stage: any, sIdx: number) => (
+                                  <div key={sIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px] flex justify-between items-center">
+                                    <span>Step {sIdx + 1}: {stage.stageTitle || stage.prompt || stage.text}</span>
+                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">Expected: {stage.expectedAnswer || stage.modelAnswer}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : <div className="text-muted-foreground text-center">No questions in this set.</div>}

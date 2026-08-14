@@ -5,7 +5,82 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { UniversalMathJax } from '@/app/components/UniversalMathJax';
 import { cleanupMath } from '@/lib/utils';
-import { Sparkles, HelpCircle, Info } from 'lucide-react';
+import { Sparkles, HelpCircle, Info, Calculator } from 'lucide-react';
+import { formatExpressionToLatex } from '@/lib/math-parser';
+
+// ==========================================
+// 0. Live Expression Input with LaTeX Preview
+// ==========================================
+export function LiveExpressionInput({
+  value,
+  onChange,
+  placeholder = "Enter answer or math expression...",
+  disabled = false,
+  className = ""
+}: {
+  value: string | number;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const strVal = String(value ?? '');
+
+  const insertSymbol = (sym: string) => {
+    if (disabled) return;
+    onChange(strVal + sym);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Input
+        type="text"
+        placeholder={placeholder}
+        value={strVal}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`bg-white dark:bg-slate-950 text-sm font-mono ${className}`}
+      />
+
+      {/* Quick Math Toolbar & Live LaTeX Preview */}
+      {!disabled && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 max-w-full">
+            <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0 flex items-center gap-1">
+              <Calculator className="w-3 h-3" /> Quick Math:
+            </span>
+            {[
+              { label: 'x²', insert: '^2' },
+              { label: 'a/b', insert: '/' },
+              { label: '√x', insert: 'sqrt()' },
+              { label: '10ⁿ', insert: '10^' },
+              { label: 'π', insert: '\\pi' },
+              { label: '±', insert: '\\pm' },
+              { label: 'sin', insert: 'sin()' },
+              { label: 'cos', insert: 'cos()' },
+            ].map((btn) => (
+              <button
+                key={btn.label}
+                type="button"
+                onClick={() => insertSymbol(btn.insert)}
+                className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border text-[11px] font-mono text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          {strVal && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-950 dark:text-indigo-200 shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">LaTeX Output:</span>
+              <span className="font-semibold text-xs"><UniversalMathJax inline dynamic>{cleanupMath(formatExpressionToLatex(strVal))}</UniversalMathJax></span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ==========================================
 // 1. CMA (Constructed Multi-Answer) Renderer
@@ -108,14 +183,11 @@ export function CMARenderer({
                   </div>
                 </div>
 
-                <Input
-                  type={part.type === 'integer' || part.type === 'decimal' || part.type === 'number' ? 'number' : 'text'}
-                  step={part.type === 'decimal' ? 'any' : '1'}
+                <LiveExpressionInput
                   placeholder={part.type === 'expression' ? 'e.g. (2x+1)/(x^2+3)' : 'Enter value...'}
                   value={partVal}
-                  onChange={(e) => handlePartChange(partId, e.target.value)}
+                  onChange={(val) => handlePartChange(partId, val)}
                   disabled={disabled}
-                  className="bg-white dark:bg-slate-950 text-sm rounded-lg"
                 />
 
                 {showFeedback && res && (
@@ -247,13 +319,11 @@ export function MPCRenderer({
                   )}
                 </div>
 
-                <Input
-                  type="text"
-                  placeholder="Enter stage answer..."
+                <LiveExpressionInput
+                  placeholder="Enter stage answer or math expression..."
                   value={stageVal}
-                  onChange={(e) => handleStageChange(stageId, e.target.value)}
+                  onChange={(val) => handleStageChange(stageId, val)}
                   disabled={disabled}
-                  className="bg-slate-50 dark:bg-slate-950 text-sm rounded-lg"
                 />
 
                 {showFeedback && res && (
@@ -389,13 +459,11 @@ export function DRRenderer({
             })}
           </div>
         ) : (
-          <Input
-            type={question.answerType === 'decimal' || question.answerType === 'integer' || (question as any).type === 'number' ? 'number' : 'text'}
-            placeholder="Enter your final answer (e.g. 15, x^2+3, 4.5)..."
+          <LiveExpressionInput
+            placeholder="Enter your final answer or math expression (e.g. 15, x^2+3, 4.5)..."
             value={value?.answer ?? ''}
-            onChange={(e) => handleAnswerChange(e.target.value)}
+            onChange={(val) => handleAnswerChange(val)}
             disabled={disabled}
-            className="bg-white dark:bg-slate-950 text-sm"
           />
         )}
       </div>

@@ -378,7 +378,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             {type === "cma" && (
               <CMARenderer
                 question={question}
-                value={userAnswer || {}}
+                value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
                 onChange={onAnswerChange}
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}
@@ -389,7 +389,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             {type === "mpc" && (
               <MPCRenderer
                 question={question}
-                value={userAnswer || {}}
+                value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
                 onChange={onAnswerChange}
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}
@@ -400,7 +400,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             {type === "dr" && (
               <DRRenderer
                 question={question}
-                value={userAnswer || {}}
+                value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
                 onChange={onAnswerChange}
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}

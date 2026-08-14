@@ -4188,9 +4188,33 @@ function DRQuestionForm({
         Diagnostic Reasoning Configuration
       </h4>
 
+      {/* Question Maker Setup Guidance Banner */}
+      <div className="p-3.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1.5">
+        <div className="font-bold text-xs flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+          <Sparkles className="w-4 h-4 text-purple-600" /> Question Creator Setup Guide for DR Questions:
+        </div>
+        <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
+          <li><strong>Part A (Answer Key):</strong> Type the expected numerical value, expression (e.g. <code className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded border">x^2+1</code>), or string key for Part A.</li>
+          <li><strong>Part B (Principle & Justifications):</strong> Add 2 to 4 conceptual principles explaining *why* Part A is true. Check the box for the single correct principle.</li>
+          <li><strong>Part C (Confidence Level):</strong> Leave confidence tracking enabled to calculate student Mastery, Misconception, and Execution Slip diagnostic tags!</li>
+        </ul>
+      </div>
+
       <div className="p-3 border rounded-lg bg-background space-y-2">
-        <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part A: Correct Answer Key</Label>
-        <Input value={expectedAnswer} onChange={e => setExpectedAnswer(e.target.value)} placeholder="e.g. 42 or Option B text" className="h-8 text-xs font-mono" />
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Part A: Correct Answer Key / Expression</Label>
+          {expectedAnswer && (
+            <span className="text-xs font-mono font-bold text-purple-600 dark:text-purple-400">
+              Preview: <UniversalMathJax inline dynamic>{cleanupMath(expectedAnswer)}</UniversalMathJax>
+            </span>
+          )}
+        </div>
+        <Input
+          value={expectedAnswer}
+          onChange={e => setExpectedAnswer(e.target.value)}
+          placeholder="e.g. 42 or (2x+1)/(x^2+3) or Option B text"
+          className="h-8 text-xs font-mono"
+        />
       </div>
 
       <div className="p-3 border rounded-lg bg-background space-y-3">
@@ -4213,29 +4237,37 @@ function DRQuestionForm({
 
         <div className="space-y-2">
           {reasonOptions.map((opt, idx) => (
-            <div key={idx} className="flex items-center gap-2 p-2 border rounded bg-slate-50 dark:bg-slate-900/50">
-              <Checkbox
-                checked={!!opt.isCorrect}
-                onCheckedChange={ch => {
-                  const next = reasonOptions.map((o, i) => ({ ...o, isCorrect: i === idx ? !!ch : false }));
-                  setReasonOptions(next);
-                }}
-              />
-              <span className="font-bold text-xs shrink-0">{String.fromCharCode(65 + idx)}.</span>
-              <Input
-                value={opt.text || ''}
-                onChange={e => {
-                  const next = [...reasonOptions];
-                  next[idx].text = e.target.value;
-                  setReasonOptions(next);
-                }}
-                placeholder={`Reason option ${String.fromCharCode(65 + idx)}...`}
-                className="h-8 text-xs flex-1"
-              />
-              {reasonOptions.length > 1 && (
-                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setReasonOptions(reasonOptions.filter((_, i) => i !== idx))}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+            <div key={idx} className="flex flex-col gap-1 p-2.5 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={!!opt.isCorrect}
+                  onCheckedChange={ch => {
+                    const next = reasonOptions.map((o, i) => ({ ...o, isCorrect: i === idx ? !!ch : false }));
+                    setReasonOptions(next);
+                  }}
+                />
+                <span className="font-bold text-xs shrink-0">{String.fromCharCode(65 + idx)}.</span>
+                <Input
+                  value={opt.text || ''}
+                  onChange={e => {
+                    const next = [...reasonOptions];
+                    next[idx].text = e.target.value;
+                    setReasonOptions(next);
+                  }}
+                  placeholder={`Reason option ${String.fromCharCode(65 + idx)} text (MathJax allowed, e.g. x^2)...`}
+                  className="h-8 text-xs flex-1"
+                />
+                {reasonOptions.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setReasonOptions(reasonOptions.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              {opt.text && (
+                <div className="pl-7 text-[11px] text-slate-500 flex items-center gap-1">
+                  <span className="font-bold text-[10px] text-purple-600 uppercase">Math Output:</span>
+                  <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                </div>
               )}
             </div>
           ))}

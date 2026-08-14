@@ -1,3 +1,5 @@
+import { areExpressionsEquivalent } from '../math-parser';
+
 // CMA (Constructed Multi-Answer) Question Evaluation Logic
 // Evaluates multi-field constructed answers (integer, decimal with tolerance, symbolic math, text) with partial credit support.
 
@@ -77,25 +79,8 @@ export function evaluateCMAQuestion(
         const expectedStr = String(part.expectedAnswer ?? '').trim();
         const studentStr = String(rawStudentVal ?? '').trim();
 
-        if (part.type === 'decimal' || (part.tolerance !== undefined && !isNaN(Number(expectedStr)))) {
-            const expectedNum = parseFloat(expectedStr);
-            const studentNum = parseFloat(studentStr);
-            const tol = Number(part.tolerance) || 0.01;
-            if (!isNaN(expectedNum) && !isNaN(studentNum)) {
-                isCorrect = Math.abs(studentNum - expectedNum) <= tol;
-            }
-        } else if (part.type === 'integer') {
-            const expectedInt = parseInt(expectedStr, 10);
-            const studentInt = parseInt(studentStr, 10);
-            if (!isNaN(expectedInt) && !isNaN(studentInt)) {
-                isCorrect = studentInt === expectedInt;
-            }
-        } else if (part.type === 'expression') {
-            isCorrect = normalizeExpr(studentStr) === normalizeExpr(expectedStr);
-        } else {
-            // Text or exact string match
-            isCorrect = studentStr.toLowerCase() === expectedStr.toLowerCase();
-        }
+        const tol = Number(part.tolerance) || 0.01;
+        isCorrect = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
         const earned = isCorrect ? partMax : 0;
         if (isCorrect) totalEarned += earned;
