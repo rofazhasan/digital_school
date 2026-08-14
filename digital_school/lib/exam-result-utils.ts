@@ -65,3 +65,89 @@ export const isAnswerCorrect = (awardedMarks: any, totalMarks: any): boolean => 
 
     return awarded === total && total > 0;
 };
+
+/**
+ * Evaluates the precise result status of a question:
+ * - 'UNANSWERED': Question was not attempted by student.
+ * - 'CORRECT': Student answered all parts/options correctly and earned full marks.
+ * - 'PARTIAL': Student attempted the question and got at least ONE component/part/option correct, but not full marks.
+ * - 'WRONG': Student attempted the question, but got ALL components/parts/options wrong (0 correct choices/parts).
+ */
+export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIAL' | 'WRONG' | 'UNANSWERED' => {
+    if (!question) return 'UNANSWERED';
+
+    const type = (question.type || '').toUpperCase();
+    const studentAnswer = question.studentAnswer;
+    const subQuestions = question.subQuestions || question.sub_questions;
+
+    const hasAns = hasStudentAnswered(type, studentAnswer, subQuestions);
+    if (!hasAns) return 'UNANSWERED';
+
+    const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
+    if (isCorrect) return 'CORRECT';
+
+    // Check if at least 1 component/part/option is correct for partial credit classification
+    let hasAtLeastOneCorrect = false;
+
+    if (type === 'MC') {
+        const options = question.options || [];
+        const selected = Array.isArray(studentAnswer?.selectedOptions)
+            ? studentAnswer.selectedOptions
+            : (Array.isArray(studentAnswer) ? studentAnswer : []);
+
+        hasAtLeastOneCorrect = selected.some((idx: number) => Boolean(options[idx]?.isCorrect));
+    } else if (type === 'CMA') {
+        const parts = question.parts || question.cmaParts || [];
+        if (question.partResults && typeof question.partResults === 'object') {
+            hasAtLeastOneCorrect = Object.values(question.partResults).some((p: any) => Boolean(p?.isCorrect));
+        } else if (studentAnswer && typeof studentAnswer === 'object') {
+            hasAtLeastOneCorrect = parts.some((p: any) => {
+                const sVal = String(studentAnswer[p.id] ?? studentAnswer[p.label] ?? '').trim().toLowerCase();
+                const eVal = String(p.expectedAnswer ?? '').trim().toLowerCase();
+                if (!sVal || !eVal) return false;
+                if (p.type === 'decimal' || (p.tolerance !== undefined && !isNaN(Number(eVal)))) {
+                    const tol = Number(p.tolerance) || 0.01;
+                    return Math.abs(parseFloat(sVal) - parseFloat(eVal)) <= tol;
+                }
+                return sVal === eVal;
+            });
+        }
+    } else if (type === 'MPC') {
+        const stages = question.stages || question.mpcStages || [];
+        if (question.stageResults && typeof question.stageResults === 'object') {
+            hasAtLeastOneCorrect = Object.values(question.stageResults).some((s: any) => Boolean(s?.isCorrectDirectly || s?.isCorrectWithPropagatedError));
+        } else if (studentAnswer && typeof studentAnswer === 'object') {
+            hasAtLeastOneCorrect = stages.some((s: any) => {
+                const sVal = parseFloat(String(studentAnswer[s.id] ?? ''));
+                const eVal = parseFloat(String(s.expectedAnswer ?? ''));
+                const tol = Number(s.tolerance) || 0.01;
+                return !isNaN(sVal) && !isNaN(eVal) && Math.abs(sVal - eVal) <= tol;
+            });
+        }
+    } else if (type === 'DR') {
+        if (typeof question.answerCorrect === 'boolean' || typeof question.reasonCorrect === 'boolean') {
+            hasAtLeastOneCorrect = Boolean(question.answerCorrect || question.reasonCorrect);
+        } else if (studentAnswer) {
+            const expAns = String(question.expectedAnswer ?? '').trim().toLowerCase();
+            const stuAns = String(studentAnswer.answer ?? '').trim().toLowerCase();
+            const isAnsOk = Boolean(stuAns && expAns && stuAns === expAns);
+            const selectedReason = (question.reasonOptions || []).find((r: any) => r.id === studentAnswer.reasonId || r.text === studentAnswer.reasonId);
+            const isReasonOk = Boolean(selectedReason?.isCorrect);
+            hasAtLeastOneCorrect = isAnsOk || isReasonOk;
+        }
+    } else if (type === 'SMCQ') {
+        const sqs = subQuestions || [];
+        hasAtLeastOneCorrect = sqs.some((sq: any) => Number(sq.awardedMarks) > 0 || isAnswerCorrect(sq.awardedMarks, sq.marks));
+    } else if (type === 'MTF') {
+        if (question.matchesResults && typeof question.matchesResults === 'object') {
+            hasAtLeastOneCorrect = Object.values(question.matchesResults).some((m: any) => Boolean(m?.isCorrect));
+        }
+    }
+
+    // Fallback if type didn't match specialized multi-part logic
+    if (!hasAtLeastOneCorrect && Number(question.awardedMarks) > 0) {
+        hasAtLeastOneCorrect = true;
+    }
+
+    return hasAtLeastOneCorrect ? 'PARTIAL' : 'WRONG';
+};

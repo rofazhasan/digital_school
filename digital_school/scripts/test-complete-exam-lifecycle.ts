@@ -2,6 +2,7 @@ import { evaluateCMAQuestion } from '../lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '../lib/evaluation/mpcEvaluation';
 import { evaluateDRQuestion } from '../lib/evaluation/drEvaluation';
 import { evaluateMCQuestion } from '../lib/evaluation/mcEvaluation';
+import { evaluateQuestionResultStatus } from '../lib/exam-result-utils';
 
 // Complete 9-Question Type Sample Exam Payload
 export const SAMPLE_9_TYPE_EXAM = {
@@ -290,6 +291,25 @@ function auditCompleteLifecycle() {
     { negativeMarking: 25, partialMarking: true, hasAttempted: true }
   );
   testAssert(mcAllWrong === -2, `MC Audit: All wrong selections result in negative penalty (-2), got ${mcAllWrong}`);
+
+  // 11. RESULT SECTION CATEGORIZATION AUDIT (CORRECT / PARTIAL / WRONG / UNANSWERED)
+  const qMcSample = {
+    type: "MC",
+    options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: true }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }],
+    marks: 4
+  };
+
+  const statusAllCorrect = evaluateQuestionResultStatus({ ...qMcSample, studentAnswer: { selectedOptions: [0, 1] }, awardedMarks: 4 });
+  testAssert(statusAllCorrect === "CORRECT", `Section Filter Audit: Full marks -> CORRECT, got ${statusAllCorrect}`);
+
+  const statusPartial = evaluateQuestionResultStatus({ ...qMcSample, studentAnswer: { selectedOptions: [0, 2] }, awardedMarks: 1 });
+  testAssert(statusPartial === "PARTIAL", `Section Filter Audit: 1 correct option selected -> PARTIAL, got ${statusPartial}`);
+
+  const statusAllWrong = evaluateQuestionResultStatus({ ...qMcSample, studentAnswer: { selectedOptions: [2, 3] }, awardedMarks: -2 });
+  testAssert(statusAllWrong === "WRONG", `Section Filter Audit: 0 correct options selected (all wrong) -> WRONG, got ${statusAllWrong}`);
+
+  const statusUnanswered = evaluateQuestionResultStatus({ ...qMcSample, studentAnswer: null, awardedMarks: 0 });
+  testAssert(statusUnanswered === "UNANSWERED", `Section Filter Audit: Unattempted -> UNANSWERED, got ${statusUnanswered}`);
 
   console.log("--------------------------------------------------------------------------");
   console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT CHECKS PASSED CLEANLY!`);

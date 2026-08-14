@@ -59,7 +59,7 @@ import { MathJaxContext } from "better-react-mathjax";
 import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
-import { hasStudentAnswered, isAnswerCorrect } from "@/lib/exam-result-utils";
+import { hasStudentAnswered, isAnswerCorrect, evaluateQuestionResultStatus } from "@/lib/exam-result-utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -2672,17 +2672,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
 
-                          const hasAnswer = hasStudentAnswered(type, q.studentAnswer, q.subQuestions || q.sub_questions);
-                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
-                          const isPartial = hasAnswer && !isCorrect && Number(q.awardedMarks) > 0;
-
-                          switch (filterStatus as any) {
-                            case 'CORRECT': return isCorrect;
-                            case 'WRONG': return hasAnswer && !isCorrect && !isPartial;
-                            case 'PARTIAL': return isPartial;
-                            case 'UNANSWERED': return !hasAnswer;
-                            default: return true;
-                          }
+                          const status = evaluateQuestionResultStatus(q);
+                          if (filterStatus === 'ALL') return true;
+                          return status === filterStatus;
                         });
 
                         if (filteredQuestions.length === 0) return null;
@@ -2704,9 +2696,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               {paginatedQuestions.map((question, index) => {
                                 const type = (question.type || "").toUpperCase();
                                 const gIdx = startIndex + index;
-                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
-                                const hasAns = hasStudentAnswered(type, question.studentAnswer, question.subQuestions || question.sub_questions);
-                                const isPartial = hasAns && !isCorrect && Number(question.awardedMarks) > 0;
+                                const status = evaluateQuestionResultStatus(question);
+                                const isCorrect = status === 'CORRECT';
+                                const isPartial = status === 'PARTIAL';
+                                const hasAns = status !== 'UNANSWERED';
 
                                 return (
                                   <motion.div
