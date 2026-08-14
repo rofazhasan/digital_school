@@ -261,6 +261,7 @@ function auditCompleteLifecycle() {
 
   // Student makes mistake in Stage 1 (s1 = 5 instead of 6), but correctly calculates s2 = 5 * 4 = 20 and s3 = 0.5 * 2 * 20^2 = 400
   const mpcEPH = evaluateMPCQuestion(mpc as any, { s1: 5, s2: 20, s3: 400 });
+  console.log("DEBUG mpcEPH:", JSON.stringify(mpcEPH, null, 2));
   testAssert(
     mpcEPH.stageResults["s1"].earned === 0 &&
     mpcEPH.stageResults["s2"].isCorrectWithPropagatedError &&

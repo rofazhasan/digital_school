@@ -84,24 +84,24 @@ export function formatExpressionToLatex(expr: string): string {
  */
 export function evaluateExpressionAtSample(expr: string, vars: Record<string, number> = {}): number | null {
   try {
-    let norm = normalizeExpression(expr);
+    let text = String(expr || '').trim();
 
-    // 1. Convert powers ^ to Math.pow before variable substitution
-    let prevPow = '';
-    while (norm !== prevPow) {
-      prevPow = norm;
-      norm = norm.replace(/\(([^()]+)\)\^([a-zA-Z0-9_.]+)/g, 'Math.pow($1,$2)');
-      norm = norm.replace(/([a-zA-Z0-9_.]+)\^([a-zA-Z0-9_.]+)/g, 'Math.pow($1,$2)');
-    }
-
-    // 2. Convert sqrt to Math.sqrt
-    norm = norm.replace(/sqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
-
-    // 3. Substitute variables
-    for (const [varName, val] of Object.entries(vars)) {
+    // 1. Substitute variables FIRST (e.g. prev, s1, part1, etc.)
+    const sortedVars = Object.entries(vars).sort((a, b) => b[0].length - a[0].length);
+    for (const [varName, val] of sortedVars) {
       const regex = new RegExp(`\\b${varName}\\b`, 'g');
-      norm = norm.replace(regex, `(${val})`);
+      const valStr = (typeof val === 'number' && val < 0) ? `(${val})` : String(val);
+      text = text.replace(regex, valStr);
     }
+
+    // 2. Normalize the expression after variable substitution
+    let norm = normalizeExpression(text);
+
+    // 3. Convert powers ^ to ** JS exponentiation
+    norm = norm.replace(/\^/g, '**');
+
+    // 4. Convert sqrt to Math.sqrt
+    norm = norm.replace(/sqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
 
     // Sanitize string to allow only numbers, operators, Math.pow, Math.sqrt
     if (/[^0-9\.\+\-\*\/\(\)\,\sMath\.powsqrt]/.test(norm)) {

@@ -44,6 +44,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { Capacitor } from "@capacitor/core";
 import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet";
+import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 
 
 // --- Types ---
@@ -3982,14 +3983,14 @@ function CMAQuestionForm({
   setParts,
 }: {
   parts: any[];
-  setParts: (parts: any[]) => void;
+  setParts: (p: any[]) => void;
 }) {
   return (
-    <div className="space-y-4 border p-4 rounded-xl bg-cyan-50/20 dark:bg-cyan-950/10 border-cyan-200 dark:border-cyan-800">
+    <div className="space-y-4 border p-4 rounded-xl bg-teal-50/20 dark:bg-teal-950/10 border-teal-200 dark:border-teal-800">
       <div className="flex justify-between items-center">
-        <h4 className="font-bold text-sm text-cyan-900 dark:text-cyan-200 flex items-center gap-2">
-          <span className="px-2 py-0.5 bg-cyan-600 text-white rounded text-xs font-mono">CMA</span>
-          Constructed Answer Sub-Parts
+        <h4 className="font-bold text-sm text-teal-900 dark:text-teal-200 flex items-center gap-2">
+          <span className="px-2 py-0.5 bg-teal-600 text-white rounded text-xs font-mono">CMA</span>
+          Compound Multi-Part Sub-Questions
         </h4>
         <Button
           type="button"
@@ -4002,6 +4003,7 @@ function CMAQuestionForm({
                 id: `p${parts.length + 1}`,
                 label: String.fromCharCode(97 + parts.length),
                 prompt: '',
+                type: 'MCQ',
                 fieldType: 'decimal',
                 expectedAnswer: '',
                 tolerance: 0.05,
@@ -4033,14 +4035,17 @@ function CMAQuestionForm({
                 <Input value={p.label || ''} onChange={e => { const next = [...parts]; next[idx].label = e.target.value; setParts(next); }} placeholder="e.g. a, b, 1" className="h-8 text-xs" />
               </div>
               <div>
-                <Label className="text-xs">Field Type</Label>
-                <Select value={p.fieldType || 'decimal'} onValueChange={v => { const next = [...parts]; next[idx].fieldType = v; setParts(next); }}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <Label className="text-xs">Child Question Type</Label>
+                <Select value={p.type || p.fieldType || 'MCQ'} onValueChange={v => { const next = [...parts]; next[idx].type = v; next[idx].fieldType = v; setParts(next); }}>
+                  <SelectTrigger className="h-8 text-xs font-semibold"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="numeric">Numeric / Decimal</SelectItem>
-                    <SelectItem value="integer">Integer</SelectItem>
+                    <SelectItem value="MCQ">MCQ (Single Choice)</SelectItem>
+                    <SelectItem value="MC">MC (Multiple Correct)</SelectItem>
+                    <SelectItem value="INT">INT / Numeric Decimal</SelectItem>
+                    <SelectItem value="DR">DR (Direct Response)</SelectItem>
+                    <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                    <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                     <SelectItem value="expression">Symbolic Formula</SelectItem>
-                    <SelectItem value="fraction">Fraction</SelectItem>
                     <SelectItem value="text">Text / String</SelectItem>
                   </SelectContent>
                 </Select>
@@ -4052,14 +4057,14 @@ function CMAQuestionForm({
             </div>
 
             <div>
-              <Label className="text-xs">Field Prompt / Question Text</Label>
-              <Input value={p.prompt || p.label || ''} onChange={e => { const next = [...parts]; next[idx].prompt = e.target.value; setParts(next); }} placeholder="e.g. Horizontal velocity component" className="h-8 text-xs" />
+              <Label className="text-xs">Question Text / Field Prompt</Label>
+              <Input value={p.prompt || p.label || p.question || ''} onChange={e => { const next = [...parts]; next[idx].prompt = e.target.value; next[idx].question = e.target.value; setParts(next); }} placeholder="e.g. Calculate horizontal velocity component" className="h-8 text-xs" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <div>
-                <Label className="text-xs">Expected Key</Label>
-                <Input value={p.expectedAnswer ?? p.correctAnswer ?? ''} onChange={e => { const next = [...parts]; next[idx].expectedAnswer = e.target.value; next[idx].correctAnswer = e.target.value; setParts(next); }} placeholder="e.g. 17.32" className="h-8 text-xs font-mono" />
+                <Label className="text-xs">Expected Key / Answer</Label>
+                <Input value={p.expectedAnswer ?? p.correctAnswer ?? p.modelAnswer ?? ''} onChange={e => { const next = [...parts]; next[idx].expectedAnswer = e.target.value; next[idx].correctAnswer = e.target.value; setParts(next); }} placeholder="e.g. 17.32 or Option text" className="h-8 text-xs font-mono" />
               </div>
               <div>
                 <Label className="text-xs">Tolerance (±)</Label>
@@ -4088,12 +4093,14 @@ function MPCQuestionForm({
   stages: any[];
   setStages: (st: any[]) => void;
 }) {
+  const dagCheck = validateMPCDependencies(stages);
+
   return (
     <div className="space-y-4 border p-4 rounded-xl bg-indigo-50/20 dark:bg-indigo-950/10 border-indigo-200 dark:border-indigo-800">
       <div className="flex justify-between items-center">
         <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
           <span className="px-2 py-0.5 bg-indigo-600 text-white rounded text-xs font-mono">MPC</span>
-          Multi-Step Problem Chain Stages
+          Multi-Step Problem Chain (DAG Orchestrator)
         </h4>
         <Button
           type="button"
@@ -4107,6 +4114,8 @@ function MPCQuestionForm({
                 stageTitle: `Stage ${stages.length + 1}`,
                 expectedAnswer: '',
                 tolerance: 0.05,
+                dependsOnStageId: stages.length > 0 ? stages[stages.length - 1].id || `s${stages.length}` : '',
+                gradingMode: 'FOLLOW_THROUGH',
                 formula: '',
                 marks: 2,
               },
@@ -4115,6 +4124,41 @@ function MPCQuestionForm({
         >
           <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Stage
         </Button>
+      </div>
+
+      {/* DAG Cycle Validation Warning */}
+      {!dagCheck.isValid && (
+        <div className="p-3 rounded-lg bg-red-100 dark:bg-red-950/50 border border-red-300 text-red-800 dark:text-red-300 text-xs flex items-center gap-2 font-semibold">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          <span>{dagCheck.error}</span>
+        </div>
+      )}
+
+      {/* Visual Dependency Graph Workflow Preview */}
+      <div className="p-3 border rounded-xl bg-indigo-100/40 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 space-y-1.5">
+        <div className="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Visual Dependency DAG Preview:
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+          {stages.map((st, i) => {
+            const depId = st.dependsOnStageId || st.dependsOn;
+            const depStage = stages.find(s => s.id === depId);
+            return (
+              <React.Fragment key={i}>
+                {i > 0 && <span className="text-indigo-400 font-bold">→</span>}
+                <div className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-lg shadow-sm font-semibold flex items-center gap-1.5">
+                  <span className="w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{i + 1}</span>
+                  <span>{st.stageTitle || `Stage ${i + 1}`}</span>
+                  {depId && (
+                    <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950 px-1 py-0.5 rounded border border-purple-200">
+                      Dep: {depStage?.stageTitle || depId}
+                    </span>
+                  )}
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       <div>
@@ -4126,7 +4170,7 @@ function MPCQuestionForm({
         {stages.map((st, idx) => (
           <div key={idx} className="p-3 border rounded-lg bg-background space-y-3">
             <div className="flex justify-between items-center">
-              <span className="font-bold text-xs text-foreground">Stage {idx + 1}</span>
+              <span className="font-bold text-xs text-foreground">Stage {idx + 1} ({st.id || `s${idx + 1}`})</span>
               {stages.length > 1 && (
                 <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => setStages(stages.filter((_, i) => i !== idx))}>
                   <Trash2 className="h-3.5 w-3.5" />
@@ -4134,18 +4178,42 @@ function MPCQuestionForm({
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <div>
                 <Label className="text-xs">Stage Title / Question</Label>
                 <Input value={st.stageTitle || st.text || ''} onChange={e => { const next = [...stages]; next[idx].stageTitle = e.target.value; next[idx].text = e.target.value; setStages(next); }} placeholder="e.g. Calculate acceleration" className="h-8 text-xs" />
               </div>
               <div>
-                <Label className="text-xs">Marks</Label>
-                <Input type="number" value={st.marks || 2} onChange={e => { const next = [...stages]; next[idx].marks = Number(e.target.value); setStages(next); }} className="h-8 text-xs" />
+                <Label className="text-xs">Predecessor Dependency (dependsOn)</Label>
+                <Select value={st.dependsOnStageId || (Array.isArray(st.dependsOn) ? st.dependsOn[0] : st.dependsOn) || ''} onValueChange={v => { const next = [...stages]; next[idx].dependsOnStageId = v; next[idx].dependsOn = v; setStages(next); }}>
+                  <SelectTrigger className="h-8 text-xs font-semibold"><SelectValue placeholder="None (Root Stage)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Root Independent Stage)</SelectItem>
+                    {stages.filter((_, sIdx) => sIdx !== idx).map((otherStage, sIdx) => (
+                      <SelectItem key={sIdx} value={otherStage.id || `s${sIdx + 1}`}>
+                        Stage {sIdx + 1}: {otherStage.stageTitle || otherStage.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Grading Mode</Label>
+                <Select value={st.gradingMode || 'FOLLOW_THROUGH'} onValueChange={v => { const next = [...stages]; next[idx].gradingMode = v; setStages(next); }}>
+                  <SelectTrigger className="h-8 text-xs font-semibold"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FOLLOW_THROUGH">FOLLOW_THROUGH (Method Credit using Prev Answer)</SelectItem>
+                    <SelectItem value="EXACT">EXACT (Strict Answer Key Only)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <div>
+                <Label className="text-xs">Marks</Label>
+                <Input type="number" value={st.marks || 2} onChange={e => { const next = [...stages]; next[idx].marks = Number(e.target.value); setStages(next); }} className="h-8 text-xs" />
+              </div>
               <div>
                 <Label className="text-xs">Expected Key</Label>
                 <Input value={st.expectedAnswer ?? ''} onChange={e => { const next = [...stages]; next[idx].expectedAnswer = e.target.value; setStages(next); }} placeholder="e.g. 5" className="h-8 text-xs font-mono" />
@@ -4156,7 +4224,7 @@ function MPCQuestionForm({
               </div>
               <div>
                 <Label className="text-xs">EPH Formula (Optional)</Label>
-                <Input value={st.formula || ''} onChange={e => { const next = [...stages]; next[idx].formula = e.target.value; setStages(next); }} placeholder="e.g. 0.5 * 1200 * (prev * 8)^2" className="h-8 text-xs font-mono" />
+                <Input value={st.formula || ''} onChange={e => { const next = [...stages]; next[idx].formula = e.target.value; setStages(next); }} placeholder="e.g. prev * 4 or 0.5 * 2 * prev^2" className="h-8 text-xs font-mono" />
               </div>
             </div>
           </div>
@@ -4676,6 +4744,16 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       const correctOptions = validOptions.filter(opt => opt.isCorrect);
       if (correctOptions.length < 2) {
         toast({ variant: "destructive", title: "Validation Error", description: "MC must have at least 2 correct options" });
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    // Validate MPC (Multi-Step Problem Chain) DAG dependencies
+    if (type === 'MPC') {
+      const dagCheck = validateMPCDependencies(mpcStages);
+      if (!dagCheck.isValid) {
+        toast({ variant: "destructive", title: "Validation Error", description: dagCheck.error });
         setIsSaving(false);
         return;
       }

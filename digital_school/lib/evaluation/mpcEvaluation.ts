@@ -1,16 +1,28 @@
-import { areExpressionsEquivalent } from '../math-parser';
+import { areExpressionsEquivalent, evaluateExpressionAtSample } from '../math-parser';
 
 // MPC (Multi-Step Problem Chain) Question Evaluation Logic
-// Evaluates sequential problem stages with dependency-aware scoring and Error Propagation Handling.
+// Evaluates sequential problem stages with dependency-aware scoring, Directed Acyclic Graph (DAG) validation,
+// and Follow-Through Error Propagation (EPH).
 
 export interface MPCStage {
     id: string;
-    stageTitle: string;
+    stageTitle?: string;
+    text?: string;
+    question?: string;
+    type?: string; // Default NUMERIC, also supports SYMBOLIC, INT, DR, etc.
     marks: number;
     expectedAnswer: number | string;
     tolerance?: number;
     dependsOnStageId?: string; // ID of preceding stage required for evaluation
-    formula?: string;          // Dynamic formula, e.g. "0.5 * m * (prev)^2" or "prev * 2"
+    dependsOn?: string[] | string;
+    gradingMode?: 'FOLLOW_THROUGH' | 'EXACT' | string;
+    formula?: string;          // Dynamic formula, e.g. "0.5 * 2 * part1^2" or "prev * 4"
+    evaluation?: {
+        operation?: 'multiply' | 'add' | 'subtract' | 'divide' | 'power' | string;
+        operand?: number;
+        expression?: string;
+    };
+    explanation?: string;
 }
 
 export interface MPCQuestion {
@@ -19,49 +31,151 @@ export interface MPCQuestion {
     scenario?: string;
     stages?: MPCStage[];
     mpcStages?: MPCStage[];
+    subQuestions?: MPCStage[];
 }
 
-export type MPCAnswer = Record<string, number | string>;
+export type MPCAnswer = Record<string, any>;
+
+export interface MPCStageResult {
+    isCorrectDirectly: boolean;
+    isCorrectWithPropagatedError: boolean;
+    isAttempted: boolean;
+    status: 'CORRECT' | 'INCORRECT' | 'FOLLOW_THROUGH_CORRECT' | 'PARTIALLY_CORRECT' | 'UNANSWERED' | 'NOT_ATTEMPTED' | 'REVIEW_REQUIRED';
+    earned: number;
+    max: number;
+    studentVal: any;
+    expectedVal: any;
+    dependsOn?: string[];
+    gradingMode?: string;
+}
 
 export interface MPCEvaluationResult {
     score: number;
     maxScore: number;
     isCorrect: boolean;
-    stageResults: Record<string, {
-        isCorrectDirectly: boolean;
-        isCorrectWithPropagatedError: boolean;
-        earned: number;
-        max: number;
-        studentVal: any;
-        expectedVal: any;
-    }>;
+    stageResults: Record<string, MPCStageResult>;
     feedback: string;
 }
 
 /**
- * Safely evaluates dynamic formula given a previous student value
+ * Validates MPC dependencies to ensure there are no circular dependencies (DAG Check).
  */
-function computeDynamicTarget(formula: string | undefined, prevStudentVal: number): number | null {
-    if (!formula) return null;
-    try {
-        const sanitized = formula.replace(/prev|stage\d+_ans/g, String(prevStudentVal));
-        // Simple safe numeric evaluator for basic operators (+ - * / ^)
-        const func = new Function(`return ${sanitized.replace(/\^/g, '**')}`);
-        const result = func();
-        return typeof result === 'number' && !isNaN(result) ? result : null;
-    } catch {
-        return null;
+export function validateMPCDependencies(stages: MPCStage[]): { isValid: boolean; error?: string } {
+    if (!Array.isArray(stages) || stages.length === 0) return { isValid: true };
+
+    const adj: Record<string, string[]> = {};
+    const stageIds = new Set(stages.map((s, idx) => s.id || `s${idx + 1}`));
+
+    for (let idx = 0; idx < stages.length; idx++) {
+        const stage = stages[idx];
+        const u = stage.id || `s${idx + 1}`;
+        adj[u] = [];
+
+        const depsRaw = stage.dependsOn || stage.dependsOnStageId;
+        const deps = Array.isArray(depsRaw) ? depsRaw : (depsRaw ? [depsRaw] : []);
+        for (const dep of deps) {
+            if (dep && stageIds.has(dep) && dep !== u) {
+                adj[u].push(dep);
+            }
+        }
     }
+
+    const state: Record<string, number> = {};
+    let cyclePathString = '';
+
+    function dfs(node: string, currentPath: string[]): boolean {
+        state[node] = 1;
+        currentPath.push(node);
+
+        for (const dep of (adj[node] || [])) {
+            if (state[dep] === 1) {
+                const cycleStartIndex = currentPath.indexOf(dep);
+                cyclePathString = [...currentPath.slice(cycleStartIndex), dep].join(' → ');
+                return true;
+            }
+            if (!state[dep] && dfs(dep, currentPath)) {
+                return true;
+            }
+        }
+
+        state[node] = 2;
+        currentPath.pop();
+        return false;
+    }
+
+    for (const node of Object.keys(adj)) {
+        if (!state[node]) {
+            if (dfs(node, [])) {
+                return {
+                    isValid: false,
+                    error: `Circular dependency detected in MPC stages (${cyclePathString}). MPC dependencies must form a Directed Acyclic Graph (DAG).`
+                };
+            }
+        }
+    }
+
+    return { isValid: true };
 }
 
 /**
- * Evaluates an MPC (Multi-Step Problem Chain) question
+ * Safely evaluates dynamic formula for follow-through grading given predecessor student values.
+ */
+function computeDynamicTarget(
+    stage: MPCStage,
+    studentAnswer: MPCAnswer,
+    depIds: string[]
+): number | null {
+    if (depIds.length === 0) return null;
+
+    const sampleVars: Record<string, number> = {};
+    let primaryPrevVal: number | null = null;
+
+    for (const depId of depIds) {
+        const rawVal = studentAnswer ? studentAnswer[depId] : undefined;
+        const numVal = parseFloat(String(rawVal ?? ''));
+        if (!isNaN(numVal)) {
+            sampleVars[depId] = numVal;
+            sampleVars[`stage_${depId}`] = numVal;
+            if (primaryPrevVal === null) primaryPrevVal = numVal;
+        }
+    }
+
+    if (primaryPrevVal !== null) {
+        sampleVars['prev'] = primaryPrevVal;
+    }
+
+    // 1. Operation object format
+    if (stage.evaluation) {
+        if (stage.evaluation.expression) {
+            return evaluateExpressionAtSample(stage.evaluation.expression, sampleVars);
+        }
+        if (primaryPrevVal !== null && stage.evaluation.operation && stage.evaluation.operand !== undefined) {
+            const op = stage.evaluation.operation.toLowerCase();
+            const operand = Number(stage.evaluation.operand);
+            if (op === 'multiply') return primaryPrevVal * operand;
+            if (op === 'add') return primaryPrevVal + operand;
+            if (op === 'subtract') return primaryPrevVal - operand;
+            if (op === 'divide' && operand !== 0) return primaryPrevVal / operand;
+            if (op === 'power') return Math.pow(primaryPrevVal, operand);
+        }
+    }
+
+    // 2. Formula string format (e.g. "0.5 * 2 * part1^2" or "prev * 4")
+    if (stage.formula) {
+        return evaluateExpressionAtSample(stage.formula, sampleVars);
+    }
+
+    return null;
+}
+
+/**
+ * Evaluates an MPC (Multi-Step Problem Chain) question with follow-through error propagation.
  */
 export function evaluateMPCQuestion(
     question: MPCQuestion,
     studentAnswer: MPCAnswer
 ): MPCEvaluationResult {
-    let rawStages = question.stages || question.mpcStages || (question as any).subQuestions || (question as any).sub_questions || [];
+    let rawStages = question.stages || question.mpcStages || question.subQuestions || (question as any).sub_questions || [];
     if (typeof rawStages === 'string') {
         try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
     }
@@ -79,62 +193,79 @@ export function evaluateMPCQuestion(
     }
 
     let totalEarned = 0;
-    const stageResults: Record<string, {
-        isCorrectDirectly: boolean;
-        isCorrectWithPropagatedError: boolean;
-        earned: number;
-        max: number;
-        studentVal: any;
-        expectedVal: any;
-    }> = {};
-
+    const stageResults: Record<string, MPCStageResult> = {};
     const totalWeight = stages.reduce((acc, s) => acc + (Number(s.marks) || 1), 0);
 
     for (let i = 0; i < stages.length; i++) {
         const stage = stages[i];
+        const stageId = stage.id || `s${i + 1}`;
         const stageMax = (Number(stage.marks) || 1) / totalWeight * maxMarks;
-        const studentValRaw = studentAnswer ? (studentAnswer[stage.id] ?? studentAnswer[stage.stageTitle] ?? (stage as any).key ?? (stage as any).name ?? studentAnswer[`stage_${i}`]) : undefined;
-        const isAttempted = studentValRaw !== undefined && studentValRaw !== null && String(studentValRaw).trim() !== '' && String(studentValRaw).trim() !== 'No answer provided';
-        const studentNum = parseFloat(String(studentValRaw ?? ''));
+        
+        const studentValRaw = studentAnswer
+            ? (studentAnswer[stageId] ?? studentAnswer[stage.stageTitle || ''] ?? studentAnswer[stage.text || ''] ?? studentAnswer[`stage_${i}`])
+            : undefined;
 
-        const expectedNum = parseFloat(String(stage.expectedAnswer ?? ''));
-        const tol = Number(stage.tolerance) || 0.01;
+        const isAttempted = studentValRaw !== undefined &&
+            studentValRaw !== null &&
+            String(studentValRaw).trim() !== '' &&
+            String(studentValRaw).trim() !== 'No answer provided';
+
+        const expectedStr = String(stage.expectedAnswer ?? '').trim();
+        const studentStr = String(studentValRaw ?? '').trim();
+        const tol = Number(stage.tolerance) || 0.05;
 
         let isCorrectDirectly = false;
         let isCorrectWithPropagatedError = false;
 
+        const depsRaw = stage.dependsOn || stage.dependsOnStageId;
+        const depIds = Array.isArray(depsRaw) ? depsRaw : (depsRaw ? [depsRaw] : (i > 0 ? [`s${i}`] : []));
+        const gradingMode = stage.gradingMode || 'FOLLOW_THROUGH';
+
         if (isAttempted) {
-            // 1. Direct Evaluation against key
-            const expectedStr = String(stage.expectedAnswer ?? '').trim();
-            const studentStr = String(studentValRaw ?? '').trim();
+            // 1. Direct Evaluation against official answer key
             isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
-            // 2. Error Propagation Evaluation if direct check failed & dependency exists
-            if (!isCorrectDirectly && stage.dependsOnStageId) {
-                const prevStageId = stage.dependsOnStageId;
-                const prevStudentVal = parseFloat(String(studentAnswer ? studentAnswer[prevStageId] : ''));
-                if (!isNaN(prevStudentVal)) {
-                    const dynamicTarget = computeDynamicTarget(stage.formula, prevStudentVal);
-                    if (dynamicTarget !== null && !isNaN(studentNum)) {
-                        isCorrectWithPropagatedError = Math.abs(studentNum - dynamicTarget) <= tol;
+            // 2. Follow-Through Evaluation if direct check failed and gradingMode allows follow-through
+            if (!isCorrectDirectly && gradingMode !== 'EXACT' && depIds.length > 0) {
+                const dynamicTarget = computeDynamicTarget(stage, studentAnswer, depIds);
+                if (dynamicTarget !== null && !isNaN(dynamicTarget)) {
+                    const studentNum = parseFloat(studentStr);
+                    if (!isNaN(studentNum)) {
+                        isCorrectWithPropagatedError = Math.abs(studentNum - dynamicTarget) <= tol + 1e-9;
+                    } else {
+                        isCorrectWithPropagatedError = areExpressionsEquivalent(studentStr, String(dynamicTarget), tol);
                     }
                 }
             }
         }
 
-        const earned = (isCorrectDirectly || isCorrectWithPropagatedError) ? stageMax : 0;
+        const isEarned = isCorrectDirectly || isCorrectWithPropagatedError;
+        const earned = isEarned ? Math.round(stageMax * 100) / 100 : 0;
         if (earned > 0) totalEarned += earned;
 
-        stageResults[stage.id] = {
+        let status: 'CORRECT' | 'INCORRECT' | 'FOLLOW_THROUGH_CORRECT' | 'PARTIALLY_CORRECT' | 'UNANSWERED' | 'NOT_ATTEMPTED' | 'REVIEW_REQUIRED';
+        if (!isAttempted) {
+            status = 'UNANSWERED';
+        } else if (isCorrectDirectly) {
+            status = 'CORRECT';
+        } else if (isCorrectWithPropagatedError) {
+            status = 'FOLLOW_THROUGH_CORRECT';
+        } else {
+            status = 'INCORRECT';
+        }
+
+        stageResults[stageId] = {
             isCorrectDirectly,
             isCorrectWithPropagatedError,
             isAttempted,
-            status: isAttempted ? (isCorrectDirectly || isCorrectWithPropagatedError ? 'CORRECT' : 'INCORRECT') : 'UNANSWERED',
-            earned: Math.round(earned * 100) / 100,
+            status,
+            earned,
             max: Math.round(stageMax * 100) / 100,
             studentVal: studentValRaw ?? 'N/A',
-            expectedVal: stage.expectedAnswer
-        } as any;
+            expectedVal: stage.expectedAnswer,
+            dependsOn: depIds,
+            gradingMode
+        };
     }
 
     const finalScore = Math.round(totalEarned * 100) / 100;
@@ -147,6 +278,6 @@ export function evaluateMPCQuestion(
         stageResults,
         feedback: isCorrect
             ? "Multi-step problem chain completed successfully!"
-            : `Score: ${finalScore}/${maxMarks}. Includes methodology credit for error propagation.`
+            : `Score: ${finalScore}/${maxMarks}. Includes follow-through method credit.`
     };
 }
