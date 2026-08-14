@@ -121,8 +121,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
-  const type = (question.type || "").toLowerCase();
-  const text = question.text || question.questionText || "(No text)";
+  const type = (question.type || question.questionType || "").toLowerCase();
+  const text = question.text || question.questionText || question.scenario || "(No text)";
   const userAnswer = answer;
   const showResult = submitted && result;
 

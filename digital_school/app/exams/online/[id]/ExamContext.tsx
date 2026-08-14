@@ -192,8 +192,8 @@ export function ExamContextProvider({
   const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc', 'dr'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], dr: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
@@ -207,6 +207,9 @@ export function ExamContextProvider({
       ...grouped.ar,
       ...grouped.mtf,
       ...grouped.smcq,
+      ...grouped.cma,
+      ...grouped.mpc,
+      ...grouped.dr,
       ...grouped.cq,
       ...grouped.sq,
       ...grouped.int,
@@ -220,7 +223,7 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'dr', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
       });
     } else {
       return fullSortedQuestions.filter((q: any) => {
@@ -305,7 +308,7 @@ export function ExamContextProvider({
 
   const groupedQuestions = useMemo(() => {
     if (!exam.questions) return {};
-    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cq: [], sq: [], descriptive: [], other: [] };
+    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cma: [], mpc: [], dr: [], cq: [], sq: [], descriptive: [], other: [] };
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
       if (g[type]) g[type].push(q);
@@ -314,7 +317,7 @@ export function ExamContextProvider({
     return {
       creative: [...g.cq, ...g.descriptive],
       short: [...g.sq],
-      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.other]
+      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.cma, ...g.mpc, ...g.dr, ...g.other]
     };
   }, [exam.questions]);
 
