@@ -201,9 +201,24 @@ export function evaluateMPCQuestion(
         const stageId = stage.id || `s${i + 1}`;
         const stageMax = (Number(stage.marks) || 1) / totalWeight * maxMarks;
         
-        const studentValRaw = studentAnswer
-            ? (studentAnswer[stageId] ?? studentAnswer[stage.stageTitle || ''] ?? studentAnswer[stage.text || ''] ?? studentAnswer[`stage_${i}`])
-            : undefined;
+        let studentValRaw: any = undefined;
+        if (studentAnswer && typeof studentAnswer === 'object') {
+            studentValRaw = studentAnswer[stageId] ??
+                studentAnswer[stage.id || ''] ??
+                studentAnswer[stage.stageTitle || ''] ??
+                studentAnswer[stage.text || ''] ??
+                studentAnswer[`stage_${i}`] ??
+                studentAnswer[`stage_${i + 1}`] ??
+                studentAnswer[`s${i + 1}`] ??
+                studentAnswer[`s_${i + 1}`] ??
+                studentAnswer[String(i)] ??
+                studentAnswer[String(i + 1)] ??
+                studentAnswer[`Stage ${i + 1}`] ??
+                studentAnswer[`stage ${i + 1}`] ??
+                studentAnswer[['ধাপ ১', 'ধাপ ২', 'ধাপ ৩', 'ধাপ ৪', 'ধাপ ৫'][i]];
+        } else if (typeof studentAnswer === 'string' && stages.length === 1) {
+            studentValRaw = studentAnswer;
+        }
 
         const isAttempted = studentValRaw !== undefined &&
             studentValRaw !== null &&
@@ -224,6 +239,33 @@ export function evaluateMPCQuestion(
         if (isAttempted) {
             // 1. Direct Evaluation against official answer key
             isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
+
+            // Unit-resilient fallback
+            if (!isCorrectDirectly && (stage.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF]/))) {
+                const stripUnits = (s: string, u?: string) => {
+                    let res = String(s).trim();
+                    if (u) {
+                        res = res.replace(new RegExp(`\\b${u}\\b`, 'gi'), '');
+                        res = res.split(u).join('');
+                    }
+                    const commonUnits = [
+                        'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
+                        'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
+                        'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
+                        'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad'
+                    ];
+                    for (const unitStr of commonUnits) {
+                        res = res.split(unitStr).join('');
+                    }
+                    return res.trim();
+                };
+
+                const cleanStu = stripUnits(studentStr, stage.unit);
+                const cleanExp = stripUnits(expectedStr, stage.unit);
+                if (cleanStu && cleanExp) {
+                    isCorrectDirectly = areExpressionsEquivalent(cleanStu, cleanExp, tol);
+                }
+            }
 
             // 2. Follow-Through Evaluation if direct check failed and gradingMode allows follow-through
             if (!isCorrectDirectly && gradingMode !== 'EXACT' && depIds.length > 0) {

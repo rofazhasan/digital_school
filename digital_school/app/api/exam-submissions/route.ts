@@ -27,22 +27,47 @@ export async function GET(request: NextRequest) {
       where: {
         studentId: user.studentProfile.id
       },
-      select: {
-        examId: true,
-        studentId: true,
-        objectiveSubmittedAt: true,
-        cqSqSubmittedAt: true,
-        score: true,
-        answers: true,
-        status: true
+      include: {
+        exam: {
+          include: {
+            examSets: true
+          }
+        }
       },
       orderBy: {
         id: 'desc'
       }
     });
 
+    const { autoSubmitExpiredSections } = await import('@/lib/exam-logic');
+    const processedSubmissions = await Promise.all(
+      submissions.map(async (sub) => {
+        if (sub.status === 'IN_PROGRESS' && sub.exam) {
+          const updated = await autoSubmitExpiredSections(sub, sub.exam);
+          return {
+            examId: updated.examId,
+            studentId: updated.studentId,
+            objectiveSubmittedAt: updated.objectiveSubmittedAt,
+            cqSqSubmittedAt: updated.cqSqSubmittedAt,
+            score: updated.score,
+            answers: updated.answers,
+            status: updated.status
+          };
+        }
+        return {
+          examId: sub.examId,
+          studentId: sub.studentId,
+          objectiveSubmittedAt: sub.objectiveSubmittedAt,
+          cqSqSubmittedAt: sub.cqSqSubmittedAt,
+          score: sub.score,
+          answers: sub.answers,
+          status: sub.status
+        };
+      })
+    );
+
     return NextResponse.json({
-      submissions
+      submissions: processedSubmissions
     });
 
   } catch (error) {

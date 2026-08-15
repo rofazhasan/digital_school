@@ -75,8 +75,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // - If submission exists and is IN_PROGRESS, allow entry (resume).
     // - If no submission exists, allow entry (first time).
 
-    if (!exam.allowRetake && existingSubmission && existingSubmission.status === 'SUBMITTED') {
-      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId} (Already submitted)`);
+    if (!exam.allowRetake && isFinished) {
+      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId} (Already submitted/finished)`);
       return NextResponse.json({
         id: exam.id,
         name: exam.name,

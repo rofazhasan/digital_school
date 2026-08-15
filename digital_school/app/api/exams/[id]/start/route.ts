@@ -55,10 +55,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       examSetId: examStudentMap?.examSetId || null
     };
 
+    // Fetch exam details
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: { examSets: true }
+    });
+
+    if (!exam) {
+      return NextResponse.json({ error: "Exam not found" }, { status: 404 });
+    }
+
     // Find existing submission FIRST so we don't overwrite timestamps on resume
-    const existingSubmission = await prisma.examSubmission.findUnique({
+    let existingSubmission = await prisma.examSubmission.findUnique({
       where: { studentId_examId: { studentId, examId } }
     });
+
+    if (existingSubmission) {
+      const { autoSubmitExpiredSections } = await import("@/lib/exam-logic");
+      existingSubmission = await autoSubmitExpiredSections(existingSubmission, exam);
+      if (existingSubmission.status === 'SUBMITTED' && !exam.allowRetake) {
+        console.log(`[Exam Start] Student ${studentId} attempt for exam ${examId} is already finalized/expired.`);
+        return NextResponse.json({
+          success: false,
+          isFinished: true,
+          message: "Exam time has expired and submission is finalized.",
+          redirect: `/exams/results/${examId}`
+        });
+      }
+    }
 
     if (section === 'objective') {
       dataToUpdate.objectiveStatus = 'IN_PROGRESS';

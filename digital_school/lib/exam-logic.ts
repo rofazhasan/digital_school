@@ -805,62 +805,137 @@ export async function releaseExamResults(examId: string) {
  * Check for expired sections and auto-submit them
  */
 export async function autoSubmitExpiredSections(submission: ExamSubmission, exam: Partial<Exam> & { examSets?: ExamSet[] }) {
-    if (!submission || submission.status === SubmissionStatus.SUBMITTED) return submission;
+    if (!submission) return submission;
+
+    const examId = exam.id || submission.examId;
+
+    // If already submitted, ensure result exists
+    if (submission.status === SubmissionStatus.SUBMITTED) {
+        try {
+            const existingResult = await prisma.result.findUnique({
+                where: { studentId_examId: { studentId: submission.studentId, examId } }
+            });
+            if (!existingResult && examId) {
+                const fullExam = (exam.totalMarks !== undefined ? exam : await prisma.exam.findUnique({ where: { id: examId }, include: { examSets: true } })) as Exam & { examSets?: ExamSet[] };
+                const examSets = fullExam?.examSets || await prisma.examSet.findMany({ where: { examId } });
+                if (fullExam) {
+                    await evaluateSubmission(submission, fullExam, examSets, true);
+                }
+            }
+        } catch (e) {
+            console.error(`[Auto-Submit] Error ensuring result for submitted submission ${submission.id}:`, e);
+        }
+        return submission;
+    }
 
     const now = new Date();
-    const bufferMs = 60 * 1000; // 1 minute buffer for auto-submission
+    const nowTime = now.getTime();
     let hasChanges = false;
     const updateData: Partial<ExamSubmission> = {};
 
     // Intelligent section detection
     const isMCQOnly = isMCQOnlyExam(exam, exam.examSets || []);
-    const isObjectiveAvailable = (exam.objectiveTime && exam.objectiveTime > 0) || isMCQOnly || (exam as { hasObjective?: boolean }).hasObjective;
-    const isCqSqAvailable = (exam.cqSqTime && exam.cqSqTime > 0) || !isMCQOnly || (exam as { hasCqSq?: boolean }).hasCqSq;
+    const hasObjective = (exam.objectiveTime && exam.objectiveTime > 0) || isMCQOnly || (exam as { hasObjective?: boolean }).hasObjective || (exam.cqTotalQuestions === 0 && exam.sqTotalQuestions === 0);
+    const hasCqSq = (exam.cqSqTime && exam.cqSqTime > 0) || !isMCQOnly || (exam as { hasCqSq?: boolean }).hasCqSq || (Number(exam.cqTotalQuestions || 0) > 0) || (Number(exam.sqTotalQuestions || 0) > 0);
 
     // 1. Check Objective Section
-    if (submission.objectiveStatus === SubmissionStatus.IN_PROGRESS && submission.objectiveStartedAt && isObjectiveAvailable) {
+    if (submission.objectiveStatus === SubmissionStatus.IN_PROGRESS && submission.objectiveStartedAt && hasObjective) {
         const objStartTime = new Date(submission.objectiveStartedAt).getTime();
-        const objLimitMs = (Number(exam.objectiveTime) || Number(exam.duration) || 0) * 60 * 1000;
-        if (now.getTime() > objStartTime + objLimitMs + bufferMs) {
+        const objLimitMs = ((Number(exam.objectiveTime) > 0 ? Number(exam.objectiveTime) : Number(exam.duration)) || 0) * 60 * 1000;
+        if (objLimitMs > 0 && nowTime >= objStartTime + objLimitMs) {
             updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
-            updateData.objectiveSubmittedAt = now;
+            updateData.objectiveSubmittedAt = submission.objectiveSubmittedAt || new Date(objStartTime + objLimitMs);
             hasChanges = true;
             console.log(`[Auto-Submit] Objective expired for submission ${submission.id}`);
         }
     }
 
     // 2. Check CQ/SQ Section
-    if (submission.cqSqStatus === SubmissionStatus.IN_PROGRESS && submission.cqSqStartedAt && isCqSqAvailable) {
+    if (submission.cqSqStatus === SubmissionStatus.IN_PROGRESS && submission.cqSqStartedAt && hasCqSq) {
         const cqStartTime = new Date(submission.cqSqStartedAt).getTime();
-        const cqLimitMs = (Number(exam.cqSqTime) || Number(exam.duration) || 0) * 60 * 1000;
-        if (now.getTime() > cqStartTime + cqLimitMs + bufferMs) {
+        const cqLimitMs = ((Number(exam.cqSqTime) > 0 ? Number(exam.cqSqTime) : Number(exam.duration)) || 0) * 60 * 1000;
+        if (cqLimitMs > 0 && nowTime >= cqStartTime + cqLimitMs) {
             updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
-            updateData.cqSqSubmittedAt = now;
+            updateData.cqSqSubmittedAt = submission.cqSqSubmittedAt || new Date(cqStartTime + cqLimitMs);
             hasChanges = true;
             console.log(`[Auto-Submit] CQ/SQ expired for submission ${submission.id}`);
         }
     }
 
-    // 3. Check Overall Exam Time (Absolute end time)
+    // 3. Check Overall Duration (Based on when student started)
+    const firstStartTime = submission.objectiveStartedAt
+        ? new Date(submission.objectiveStartedAt).getTime()
+        : submission.cqSqStartedAt
+            ? new Date(submission.cqSqStartedAt).getTime()
+            : ((submission as any).createdAt ? new Date((submission as any).createdAt).getTime() : null);
+
+    const overallDurationMs = (Number(exam.duration) || 0) * 60 * 1000;
+    if (firstStartTime && overallDurationMs > 0 && nowTime >= firstStartTime + overallDurationMs) {
+        updateData.status = SubmissionStatus.SUBMITTED;
+        updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
+        updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
+        if (!submission.objectiveSubmittedAt) updateData.objectiveSubmittedAt = new Date(firstStartTime + overallDurationMs);
+        if (!submission.cqSqSubmittedAt) updateData.cqSqSubmittedAt = new Date(firstStartTime + overallDurationMs);
+        hasChanges = true;
+        console.log(`[Auto-Submit] Overall exam duration expired for submission ${submission.id}`);
+    }
+
+    // 4. Check Overall Exam Scheduled End Time (Absolute end time)
     if (exam.endTime) {
         const examEndTime = new Date(exam.endTime).getTime();
-        if (now.getTime() > examEndTime + bufferMs) {
+        if (nowTime >= examEndTime) {
             updateData.status = SubmissionStatus.SUBMITTED;
-            // Also force sections to submitted if overall time is over
             updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
-            updateData.objectiveSubmittedAt = now;
+            if (!submission.objectiveSubmittedAt) updateData.objectiveSubmittedAt = new Date(examEndTime);
             updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
-            updateData.cqSqSubmittedAt = now;
+            if (!submission.cqSqSubmittedAt) updateData.cqSqSubmittedAt = new Date(examEndTime);
             hasChanges = true;
-            console.log(`[Auto-Submit] Overall exam time expired for submission ${submission.id}`);
+            console.log(`[Auto-Submit] Overall scheduled end time expired for submission ${submission.id}`);
+        }
+    }
+
+    // 5. Check if all applicable sections are now submitted
+    const effectiveObjStatus = updateData.objectiveStatus || submission.objectiveStatus;
+    const effectiveCqStatus = updateData.cqSqStatus || submission.cqSqStatus;
+
+    if (isMCQOnly) {
+        if (effectiveObjStatus === SubmissionStatus.SUBMITTED) {
+            updateData.status = SubmissionStatus.SUBMITTED;
+            hasChanges = true;
+        }
+    } else if (hasObjective && hasCqSq) {
+        if (effectiveObjStatus === SubmissionStatus.SUBMITTED && effectiveCqStatus === SubmissionStatus.SUBMITTED) {
+            updateData.status = SubmissionStatus.SUBMITTED;
+            hasChanges = true;
+        }
+    } else if (!hasObjective && hasCqSq) {
+        if (effectiveCqStatus === SubmissionStatus.SUBMITTED) {
+            updateData.status = SubmissionStatus.SUBMITTED;
+            hasChanges = true;
         }
     }
 
     if (hasChanges) {
-        return await prisma.examSubmission.update({
+        const updatedSubmission = await prisma.examSubmission.update({
             where: { id: submission.id },
             data: updateData as any
         });
+
+        // If finalized, evaluate immediately so student gets result
+        if (updatedSubmission.status === SubmissionStatus.SUBMITTED && examId) {
+            try {
+                const fullExam = (exam.totalMarks !== undefined ? exam : await prisma.exam.findUnique({ where: { id: examId }, include: { examSets: true } })) as Exam & { examSets?: ExamSet[] };
+                const examSets = fullExam?.examSets || await prisma.examSet.findMany({ where: { examId } });
+                if (fullExam) {
+                    await evaluateSubmission(updatedSubmission, fullExam, examSets, true);
+                    console.log(`[Auto-Submit] Evaluated submission ${updatedSubmission.id} on auto-submit`);
+                }
+            } catch (evalErr) {
+                console.error(`[Auto-Submit] Evaluation error for submission ${updatedSubmission.id}:`, evalErr);
+            }
+        }
+
+        return updatedSubmission;
     }
 
     return submission;

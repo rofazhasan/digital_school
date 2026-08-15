@@ -96,12 +96,12 @@ export async function GET(
     if (!user || !user.studentProfile) {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
-
     const studentProfile = user.studentProfile;
-    const submission = studentProfile.examSubmissions[0];
-    const result = studentProfile.results[0];
+    let submission: any = studentProfile.examSubmissions[0];
+    let result = studentProfile.results[0];
     const studentExamMap = studentProfile.examStudentMaps[0];
     const reviewRequest = studentProfile.resultReviews[0];
+    const drawings = submission?.drawings || [];
 
     if (!submission) {
       return NextResponse.json({ error: 'No submission found' }, { status: 404 });
@@ -110,10 +110,24 @@ export async function GET(
     // 2. Fetch Exam with min fields
     const exam = await db.exam.findUnique({
       where: { id: examId },
-      include: { class: { select: { name: true } } }
+      include: { class: { select: { name: true } }, examSets: true }
     });
 
     if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+
+    // Auto-finalize and evaluate if expired or if result is missing
+    if (submission && (submission.status === 'IN_PROGRESS' || !result)) {
+      const { autoSubmitExpiredSections, evaluateSubmission } = await import('@/lib/exam-logic');
+      const updatedSub = await autoSubmitExpiredSections(submission, exam as any);
+      submission = Object.assign(submission, updatedSub, { drawings });
+      if (!result && submission.status === 'SUBMITTED') {
+        const examSets = exam.examSets || await db.examSet.findMany({ where: { examId } });
+        await evaluateSubmission(submission, exam as any, examSets, true);
+        result = await db.result.findUnique({
+          where: { studentId_examId: { studentId: studentProfile.id, examId } }
+        }) as any;
+      }
+    }
 
     // 3. Optimized Exam Set Fetching — check submission.examSetId FIRST (most accurate)
     // then fall back to exam_student_maps, then any set for the exam

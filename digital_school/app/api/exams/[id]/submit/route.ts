@@ -70,26 +70,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isObjective = section === 'objective';
     const isCqSq = section === 'cqsq';
 
-    // TIME VALIDATION (Strict Enforcement)
-    const bufferMs = 60 * 1000; // 1 minute buffer to handle sync/network lag and passive auto-submit
+    // TIME VALIDATION & AUTO-SUBMISSION HANDLING
     const now = Date.now();
+    let isOverallTimeExceeded = false;
+    let isSectionTimeExceeded = false;
 
     // A. Section-Specific Timing
     if (isObjective && (exam as any).objectiveTime && existingSubmission?.objectiveStartedAt) {
       const objStartTime = new Date(existingSubmission.objectiveStartedAt).getTime();
       const objLimitMs = (exam as any).objectiveTime * 60 * 1000;
-      if (now > objStartTime + objLimitMs + bufferMs) {
-        console.warn(`[Submit] MCQ Time Limit Exceeded for student ${studentId}.`);
-        return NextResponse.json({ error: "MCQ time limit exceeded. Submission rejected.", section: 'objective' }, { status: 403 });
+      if (now > objStartTime + objLimitMs) {
+        console.log(`[Submit] MCQ Time Limit reached for student ${studentId}. Auto-finalizing objective section.`);
+        isSectionTimeExceeded = true;
       }
     }
 
     if (isCqSq && (exam as any).cqSqTime && existingSubmission?.cqSqStartedAt) {
       const cqStartTime = new Date(existingSubmission.cqSqStartedAt).getTime();
       const cqLimitMs = (exam as any).cqSqTime * 60 * 1000;
-      if (now > cqStartTime + cqLimitMs + bufferMs) {
-        console.warn(`[Submit] CQ/SQ Time Limit Exceeded for student ${studentId}.`);
-        return NextResponse.json({ error: "CQ/SQ time limit exceeded. Submission rejected.", section: 'cqsq' }, { status: 403 });
+      if (now > cqStartTime + cqLimitMs) {
+        console.log(`[Submit] CQ/SQ Time Limit reached for student ${studentId}. Auto-finalizing subjective section.`);
+        isSectionTimeExceeded = true;
       }
     }
 
@@ -97,12 +98,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const overallStartTime = existingSubmission?.objectiveStartedAt || existingSubmission?.cqSqStartedAt;
     if (overallStartTime) {
       const startTime = new Date(overallStartTime).getTime();
-      const durationMs = exam.duration * 60 * 1000;
+      const durationMs = (Number(exam.duration) || 0) * 60 * 1000;
 
-      if (now > startTime + durationMs + bufferMs) {
-        console.warn(`[Submit] Overall Time Limit Exceeded for user ${studentId}.`);
-        return NextResponse.json({ error: "Overall exam time limit exceeded. Submission rejected." }, { status: 403 });
+      if (durationMs > 0 && now > startTime + durationMs) {
+        console.log(`[Submit] Overall Time Limit reached for user ${studentId}. Auto-finalizing exam.`);
+        isOverallTimeExceeded = true;
       }
+    }
+
+    // C. Exam Absolute End Time
+    if (exam.endTime && now > new Date(exam.endTime).getTime()) {
+      console.log(`[Submit] Scheduled exam end time reached for user ${studentId}. Auto-finalizing exam.`);
+      isOverallTimeExceeded = true;
     }
 
     // Check if student exceeded question limits
@@ -110,8 +117,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let cqAnswered = 0;
     let sqAnswered = 0;
 
-    // Process answers
-    const processedAnswers = { ...data.answers, _status: 'submitted' };
+    // Process answers - merge existing answers if any
+    const existingAnswers = typeof existingSubmission?.answers === 'object' && existingSubmission?.answers !== null
+      ? existingSubmission.answers
+      : {};
+    const processedAnswers = { ...existingAnswers, ...data.answers, _status: 'submitted' };
 
     // Optimize: Pre-map question types for O(1) lookup
     const questionTypeMap = new Map<string, string>();
@@ -157,21 +167,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const hasCqSqSection = (exam.cqTotalQuestions || 0) > 0 ||
       (exam.sqTotalQuestions || 0) > 0 ||
       Array.from(questionTypeMap.values()).some(t => ['cq', 'sq', 'descriptive'].includes(t));
-    const isFinalSubmission = isCqSq || (!hasCqSqSection && isObjective);
+    const isFinalSubmission = isCqSq || (!hasCqSqSection && isObjective) || isOverallTimeExceeded;
 
     const updateData: any = {
       answers: processedAnswers,
       exceededQuestionLimit
     };
 
-    if (isObjective) {
+    if (isObjective || isOverallTimeExceeded) {
       updateData.objectiveStatus = 'SUBMITTED';
-      updateData.objectiveSubmittedAt = new Date();
+      updateData.objectiveSubmittedAt = existingSubmission?.objectiveSubmittedAt || new Date();
     }
 
-    if (isCqSq) {
+    if (isCqSq || isOverallTimeExceeded) {
       updateData.cqSqStatus = 'SUBMITTED';
-      updateData.cqSqSubmittedAt = new Date();
+      updateData.cqSqSubmittedAt = existingSubmission?.cqSqSubmittedAt || new Date();
     }
 
     if (isFinalSubmission) {

@@ -135,6 +135,33 @@ export function evaluateCMAChildPart(
     // 6. Default INT / NUMERIC / EXPRESSION / TEXT Child
     let isEquiv = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
+    // Unit-resilient fallback: try stripping units if direct check fails
+    if (!isEquiv && (part.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF]/))) {
+        const stripUnits = (s: string, u?: string) => {
+            let res = String(s).trim();
+            if (u) {
+                res = res.replace(new RegExp(`\\b${u}\\b`, 'gi'), '');
+                res = res.split(u).join('');
+            }
+            const commonUnits = [
+                'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
+                'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
+                'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
+                'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad'
+            ];
+            for (const unitStr of commonUnits) {
+                res = res.split(unitStr).join('');
+            }
+            return res.trim();
+        };
+
+        const cleanStu = stripUnits(studentStr, part.unit);
+        const cleanExp = stripUnits(expectedStr, part.unit);
+        if (cleanStu && cleanExp) {
+            isEquiv = areExpressionsEquivalent(cleanStu, cleanExp, tol);
+        }
+    }
+
     if (!isEquiv && (part.acceptedAnswers || part.aliases)) {
         const aliases = Array.isArray(part.acceptedAnswers || part.aliases)
             ? (part.acceptedAnswers || part.aliases) as string[]
@@ -184,9 +211,25 @@ export function evaluateCMAQuestion(
         const partId = part.id || `part_${i}`;
         const partMax = (Number(part.marks) || 1) / totalPartsWeight * maxMarks;
         
-        const rawStudentVal = studentAnswer
-            ? (studentAnswer[partId] ?? studentAnswer[part.label || ''] ?? studentAnswer[(part as any).prompt || ''] ?? studentAnswer[`part_${i}`])
-            : undefined;
+        let rawStudentVal: any = undefined;
+        if (studentAnswer && typeof studentAnswer === 'object') {
+            rawStudentVal = studentAnswer[partId] ??
+                studentAnswer[part.id || ''] ??
+                studentAnswer[part.label || ''] ??
+                studentAnswer[(part.label || '').toLowerCase()] ??
+                studentAnswer[(part.label || '').toUpperCase()] ??
+                studentAnswer[(part as any).prompt || ''] ??
+                studentAnswer[(part as any).text || ''] ??
+                studentAnswer[`part_${i}`] ??
+                studentAnswer[`part_${i + 1}`] ??
+                studentAnswer[`p${i + 1}`] ??
+                studentAnswer[`p_${i + 1}`] ??
+                studentAnswer[String(i)] ??
+                studentAnswer[String(i + 1)] ??
+                studentAnswer[['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i]];
+        } else if (typeof studentAnswer === 'string' && parts.length === 1) {
+            rawStudentVal = studentAnswer;
+        }
 
         const evalRes = evaluateCMAChildPart(part, rawStudentVal);
         const earned = Math.round((evalRes.earnedRatio * partMax) * 100) / 100;
