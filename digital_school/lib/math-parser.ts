@@ -1,12 +1,14 @@
-// Dynamic Math, Physics & Bengali Expression Parsing Engine
+// Dynamic Math, Physics, Chemistry, Biology & Bengali Expression Parsing Engine
 // Normalizes algebraic, chemical, physical & numerical expressions, handles implicit multiplication,
 // commutativity of products (e.g. GMm == GmM), LaTeX superscripts (e.g. R^2 == $R^{2}$),
-// Bengali digits & synonyms (e.g. ৫ == 5, হ্যাঁ == yes, বৃদ্ধি পাবে == increase),
-// renders clean LaTeX representations, and evaluates equivalence.
+// fraction coefficients (e.g. 3v/2 == (3/2)*v == 1.5v),
+// Bengali digits, danda, suffixes & partial stem containment (e.g. জনন কোষ == জনন, ৫ == 5, ৯ . ৮ == 9.8),
+// science ontology knowledge graphs (H2O == পানি, CO2 == কার্বন ডাই অক্সাইড, g == অভিকর্ষজ ত্বরণ),
+// renders clean LaTeX representations, and evaluates equivalence with fuzzy typo tolerance.
 
 /**
  * Normalizes Bengali numerals, Bengali punctuation/danda, zero-width characters,
- * and converts LaTeX / Greek symbols to unified standard ASCII identifiers.
+ * spaces around decimal dots, and converts LaTeX / Greek symbols to unified standard ASCII identifiers.
  */
 export function normalizeBengaliNumeralsAndText(str: string | number | undefined | null): string {
   if (str === undefined || str === null) return '';
@@ -16,13 +18,16 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
   // Zero-width characters & non-breaking spaces
   text = text.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ');
 
-  // Bengali digits 0-9 (০-৯) to standard 0-9
+  // Normalize spaces around dots / decimals (e.g. "9 . 8" or "৯ . ৮" -> "9.8" or "৯.৮")
+  text = text.replace(/(\d|[\u09E6-\u09EF])\s*[\.\,\u0964\u0965]\s*(\d|[\u09E6-\u09EF])/g, '$1.$2');
+
+  // Bengali digits 0-9 (০-৯) to standard ASCII 0-9
   const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
   bnDigits.forEach((d, i) => {
     text = text.split(d).join(String(i));
   });
 
-  // Bengali danda between digits or as dot
+  // Remaining Bengali danda between digits or as dot/space
   text = text.replace(/(\d)[\u0964\u0965](\d)/g, '$1.$2');
   text = text.replace(/[\u0964\u0965]/g, ' ');
 
@@ -51,13 +56,41 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
     text = text.split(sym).join(rep);
   }
 
+  // Normalize ya-fala and Bengali character variations
+  text = text.replace(/য়/g, 'য়');
+
   return text.trim();
 }
 
 /**
- * Standard Bengali and English scientific synonym groups for semantic text evaluation.
+ * Bengali suffixes (বিভক্তি ও বহুবচন প্রত্যয়) to strip for root stem matching.
  */
-export const BENGALI_SYNONYM_GROUPS: string[][] = [
+export const BENGALI_SUFFIXES: string[] = [
+  'গুলো', 'গুলি', 'দের', 'দেরকে', 'দিগকে', 'সমূহ', 'গণ', 'বর্গ', 'মালা', 'বৃন্দ',
+  'টিতে', 'টাতে', 'খানি', 'খানা', 'টি', 'টা',
+  'দ্বারা', 'দিয়া', 'দিয়ে', 'হতে', 'থেকে', 'চেয়ে',
+  'এর', 'র', 'কে', 'রে', 'তে', 'য়ে', 'এ', 'ই', 'ও'
+];
+
+/**
+ * Strips common Bengali inflection suffixes from a word.
+ */
+export function stripBengaliSuffix(word: string): string {
+  let w = word.trim();
+  if (w.length <= 3) return w;
+  for (const suf of BENGALI_SUFFIXES) {
+    if (w.endsWith(suf) && w.length - suf.length >= 2) {
+      return w.slice(0, -suf.length).trim();
+    }
+  }
+  return w;
+}
+
+/**
+ * Comprehensive Science Knowledge Synonym & Canonical Term Mappings (Bengali <-> English <-> Formula).
+ */
+export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
+  // General logic & choices
   ['yes', 'true', '1', 'হ্যাঁ', 'হাঁ', 'সঠিক', 'সত্য', 'রাইট', 'correct', 'right'],
   ['no', 'false', '0', 'না', 'নাই', 'ভুল', 'মিথ্যা', 'রং', 'incorrect', 'wrong'],
   ['increase', 'increases', 'increasing', 'বৃদ্ধি পাবে', 'বৃদ্ধি', 'বাড়বে', 'বাড়বে', 'উন্নতি', 'বেড়ে যাবে', 'বেড়ে যাবে', 'বৃদ্ধি পায়', 'বৃদ্ধি pay', 'বৃদ্ধি পায়'],
@@ -69,23 +102,186 @@ export const BENGALI_SYNONYM_GROUPS: string[][] = [
   ['north', 'উত্তর', 'উত্তরমুখী', 'উত্তর দিকে'],
   ['south', 'দক্ষিণ', 'দক্ষিণমুখী', 'দক্ষিণ দিকে'],
   ['east', 'পূর্ব', 'পূর্বমুখী', 'পূর্ব দিকে'],
-  ['west', 'পশ্চিম', 'পশ্চিমমুখী', 'পশ্চিম দিকে']
+  ['west', 'পশ্চিম', 'পশ্চিমমুখী', 'পশ্চিম দিকে'],
+
+  // Biology Terms
+  ['জনন কোষ', 'জননকোষ', 'জনন', 'গ্যামেট', 'gamete', 'germ cell', 'reproductive cell'],
+  ['দেহ কোষ', 'দেহকোষ', 'somatic cell', 'body cell'],
+  ['কোষ প্রাচীর', 'কোষপ্রাচীর', 'cell wall'],
+  ['কোষ ঝিল্লি', 'কোষঝিল্লি', 'প্লাজমা মেমব্রেন', 'plasma membrane', 'cell membrane'],
+  ['মাইটোসিস', 'মাইটোসিস বিভাজন', 'মাইটোসিস কোষ বিভাজন', 'সমীকরণিক বিভাজন', 'mitosis'],
+  ['মিয়োসিস', 'মায়োসিস', 'মিয়োসিস', 'মায়োসিস', 'হ্রাসমূলক বিভাজন', 'meiosis'],
+  ['সালোকসংশ্লেষণ', 'সালোক সংশ্লেষণ', 'photosynthesis'],
+  ['শ্বসন', 'কোষীয় শ্বসন', 'কোষীয় শ্বসন', 'respiration', 'cellular respiration'],
+  ['মাইটোকন্ড্রিয়া', 'মাইটোকন্ড্রিয়া', 'মাইটোকনড্রিয়া', 'mitochondria', 'শক্তিঘর', 'পাওয়ার হাউস', 'power house'],
+  ['ক্লোরোপ্লাস্ট', 'ক্লোরোপ্লাস্টিড', 'chloroplast'],
+  ['প্লাস্টিড', 'plastid'],
+  ['নিউক্লিয়াস', 'নিউক্লিয়াস', 'nucleus'],
+  ['ক্রোমোজোম', 'ক্রোমোজম', 'chromosome'],
+  ['ডিএনএ', 'ডি এন এ', 'dna', 'deoxyribonucleic acid'],
+  ['আরএনএ', 'আর এন এ', 'rna', 'ribonucleic acid'],
+  ['এনজাইম', 'উৎসেচক', 'enzyme'],
+  ['হরমোন', 'প্রনরস', 'hormone'],
+  ['অ্যামিনো এসিড', 'অ্যামাইনো এসিড', 'amino acid'],
+  ['প্রোটিন', 'আমিষ', 'protein'],
+  ['লিপিড', 'স্নেহ', 'lipid', 'fat'],
+  ['কার্বোহাইড্রেট', 'শর্করা', 'carbohydrate'],
+  ['গ্লুকোজ', 'c6h12o6', 'glucose'],
+
+  // Chemistry Terms & Formulas
+  ['পানি', 'জল', 'h2o', 'h_2o', 'water', 'dihydrogen monoxide'],
+  ['কার্বন ডাই অক্সাইড', 'কার্বন ডাইঅক্সাইড', 'কার্বন ডাই-অক্সাইড', 'co2', 'co_2', 'carbon dioxide'],
+  ['অক্সিজেন', 'অক্সিজেন গ্যাস', 'o2', 'o_2', 'oxygen'],
+  ['নাইট্রোজেন', 'n2', 'n_2', 'nitrogen'],
+  ['হাইড্রোজেন', 'h2', 'h_2', 'hydrogen'],
+  ['মিথেন', 'ch4', 'ch_4', 'methane', 'মার্শ গ্যাস', 'marsh gas'],
+  ['হাইড্রোক্লোরিক এসিড', 'হাইড্রোক্লোরিক অ্যাসিড', 'hcl', 'hydrochloric acid'],
+  ['সালফিউরিক এসিড', 'সালফিউরিক অ্যাসিড', 'h2so4', 'h_2so4', 'sulfuric acid'],
+  ['নাইট্রিক এসিড', 'নাইট্রিক অ্যাসিড', 'hno3', 'h_no3', 'nitric acid'],
+  ['সোডিয়াম ক্লোরাইড', 'সোডিয়াম ক্লোরাইড', 'nacl', 'খাবার লবণ', 'লবণ', 'sodium chloride', 'salt'],
+  ['ক্যালসিয়াম কার্বনেট', 'ক্যালসিয়াম কার্বোনেট', 'caco3', 'চুনাপাথর', 'মার্বেল পাথর', 'calcium carbonate'],
+  ['ক্যালসিয়াম অক্সাইড', 'cao', 'চুন', 'পোড়া চুন', 'calcium oxide', 'quicklime'],
+  ['ক্যালসিয়াম হাইড্রোক্সাইড', 'ca(oh)2', 'কলিচুন', 'চুনের পানি', 'calcium hydroxide', 'slaked lime'],
+
+  // Physics Terms & Equations
+  ['অভিকর্ষজ ত্বরণ', 'অভিকর্ষ ত্বরণ', 'অভিকর্ষজ', 'g', 'acceleration due to gravity', 'gravity'],
+  ['মহাকর্ষীয় ধ্রুবক', 'মহাকর্ষ ধ্রুবক', 'G', 'gravitational constant'],
+  ['আলোর বেগ', 'আলোর দ্রুতি', 'c', 'speed of light'],
+  ['প্ল্যাঙ্কের ধ্রুবক', 'h', 'planck constant', "planck's constant"],
+  ['গতিশক্তি', 'e_k', 'ek', 'kinetic energy'],
+  ['বিভব শক্তি', 'স্থিতিশক্তি', 'e_p', 'ep', 'potential energy'],
+  ['কাজ', 'w', 'work'],
+  ['বল', 'f', 'force'],
+  ['ক্ষমতা', 'p', 'power'],
+  ['ত্বরণ', 'a', 'acceleration'],
+  ['বেগ', 'v', 'velocity'],
+  ['দ্রুতি', 'speed'],
+  ['ভরবেগ', 'p', 'momentum'],
+  ['তরঙ্গদৈর্ঘ্য', 'lambda', 'wavelength'],
+  ['কম্পাঙ্ক', 'f', 'frequency'],
+  ['পর্যায়কাল', 't', 'time period', 'period']
 ];
 
+export const BENGALI_SYNONYM_GROUPS = COMPREHENSIVE_SCIENCE_SYNONYMS;
+
 /**
- * Checks if two text strings are semantically equivalent based on scientific synonym groups.
+ * Levenshtein distance for fuzzy typo tolerance.
  */
-export function areSynonymsEquivalent(textA: string, textB: string): boolean {
-  const a = textA.toLowerCase().replace(/\s+/g, ' ').trim();
-  const b = textB.toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!a || !b) return false;
-  if (a === b) return true;
-  for (const group of BENGALI_SYNONYM_GROUPS) {
-    const hasA = group.some(item => item.toLowerCase() === a);
-    const hasB = group.some(item => item.toLowerCase() === b);
+export function levenshteinDistance(s1: string, s2: string): number {
+  const m = s1.length;
+  const n = s2.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Fuzzy string matching with similarity ratio threshold.
+ */
+export function fuzzyStringMatch(s1: string, s2: string, threshold = 0.80): boolean {
+  if (s1 === s2) return true;
+  const maxLen = Math.max(s1.length, s2.length);
+  if (maxLen <= 2) return s1 === s2;
+  const dist = levenshteinDistance(s1, s2);
+  const similarity = (maxLen - dist) / maxLen;
+  return similarity >= threshold;
+}
+
+/**
+ * Cleans Bengali text for semantic matching.
+ */
+export function cleanBengaliText(str: string | number | undefined | null): string {
+  if (str === undefined || str === null) return '';
+  let s = String(str).toLowerCase().trim();
+  s = s.replace(/য়/g, 'য়');
+  s = s.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ');
+  s = s.replace(/[\u0964\u0965]/g, ' ');
+  s = s.replace(/[,\.\-\_\:\;\'\"\(\)\[\]\{\}]/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+/**
+ * Checks if two text strings or scientific concepts are semantically equivalent.
+ * Supports partial word containment (e.g. 'জনন' for 'জনন কোষ'), compound word joining,
+ * science ontology dictionary, and fuzzy similarity.
+ */
+export function areConceptsEquivalent(textA: string | number | undefined | null, textB: string | number | undefined | null): boolean {
+  if (textA === undefined || textA === null || textB === undefined || textB === null) return false;
+  const rawA = String(textA).trim();
+  const rawB = String(textB).trim();
+  if (!rawA || !rawB) return false;
+  if (rawA.toLowerCase() === rawB.toLowerCase()) return true;
+
+  const cleanA = cleanBengaliText(rawA);
+  const cleanB = cleanBengaliText(rawB);
+  if (cleanA === cleanB) return true;
+
+  // Check without spaces (compound word joining: জনন কোষ == জননকোষ)
+  const noSpaceA = cleanA.replace(/\s+/g, '');
+  const noSpaceB = cleanB.replace(/\s+/g, '');
+  if (noSpaceA === noSpaceB) return true;
+
+  // 1. Check Science Synonyms Knowledge Graph
+  for (const group of COMPREHENSIVE_SCIENCE_SYNONYMS) {
+    const hasA = group.some(item => {
+      const c = cleanBengaliText(item);
+      return c === cleanA || c.replace(/\s+/g, '') === noSpaceA;
+    });
+    const hasB = group.some(item => {
+      const c = cleanBengaliText(item);
+      return c === cleanB || c.replace(/\s+/g, '') === noSpaceB;
+    });
     if (hasA && hasB) return true;
   }
+
+  // 2. Token Containment & Stemming (e.g. "জনন কোষ" vs "জনন", "মাইটোসিস কোষ বিভাজন" vs "মাইটোসিস")
+  const tokensA = cleanA.split(' ').map(stripBengaliSuffix).filter(Boolean);
+  const tokensB = cleanB.split(' ').map(stripBengaliSuffix).filter(Boolean);
+
+  if (tokensA.length === 1 && tokensB.length >= 1) {
+    const single = tokensA[0];
+    if (single.length >= 2 && tokensB.some(t => t === single || fuzzyStringMatch(t, single, 0.85) || t.includes(single))) {
+      return true;
+    }
+  }
+  if (tokensB.length === 1 && tokensA.length >= 1) {
+    const single = tokensB[0];
+    if (single.length >= 2 && tokensA.some(t => t === single || fuzzyStringMatch(t, single, 0.85) || t.includes(single))) {
+      return true;
+    }
+  }
+
+  // Jaccard token overlap
+  const setB = new Set(tokensB);
+  const intersection = tokensA.filter(t => setB.has(t) || tokensB.some(tb => fuzzyStringMatch(t, tb, 0.85)));
+  if (intersection.length > 0) {
+    const overlapRatio = intersection.length / Math.min(tokensA.length, tokensB.length);
+    if (overlapRatio >= 0.5) return true;
+  }
+
+  // Fuzzy match on full string without spaces
+  if (noSpaceA.length >= 4 && noSpaceB.length >= 4) {
+    if (fuzzyStringMatch(noSpaceA, noSpaceB, 0.82)) return true;
+  }
+
   return false;
+}
+
+export function areSynonymsEquivalent(textA: string, textB: string): boolean {
+  return areConceptsEquivalent(textA, textB);
 }
 
 /**
@@ -186,7 +382,8 @@ export function flattenMathOrChemical(raw: string | number | undefined | null): 
 
 /**
  * Converts a raw mathematical string or LaTeX expression into a standardized ASCII expression.
- * Handles implicit multiplication, scientific notation (1.5x10^8 -> 1.5e8), juxtaposed variables (GMm -> G*M*m).
+ * Handles implicit multiplication, scientific notation (1.5x10^8 -> 1.5e8), juxtaposed variables (GMm -> G*M*m),
+ * and fraction expressions (3v/2 -> (3*v)/2 -> 1.5*v).
  */
 export function normalizeExpression(rawExpr: string | number | undefined | null): string {
   if (rawExpr === undefined || rawExpr === null) return '';
@@ -206,7 +403,7 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   ];
 
   // Tokenize string to preserve multi-letter functions and add explicit multiplication between variables/tokens
-  // e.g. "2pir" -> "2 * pi * r", "GMm" -> "G * M * m", "2 pi r" -> "2 * pi * r", "2x" -> "2 * x"
+  // e.g. "2pir" -> "2 * pi * r", "GMm" -> "G * M * m", "2 pi r" -> "2 * pi * r", "2x" -> "2 * x", "3v/2" -> "(3*v)/2"
   let formatted = '';
   let i = 0;
   while (i < expr.length) {
@@ -366,13 +563,13 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
 /**
  * Dynamic Algorithm to check if two mathematical / chemical / physical expressions or Bengali text answers are equivalent.
  * 1. Checks direct string equality (case-insensitive & whitespace-free).
- * 2. Checks Bengali and scientific synonym groups (e.g. হ্যাঁ == yes, বৃদ্ধি পাবে == increase, শূন্য == 0).
+ * 2. Checks Bengali & scientific concept equivalence (synonyms, partial token containment, stem matching).
  * 3. Normalizes Bengali digits (০-৯ -> 0-9) and danda.
  * 4. Strips LaTeX formatting, delimiters, style commands, fractions, and root wrappers.
  * 5. Handles equation symmetry (LHS = RHS vs RHS = LHS).
  * 6. Checks numeric float tolerance (e.g., ±0.05).
  * 7. Checks normalized algebraic string equality.
- * 8. Evaluates algebraic equivalence across multiple independent sample points.
+ * 8. Evaluates algebraic equivalence across multiple independent sample points (e.g. 3v/2 == (3/2)*v == 1.5v).
  * 9. Handles product factor permutation (commutativity of multiplication: GMm == GmM == mGM, 2*pi*r == 2*r*pi).
  */
 export function areExpressionsEquivalent(
@@ -393,14 +590,14 @@ export function areExpressionsEquivalent(
   // 1. Direct text equality
   if (stuStr.toLowerCase() === expStr.toLowerCase()) return true;
 
-  // 2. Bengali & scientific synonyms equivalence (e.g. হ্যাঁ == yes, বৃদ্ধি পাবে == increase, শূন্য == 0)
-  if (areSynonymsEquivalent(stuStr, expStr)) return true;
+  // 2. Bengali & scientific concept equivalence (e.g. জনন কোষ == জনন, হ্যাঁ == yes, বৃদ্ধি পাবে == increase, শূন্য == 0)
+  if (areConceptsEquivalent(stuStr, expStr)) return true;
 
-  // 3. Bengali text & numeral normalization
+  // 3. Bengali text & numeral normalization (৯ . ৮ -> 9.8)
   const bnStu = normalizeBengaliNumeralsAndText(stuStr);
   const bnExp = normalizeBengaliNumeralsAndText(expStr);
   if (bnStu.toLowerCase() === bnExp.toLowerCase()) return true;
-  if (areSynonymsEquivalent(bnStu, bnExp)) return true;
+  if (areConceptsEquivalent(bnStu, bnExp)) return true;
 
   // 4. Canonical Math & Chemical Normalization (e.g. D^2+ vs D^{2+} vs D²⁺, SO_4^{2-} vs SO_4^2-)
   const canonStu = normalizeCanonicalMathOrChemical(bnStu);
@@ -420,7 +617,7 @@ export function areExpressionsEquivalent(
   const cleanStu = stripLatexAndMathFormatting(bnStu);
   const cleanExp = stripLatexAndMathFormatting(bnExp);
   if (cleanStu.toLowerCase().replace(/\s+/g, '') === cleanExp.toLowerCase().replace(/\s+/g, '')) return true;
-  if (areSynonymsEquivalent(cleanStu, cleanExp)) return true;
+  if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
 
   // 7. Equation Symmetry Check (e.g. F = ma vs ma = F)
   if (cleanStu.includes('=') && cleanExp.includes('=')) {
@@ -450,7 +647,7 @@ export function areExpressionsEquivalent(
     return true;
   }
 
-  // 10. Multi-point sample point evaluation for variable expressions (e.g. G, M, m, R, x, y, v, t, etc.)
+  // 10. Multi-point sample point evaluation for variable expressions (e.g. 3v/2 == (3/2)*v == 1.5v, GMm/R^2 == GmM/R^2)
   const varNames = Array.from(new Set([
     ...(normStu.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || []),
     ...(normExp.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [])
