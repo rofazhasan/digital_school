@@ -8,7 +8,8 @@
 
 /**
  * Normalizes Bengali numerals, Bengali punctuation/danda, zero-width characters,
- * spaces around decimal dots, and converts LaTeX / Greek symbols to unified standard ASCII identifiers.
+ * Unicode minus/dash signs, spaces around decimal dots, degree symbols, vectors,
+ * and converts LaTeX / Greek symbols to unified standard ASCII identifiers.
  */
 export function normalizeBengaliNumeralsAndText(str: string | number | undefined | null): string {
   if (str === undefined || str === null) return '';
@@ -17,6 +18,9 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
 
   // Zero-width characters & non-breaking spaces
   text = text.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ');
+
+  // All Unicode minus, dash, hyphen variations to standard ASCII '-'
+  text = text.replace(/[\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uFE63\uFF0D]/g, '-');
 
   // Normalize spaces around dots / decimals (e.g. "9 . 8" or "৯ . ৮" -> "9.8" or "৯.৮")
   text = text.replace(/(\d|[\u09E6-\u09EF])\s*[\.\,\u0964\u0965]\s*(\d|[\u09E6-\u09EF])/g, '$1.$2');
@@ -27,9 +31,20 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
     text = text.split(d).join(String(i));
   });
 
+  // Leading plus on numbers: "+5" -> "5", "+ 9.8" -> "9.8"
+  text = text.replace(/^\+\s*(\d+(?:\.\d+)?)$/, '$1');
+
   // Remaining Bengali danda between digits or as dot/space
   text = text.replace(/(\d)[\u0964\u0965](\d)/g, '$1.$2');
   text = text.replace(/[\u0964\u0965]/g, ' ');
+
+  // Degree symbols: 90° -> 90 deg, 90^\circ -> 90 deg, 90 ডিগ্রি -> 90 deg
+  text = text.replace(/(\d+(?:\.\d+)?)\s*(?:°|\^\\circ|\\circ|deg|degree|ডিগ্রি)\b/gi, '$1 deg');
+  text = text.replace(/°/g, ' deg');
+
+  // Unit vector notation: \hat{i} -> i, \hat{j} -> j, \hat{k} -> k
+  text = text.replace(/\\hat\{([a-zA-Z])\}/g, '$1');
+  text = text.replace(/\\vec\{([a-zA-Z])\}/g, '$1');
 
   // Replace LaTeX Greek letters (with 1 or more backslashes)
   text = text.replace(/\\+(pi|theta|lambda|mu|omega|alpha|beta|gamma|delta|rho|sigma|phi)\b/gi, '$1');
@@ -94,7 +109,7 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['yes', 'true', '1', 'হ্যাঁ', 'হাঁ', 'সঠিক', 'সত্য', 'রাইট', 'correct', 'right'],
   ['no', 'false', '0', 'না', 'নাই', 'ভুল', 'মিথ্যা', 'রং', 'incorrect', 'wrong'],
   ['increase', 'increases', 'increasing', 'বৃদ্ধি পাবে', 'বৃদ্ধি', 'বাড়বে', 'বাড়বে', 'উন্নতি', 'বেড়ে যাবে', 'বেড়ে যাবে', 'বৃদ্ধি পায়', 'বৃদ্ধি pay', 'বৃদ্ধি পায়'],
-  ['decrease', 'decreases', 'decreasing', 'হ্রাস পাবে', 'হ্রাস', 'কমবে', 'কম', 'হ্রাস পায়', 'হ্রাস pay', 'হ্রাস পায়', 'কমে যাবে'],
+  ['decrease', 'decreases', 'decreasing', 'হ্রাস পাবে', 'হ্রাস', 'কমবে', 'কম', 'হ্রাস পায়', 'হ্রাস pay', 'হ্রাস pay', 'কমে যাবে'],
   ['constant', 'unchanged', 'same', 'সমান', 'অপরিবর্তিত', 'একই থাকবে', 'ধ্রুবক', 'একই', 'অপরিবর্তিত থাকবে', 'স্থির থাকবে', 'স্থির'],
   ['zero', '0', '০', 'শূন্য', 'শূণ্য', 'নিল', 'nil', 'none'],
   ['positive', '+', 'ধনাত্মক', 'পজিটিভ', 'পজেটিভ'],
@@ -104,7 +119,7 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['east', 'পূর্ব', 'পূর্বমুখী', 'পূর্ব দিকে'],
   ['west', 'পশ্চিম', 'পশ্চিমমুখী', 'পশ্চিম দিকে'],
 
-  // Biology Terms
+  // Biology Terms & Organelles
   ['জনন কোষ', 'জননকোষ', 'জনন', 'গ্যামেট', 'gamete', 'germ cell', 'reproductive cell'],
   ['দেহ কোষ', 'দেহকোষ', 'somatic cell', 'body cell'],
   ['কোষ প্রাচীর', 'কোষপ্রাচীর', 'cell wall'],
@@ -114,12 +129,26 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['সালোকসংশ্লেষণ', 'সালোক সংশ্লেষণ', 'photosynthesis'],
   ['শ্বসন', 'কোষীয় শ্বসন', 'কোষীয় শ্বসন', 'respiration', 'cellular respiration'],
   ['মাইটোকন্ড্রিয়া', 'মাইটোকন্ড্রিয়া', 'মাইটোকনড্রিয়া', 'mitochondria', 'শক্তিঘর', 'পাওয়ার হাউস', 'power house'],
+  ['লাইসোজোম', 'লাইসোজম', 'lysosome', 'আত্মঘাতী থলিকা', 'suicide bag'],
+  ['গলজি বস্তু', 'গলগি বডি', 'গলজি বডি', 'গলগি কমপ্লেক্স', 'golgi apparatus', 'golgi body'],
+  ['এন্ডোপ্লাজমিক রেটিকুলাম', 'endoplasmic reticulum', 'er'],
   ['ক্লোরোপ্লাস্ট', 'ক্লোরোপ্লাস্টিড', 'chloroplast'],
   ['প্লাস্টিড', 'plastid'],
   ['নিউক্লিয়াস', 'নিউক্লিয়াস', 'nucleus'],
   ['ক্রোমোজোম', 'ক্রোমোজম', 'chromosome'],
+  ['সেন্ট্রিওল', 'centriole', 'সেন্ট্রোজোম', 'centrosome'],
+  ['ভ্যাকুওল', 'কোষ গহ্বর', 'vacuole'],
+  ['প্লাজমিড', 'plasmid'],
   ['ডিএনএ', 'ডি এন এ', 'dna', 'deoxyribonucleic acid'],
   ['আরএনএ', 'আর এন এ', 'rna', 'ribonucleic acid'],
+  ['জিন', 'gene', 'জিনোম', 'genome'],
+  ['ফেনোটাইপ', 'phenotype', 'জিনোটাইপ', 'genotype'],
+  ['রক্তকণিকা', 'blood corpuscle', 'blood cell'],
+  ['লোহিত রক্তকণিকা', 'rbc', 'erythrocyte', 'red blood cell'],
+  ['শ্বেত রক্তকণিকা', 'wbc', 'leukocyte', 'white blood cell'],
+  ['অণুচক্রিকা', 'platelet', 'thrombocyte'],
+  ['হিমোগ্লোবিন', 'haemoglobin', 'hemoglobin'],
+  ['অ্যান্টিজেন', 'antigen', 'অ্যান্টিবডি', 'antibody'],
   ['এনজাইম', 'উৎসেচক', 'enzyme'],
   ['হরমোন', 'প্রনরস', 'hormone'],
   ['অ্যামিনো এসিড', 'অ্যামাইনো এসিড', 'amino acid'],
@@ -142,6 +171,12 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['ক্যালসিয়াম কার্বনেট', 'ক্যালসিয়াম কার্বোনেট', 'caco3', 'চুনাপাথর', 'মার্বেল পাথর', 'calcium carbonate'],
   ['ক্যালসিয়াম অক্সাইড', 'cao', 'চুন', 'পোড়া চুন', 'calcium oxide', 'quicklime'],
   ['ক্যালসিয়াম হাইড্রোক্সাইড', 'ca(oh)2', 'কলিচুন', 'চুনের পানি', 'calcium hydroxide', 'slaked lime'],
+  ['জারণ', 'oxidation', 'বিজারণ', 'reduction', 'জারণ-বিজারণ', 'রেডক্স', 'redox'],
+  ['ক্ষার', 'ক্ষারক', 'base', 'alkali'],
+  ['এসিড', 'অ্যাসিড', 'acid'],
+  ['প্রশমন বিক্রিয়া', 'প্রশমন', 'neutralization'],
+  ['পর্যায় সারণি', 'periodic table'],
+  ['আইসোটোপ', 'isotope', 'আইসোবার', 'isobar', 'আইসোটোন', 'isotone'],
 
   // Physics Terms & Equations
   ['অভিকর্ষজ ত্বরণ', 'অভিকর্ষ ত্বরণ', 'অভিকর্ষজ', 'g', 'acceleration due to gravity', 'gravity'],
@@ -159,7 +194,17 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['ভরবেগ', 'p', 'momentum'],
   ['তরঙ্গদৈর্ঘ্য', 'lambda', 'wavelength'],
   ['কম্পাঙ্ক', 'f', 'frequency'],
-  ['পর্যায়কাল', 't', 'time period', 'period']
+  ['পর্যায়কাল', 't', 'time period', 'period'],
+  ['লেনজের সূত্র', "lenz's law", 'lenz law'],
+  ['ফ্যারাডের সূত্র', "faraday's law", 'faraday law'],
+  ['কুলম্বের সূত্র', "coulomb's law", 'coulomb law'],
+  ['ওহমের সূত্র', "ohm's law", 'ohm law'],
+  ['হুকের সূত্র', "hooke's law", 'hooke law'],
+  ['প্যাসকেলের সূত্র', "pascal's law", 'pascal law'],
+  ['আর্কিমিডিসের নীতি', 'archimedes principle'],
+  ['ডপলার প্রভাব', 'ডপলার ক্রিয়া', 'doppler effect'],
+  ['পূর্ণ অভ্যন্তরীণ প্রতিফলন', 'total internal reflection', 'tir'],
+  ['সংকট কোণ', 'ক্রান্তি কোণ', 'critical angle']
 ];
 
 export const BENGALI_SYNONYM_GROUPS = COMPREHENSIVE_SCIENCE_SYNONYMS;
@@ -633,14 +678,35 @@ export function areExpressionsEquivalent(
     }
   }
 
-  // 8. Direct numeric comparison (with tolerance) for purely numeric values
+  // 8. Percentage and proportion comparison (e.g. 50% == 0.5 == ৫০% == ৫০ শতাংশ)
+  const parsePercentOrNumber = (str: string): number | null => {
+    if (!str) return null;
+    const s = normalizeBengaliNumeralsAndText(str).toLowerCase().trim();
+    const m = s.match(/^([\+\-]?\d+(?:\.\d+)?)\s*(?:%|শতাংশ|ভাগ|percent|percentage)$/);
+    if (m) {
+      return parseFloat(m[1]) / 100;
+    }
+    const num = parseFloat(s);
+    if (!isNaN(num) && (s === String(num) || s === `+${num}`)) {
+      return num;
+    }
+    return null;
+  };
+
+  const pStu = parsePercentOrNumber(cleanStu);
+  const pExp = parsePercentOrNumber(cleanExp);
+  if (pStu !== null && pExp !== null) {
+    if (Math.abs(pStu - pExp) <= (tolerance || 0.01)) return true;
+  }
+
+  // 9. Direct numeric comparison (with tolerance) for purely numeric values
   const numStu = parseFloat(cleanStu.replace(/[$,]/g, ''));
   const numExp = parseFloat(cleanExp.replace(/[$,]/g, ''));
   if (!isNaN(numStu) && !isNaN(numExp) && String(numStu) === cleanStu.trim() && String(numExp) === cleanExp.trim()) {
     if (Math.abs(numStu - numExp) <= tolerance) return true;
   }
 
-  // 9. Normalized algebraic string comparison
+  // 10. Normalized algebraic string comparison
   const normStu = normalizeExpression(stuStr);
   const normExp = normalizeExpression(expectedExpr);
   if (normStu && normExp && normStu.toLowerCase() === normExp.toLowerCase()) {
