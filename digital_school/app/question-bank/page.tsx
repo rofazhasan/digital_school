@@ -378,6 +378,42 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
           </div>
         </div>
       )}
+
+      {/* CMA Constructed Multi-Answer Preview */}
+      {q.type === 'CMA' && (
+        <div className="space-y-1.5 pt-1.5 border-t border-cyan-200/50 dark:border-cyan-700/50 text-[11px]">
+          <span className="font-bold text-cyan-600 dark:text-cyan-400 block text-[10px] uppercase">CMA Sub-Parts:</span>
+          {(((q.parts || q.cmaParts || q.subQuestions) || []) as any[]).map((part: any, i: number) => (
+            <div key={i} className="flex justify-between items-center bg-cyan-50/40 dark:bg-cyan-950/20 px-2 py-1 rounded border border-cyan-100 dark:border-cyan-900/50">
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                <span className="font-bold text-cyan-600 mr-1">({part.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i] || i + 1})</span>
+                <UniversalMathJax inline dynamic>{cleanupMath(part.prompt || part.text || part.question || '')}</UniversalMathJax>
+              </span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold ml-2 shrink-0">
+                {part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '—'} {part.unit ? `(${part.unit})` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* MPC Problem Chain Stages Preview */}
+      {q.type === 'MPC' && (
+        <div className="space-y-1.5 pt-1.5 border-t border-indigo-200/50 dark:border-indigo-700/50 text-[11px]">
+          <span className="font-bold text-indigo-600 dark:text-indigo-400 block text-[10px] uppercase">MPC Problem Chain:</span>
+          {(((q.stages || q.mpcStages || q.subQuestions) || []) as any[]).map((stage: any, i: number) => (
+            <div key={i} className="flex justify-between items-center bg-indigo-50/40 dark:bg-indigo-950/20 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-900/50">
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                <span className="font-bold text-indigo-600 mr-1">Stage {i + 1}:</span>
+                <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || '')}</UniversalMathJax>
+              </span>
+              <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold ml-2 shrink-0">
+                {stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? '—'} {stage.unit ? `(${stage.unit})` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 });
@@ -2597,7 +2633,205 @@ const QuestionCard: React.FC<{
             </div>
           )}
 
-          {/* DESCRIPTIVE Display */}
+          {/* CMA Constructed Multi-Answer Display */}
+          {question.type === 'CMA' && (
+            <div className="space-y-3 mt-2">
+              {(() => {
+                const parts = (question.parts && question.parts.length > 0 ? question.parts :
+                  (question as any).cmaParts && (question as any).cmaParts.length > 0 ? (question as any).cmaParts :
+                  question.subQuestions && question.subQuestions.length > 0 ? question.subQuestions :
+                  (question as any).sub_questions && (question as any).sub_questions.length > 0 ? (question as any).sub_questions : []) as any[];
+
+                if (parts.length === 0) return (
+                  <div className="p-4 rounded-2xl bg-cyan-50/30 dark:bg-cyan-900/10 border border-cyan-100 dark:border-cyan-800 text-xs text-gray-400 italic">
+                    (No CMA sub-parts available)
+                  </div>
+                );
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                        Constructed Sub-Parts ({parts.length})
+                      </p>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {parts.map((part: any, i: number) => {
+                        const expectedKey = part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? part.answer;
+                        return (
+                          <div key={i} className="p-3.5 rounded-2xl bg-cyan-50/30 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/40 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2.5 flex-1">
+                                <span className="flex-shrink-0 w-5 h-5 rounded-lg bg-cyan-600 text-white flex items-center justify-center text-[10px] font-black mt-0.5 shadow-sm shadow-cyan-600/20">
+                                  {part.label || getLetter(i).toLowerCase()}
+                                </span>
+                                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                                  <UniversalMathJax dynamic>{cleanupMath(part.prompt || part.text || part.question || '')}</UniversalMathJax>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {part.fieldType && (
+                                  <Badge variant="outline" className="text-[8px] font-mono uppercase bg-white dark:bg-gray-800 px-1 py-0 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300">
+                                    {part.fieldType}
+                                  </Badge>
+                                )}
+                                <Badge variant="secondary" className="text-[9px] font-black h-5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300">
+                                  {part.marks || 1}M
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Sub-options if child MCQ */}
+                            {Array.isArray(part.options) && part.options.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-7 mt-1.5">
+                                {part.options.map((opt: any, oi: number) => {
+                                  const isCorrect = opt.isCorrect || String(expectedKey) === String(oi) || String(expectedKey) === String(opt.text || opt);
+                                  return (
+                                    <div key={oi} className={`text-[11px] p-1.5 rounded-lg border flex items-center gap-2 ${isCorrect ? 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold' : 'bg-white dark:bg-gray-900/30 border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-300'}`}>
+                                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${isCorrect ? 'bg-emerald-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                                        {String.fromCharCode(65 + oi)}
+                                      </span>
+                                      <UniversalMathJax inline dynamic>{cleanupMath(typeof opt === 'string' ? opt : opt.text || '')}</UniversalMathJax>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Expected Model Answer Key */}
+                            {expectedKey !== undefined && expectedKey !== null && expectedKey !== '' && (
+                              <div className="pl-7 pt-1">
+                                <div className="p-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-tight">Expected Key:</span>
+                                  <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                    <UniversalMathJax inline dynamic>{cleanupMath(String(expectedKey))}</UniversalMathJax>
+                                    {part.unit && <span className="ml-1 text-[10px] text-emerald-600/80 dark:text-emerald-400/80">({part.unit})</span>}
+                                    {part.tolerance !== undefined && <span className="ml-1 text-[9px] text-gray-400">±{part.tolerance}</span>}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Explanation */}
+                            {part.explanation && (
+                              <div className="pl-7 pt-1">
+                                <div className="p-2 rounded-xl bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 text-[11px] text-blue-800 dark:text-blue-300">
+                                  <span className="font-black uppercase text-[9px] text-blue-600 dark:text-blue-400 block mb-0.5">Explanation:</span>
+                                  <UniversalMathJax dynamic>{cleanupMath(part.explanation)}</UniversalMathJax>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* MPC Multi-Step Problem Chain Display */}
+          {question.type === 'MPC' && (
+            <div className="space-y-3 mt-2">
+              {(() => {
+                const stages = ((question as any).stages && (question as any).stages.length > 0 ? (question as any).stages :
+                  (question as any).mpcStages && (question as any).mpcStages.length > 0 ? (question as any).mpcStages :
+                  question.subQuestions && question.subQuestions.length > 0 ? question.subQuestions :
+                  (question as any).sub_questions && (question as any).sub_questions.length > 0 ? (question as any).sub_questions : []) as any[];
+
+                const scenario = (question as any).scenario;
+
+                return (
+                  <div className="space-y-3">
+                    {/* Scenario if available */}
+                    {scenario && (
+                      <div className="p-3.5 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1">
+                          <BrainCircuit className="w-3 h-3" /> Problem Scenario
+                        </p>
+                        <div className="text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed font-medium">
+                          <UniversalMathJax dynamic>{cleanupMath(scenario)}</UniversalMathJax>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Sequential Stages ({stages.length})
+                      </p>
+                    </div>
+
+                    {stages.length === 0 ? (
+                      <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800 text-xs text-gray-400 italic">
+                        (No MPC stages available)
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {stages.map((stage: any, i: number) => {
+                          const expectedKey = stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? stage.answer;
+                          return (
+                            <div key={i} className="p-3.5 rounded-2xl bg-indigo-50/30 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2.5 flex-1">
+                                  <span className="flex-shrink-0 px-2 py-0.5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black mt-0.5 shadow-sm shadow-indigo-600/20">
+                                    Stage {i + 1}
+                                  </span>
+                                  <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                                    <UniversalMathJax dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || `Stage ${i + 1}`)}</UniversalMathJax>
+                                  </div>
+                                </div>
+                                <Badge variant="secondary" className="text-[9px] font-black h-5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300 shrink-0">
+                                  {stage.marks || 1}M
+                                </Badge>
+                              </div>
+
+                              {/* Formula */}
+                              {stage.formula && (
+                                <div className="pl-7">
+                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300 font-mono text-[10px]">
+                                    <span className="text-[9px] uppercase font-bold text-indigo-500">Formula:</span> {stage.formula}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Expected Model Answer Key */}
+                              {expectedKey !== undefined && expectedKey !== null && expectedKey !== '' && (
+                                <div className="pl-7 pt-1">
+                                  <div className="p-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 tracking-tight">Solution Key:</span>
+                                    <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(String(expectedKey))}</UniversalMathJax>
+                                      {stage.unit && <span className="ml-1 text-[10px] text-emerald-600/80 dark:text-emerald-400/80">({stage.unit})</span>}
+                                      {stage.tolerance !== undefined && <span className="ml-1 text-[9px] text-gray-400">±{stage.tolerance}</span>}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Explanation */}
+                              {stage.explanation && (
+                                <div className="pl-7 pt-1">
+                                  <div className="p-2 rounded-xl bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 text-[11px] text-blue-800 dark:text-blue-300">
+                                    <span className="font-black uppercase text-[9px] text-blue-600 dark:text-blue-400 block mb-0.5">Explanation:</span>
+                                    <UniversalMathJax dynamic>{cleanupMath(stage.explanation)}</UniversalMathJax>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* DESCRIPTIVE Display */}
           {question.type === 'DESCRIPTIVE' && (
             <div className="space-y-4 mt-3">
@@ -6599,6 +6833,28 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                                   {(sq.instructions || sq.instruction)?.trim() && (
                                     <div className="shrink-0 px-1 bg-amber-500 text-white rounded-[2px] font-black text-[7px] leading-none py-0.5" title={sq.instructions}>INST</div>
                                   )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {row.data.type === 'CMA' && (row.data.parts || row.data.cmaParts || row.data.subQuestions) && (
+                            <div className="mt-1 border-t pt-1 space-y-1">
+                              {((row.data.parts || row.data.cmaParts || row.data.subQuestions) as any[]).map((p: any, pi: number) => (
+                                <div key={pi} className="text-[9px] bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800 p-1 rounded flex items-center justify-between gap-1 overflow-hidden">
+                                  <span className="font-bold text-cyan-700 dark:text-cyan-300 mr-1">{p.label || String.fromCharCode(97 + pi)}.</span>
+                                  <span className="truncate flex-1 text-gray-700 dark:text-gray-300">{p.prompt || p.text || 'Part'}</span>
+                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{p.expectedAnswer ?? p.modelAnswer ?? '—'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {row.data.type === 'MPC' && (row.data.stages || row.data.mpcStages || row.data.subQuestions) && (
+                            <div className="mt-1 border-t pt-1 space-y-1">
+                              {((row.data.stages || row.data.mpcStages || row.data.subQuestions) as any[]).map((s: any, si: number) => (
+                                <div key={si} className="text-[9px] bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 p-1 rounded flex items-center justify-between gap-1 overflow-hidden">
+                                  <span className="font-bold text-indigo-700 dark:text-indigo-300 mr-1">S{si + 1}:</span>
+                                  <span className="truncate flex-1 text-gray-700 dark:text-gray-300">{s.stageTitle || s.prompt || s.text || 'Stage'}</span>
+                                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0">{s.expectedAnswer ?? s.modelAnswer ?? '—'}</span>
                                 </div>
                               ))}
                             </div>
