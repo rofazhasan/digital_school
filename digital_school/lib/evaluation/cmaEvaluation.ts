@@ -1,8 +1,7 @@
 import { areExpressionsEquivalent } from '../math-parser';
-import { gradeDRResponse } from '../dr-autograder';
 
 // CMA (Constructed Multi-Answer) Question Evaluation Logic
-// Evaluates compound multi-part questions containing child questions of varying types (MCQ, MC, INT, AR, MTF, DR)
+// Evaluates compound multi-part questions containing child questions of varying types (MCQ, MC, INT, AR, MTF)
 // with partial credit support and deterministic offline grading.
 
 export interface CMAPart {
@@ -10,7 +9,7 @@ export interface CMAPart {
     label?: string;
     prompt?: string;
     question?: string;
-    type?: 'integer' | 'decimal' | 'expression' | 'fraction' | 'text' | 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'SRA' | 'DR' | string;
+    type?: 'integer' | 'decimal' | 'expression' | 'fraction' | 'text' | 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | string;
     marks: number;
     expectedAnswer?: number | string;
     correctAnswer?: number | string;
@@ -19,9 +18,6 @@ export interface CMAPart {
     unit?: string;
     options?: any[];
     matches?: Record<string, string>;
-    acceptedAnswers?: string[] | string;
-    aliases?: string[] | string;
-    drSubtype?: 'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST';
 }
 
 export interface CMAQuestion {
@@ -106,36 +102,7 @@ export function evaluateCMAChildPart(
         return { isCorrect: false, isAttempted: true, status: 'INCORRECT', earnedRatio: 0 };
     }
 
-    // 3. SRA Child
-    if (childType === 'SRA') {
-        const isMatch = studentStr.toLowerCase() === expectedStr.toLowerCase() ||
-            areExpressionsEquivalent(studentStr, expectedStr, tol);
-        return {
-            isCorrect: isMatch,
-            isAttempted: true,
-            status: isMatch ? 'CORRECT' : 'INCORRECT',
-            matchedBy: 'SRA',
-            earnedRatio: isMatch ? 1 : 0
-        };
-    }
 
-    // 4. DR Legacy Child
-    if (childType === 'DR') {
-        const drRes = gradeDRResponse(studentStr, {
-            canonicalAnswer: expectedStr,
-            acceptedAnswers: part.acceptedAnswers || part.aliases,
-            drSubtype: part.drSubtype || 'TEXT',
-            toleranceValue: tol
-        });
-        const isMatch = drRes.status === 'CORRECT';
-        return {
-            isCorrect: isMatch,
-            isAttempted: true,
-            status: isMatch ? 'CORRECT' : 'INCORRECT',
-            matchedBy: drRes.matchedBy,
-            earnedRatio: isMatch ? 1 : 0
-        };
-    }
 
     // 4. AR (Assertion-Reason) Child
     if (childType === 'AR') {

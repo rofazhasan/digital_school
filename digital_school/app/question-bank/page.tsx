@@ -48,7 +48,7 @@ import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'SRA' | 'SDR' | 'DR';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
@@ -996,8 +996,7 @@ export default function QuestionBankPage() {
       .filter((q: Question) => searchTerm === "" || (q.questionText || '').toLowerCase().includes(searchTerm.toLowerCase()) || (q.subject || '').toLowerCase().includes(searchTerm.toLowerCase()))
       .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
       .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
-      .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter)
-      .filter((q: Question) => typeFilter === "all" || (typeFilter === "SDR" || typeFilter === "SRA" || typeFilter === "DR" ? (String(q.type) === "SRA" || String(q.type) === "SDR" || String(q.type) === "DR") : q.type === typeFilter))
+      .filter((q: Question) => typeFilter === "all" || q.type === typeFilter)
       .filter((q: Question) => topicFilter === "" || (q.topic || '').toLowerCase().includes(topicFilter.toLowerCase()))
       .filter((q: Question) => {
         if (!dateRange || !dateRange.from) return true;
@@ -1230,7 +1229,6 @@ export default function QuestionBankPage() {
                               <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                               <SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem>
                               <SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem>
-                              <SelectItem value="SDR">SDR (Structured Diagnostic Reasoning)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
                               <SelectItem value="SMCQ">SMCQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
@@ -4264,468 +4262,7 @@ function MPCQuestionForm({
   );
 }
 
-function SRAQuestionForm({
-  components,
-  setComponents,
-}: {
-  components: any[];
-  setComponents: (comps: any[]) => void;
-}) {
-  const addComponent = (kind: string = 'CONSTRUCT') => {
-    const nextIdx = components.length + 1;
-    const newComp: any = {
-      id: `step_${nextIdx}_${Date.now().toString(36).slice(-4)}`,
-      kind,
-      label: `Step ${nextIdx}: ${kind === 'CONSTRUCT' ? 'Constructed Calculation' : kind === 'EVIDENCE_SELECT' ? 'Evidence / Rule Selection' : kind === 'ORDER' ? 'Sequence Order' : kind === 'RELATION' ? 'Logical Relationship' : 'Intermediate Step'}`,
-      prompt: '',
-      marks: 2,
-    };
 
-    if (kind === 'CONSTRUCT' || kind === 'INTERMEDIATE_CONSTRUCT' || kind === 'CONCLUSION') {
-      newComp.expectedAnswer = '';
-      newComp.evaluationMode = 'NUMERIC';
-      newComp.tolerance = 0.01;
-      newComp.unit = '';
-    } else if (kind === 'EVIDENCE_SELECT') {
-      newComp.scoring = 'ALL_OR_NOTHING';
-      newComp.multiSelect = false;
-      newComp.options = [
-        { id: `opt_1`, text: '', isCorrect: true },
-        { id: `opt_2`, text: '', isCorrect: false },
-        { id: `opt_3`, text: '', isCorrect: false }
-      ];
-    } else if (kind === 'ORDER') {
-      newComp.scoring = 'ALL_OR_NOTHING';
-      newComp.items = [
-        { id: 'item_1', text: '' },
-        { id: 'item_2', text: '' },
-        { id: 'item_3', text: '' }
-      ];
-      newComp.correctOrder = ['item_1', 'item_2', 'item_3'];
-    }
-
-    setComponents([...components, newComp]);
-  };
-
-  const removeComponent = (idx: number) => {
-    setComponents(components.filter((_, i) => i !== idx));
-  };
-
-  const moveComponent = (fromIdx: number, toIdx: number) => {
-    if (toIdx < 0 || toIdx >= components.length) return;
-    const updated = [...components];
-    const [moved] = updated.splice(fromIdx, 1);
-    updated.splice(toIdx, 0, moved);
-    setComponents(updated);
-  };
-
-  const updateComp = (idx: number, patch: any) => {
-    const updated = [...components];
-    updated[idx] = { ...updated[idx], ...patch };
-    setComponents(updated);
-  };
-
-  const applyPreset = (presetKey: string) => {
-    if (presetKey === 'physics_work_energy') {
-      setComponents([
-        {
-          id: 'step_1_calc',
-          kind: 'CONSTRUCT',
-          label: 'Step 1: Calculate Kinetic Energy',
-          prompt: 'Calculate the kinetic energy of a 2 kg block at 3 m/s in Joules:',
-          expectedAnswer: '9',
-          unit: 'J',
-          marks: 2,
-          tolerance: 0.01,
-          evaluationMode: 'NUMERIC'
-        },
-        {
-          id: 'step_2_evidence',
-          kind: 'EVIDENCE_SELECT',
-          label: 'Step 2: Select Governing Conservation Law',
-          prompt: 'Select the primary physical principle explaining energy conservation:',
-          marks: 2,
-          scoring: 'ALL_OR_NOTHING',
-          options: [
-            { id: 'opt_1', text: 'E_k = \\frac{1}{2}mv^2 \\text{ and mechanical energy is conserved}', isCorrect: true },
-            { id: 'opt_2', text: 'Newton\'s 3rd Law \\vec{F}_{12} = -\\vec{F}_{21}', isCorrect: false },
-            { id: 'opt_3', text: 'Ohm\'s Law V = IR', isCorrect: false }
-          ]
-        }
-      ]);
-    } else if (presetKey === 'chemistry_stoichiometry') {
-      setComponents([
-        {
-          id: 'step_1_balance',
-          kind: 'EVIDENCE_SELECT',
-          label: 'Step 1: Balanced Reaction Equation',
-          prompt: 'Select the correctly balanced chemical equation for water synthesis:',
-          marks: 2,
-          scoring: 'ALL_OR_NOTHING',
-          options: [
-            { id: 'opt_1', text: '2H_2 + O_2 \\rightarrow 2H_2O', isCorrect: true },
-            { id: 'opt_2', text: 'H_2 + O_2 \\rightarrow H_2O', isCorrect: false },
-            { id: 'opt_3', text: 'H_2 + 2O_2 \\rightarrow 2H_2O_2', isCorrect: false }
-          ]
-        },
-        {
-          id: 'step_2_moles',
-          kind: 'CONSTRUCT',
-          label: 'Step 2: Calculate Produced Moles of Water',
-          prompt: 'If 4 moles of H_2 react with excess O_2, how many moles of H_2O are formed?',
-          expectedAnswer: '4',
-          unit: 'mol',
-          marks: 2,
-          tolerance: 0.01,
-          evaluationMode: 'NUMERIC'
-        }
-      ]);
-    } else if (presetKey === 'biology_sequence') {
-      setComponents([
-        {
-          id: 'step_1_order',
-          kind: 'ORDER',
-          label: 'Step 1: Biological Process Order',
-          prompt: 'Arrange the stages of Mitosis in correct chronological sequence:',
-          marks: 4,
-          scoring: 'ALL_OR_NOTHING',
-          items: [
-            { id: 'item_prophase', text: 'Prophase (Chromosome condensation)' },
-            { id: 'item_metaphase', text: 'Metaphase (Equatorial alignment)' },
-            { id: 'item_anaphase', text: 'Anaphase (Sister chromatid separation)' },
-            { id: 'item_telophase', text: 'Telophase (Nuclear envelope reformation)' }
-          ],
-          correctOrder: ['item_prophase', 'item_metaphase', 'item_anaphase', 'item_telophase']
-        }
-      ]);
-    }
-  };
-
-  return (
-    <div className="space-y-4 border p-4 rounded-xl bg-purple-50/20 dark:bg-purple-950/10 border-purple-200 dark:border-purple-800">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
-          <span className="px-2 py-0.5 bg-purple-600 text-white rounded text-xs font-mono">SRA</span>
-          Structured Reasoning Assembly (100% Deterministic Autograder)
-        </h4>
-        <div className="flex items-center gap-2">
-          <Select onValueChange={applyPreset}>
-            <SelectTrigger className="h-8 text-xs font-semibold bg-background">
-              <SelectValue placeholder="Quick PCMB Preset..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="physics_work_energy">Physics: Calculation + Principle</SelectItem>
-              <SelectItem value="chemistry_stoichiometry">Chemistry: Reaction + Moles</SelectItem>
-              <SelectItem value="biology_sequence">Biology: Sequential Order</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button type="button" size="sm" onClick={() => addComponent('CONSTRUCT')} className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white">
-            <PlusCircle className="h-3.5 w-3.5 mr-1" /> Add Step
-          </Button>
-        </div>
-      </div>
-
-      {/* Info Guide */}
-      <div className="p-3.5 rounded-xl bg-purple-100/70 dark:bg-purple-950/40 border border-purple-300 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1.5">
-        <div className="font-bold text-xs flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
-          <Sparkles className="w-4 h-4 text-purple-600" /> SRA Multi-Component Autograder Architecture:
-        </div>
-        <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-          Students construct logical reasoning sequences from machine-checkable components: <strong>Calculations / Formulations (CONSTRUCT)</strong>, <strong>Law / Evidence Selection (EVIDENCE_SELECT)</strong>, <strong>Step Ordering (ORDER)</strong>, or <strong>Relational Links (RELATION)</strong>. Full LaTeX MathJax support is active across all fields without any AI dependencies.
-        </p>
-      </div>
-
-      {/* Components List */}
-      <div className="space-y-4">
-        {components.map((comp, idx) => (
-          <div key={comp.id || idx} className="p-4 border rounded-xl bg-background space-y-3 shadow-sm relative">
-            <div className="flex items-center justify-between border-b pb-2">
-              <div className="flex items-center gap-2 flex-1">
-                <span className="h-6 w-6 rounded-full bg-purple-600 text-white flex items-center justify-center font-mono text-xs font-bold shrink-0">
-                  {idx + 1}
-                </span>
-                <Input
-                  value={comp.label || ''}
-                  onChange={e => updateComp(idx, { label: e.target.value })}
-                  placeholder={`Step ${idx + 1} Title (e.g. Step 1: Calculate Energy)`}
-                  className="h-8 text-xs font-bold"
-                />
-              </div>
-
-              <div className="flex items-center gap-1 ml-2">
-                <Select value={comp.kind || 'CONSTRUCT'} onValueChange={k => updateComp(idx, { kind: k })}>
-                  <SelectTrigger className="h-8 text-xs font-semibold w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CONSTRUCT">CONSTRUCT (Value / Expr)</SelectItem>
-                    <SelectItem value="EVIDENCE_SELECT">EVIDENCE_SELECT (Rules)</SelectItem>
-                    <SelectItem value="ORDER">ORDER (Sequence)</SelectItem>
-                    <SelectItem value="RELATION">RELATION (Graph Edge)</SelectItem>
-                    <SelectItem value="INTERMEDIATE_CONSTRUCT">INTERMEDIATE (Step)</SelectItem>
-                    <SelectItem value="CONCLUSION">CONCLUSION (Deduction)</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    value={comp.marks || 1}
-                    onChange={e => updateComp(idx, { marks: Number(e.target.value) })}
-                    className="h-8 w-16 text-xs text-center font-bold"
-                    placeholder="Marks"
-                  />
-                  <span className="text-xs text-muted-foreground mr-1">pts</span>
-                </div>
-
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === 0} onClick={() => moveComponent(idx, idx - 1)}>
-                  ▲
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={idx === components.length - 1} onClick={() => moveComponent(idx, idx + 1)}>
-                  ▼
-                </Button>
-                {components.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => removeComponent(idx)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Prompt */}
-            <div>
-              <Label className="text-xs font-semibold">Step Prompt / Problem Description</Label>
-              <Input
-                value={comp.prompt || ''}
-                onChange={e => updateComp(idx, { prompt: e.target.value })}
-                placeholder="Enter prompt for this reasoning step..."
-                className="h-8 text-xs mt-1"
-              />
-              {comp.prompt && (
-                <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <span className="font-bold text-[10px] text-purple-600 uppercase">Preview:</span>
-                  <UniversalMathJax inline dynamic>{cleanupMath(comp.prompt)}</UniversalMathJax>
-                </div>
-              )}
-            </div>
-
-            {/* CONSTRUCT / INTERMEDIATE / CONCLUSION specifics */}
-            {(comp.kind === 'CONSTRUCT' || comp.kind === 'INTERMEDIATE_CONSTRUCT' || comp.kind === 'CONCLUSION' || !comp.kind) && (
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40">
-                <div className="sm:col-span-2">
-                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">Expected Answer Key</Label>
-                  <Input
-                    value={comp.expectedAnswer || ''}
-                    onChange={e => updateComp(idx, { expectedAnswer: e.target.value })}
-                    placeholder="e.g. 9.8, \\frac{1}{2}mv^2, or 42"
-                    className="h-8 text-xs font-mono mt-1"
-                  />
-                  {comp.expectedAnswer && (
-                    <div className="text-[11px] font-mono text-purple-600 dark:text-purple-400 mt-1">
-                      Render: <UniversalMathJax inline dynamic>{cleanupMath(String(comp.expectedAnswer))}</UniversalMathJax>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs">Tolerance (±)</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={comp.tolerance ?? 0.01}
-                    onChange={e => updateComp(idx, { tolerance: parseFloat(e.target.value) || 0 })}
-                    className="h-8 text-xs font-mono mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Unit (optional)</Label>
-                  <Input
-                    value={comp.unit || ''}
-                    onChange={e => updateComp(idx, { unit: e.target.value })}
-                    placeholder="e.g. m/s, J, N"
-                    className="h-8 text-xs font-mono mt-1"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* EVIDENCE_SELECT specifics */}
-            {comp.kind === 'EVIDENCE_SELECT' && (
-              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40 space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">
-                    Reasoning / Law Options (Check the correct principle)
-                  </Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      const opts = comp.options || [];
-                      updateComp(idx, {
-                        options: [...opts, { id: `opt_${opts.length + 1}`, text: '', isCorrect: false }]
-                      });
-                    }}
-                  >
-                    <PlusCircle className="h-3 w-3 mr-1" /> Add Option
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {(comp.options || []).map((opt: any, optIdx: number) => (
-                    <div key={opt.id || optIdx} className="flex flex-col gap-1 p-2 border rounded bg-background">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={!!opt.isCorrect}
-                          onCheckedChange={ch => {
-                            const nextOpts = (comp.options || []).map((o: any, i: number) => ({
-                              ...o,
-                              isCorrect: comp.multiSelect ? (i === optIdx ? !!ch : o.isCorrect) : (i === optIdx ? !!ch : false)
-                            }));
-                            updateComp(idx, { options: nextOpts });
-                          }}
-                        />
-                        <span className="font-bold text-xs">{String.fromCharCode(65 + optIdx)}.</span>
-                        <Input
-                          value={opt.text || ''}
-                          onChange={e => {
-                            const nextOpts = [...(comp.options || [])];
-                            nextOpts[optIdx] = { ...nextOpts[optIdx], text: e.target.value };
-                            updateComp(idx, { options: nextOpts });
-                          }}
-                          placeholder={`Option ${String.fromCharCode(65 + optIdx)} text or LaTeX formula...`}
-                          className="h-8 text-xs flex-1"
-                        />
-                        {(comp.options || []).length > 2 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-red-500"
-                            onClick={() => {
-                              updateComp(idx, {
-                                options: (comp.options || []).filter((_: any, i: number) => i !== optIdx)
-                              });
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                      {opt.text && (
-                        <div className="pl-6 text-[11px] text-muted-foreground flex items-center gap-1">
-                          <span className="font-bold text-[10px] text-purple-600 uppercase">Math:</span>
-                          <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ORDER specifics */}
-            {comp.kind === 'ORDER' && (
-              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/40 space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">
-                    Sequence Steps (Define items in their correct sequential order)
-                  </Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      const items = comp.items || [];
-                      const newItemId = `item_${items.length + 1}`;
-                      const nextItems = [...items, { id: newItemId, text: '' }];
-                      updateComp(idx, {
-                        items: nextItems,
-                        correctOrder: nextItems.map((it: any) => it.id)
-                      });
-                    }}
-                  >
-                    <PlusCircle className="h-3 w-3 mr-1" /> Add Sequence Step
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {(comp.items || []).map((it: any, itIdx: number) => (
-                    <div key={it.id || itIdx} className="flex items-center gap-2 p-2 border rounded bg-background">
-                      <span className="font-bold text-xs w-6">{itIdx + 1}.</span>
-                      <Input
-                        value={it.text || ''}
-                        onChange={e => {
-                          const nextItems = [...(comp.items || [])];
-                          nextItems[itIdx] = { ...nextItems[itIdx], text: e.target.value };
-                          updateComp(idx, { items: nextItems });
-                        }}
-                        placeholder={`Sequence step ${itIdx + 1} description...`}
-                        className="h-8 text-xs flex-1"
-                      />
-                      {(comp.items || []).length > 2 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-red-500"
-                          onClick={() => {
-                            const nextItems = (comp.items || []).filter((_: any, i: number) => i !== itIdx);
-                            updateComp(idx, {
-                              items: nextItems,
-                              correctOrder: nextItems.map((item: any) => item.id)
-                            });
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Backward-compatibility wrapper for legacy DR
-function DRQuestionForm(props: any) {
-  const components = [
-    {
-      id: 'step_1_answer',
-      kind: 'CONSTRUCT',
-      label: 'Part A: Direct Solution',
-      expectedAnswer: props.expectedAnswer,
-      tolerance: props.toleranceValue || 0.01,
-      unit: props.expectedUnit,
-      marks: 2,
-    },
-    {
-      id: 'step_2_reasons',
-      kind: 'EVIDENCE_SELECT',
-      label: 'Part B: Conceptual Justification',
-      marks: 3,
-      options: props.reasonOptions || []
-    }
-  ];
-
-  return (
-    <SRAQuestionForm
-      components={components}
-      setComponents={(comps: any[]) => {
-        const c1 = comps[0];
-        const c2 = comps[1];
-        if (c1 && props.setExpectedAnswer) props.setExpectedAnswer(c1.expectedAnswer || '');
-        if (c2 && props.setReasonOptions) props.setReasonOptions(c2.options || []);
-      }}
-    />
-  );
-}
 
 interface QuestionFormProps {
   initialData?: Question | null;
@@ -4796,76 +4333,6 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     ((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions)
       ? (((initialData as any)?.stages || (initialData as any)?.mpcStages || initialData?.subQuestions) as any[])
       : [{ id: 's1', stageTitle: 'Stage 1 prompt', expectedAnswer: '0', tolerance: 0.05, formula: '', marks: 2 }]
-  );
-  const [sraComponents, setSraComponents] = useState<any[]>(
-    ((initialData as any)?.components || (initialData as any)?.sraComponents || initialData?.subQuestions)
-      ? (((initialData as any)?.components || (initialData as any)?.sraComponents || initialData?.subQuestions) as any[])
-      : [
-          {
-            id: 'step_1_calc',
-            kind: 'CONSTRUCT',
-            label: 'Step 1: Calculate Energy / Value',
-            prompt: 'Calculate the primary physical value or formula output:',
-            expectedAnswer: '9',
-            unit: 'J',
-            marks: 2,
-            tolerance: 0.01,
-            evaluationMode: 'NUMERIC'
-          },
-          {
-            id: 'step_2_evidence',
-            kind: 'EVIDENCE_SELECT',
-            label: 'Step 2: Governing Law / Principle Selection',
-            prompt: 'Select the primary physical principle explaining this phenomenon:',
-            marks: 2,
-            scoring: 'ALL_OR_NOTHING',
-            options: [
-              { id: 'opt_1', text: 'E_k = \\frac{1}{2}mv^2', isCorrect: true },
-              { id: 'opt_2', text: 'F = ma', isCorrect: false },
-              { id: 'opt_3', text: 'V = IR', isCorrect: false }
-            ]
-          }
-        ]
-  );
-  const [reasonOptions, setReasonOptions] = useState<any[]>(
-    ((initialData as any)?.reasonOptions || initialData?.subQuestions || initialData?.options)
-      ? (((initialData as any)?.reasonOptions || initialData?.subQuestions || initialData?.options) as any[])
-      : [
-        { id: 'r1', text: 'Correct conceptual justification option', isCorrect: true },
-        { id: 'r2', text: 'Common misconception or incorrect reasoning', isCorrect: false }
-      ]
-  );
-  const [confidenceTracking, setConfidenceTracking] = useState<boolean>(
-    (initialData as any)?.confidenceTracking !== false
-  );
-  const [drSubtype, setDrSubtype] = useState<'TEXT' | 'NUMERIC' | 'SYMBOLIC' | 'SET' | 'LIST'>(
-    (initialData as any)?.drSubtype || 'TEXT'
-  );
-  const [acceptedAnswers, setAcceptedAnswers] = useState<string>(
-    Array.isArray((initialData as any)?.acceptedAnswers)
-      ? (initialData as any)?.acceptedAnswers.join(', ')
-      : (initialData as any)?.acceptedAnswers || (initialData as any)?.aliases || ''
-  );
-  const [toleranceType, setToleranceType] = useState<'ABSOLUTE' | 'RELATIVE' | 'PERCENTAGE'>(
-    (initialData as any)?.toleranceType || 'ABSOLUTE'
-  );
-  const [toleranceValue, setToleranceValue] = useState<number>(
-    Number((initialData as any)?.toleranceValue ?? (initialData as any)?.tolerance ?? 0.01)
-  );
-  const [expectedUnit, setExpectedUnit] = useState<string>(
-    (initialData as any)?.expectedUnit || ''
-  );
-  const [unitRequired, setUnitRequired] = useState<boolean>(
-    Boolean((initialData as any)?.unitRequired)
-  );
-  const [orderSensitive, setOrderSensitive] = useState<boolean>(
-    (initialData as any)?.orderSensitive !== false
-  );
-  const [caseSensitive, setCaseSensitive] = useState<boolean>(
-    Boolean((initialData as any)?.caseSensitive)
-  );
-  const [allowBengali, setAllowBengali] = useState<boolean>(
-    (initialData as any)?.allowBengali !== false
   );
   const [explanation, setExplanation] = useState((initialData as any)?.explanation || '');
   const [images, setImages] = useState<string[]>(initialData?.images || []);
@@ -5136,29 +4603,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           isCorrect: opt.isCorrect
         })),
         image: sq.image || undefined
-      })) : type === 'DESCRIPTIVE' ? descriptiveParts : type === 'CMA' ? cmaParts : type === 'MPC' ? mpcStages : type === 'SRA' ? sraComponents : type === 'DR' ? reasonOptions : null,
+      })) : type === 'DESCRIPTIVE' ? descriptiveParts : type === 'CMA' ? cmaParts : type === 'MPC' ? mpcStages : null,
       parts: type === 'CMA' ? cmaParts : null,
       cmaParts: type === 'CMA' ? cmaParts : null,
       scenario: type === 'MPC' ? scenario : null,
       stages: type === 'MPC' ? mpcStages : null,
       mpcStages: type === 'MPC' ? mpcStages : null,
-      components: type === 'SRA' ? sraComponents : null,
-      sraComponents: type === 'SRA' ? sraComponents : null,
-      reasonOptions: type === 'DR' ? reasonOptions : null,
-      confidenceTracking: type === 'DR' ? confidenceTracking : null,
-      drSubtype: type === 'DR' ? drSubtype : null,
-      canonicalAnswer: type === 'DR' ? modelAnswer.trim() : null,
-      acceptedAnswers: type === 'DR' ? acceptedAnswers : null,
-      aliases: type === 'DR' ? acceptedAnswers : null,
-      toleranceType: type === 'DR' ? toleranceType : null,
-      toleranceValue: type === 'DR' ? toleranceValue : null,
-      expectedUnit: type === 'DR' ? expectedUnit : null,
-      unitRequired: type === 'DR' ? unitRequired : null,
-      orderSensitive: type === 'DR' ? orderSensitive : null,
-      caseSensitive: type === 'DR' ? caseSensitive : null,
-      allowBengali: type === 'DR' ? allowBengali : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
-        type === 'INT' ? correctAnswer.toString() : (type === 'DR' || type === 'SRA') ? (modelAnswer.trim() || (sraComponents[0]?.expectedAnswer ? String(sraComponents[0].expectedAnswer) : null)) : null,
+        type === 'INT' ? correctAnswer.toString() : null,
       assertion: type === 'AR' ? assertion.trim() : null,
       reason: type === 'AR' ? reason.trim() : null,
       correctOption: type === 'AR' ? correctOption : null,
@@ -5221,7 +4673,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="SRA">SDR (Structured Diagnostic Reasoning / SRA)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -5679,40 +5131,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             {type === 'MPC' && (
               <MPCQuestionForm scenario={scenario} setScenario={setScenario} stages={mpcStages} setStages={setMpcStages} />
             )}
-            {type === 'SRA' && (
-              <SRAQuestionForm
-                components={sraComponents}
-                setComponents={setSraComponents}
-              />
-            )}
-            {type === 'DR' && (
-              <DRQuestionForm
-                expectedAnswer={modelAnswer}
-                setExpectedAnswer={setModelAnswer}
-                reasonOptions={reasonOptions}
-                setReasonOptions={setReasonOptions}
-                confidenceTracking={confidenceTracking}
-                setConfidenceTracking={setConfidenceTracking}
-                drSubtype={drSubtype}
-                setDrSubtype={setDrSubtype}
-                acceptedAnswers={acceptedAnswers}
-                setAcceptedAnswers={setAcceptedAnswers}
-                toleranceType={toleranceType}
-                setToleranceType={setToleranceType}
-                toleranceValue={toleranceValue}
-                setToleranceValue={setToleranceValue}
-                expectedUnit={expectedUnit}
-                setExpectedUnit={setExpectedUnit}
-                unitRequired={unitRequired}
-                setUnitRequired={setUnitRequired}
-                orderSensitive={orderSensitive}
-                setOrderSensitive={setOrderSensitive}
-                caseSensitive={caseSensitive}
-                setCaseSensitive={setCaseSensitive}
-                allowBengali={allowBengali}
-                setAllowBengali={setAllowBengali}
-              />
-            )}
+
           </motion.div></AnimatePresence>
 
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -6107,53 +5526,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 </div>
               )}
 
-              {type === 'SRA' && (
-                <div className="mt-4 pt-3 border-t border-purple-200 dark:border-purple-800 space-y-2">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">STRUCTURED REASONING ASSEMBLY</Badge>
-                  <div className="space-y-2">
-                    {sraComponents.map((comp, cIdx) => (
-                      <div key={cIdx} className="p-2 border rounded bg-background text-xs space-y-1">
-                        <div className="flex justify-between font-bold">
-                          <span>{comp.label || `Step ${cIdx + 1}`} ({comp.kind || 'CONSTRUCT'}):</span>
-                          <span className="text-purple-600 font-mono">{comp.marks || 1} pts</span>
-                        </div>
-                        {comp.prompt && <p className="text-muted-foreground">{comp.prompt}</p>}
-                        {comp.expectedAnswer && (
-                          <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                            Key: {String(comp.expectedAnswer)} {comp.unit || ''}
-                          </div>
-                        )}
-                        {comp.options && (
-                          <div className="space-y-0.5 pt-1">
-                            {comp.options.map((opt: any, oIdx: number) => (
-                              <div key={oIdx} className={`p-1 rounded text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 font-bold' : ''}`}>
-                                {String.fromCharCode(65 + oIdx)}. {opt.text} {opt.isCorrect ? '✓' : ''}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {type === 'DR' && (
-                <div className="mt-4 pt-3 border-t border-purple-200 dark:border-purple-800 space-y-2">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">STRUCTURED DIAGNOSTIC REASONING (SDR)</Badge>
-                  <div className="p-2 border rounded bg-background text-xs space-y-2">
-                    <div><strong>Part A Key:</strong> <span className="font-mono font-bold text-purple-600">{modelAnswer || '—'}</span></div>
-                    <div>
-                      <strong className="text-muted-foreground">Part B Reasons:</strong>
-                      {reasonOptions.map((opt, rIdx) => (
-                        <div key={rIdx} className={`p-1 rounded mt-1 text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 font-bold text-emerald-900 dark:text-emerald-200' : ''}`}>
-                          {String.fromCharCode(65 + rIdx)}. {opt.text} {opt.isCorrect ? '✓' : ''}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
               </div>
           </Card>
         </div>
@@ -6459,21 +5832,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       </div>
                     )}
 
-                    {/* DR Reasoning preview */}
-                    {q.type === 'DR' && (
-                      <div className="mt-3 space-y-2 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs">
-                        <p className="font-semibold text-purple-900 dark:text-purple-300">Structured Diagnostic Reasoning (SDR):</p>
-                        <div className="space-y-1 bg-background p-2 border rounded">
-                          <div><span className="font-bold">Part A Key:</span> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{(q as any).expectedAnswer || q.modelAnswer || '—'}</span></div>
-                          <div className="font-bold text-muted-foreground mt-1">Part B Justification Options:</div>
-                          {(((q as any).reasonOptions || q.subQuestions || q.options) || []).map((opt: any, rIdx: number) => (
-                            <div key={rIdx} className={`p-1 rounded text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 font-bold' : ''}`}>
-                              {String.fromCharCode(65 + rIdx)}. {opt.text || opt.question || ''} {opt.isCorrect ? '✓' : ''}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+
                   </div>
                   <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                     <Button size="sm" variant="outline" onClick={() => setEditingQuestion(q)}><Edit className="h-3 w-3 mr-1" /> Edit & Refine</Button>
@@ -6824,21 +6183,6 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         { "id": "s2", "stageTitle": "Stage 2: Calculate velocity after 5 seconds", "marks": 5, "modelAnswer": "50", "dependsOnStageId": "s1", "formula": "prev * 5", "tolerance": 0.1 }
       ],
       "explanation": "Stage 1: a = F/m = 10 m/s^2; Stage 2: v = a * t = 10 * 5 = 50 m/s (includes Error Propagation Protection)"
-    },
-    {
-      "type": "DR",
-      "questionText": "A car moves with constant velocity. What is its acceleration?",
-      "modelAnswer": "0",
-      "marks": 5,
-      "difficulty": "MEDIUM",
-      "subject": "Physics",
-      "className": "Class 10",
-      "reasonOptions": [
-        { "id": "r1", "text": "Velocity is constant, therefore dv/dt = 0", "isCorrect": true },
-        { "id": "r2", "text": "Acceleration is directly proportional to constant velocity", "isCorrect": false },
-        { "id": "r3", "text": "Constant velocity requires a non-zero net external force", "isCorrect": false }
-      ],
-      "explanation": "Constant velocity implies dv/dt = 0 according to Newton's First Law."
     }
   ];
 
@@ -7042,10 +6386,9 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                   <Info className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>Objective Template Instructions & Field Rules</span>
                 </div>
-                <p>• <strong>Model Answer vs Explanation:</strong> Model Answer is the official answer key (required for INT, SQ, & DR Part A). Explanation is optional teacher notes/rationale.</p>
+                <p>• <strong>Model Answer vs Explanation:</strong> Model Answer is the official answer key (required for INT and SQ). Explanation is optional teacher notes/rationale.</p>
                 <p>• <strong>CMA (Constructed Multi-Answer):</strong> Set Type = <code>CMA</code>. Fill Sub 1-10 Text (part labels), Sub 1-10 Marks, & Sub 1-10 Model Answer (key values/expressions).</p>
                 <p>• <strong>MPC (Multi-Step Problem Chain):</strong> Set Type = <code>MPC</code>. Fill Sub 1-10 Text (stage titles), Sub 1-10 Marks, & Sub 1-10 Model Answer. Set Sub X Depends On & Sub X Formula for Error Propagation (EPH).</p>
-                <p>• <strong>SDR (Structured Diagnostic Reasoning / SRA):</strong> Set Type = <code>SRA</code> or <code>SDR</code>. Fill Question Text & Model Answer (Part A). Fill Sub 1-4 Text (Part B justification reasons) & mark correct reason via Sub X Correct = TRUE (or Correct Option = A/B).</p>
               </div>
             </div>
 

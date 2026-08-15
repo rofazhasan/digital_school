@@ -26,11 +26,11 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { CheckSquare } from "lucide-react";
 import { cleanupMath } from "@/lib/utils";
 
-import { CMARenderer, MPCRenderer, DRRenderer } from '@/components/ui/QuestionRenderers';
+import { CMARenderer, MPCRenderer } from '@/components/ui/QuestionRenderers';
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'SRA' | 'DR';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -346,7 +346,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           {question.difficulty}
         </Badge>
         <Badge variant="outline">{question.marks} Marks</Badge>
-        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'SRA', 'DR'].includes(question.type || '') && question.negativeMarks && (
+        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
@@ -531,7 +531,7 @@ export default function ExamBuilderPage() {
       const queryParams: any = {
         page: '1',
         limit: '10000', // Fetch all matching
-        ...(filters.type && { type: filters.type === 'SDR' ? 'SRA' : filters.type }),
+        ...(filters.type && { type: filters.type }),
         ...(filters.difficulty && { difficulty: filters.difficulty }),
         ...(filters.subject && { subject: filters.subject }),
         ...(filters.topic && { topic: filters.topic }),
@@ -598,7 +598,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'DR'].includes(q.type)), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -630,11 +630,11 @@ export default function ExamBuilderPage() {
 
   const selectedQuestionIds = useMemo(() => new Set(selectedQuestions.map(q => q.id)), [selectedQuestions]);
 
-  // Helper function to determine if a question can be added
+  // Helper function to check if a question can be added based on exam constraints
   const canAddQuestion = useCallback((question: Question) => {
     if (!exam) return false;
 
-    // Check if question is already selected
+    // Check if already selected
     if (selectedQuestionIds.has(question.id)) return false;
 
     // Check type-specific constraints first
@@ -645,7 +645,7 @@ export default function ExamBuilderPage() {
     }
 
     // For MCQ/Objective/Multi-step questions, check if adding would exceed total marks
-    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(question.type)) {
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -664,9 +664,9 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(question.type)) {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
-      return `Add ${question.type === 'SRA' || question.type === 'DR' ? 'SDR' : question.type} Question`;
+      return `Add ${question.type} Question`;
     }
 
     return 'Add Question';
@@ -977,7 +977,7 @@ export default function ExamBuilderPage() {
           }
 
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
-          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(q.type);
+          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC'].includes(q.type);
           const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
 
           if (isObjective && negativePercentage > 0) {
@@ -1095,7 +1095,6 @@ export default function ExamBuilderPage() {
                         <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                         <SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem>
                         <SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem>
-                        <SelectItem value="SDR">SDR (Structured Diagnostic Reasoning)</SelectItem>
                         <SelectItem value="CQ">CQ</SelectItem>
                         <SelectItem value="SQ">SQ</SelectItem>
                         <SelectItem value="SMCQ">SMCQ (Stem MCQ)</SelectItem>
@@ -1412,41 +1411,7 @@ export default function ExamBuilderPage() {
                               ))}
                             </div>
                           )}
-                          {(q.type === 'SRA' || q.type === 'DR') && (
-                            <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
-                              <span className="font-bold text-purple-900 dark:text-purple-300 uppercase text-[10px]">Structured Diagnostic Reasoning (SDR):</span>
-                              {(((q as any).components || (q as any).sraComponents || [])).length > 0 ? (
-                                <div className="space-y-1.5">
-                                  {(((q as any).components || (q as any).sraComponents || [])).map((comp: any, cIdx: number) => (
-                                    <div key={cIdx} className="p-1.5 rounded bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 flex items-center justify-between text-[11px]">
-                                      <span className="font-semibold text-slate-800 dark:text-slate-200">{comp.label || `Step ${cIdx + 1}`}:</span>
-                                      <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">
-                                        {comp.expectedAnswer ? String(comp.expectedAnswer) : (comp.correctOrder ? `Order [${comp.correctOrder.join(', ')}]` : `[${comp.kind || 'Step'}]`)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="text-slate-700 dark:text-slate-300">
-                                    <strong>Part A Answer Key:</strong> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{q.expectedAnswer || q.modelAnswer || '—'}</span>
-                                  </div>
-                                  <div className="space-y-1 mt-1">
-                                    <span className="font-semibold text-slate-500">Part B Justification Options:</span>
-                                    {(((q as any).reasonOptions || (q as any).reasons || q.subQuestions || q.options) || []).map((rOpt: any, rIdx: number) => {
-                                      const rText = typeof rOpt === 'string' ? rOpt : (rOpt.text || rOpt.label || rOpt.question);
-                                      const isCor = typeof rOpt === 'object' && !!rOpt.isCorrect;
-                                      return (
-                                        <div key={rIdx} className={`p-1.5 rounded border text-[11px] ${isCor ? 'bg-green-50 dark:bg-green-950/40 border-green-300 font-bold text-green-800 dark:text-green-200' : 'bg-white dark:bg-slate-900 border-slate-200'}`}>
-                                          {String.fromCharCode(65 + rIdx)}. <UniversalMathJax inline>{cleanupMath(rText)}</UniversalMathJax> {isCor && '✓'}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
+
                           {q.type === 'CMA' && (
                             <div className="mt-3 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs space-y-2">
                               <span className="font-bold text-indigo-900 dark:text-indigo-300 uppercase text-[10px]">Constructed Multi-Answer Parts:</span>

@@ -49,9 +49,6 @@ const QUESTION_TYPE_LABELS_BN: Record<string, string> = {
   SMCQ: "বহুনির্বাচনী (উদ্দীপকভিত্তিক)",
   CMA: "মাল্টি-পার্ট গাণিতিক (CMA)",
   MPC: "বহু-ধাপ সমস্যা চেইন (MPC)",
-  SRA: "কাঠামোগত যুক্তি সমাবেশ (SDR)",
-  SDR: "কাঠামোগত ডায়াগনস্টিক যুক্তি (SDR)",
-  DR: "কাঠামোগত ডায়াগনস্টিক যুক্তি (SDR)",
   DESCRIPTIVE: "বর্ণনামূলক"
 };
 
@@ -66,9 +63,6 @@ const QUESTION_TYPE_LABELS_EN: Record<string, string> = {
   SMCQ: "Stem MCQ",
   CMA: "Constructed Multi-Answer",
   MPC: "Multi-Step Problem Chain",
-  SRA: "Structured Diagnostic Reasoning (SDR)",
-  SDR: "Structured Diagnostic Reasoning (SDR)",
-  DR: "Structured Diagnostic Reasoning (SDR)",
   DESCRIPTIVE: "Descriptive"
 };
 
@@ -742,48 +736,7 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* DR Diagnostic Reasoning Block */}
-                        {qTypeKey === 'DR' && (
-                          <div className="space-y-2 mt-3 p-3 bg-purple-50/50 border border-purple-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
-                            <span className="font-bold text-purple-900 block mb-1">
-                              {isBn ? 'কাঠামোগত ডায়াগনস্টিক রিজনিং (SDR):' : 'Structured Diagnostic Reasoning (SDR):'}
-                            </span>
-                            <div className="p-2 bg-white border border-purple-200 rounded space-y-2 text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-purple-900">Part A Answer Key:</span>
-                                <span className="font-mono font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded">
-                                  {showAnswers ? (rawQuestion.expectedAnswer || rawQuestion.modelAnswer || '—') : '___________'}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-bold text-purple-900 block mb-1">Part B Conceptual Justification Options:</span>
-                                <div className="space-y-1 pl-1">
-                                  {(rawQuestion.reasonOptions || rawQuestion.subQuestions || rawQuestion.options || []).map((opt: any, rIdx: number) => {
-                                    const isReasonCorrect = opt.isCorrect;
-                                    return (
-                                      <div
-                                        key={rIdx}
-                                        className={`p-1.5 rounded border flex items-center gap-2 text-xs ${
-                                          showAnswers && isReasonCorrect
-                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
-                                            : 'border-gray-200 bg-gray-50/50'
-                                        }`}
-                                      >
-                                        <span className="w-4 h-4 rounded-full bg-purple-200 text-purple-900 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                          {String.fromCharCode(65 + rIdx)}
-                                        </span>
-                                        <span className="flex-1"><MathText>{opt.text || opt.question || ''}</MathText></span>
-                                        {showAnswers && isReasonCorrect && (
-                                          <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded shrink-0">✓ Correct Reason</span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
+
 
                         {/* Question Images */}
                         {question.images && question.images.length > 0 && (

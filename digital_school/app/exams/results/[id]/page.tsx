@@ -66,11 +66,9 @@ import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
-import { CMARenderer, MPCRenderer, SRARenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
-import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
-import { evaluateSRAQuestion } from "@/lib/evaluation/sraEvaluation";
 
 // import QRCode from "react-qr-code"; // Unused
 
@@ -1337,21 +1335,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         scenario: (q as any).scenario || q.questionText,
         marks: q.marks,
         stages: (q as any).stages || (q as any).mpcStages || []
-      })),
-      sra: result.questions.filter(q => q.type?.toUpperCase() === 'SRA' || q.type?.toUpperCase() === 'DR').map(q => ({
-        id: q.id,
-        questionText: q.questionText,
-        marks: q.marks,
-        components: (q as any).components || (q as any).sraComponents || [],
-        expectedAnswer: (q as any).expectedAnswer || (q as any).correctAnswer,
-        reasonOptions: (q as any).reasonOptions || []
-      })),
-      dr: result.questions.filter(q => q.type?.toUpperCase() === 'DR' || q.type?.toUpperCase() === 'SRA').map(q => ({
-        id: q.id,
-        questionText: q.questionText,
-        marks: q.marks,
-        expectedAnswer: (q as any).expectedAnswer || (q as any).correctAnswer,
-        reasonOptions: (q as any).reasonOptions || []
       }))
     };
 
@@ -1914,11 +1897,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const smcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SMCQ') || [];
   const cmaQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CMA') || [];
   const mpcQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MPC') || [];
-  const sraQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SRA') || [];
-  const drQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'DR') || [];
   const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'DESCRIPTIVE') || [];
   const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
-  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions, ...cmaQuestions, ...mpcQuestions, ...sraQuestions, ...drQuestions];
+  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions, ...cmaQuestions, ...mpcQuestions];
 
   // Re-calculate awarded marks on the fly to avoid "zero-score" errors for descriptive/creative parts
   const recalculatedCqMarks = cqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
@@ -2677,7 +2658,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-12">
                       {/* 1. OBJECTIVE SECTION (Unified MCQ, MC, MTF, AR, INT, SMCQ) */}
                       {(() => {
-                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'SRA', 'DR'];
+                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC', 'SMCQ', 'CMA', 'MPC'];
                         const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
@@ -3158,35 +3139,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           );
                                         })()}
                                       </div>
-                                    ) : (type === 'SRA' || type === 'DR') ? (
-                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
-                                         {(() => {
-                                           const parsedVal = typeof question.studentAnswer === 'string'
-                                             ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
-                                             : (question.studentAnswer || {});
-                                           const sraQ = {
-                                             id: question.id,
-                                             stem: question.questionText || (question as any).stem || (question as any).text,
-                                             questionText: question.questionText || (question as any).stem || (question as any).text,
-                                             marks: question.marks,
-                                             components: (question as any).components || (question as any).sraComponents || [],
-                                             expectedAnswer: (question as any).expectedAnswer || (question as any).modelAnswer,
-                                             reasonOptions: (question as any).reasonOptions || (question as any).reasons || (question as any).options || []
-                                           };
-                                           return (
-                                             <SRARenderer
-                                               question={sraQ}
-                                               value={parsedVal}
-                                               showFeedback={true}
-                                               evalResult={evaluateSRAQuestion(sraQ as any, parsedVal)}
-                                             />
-                                           );
-                                         })()}
-                                       </div>
-                                     ) : null}
+                                    ) : null}
 
                                     {/* Objective Explanation & Model Answer Breakdown Section */}
-                                    {(question.explanation || (question as any).explanationImage || type === 'CMA' || type === 'MPC' || type === 'SRA' || type === 'DR') && (
+                                    {(question.explanation || (question as any).explanationImage || type === 'CMA' || type === 'MPC') && (
                                       <div className="mt-6 p-5 rounded-3xl bg-amber-500/[0.03] dark:bg-amber-500/[0.05] border border-amber-500/10 dark:border-amber-500/20 shadow-sm relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/10 transition-colors" />
                                         <div className="relative z-10 space-y-3">
@@ -3227,34 +3183,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   {s.formula && <span className="text-[10px] text-slate-500 font-mono">Formula: {s.formula}</span>}
                                                 </div>
                                               ))}
-                                            </div>
-                                          )}
-
-                                          {/* SRA / DR Model Answer Breakdown */}
-                                          {(type === 'SRA' || type === 'DR') && (
-                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-2 text-slate-800 dark:text-slate-200">
-                                              <span className="font-bold text-amber-700 dark:text-amber-400">Structured Diagnostic Reasoning (SDR) Solution:</span>
-                                              {((question as any).components || (question as any).sraComponents || []).length > 0 ? (
-                                                ((question as any).components || (question as any).sraComponents || []).map((c: any, cIdx: number) => (
-                                                  <div key={cIdx} className="pl-2 border-l-2 border-amber-500/30 space-y-0.5">
-                                                    <div className="flex items-center justify-between">
-                                                      <span className="font-semibold">{c.label || `Step ${cIdx + 1}`}:</span>
-                                                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                        {c.expectedAnswer ? (
-                                                          <UniversalMathJax inline dynamic>{cleanupMath(String(c.expectedAnswer))}</UniversalMathJax>
-                                                        ) : (c.correctOrder ? `Order: [${c.correctOrder.join(' → ')}]` : 'Configured in key')}
-                                                      </span>
-                                                    </div>
-                                                  </div>
-                                                ))
-                                              ) : (
-                                                <div className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
-                                                  <span>Model Answer:</span>
-                                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(String((question as any).expectedAnswer || (question as any).modelAnswer || 'N/A'))}</UniversalMathJax>
-                                                  </span>
-                                                </div>
-                                              )}
                                             </div>
                                           )}
 

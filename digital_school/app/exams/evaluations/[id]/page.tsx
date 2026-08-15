@@ -73,11 +73,9 @@ import { verifyAdminAction } from "@/lib/native/auth";
 import { Capacitor } from "@capacitor/core";
 import { ShieldCheck, Battery, Wifi, Scan } from "lucide-react";
 import { scanDocument } from "@/lib/native/scanner";
-import { CMARenderer, MPCRenderer, SRARenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
-import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
-import { evaluateSRAQuestion } from "@/lib/evaluation/sraEvaluation";
 
 // --- Constants & Utilities ---
 const MCQ_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
@@ -256,7 +254,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc' | 'sdr'>('all');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc'>('all');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -1762,9 +1760,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const filteredQuestions = activeQuestions?.filter(q => {
     if (questionTypeFilter === 'all') return true;
     const qType = (q?.type || '').toLowerCase();
-    if (questionTypeFilter === 'sdr') {
-      return qType === 'sdr' || qType === 'sra' || qType === 'dr';
-    }
     return qType === questionTypeFilter.toLowerCase();
   }) || [];
 
@@ -1882,21 +1877,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         return qMark;
       }
 
-      if (type === 'sra' || type === 'dr') {
-        const sraRes = evaluateSRAQuestion(question as any, answer as any);
-        let qMark = sraRes.score;
-        const negRate = Number(exam?.mcqNegativeMarking || 0);
-        if (negRate > 0) {
-          const maxM = sraRes.maxScore || Number(question.marks) || 1;
-          const halfMark = maxM / 2;
-          let wrongPenalty = 0;
-          Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
-            if (cr.status === 'INCORRECT') wrongPenalty += (halfMark * negRate) / 100;
-          });
-          qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
-        }
-        return qMark;
-      }
+
 
       if (type === 'mcq') {
         const userAnswer = answer;
@@ -2866,7 +2847,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
                     <div className="flex flex-wrap gap-2">
-                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'sdr'] as const).map((type) => (
+                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc'] as const).map((type) => (
                         <Button
                           key={type}
                           variant={questionTypeFilter === type ? 'default' : 'outline'}
@@ -2877,7 +2858,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           }}
                           className="capitalize px-4 flex-1 sm:flex-none"
                         >
-                          {type === 'all' ? 'All Questions' : (type === 'sdr' ? 'SDR' : type.toUpperCase())}
+                          {type === 'all' ? 'All Questions' : type.toUpperCase()}
                         </Button>
                       ))}
                     </div>
@@ -3231,7 +3212,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         currentQuestion?.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
                                           'bg-yellow-100 text-yellow-800'
                                     }>
-                                      {((currentQuestion?.type || "unknown").toUpperCase() === 'DR' || (currentQuestion?.type || "unknown").toUpperCase() === 'SRA') ? 'SDR' : (currentQuestion?.type || "unknown").toUpperCase()}
+                                      {(currentQuestion?.type || "unknown").toUpperCase()}
                                     </Badge>
                                     <div className="flex flex-col items-end gap-1">
                                       <div className="text-sm text-muted-foreground">
@@ -4266,35 +4247,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         evalResult={evaluateMPCQuestion(currentQuestion as any, currentAnswer)}
                                       />
                                     </div>
-                                  )}
+                                   )}
 
-                                  {((currentQuestion?.type || "").toLowerCase() === "sra" || (currentQuestion?.type || "").toLowerCase() === "dr") && (
-                                    <div className="mb-4">
-                                      <SRARenderer
-                                        question={currentQuestion}
-                                        value={currentAnswer || {}}
-                                        onChange={() => {}}
-                                        disabled={true}
-                                        showFeedback={true}
-                                        evalResult={evaluateSRAQuestion(currentQuestion as any, currentAnswer)}
-                                      />
-                                    </div>
-                                  )}
+                                   {/* Correct Answer (Non-MCQ or if options missing) */}
+                                   {!['mcq', 'cma', 'mpc'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
+                                     <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                                       <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
+                                         <CheckCircle className="h-4 w-4" />
+                                         Correct / Model Answer:
+                                       </h5>
+                                       <div className="text-green-900 text-sm md:text-base">
+                                         <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct))}</UniversalMathJax>
+                                       </div>
+                                     </div>
+                                   )}
 
-                                  {/* Correct Answer (Non-MCQ or if options missing) */}
-                                  {!['mcq', 'cma', 'mpc', 'dr'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
-                                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
-                                      <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4" />
-                                        Correct / Model Answer:
-                                      </h5>
-                                      <div className="text-green-900 text-sm md:text-base">
-                                        <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct))}</UniversalMathJax>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Explanation */}
+                                   {/* Explanation */}
                                   {currentQuestion?.explanation && (
                                     <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded">
                                       <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
@@ -4315,13 +4283,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   )}
                                 </div>
 
-
-
                                 {/* Grading */}
                                 <div>
                                   <h4 className="font-semibold mb-2">Grading:</h4>
                                   <div className="flex items-center gap-4">
-                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'sra', 'sdr', 'dr'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
+                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="flex flex-col gap-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-gray-600">Auto-graded:</span>

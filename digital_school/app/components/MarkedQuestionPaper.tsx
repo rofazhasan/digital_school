@@ -41,7 +41,6 @@ import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from "@/utils/numeralConverter";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
-import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
 
 // --- TYPES ---
 interface MCQ {
@@ -927,23 +926,9 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             return evalRes.score;
         };
 
-        const getDRMark = (q: any, userAnswer: any) => {
-            if (!userAnswer) return 0;
-            const evalRes = evaluateDRQuestion(q, userAnswer);
-            if (negativeRate > 0) {
-                const maxM = evalRes.maxScore || q.marks || 1;
-                const halfMark = maxM / 2;
-                let wrongPenalty = 0;
-                if (!evalRes.answerCorrect) wrongPenalty += halfMark * negativeRate;
-                if (!evalRes.reasonCorrect) wrongPenalty += halfMark * negativeRate;
-                return Math.round((evalRes.score - wrongPenalty) * 100) / 100;
-            }
-            return evalRes.score;
-        };
-
         // Calculate total deducted marks for header display
         let totalDeducted = 0;
-        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || []), ...(questions.cma || []), ...(questions.mpc || []), ...(questions.dr || [])].forEach(q => {
+        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || []), ...(questions.cma || []), ...(questions.mpc || [])].forEach(q => {
             const ans = submission.answers[q.id || ''];
             let m = 0;
             const type = (q as any).type?.toUpperCase();
@@ -954,7 +939,6 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             else if (type === 'MTF') m = getMTFMark(q as MTF, ans);
             else if (type === 'CMA') m = getCMAMark(q, ans);
             else if (type === 'MPC') m = getMPCMark(q, ans);
-            else if (type === 'DR') m = getDRMark(q, ans);
 
             if (m < 0) totalDeducted += Math.abs(m);
         });
@@ -1062,8 +1046,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
                             ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
                             ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
-                            ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' })),
-                            ...(questions.dr || []).map(q => ({ ...q, type: 'DR' }))
+                            ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' }))
                         ];
 
                         if (allObjective.length === 0) return null;
@@ -1517,52 +1500,6 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                     </div>
                                                                 </div>
                                                             ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-
-                                        if (q.type === 'DR') {
-                                            const evalRes = evaluateDRQuestion(q as any, ans || {});
-                                            const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
-                                                ? Number(submission.answers[`${q.id}_marks`])
-                                                : getDRMark(q, ans);
-                                            const maxM = evalRes.maxScore || q.marks || 1;
-                                            const isFull = earnedMark >= maxM * 0.99;
-                                            const isPartial = earnedMark > 0 && !isFull;
-                                            const isMinus = earnedMark < 0;
-
-                                            return (
-                                                <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
-                                                    <div className="flex justify-between items-start mb-2 border-b pb-2">
-                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 uppercase tracking-wider">
-                                                                {evalRes.diagnosticTag}
-                                                            </span>
-                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
-                                                                [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-2 mt-2">
-                                                        <div className="p-2.5 bg-purple-50/50 border border-purple-200 rounded space-y-1.5 text-xs">
-                                                            <div className="flex items-center justify-between">
-                                                                <span><strong>Part A Answer:</strong> Student [<span className="font-mono font-bold">{ans?.answer ?? 'None'}</span>] vs Key [<span className="font-mono font-bold">{q.expectedAnswer ?? q.modelAnswer ?? '—'}</span>]</span>
-                                                                <span className={evalRes.answerCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>{evalRes.answerCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
-                                                            </div>
-                                                            <div className="flex items-start justify-between border-t border-purple-200 pt-1.5">
-                                                                <div className="flex-1 pr-2">
-                                                                    <strong>Part B Reason:</strong> Selected Reason [{ans?.reasonId ?? 'None'}]
-                                                                </div>
-                                                                <span className={evalRes.reasonCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>{evalRes.reasonCorrect ? '✓ Correct Justification' : '✗ Misconception / Wrong Reason'}</span>
-                                                            </div>
-                                                            {evalRes.confidence && (
-                                                                <div className="border-t border-purple-200 pt-1.5 text-[11px] text-purple-900">
-                                                                    <strong>Part C Confidence:</strong> Student selected [<span className="font-bold">{evalRes.confidence}</span>]
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>

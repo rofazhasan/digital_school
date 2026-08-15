@@ -192,14 +192,13 @@ export function ExamContextProvider({
   const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc', 'sdr', 'sra', 'dr'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], sdr: [], sra: [], dr: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       let type = (q.type || q.questionType || '').toLowerCase();
       if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
       if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
-      if (type === 'diagnostic_reasoning' || type === 'diagnostic-reasoning' || type === 'sra' || type === 'dr') type = 'sdr';
       if (grouped[type]) grouped[type].push(q);
       else grouped.other.push(q);
     });
@@ -212,9 +211,6 @@ export function ExamContextProvider({
       ...grouped.smcq,
       ...grouped.cma,
       ...grouped.mpc,
-      ...grouped.sdr,
-      ...grouped.sra,
-      ...grouped.dr,
       ...grouped.cq,
       ...grouped.sq,
       ...grouped.int,
@@ -228,7 +224,7 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'sdr', 'sra', 'dr', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
       });
     } else {
       return fullSortedQuestions.filter((q: any) => {

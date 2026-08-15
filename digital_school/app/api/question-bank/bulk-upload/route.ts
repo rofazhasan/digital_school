@@ -7,13 +7,13 @@ import { s, n, getValue } from '@/utils/parser-utils';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'SRA' | 'DR';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 async function validateAndMapRow(row: any, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
-    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'DR'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
+    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
     const diffRaw = s(getValue(row, ["Difficulty", "Level", "Diff"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';
@@ -40,7 +40,7 @@ async function validateAndMapRow(row: any, classes: any[]) {
     };
 
     try {
-        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'SRA', 'DR'].includes(typeRaw)) {
+        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(typeRaw)) {
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
@@ -262,103 +262,7 @@ async function validateAndMapRow(row: any, classes: any[]) {
                 });
             }
             if (data.subQuestions.length === 0) throw new Error("MPC requires at least one Stage (Sub 1 Text & Sub 1 Model Answer)");
-        } else if (data.type === 'SRA' || data.type === 'DR') {
-            const rawComponents = getValue(row, ["Components", "SRA Components", "sraComponents"]);
-            if (rawComponents && typeof rawComponents === 'string') {
-                try {
-                    const parsed = JSON.parse(rawComponents);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        (data as any).components = parsed;
-                        data.subQuestions = parsed;
-                    }
-                } catch {}
-            }
 
-            if (!(data as any).components) {
-                const mainAnswer = data.modelAnswer || s(getValue(row, ["Canonical Answer", "Model Answer", "Correct Answer", "Answer", "Result", "Sub 1 Model Answer"]));
-                const components: any[] = [];
-
-                // Component 1: CONSTRUCT or INTERMEDIATE_CONSTRUCT
-                if (mainAnswer || getValue(row, ["Sub 1 Text"])) {
-                    const c1Text = s(getValue(row, ["Sub 1 Text"])) || "Constructed Value";
-                    const c1Marks = n(getValue(row, ["Sub 1 Marks"])) || 2;
-                    const c1Tol = n(getValue(row, ["Sub 1 Tolerance", "Tolerance Value", "Tolerance"])) || 0.01;
-                    const c1Unit = s(getValue(row, ["Sub 1 Unit", "Expected Unit", "Unit"]));
-                    components.push({
-                        id: 'comp_1',
-                        kind: 'CONSTRUCT',
-                        label: 'Step 1: Construct / Calculation',
-                        prompt: c1Text,
-                        expectedAnswer: mainAnswer || '',
-                        marks: c1Marks,
-                        tolerance: c1Tol,
-                        unit: c1Unit,
-                        evaluationMode: /^[0-9.-]+$/.test(mainAnswer || '') ? 'NUMERIC' : 'TEXT'
-                    });
-                }
-
-                // Component 2: EVIDENCE_SELECT / REASONING (from Sub 2 or options)
-                const reasonOpts: Array<{ id: string; text: string; isCorrect: boolean }> = [];
-                const correctReasonOptRaw = s(getValue(row, ["Correct Option", "Correct Answer", "Sub 2 Correct Option", "Sub 2 Correct", "Sub 1 Correct", "Correct Reason"])).toUpperCase();
-
-                // Option columns from Sub 2 A-D or Sub X
-                const optA = s(getValue(row, ["Sub 2 Option A", "Sub 2 A", "Option A", "Sub 1 Option A"]));
-                const optB = s(getValue(row, ["Sub 2 Option B", "Sub 2 B", "Option B", "Sub 1 Option B"]));
-                const optC = s(getValue(row, ["Sub 2 Option C", "Sub 2 C", "Option C", "Sub 1 Option C"]));
-                const optD = s(getValue(row, ["Sub 2 Option D", "Sub 2 D", "Option D", "Sub 1 Option D"]));
-
-                if (optA && optB) {
-                    [optA, optB, optC, optD].filter(Boolean).forEach((txt, idx) => {
-                        const letter = String.fromCharCode(65 + idx);
-                        reasonOpts.push({
-                            id: `opt_${letter}`,
-                            text: txt,
-                            isCorrect: correctReasonOptRaw.includes(letter) || correctReasonOptRaw === String(idx + 1)
-                        });
-                    });
-                } else {
-                    for (let i = 1; i <= 10; i++) {
-                        const prefix = `Sub ${i}`;
-                        const reasonText = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `Reason ${i}`, `${prefix} Reason`]));
-                        if (!reasonText || (i === 1 && components.length > 0 && mainAnswer)) continue;
-
-                        const isSubCorrect = s(getValue(row, [`${prefix} Correct`, `${prefix} Correct Option`])).toUpperCase();
-                        let isCorrect = isSubCorrect === 'TRUE' || isSubCorrect === 'YES' || isSubCorrect === '1';
-
-                        const letter = String.fromCharCode(64 + i);
-                        if (correctReasonOptRaw === letter || correctReasonOptRaw === String(i)) {
-                            isCorrect = true;
-                        }
-
-                        reasonOpts.push({
-                            id: `r${i}`,
-                            text: reasonText,
-                            isCorrect
-                        });
-                    }
-                }
-
-                if (reasonOpts.length > 0) {
-                    const c2Marks = n(getValue(row, ["Sub 2 Marks"])) || 2;
-                    components.push({
-                        id: 'comp_2',
-                        kind: 'EVIDENCE_SELECT',
-                        label: 'Step 2: Justification / Principle Selection',
-                        prompt: s(getValue(row, ["Sub 2 Text"])) || "Select the governing law or evidence:",
-                        marks: c2Marks,
-                        scoring: 'ALL_OR_NOTHING',
-                        options: reasonOpts
-                    });
-                }
-
-                if (components.length === 0) {
-                    throw new Error("SRA requires at least one component (Model Answer or Sub 1/2 Text)");
-                }
-
-                (data as any).components = components;
-                data.subQuestions = components;
-                data.options = reasonOpts;
-            }
         } else if (data.type === 'DESCRIPTIVE') {
             data.subQuestions = [];
             for (let i = 1; i <= 10; i++) {

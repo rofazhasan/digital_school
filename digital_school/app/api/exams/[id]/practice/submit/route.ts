@@ -7,8 +7,6 @@ import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
 import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
 import { evaluateCMAQuestion } from '@/lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '@/lib/evaluation/mpcEvaluation';
-import { evaluateDRQuestion } from '@/lib/evaluation/drEvaluation';
-import { evaluateSRAQuestion } from '@/lib/evaluation/sraEvaluation';
 
 export async function POST(
     request: NextRequest,
@@ -144,12 +142,6 @@ export async function POST(
                 }
             } else if (type === 'MPC') {
                 const result = evaluateMPCQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
-                }
-            } else if (type === 'SRA' || type === 'SDR' || type === 'DR') {
-                const result = evaluateSRAQuestion(question, studentAnswer);
                 questionScore = Number(result.score) || 0;
                 if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);

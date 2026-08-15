@@ -8,8 +8,6 @@ import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
 import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
 import { evaluateCMAQuestion } from '@/lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '@/lib/evaluation/mpcEvaluation';
-import { evaluateDRQuestion } from '@/lib/evaluation/drEvaluation';
-import { evaluateSRAQuestion } from '@/lib/evaluation/sraEvaluation';
 import { Prisma, QuestionType } from '@prisma/client';
 
 interface ProcessedQuestion {
@@ -318,7 +316,7 @@ export async function GET(
       // to avoid stale pre-saved marks from a different examSet mapping.
       // For manual-graded types (CQ, SQ, SMCQ), trust pre-saved marks.
       const preSavedMarks = (studentAnswers as any)[`${questionId}_marks`];
-      const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'CMA', 'MPC', 'SRA', 'SDR', 'DR'].includes(type);
+      const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'CMA', 'MPC'].includes(type);
       let calculatedMarks: number | undefined = isObjectiveType ? undefined : preSavedMarks;
 
       if (calculatedMarks === undefined || calculatedMarks === null) {
@@ -433,29 +431,6 @@ export async function GET(
                 }
               }
               qMark = Math.round((mpcRes.score - wrongPenalty) * 100) / 100;
-            }
-            calculatedMarks = qMark;
-          }
-        } else if (type === 'SRA' || type === 'SDR' || type === 'DR') {
-          let parsedAns = studentAnswer;
-          if (typeof parsedAns === 'string') {
-            try { parsedAns = JSON.parse(parsedAns); } catch {}
-          }
-          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
-          if (!hasAttempt) {
-            calculatedMarks = 0;
-          } else {
-            const sraRes = evaluateSRAQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
-            let qMark = sraRes.score;
-            const negRate = Number(exam.mcqNegativeMarking || 0);
-            if (!sraRes.isCorrect && negRate > 0) {
-              const maxM = sraRes.maxScore || Number(question.marks) || 1;
-              const halfMark = maxM / 2;
-              let wrongPenalty = 0;
-              Object.values(sraRes.componentResults || {}).forEach((cr: any) => {
-                if (cr.status === 'INCORRECT') wrongPenalty += (halfMark * negRate) / 100;
-              });
-              qMark = Math.round(Math.max(0, sraRes.score - wrongPenalty) * 100) / 100;
             }
             calculatedMarks = qMark;
           }

@@ -126,24 +126,6 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 return !isNaN(sVal) && !isNaN(eVal) && Math.abs(sVal - eVal) <= tol;
             });
         }
-    } else if (type === 'SRA') {
-        if (question.componentResults && typeof question.componentResults === 'object') {
-            hasAtLeastOneCorrect = Object.values(question.componentResults).some((cr: any) => cr.status === 'CORRECT' || cr.status === 'PARTIAL' || Number(cr.earnedMarks) > 0);
-        } else if (studentAnswer && typeof studentAnswer === 'object') {
-            hasAtLeastOneCorrect = Object.keys(studentAnswer).length > 0;
-        }
-    } else if (type === 'DR') {
-        if (typeof question.answerCorrect === 'boolean' || typeof question.reasonCorrect === 'boolean') {
-            hasAtLeastOneCorrect = Boolean(question.answerCorrect || question.reasonCorrect);
-        } else if (studentAnswer) {
-            const expAns = String(question.expectedAnswer ?? question.modelAnswer ?? '').trim().toLowerCase();
-            const stuAns = String(studentAnswer.answer ?? '').trim().toLowerCase();
-            const isAnsOk = Boolean(stuAns && expAns && stuAns === expAns);
-            const reasonOpts = question.reasonOptions || question.reasons || question.options || question.reason_options || question.subQuestions || [];
-            const selectedReason = reasonOpts.find((r: any) => r.id === studentAnswer.reasonId || r.text === studentAnswer.reasonId);
-            const isReasonOk = Boolean(selectedReason?.isCorrect);
-            hasAtLeastOneCorrect = isAnsOk || isReasonOk;
-        }
     } else if (type === 'SMCQ') {
         const sqs = subQuestions || [];
         hasAtLeastOneCorrect = sqs.some((sq: any) => Number(sq.awardedMarks) > 0 || isAnswerCorrect(sq.awardedMarks, sq.marks));

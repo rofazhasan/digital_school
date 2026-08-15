@@ -262,8 +262,6 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const mtfs = questions.mtf || [];
     const cmas = questions.cma || [];
     const mpcs = questions.mpc || [];
-    const sras = questions.sra || [];
-    const drs = questions.dr || [];
 
     const allObjective = questions.allObjective && questions.allObjective.length > 0
       ? questions.allObjective
@@ -275,9 +273,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
         ...(mtfs.map((q: MTF) => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
         ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' })),
         ...(cmas.map((q: any) => ({ ...q, type: 'CMA' }))),
-        ...(mpcs.map((q: any) => ({ ...q, type: 'MPC' }))),
-        ...(sras.map((q: any) => ({ ...q, type: 'SRA' }))),
-        ...(drs.map((q: any) => ({ ...q, type: 'DR' })))
+        ...(mpcs.map((q: any) => ({ ...q, type: 'MPC' })))
       ];
 
     const objectiveTotal = allObjective.reduce((sum, q) => {
@@ -743,92 +739,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       );
                     }
 
-                    if (q.type?.toUpperCase() === 'SRA' || q.type?.toUpperCase() === 'DR') {
-                      const components = q.components || q.sraComponents || [];
-                      const reasonOpts = q.reasonOptions || q.subQuestions || q.options || [];
-                      const correctReason = reasonOpts.find((r: any) => r.isCorrect);
 
-                      return (
-                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline dynamic>{cleanupMath(q.questionText || q.text || '')}</UniversalMathJax></span>
-                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                          </div>
-                          
-                          {components.length > 0 ? (
-                            <div className="ml-4 space-y-2 border border-purple-300 bg-purple-50/50 p-3 rounded text-xs">
-                              <span className="font-bold text-purple-900 block border-b border-purple-200 pb-1">
-                                SRA Structured Reasoning Key:
-                              </span>
-                              {components.map((comp: any, cIdx: number) => (
-                                <div key={cIdx} className="space-y-1 pl-2 border-l-2 border-purple-400">
-                                  <div className="flex justify-between font-bold text-purple-900 text-[11px]">
-                                    <span>{comp.label || `Step ${cIdx + 1}`} ({comp.kind || 'CONSTRUCT'}):</span>
-                                    <span>[{comp.marks || 1} pts]</span>
-                                  </div>
-                                  
-                                  {/* CONSTRUCT Key */}
-                                  {(comp.kind === 'CONSTRUCT' || comp.kind === 'INTERMEDIATE_CONSTRUCT' || comp.kind === 'CONCLUSION' || !comp.kind) && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-gray-700">Expected Value:</span>
-                                      <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-white border border-purple-200 px-2 py-0.5 rounded">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(String(comp.expectedAnswer || 'N/A'))}</UniversalMathJax> {comp.unit || ''}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {/* EVIDENCE_SELECT Key */}
-                                  {comp.kind === 'EVIDENCE_SELECT' && (
-                                    <div className="space-y-0.5">
-                                      <span className="font-semibold text-gray-700">Correct Rule / Evidence:</span>
-                                      {((comp.options || []).filter((o: any) => o.isCorrect)).map((o: any, oIdx: number) => (
-                                        <div key={oIdx} className="font-medium text-emerald-800 bg-white p-1 rounded border border-emerald-200">
-                                          ✓ <UniversalMathJax inline dynamic>{cleanupMath(o.text || '')}</UniversalMathJax>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* ORDER Key */}
-                                  {comp.kind === 'ORDER' && (
-                                    <div className="space-y-0.5">
-                                      <span className="font-semibold text-gray-700">Correct Sequence:</span>
-                                      <div className="font-mono font-bold text-emerald-800 bg-white p-1 rounded border border-emerald-200">
-                                        {comp.correctOrder ? comp.correctOrder.map((id: string, i: number) => {
-                                          const item = (comp.items || []).find((it: any) => it.id === id);
-                                          return `${i + 1}. ${item?.text || id}`;
-                                        }).join(' → ') : 'Configured in key'}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="ml-4 space-y-2 border border-purple-300 bg-purple-50/50 p-3 rounded text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-purple-900">Part A Answer Key:</span>
-                                <span className="font-mono font-bold text-purple-700 bg-white border border-purple-300 px-2 py-0.5 rounded">
-                                  <UniversalMathJax inline dynamic>{cleanupMath(String(q.expectedAnswer ?? q.modelAnswer ?? 'N/A'))}</UniversalMathJax>
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-bold text-purple-900">Part B Correct Reason Justification:</span>
-                                <div className="mt-1 font-medium text-purple-950 bg-white p-2 border border-purple-200 rounded">
-                                  ✓ <UniversalMathJax inline dynamic>{cleanupMath(correctReason?.text || 'Correct reason key defined')}</UniversalMathJax>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {q.explanation && (
-                            <div className="mt-2 ml-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                              <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax inline dynamic>{cleanupMath(q.explanation)}</UniversalMathJax>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
 
                     return null;
                   });
