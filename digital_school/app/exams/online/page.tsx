@@ -221,29 +221,38 @@ function getDurationText(start: Date, end: Date, durationMinutes?: number): stri
   return null;
 }
 
+function formatTimeRemaining(diffMs: number): string {
+  if (diffMs <= 0) return "0s";
+  const totalSecs = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${mins}m ${secs}s`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${mins}m ${secs}s`;
+  }
+  if (mins > 0) {
+    return `${mins}m ${secs}s`;
+  }
+  return `${secs}s`;
+}
+
 function getLiveCountdown(start: Date, end: Date, now: Date): { text: string; state: "live" | "upcoming" | "ended" } {
   const startDiff = start.getTime() - now.getTime();
   const endDiff = end.getTime() - now.getTime();
 
   if (now < start) {
     if (startDiff <= 0) return { text: "Starting now", state: "upcoming" };
-    const hours = Math.floor(startDiff / (1000 * 60 * 60));
-    const mins = Math.floor((startDiff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((startDiff % (1000 * 60)) / 1000);
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      return { text: `Starts in ${days}d ${hours % 24}h`, state: "upcoming" };
-    }
-    if (hours > 0) return { text: `Starts in ${hours}h ${mins}m`, state: "upcoming" };
-    return { text: `Starts in ${mins}m ${secs}s`, state: "upcoming" };
+    return { text: `Starts in ${formatTimeRemaining(startDiff)}`, state: "upcoming" };
   }
 
   if (now >= start && now <= end) {
-    const hours = Math.floor(endDiff / (1000 * 60 * 60));
-    const mins = Math.floor((endDiff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((endDiff % (1000 * 60)) / 1000);
-    if (hours > 0) return { text: `Ends in ${hours}h ${mins}m ${secs}s`, state: "live" };
-    return { text: `Ends in ${mins}m ${secs}s`, state: "live" };
+    if (endDiff <= 0) return { text: "Ending now", state: "live" };
+    return { text: `Ends in ${formatTimeRemaining(endDiff)}`, state: "live" };
   }
 
   return { text: "Ended", state: "ended" };
@@ -501,19 +510,31 @@ export default function OnlineExamsPage() {
           return (a.name || "").localeCompare(b.name || "");
         case "start_asc":
         default: {
-          // Status grouping: 1st Live (active), 2nd Upcoming, 3rd Finished (passed)
+          // Status priority:
+          // 0: Live & Not Given
+          // 1: Live & Given (submitted)
+          // 2: Upcoming
+          // 3: Finished & Given (submitted)
+          // 4: Finished & Missed (not submitted)
           const getStatusRank = (exam: Exam) => {
             const st = getExamStatus(exam, now);
-            if (st === "active") return 0;
-            if (st === "upcoming") return 1;
-            return 2;
+            const submitted = hasSubmitted(exam.id);
+
+            if (st === "active") {
+              return submitted ? 1 : 0;
+            }
+            if (st === "upcoming") {
+              return 2;
+            }
+            // st === "finished"
+            return submitted ? 3 : 4;
           };
 
           const rankA = getStatusRank(a);
           const rankB = getStatusRank(b);
           if (rankA !== rankB) return rankA - rankB;
 
-          // Earliest start first (ascending)
+          // Earliest start first (ascending) within each group
           if (startA !== startB) return startA - startB;
           if (endA !== endB) return endA - endB;
           return (a.name || "").localeCompare(b.name || "");
