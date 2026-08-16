@@ -8,6 +8,9 @@ import {
   Clock,
   BookOpen,
   ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
   Play,
   CheckCircle2,
   Timer,
@@ -105,7 +108,6 @@ const fetchUser = async () => {
 };
 
 const fetchExams = async () => {
-  // Use summary=true to avoid huge relational payloads
   const res = await fetch("/api/exams?summary=true&limit=500");
   if (!res.ok) return [];
   const result = await res.json();
@@ -130,7 +132,6 @@ const fetchResults = async () => {
 
 const fetchExamSubmissions = async () => {
   try {
-    // Use summary=true for lightweight check
     const res = await fetch("/api/exam-submissions?summary=true");
     if (!res.ok) return { submissions: [] };
     const result = await res.json();
@@ -248,6 +249,22 @@ function getLiveCountdown(start: Date, end: Date, now: Date): { text: string; st
   return { text: "Ended", state: "ended" };
 }
 
+function getPaginationRange(currentPage: number, totalPages: number): (number | "...")[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 2) {
+    return [1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+}
+
 export default function OnlineExamsPage() {
   const [user, setUser] = useState<any>(null);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -263,7 +280,13 @@ export default function OnlineExamsPage() {
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(12);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const gridSectionRef = useRef<HTMLDivElement>(null);
 
   // Live timer tick every 1000ms for accurate real-time status transitions and countdowns
   useEffect(() => {
@@ -273,7 +296,7 @@ export default function OnlineExamsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Keyboard shortcut: '/' to search, 'Escape' to clear
+  // Keyboard shortcuts: '/' to search, 'Escape' to clear, Arrow Left/Right to paginate
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement !== searchInputRef.current) {
@@ -286,6 +309,11 @@ export default function OnlineExamsPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Reset page to 1 when filters or sorting change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, selectedSubject, sortOption, dateFrom, dateTo, search]);
 
   // Fetch function with Stale-While-Revalidate support
   const loadData = useCallback(async (isManualRefresh = false) => {
@@ -480,6 +508,25 @@ export default function OnlineExamsPage() {
       }
     });
   }, [classExams, statusFilter, selectedSubject, sortOption, dateFrom, dateTo, search, now, hasSubmitted, hasInProgress]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredExams.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+
+  const paginatedExams = useMemo(() => {
+    return filteredExams.slice(startIndex, endIndex);
+  }, [filteredExams, startIndex, endIndex]);
+
+  const paginationRange = useMemo(() => {
+    return getPaginationRange(currentPage, totalPages);
+  }, [currentPage, totalPages]);
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    gridSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const hasActiveFilters = statusFilter !== "all" || selectedSubject !== "all" || dateFrom !== "" || dateTo !== "" || search !== "";
 
@@ -756,19 +803,48 @@ export default function OnlineExamsPage() {
         </motion.div>
 
         {/* Results Header Info */}
-        {!loading && (
-          <div className="flex items-center justify-between mb-4 px-1">
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Showing <span className="text-slate-800 dark:text-slate-200 font-semibold">{filteredExams.length}</span> exam{filteredExams.length !== 1 ? "s" : ""}
-              {hasActiveFilters && " (filtered)"}
-            </p>
-            {isRefreshing && (
-              <span className="text-xs text-indigo-500 dark:text-indigo-400 flex items-center gap-1 font-medium animate-pulse">
-                <RefreshCw className="w-3 h-3 animate-spin" /> Updating in background...
-              </span>
-            )}
-          </div>
-        )}
+        <div ref={gridSectionRef} className="scroll-mt-6">
+          {!loading && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 px-1">
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                Showing{" "}
+                <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                  {filteredExams.length === 0 ? 0 : startIndex + 1}–{Math.min(endIndex, filteredExams.length)}
+                </span>{" "}
+                of{" "}
+                <span className="text-slate-800 dark:text-slate-200 font-semibold">{filteredExams.length}</span> exam{filteredExams.length !== 1 ? "s" : ""}
+                {hasActiveFilters && " (filtered)"}
+              </p>
+
+              {/* Page size & Status details */}
+              <div className="flex items-center gap-3 self-end sm:self-auto text-xs text-slate-500 dark:text-slate-400">
+                {isRefreshing && (
+                  <span className="text-xs text-indigo-500 dark:text-indigo-400 flex items-center gap-1 font-medium animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> Updating...
+                  </span>
+                )}
+                {filteredExams.length > 12 && (
+                  <div className="flex items-center gap-1.5">
+                    <span>Show:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                    >
+                      <option value={12}>12 / page</option>
+                      <option value={24}>24 / page</option>
+                      <option value={48}>48 / page</option>
+                      <option value={999}>All</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Exam Cards Grid */}
         {loading ? (
@@ -790,28 +866,109 @@ export default function OnlineExamsPage() {
         ) : filteredExams.length === 0 ? (
           <EmptyState filter={statusFilter} hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            <AnimatePresence mode="popLayout">
-              {filteredExams.map((exam, i) => (
-                <motion.div
-                  key={exam.id}
-                  layout
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.3) }}
-                >
-                  <ExamCard
-                    exam={exam}
-                    submitted={hasSubmitted(exam.id)}
-                    inProgress={hasInProgress(exam.id)}
-                    result={getResult(exam.id)}
-                    now={now}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              <AnimatePresence mode="popLayout">
+                {paginatedExams.map((exam, i) => (
+                  <motion.div
+                    key={exam.id}
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.25) }}
+                  >
+                    <ExamCard
+                      exam={exam}
+                      submitted={hasSubmitted(exam.id)}
+                      inProgress={hasInProgress(exam.id)}
+                      result={getResult(exam.id)}
+                      now={now}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Information status */}
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Page <strong className="text-slate-800 dark:text-slate-200">{currentPage}</strong> of{" "}
+                  <strong className="text-slate-800 dark:text-slate-200">{totalPages}</strong>
+                </div>
+
+                {/* Page Buttons */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(1)}
+                    className="h-8.5 w-8.5 p-0 rounded-xl text-slate-600 dark:text-slate-400"
+                    title="First Page"
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className="h-8.5 px-2.5 rounded-xl text-xs gap-1 font-semibold text-slate-700 dark:text-slate-300"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </Button>
+
+                  {/* Page numbers range */}
+                  <div className="flex items-center gap-1 mx-1">
+                    {paginationRange.map((page, idx) =>
+                      page === "..." ? (
+                        <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 text-xs select-none">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={`page-${page}`}
+                          onClick={() => handlePageChange(page as number)}
+                          className={`h-8.5 min-w-[34px] px-2.5 rounded-xl text-xs font-bold transition-all duration-150 ${
+                            currentPage === page
+                              ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25 ring-2 ring-indigo-500/30"
+                              : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className="h-8.5 px-2.5 rounded-xl text-xs gap-1 font-semibold text-slate-700 dark:text-slate-300"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(totalPages)}
+                    className="h-8.5 w-8.5 p-0 rounded-xl text-slate-600 dark:text-slate-400"
+                    title="Last Page"
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
