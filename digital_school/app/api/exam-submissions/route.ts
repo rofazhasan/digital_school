@@ -22,6 +22,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
 
+    const url = new URL(request.url);
+    const isSummary = url.searchParams.get('summary') === 'true';
+
+    if (isSummary) {
+      const summarySubs = await db.examSubmission.findMany({
+        where: {
+          studentId: user.studentProfile.id,
+        },
+        select: {
+          examId: true,
+          studentId: true,
+          status: true,
+          score: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
+      return NextResponse.json({
+        submissions: summarySubs,
+      });
+    }
+
     // Fetch exam submissions for this student
     const submissions = await db.examSubmission.findMany({
       where: {

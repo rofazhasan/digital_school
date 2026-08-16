@@ -191,6 +191,22 @@ export default function StudentDashboardPage() {
               const userClassId = data.user.studentProfile?.classId;
               if (userClassId && Array.isArray(examData)) {
                 filtered = examData.filter((exam: any) => exam.classId === userClassId); // eslint-disable-line @typescript-eslint/no-explicit-any
+                filtered.sort((a: any, b: any) => {
+                  const getStart = (e: any) => {
+                    if (e.startTime) {
+                      const t = new Date(e.startTime).getTime();
+                      if (!isNaN(t)) return t;
+                    }
+                    if (e.date) {
+                      const d = new Date(e.date);
+                      d.setHours(0, 0, 0, 0);
+                      const t = d.getTime();
+                      if (!isNaN(t)) return t;
+                    }
+                    return 0;
+                  };
+                  return getStart(a) - getStart(b);
+                });
               }
               if (isMounted) setExams(filtered);
             })
@@ -1049,10 +1065,28 @@ export default function StudentDashboardPage() {
                                 </CardDescription>
                               </CardHeader>
                               <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
-                                  <Calendar className="w-4 h-4 text-primary" />
-                                  <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
-                                </div>
+                                {!isSubmitted ? (
+                                  <div className="bg-muted/40 rounded-xl p-2.5 mb-4 border border-border space-y-1.5 text-xs">
+                                    <div className="flex items-center justify-between text-muted-foreground">
+                                      <span className="flex items-center gap-1 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Start:</span>
+                                      <span className="font-semibold text-foreground">
+                                        {exam.date ? new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                                        {exam.startTime ? ` • ${new Date(exam.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-muted-foreground">
+                                      <span className="flex items-center gap-1 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> End:</span>
+                                      <span className="font-semibold text-foreground">
+                                        {exam.endTime ? `${new Date(exam.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • ${new Date(exam.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'End of day'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
+                                    <Calendar className="w-4 h-4 text-primary" />
+                                    <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
+                                  </div>
+                                )}
 
                                 {/* Marks & Rank Section */}
                                 {result && (
