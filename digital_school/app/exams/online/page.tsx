@@ -500,11 +500,24 @@ export default function OnlineExamsPage() {
         case "name_asc":
           return (a.name || "").localeCompare(b.name || "");
         case "start_asc":
-        default:
-          // Earliest start first (default)
+        default: {
+          // Status grouping: 1st Live (active), 2nd Upcoming, 3rd Finished (passed)
+          const getStatusRank = (exam: Exam) => {
+            const st = getExamStatus(exam, now);
+            if (st === "active") return 0;
+            if (st === "upcoming") return 1;
+            return 2;
+          };
+
+          const rankA = getStatusRank(a);
+          const rankB = getStatusRank(b);
+          if (rankA !== rankB) return rankA - rankB;
+
+          // Earliest start first (ascending)
           if (startA !== startB) return startA - startB;
           if (endA !== endB) return endA - endB;
           return (a.name || "").localeCompare(b.name || "");
+        }
       }
     });
   }, [classExams, statusFilter, selectedSubject, sortOption, dateFrom, dateTo, search, now, hasSubmitted, hasInProgress]);
