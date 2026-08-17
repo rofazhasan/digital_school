@@ -396,8 +396,8 @@ export async function PATCH(request: NextRequest) {
 
     const url = new URL(request.url);
     const queryId = url.searchParams.get('id');
-    const body = await request.json();
-    const { id: bodyId, ...updateData } = body;
+    const body = await request.json().catch(() => ({}));
+    const { id: bodyId, ...rawUpdateData } = body;
 
     // Use ID from query parameter or request body
     const examId = queryId || bodyId;
@@ -405,6 +405,22 @@ export async function PATCH(request: NextRequest) {
     if (!examId) {
       return createApiResponse(null, 'Exam ID is required', 400);
     }
+
+    // Sanitize and format data for Prisma
+    const updateData: any = {};
+    if (typeof rawUpdateData.name === 'string') updateData.name = rawUpdateData.name;
+    if (typeof rawUpdateData.description === 'string') updateData.description = rawUpdateData.description;
+    if (rawUpdateData.date) updateData.date = new Date(rawUpdateData.date);
+    if (rawUpdateData.startTime !== undefined) updateData.startTime = rawUpdateData.startTime ? new Date(rawUpdateData.startTime) : null;
+    if (rawUpdateData.endTime !== undefined) updateData.endTime = rawUpdateData.endTime ? new Date(rawUpdateData.endTime) : null;
+    if (typeof rawUpdateData.duration === 'number') updateData.duration = rawUpdateData.duration;
+    if (typeof rawUpdateData.allowRetake === 'boolean') updateData.allowRetake = rawUpdateData.allowRetake;
+    if (typeof rawUpdateData.isActive === 'boolean') updateData.isActive = rawUpdateData.isActive;
+    if (rawUpdateData.type) updateData.type = rawUpdateData.type;
+    if (rawUpdateData.objectiveTime !== undefined) updateData.objectiveTime = rawUpdateData.objectiveTime ? Number(rawUpdateData.objectiveTime) : null;
+    if (rawUpdateData.cqSqTime !== undefined) updateData.cqSqTime = rawUpdateData.cqSqTime ? Number(rawUpdateData.cqSqTime) : null;
+    if (typeof rawUpdateData.totalMarks === 'number') updateData.totalMarks = rawUpdateData.totalMarks;
+    if (typeof rawUpdateData.passMarks === 'number') updateData.passMarks = rawUpdateData.passMarks;
 
     const updatedExam = await safeDatabaseOperation(
       async () => {
@@ -424,12 +440,18 @@ export async function PATCH(request: NextRequest) {
     return createApiResponse({
       id: updatedExam.id,
       name: updatedExam.name,
+      isActive: updatedExam.isActive,
+      type: updatedExam.type,
       message: 'Exam updated successfully',
     });
   } catch (error) {
     console.error('Failed to update exam:', error);
     return createApiResponse(null, 'Failed to update exam', 500);
   }
+}
+
+export async function PUT(request: NextRequest) {
+  return PATCH(request);
 }
 
 export async function DELETE(request: NextRequest) {

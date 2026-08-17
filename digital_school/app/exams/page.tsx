@@ -44,7 +44,8 @@ import {
   X,
   Layers,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  Printer
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -240,6 +241,17 @@ export default function ExamsPage() {
     objectiveTime: 0,
     cqSqTime: 0
   });
+
+  // Single Delete Confirmation Modal State ('DELETE' text required)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Bulk Delete Confirmation Modal State ('DELETE' text required)
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleteConfirmationText, setBulkDeleteConfirmationText] = useState("");
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -461,49 +473,57 @@ export default function ExamsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this exam? All related results and sets will be deleted permanently.')) {
-      return;
-    }
+  const openDeleteDialog = (exam: Exam, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExamToDelete(exam);
+    setDeleteConfirmationText("");
+    setIsDeleteDialogOpen(true);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!examToDelete || deleteConfirmationText !== "DELETE") return;
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/exams?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/exams?id=${examToDelete.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete exam');
 
-      setExams(prev => prev.filter(exam => exam.id !== id));
-      if (selectedExams.includes(id)) {
-        setSelectedExams(prev => prev.filter(examId => examId !== id));
-      }
+      setExams(prev => prev.filter(exam => exam.id !== examToDelete.id));
+      setSelectedExams(prev => prev.filter(examId => examId !== examToDelete.id));
+      setIsDeleteDialogOpen(false);
+      setExamToDelete(null);
       toast({ title: 'Success', description: 'Exam deleted permanently.' });
     } catch {
       toast({ title: 'Error', description: 'Failed to delete exam.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleBulkDelete = async () => {
+  const openBulkDeleteDialog = () => {
     if (selectedExams.length === 0) return;
+    setBulkDeleteConfirmationText("");
+    setIsBulkDeleteModalOpen(true);
+  };
 
-    if (!confirm(`⚠️ BULK DELETION\n\nAre you sure you want to delete ${selectedExams.length} selected exams?`)) {
-      return;
-    }
-
-    const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
-    if (confirmation !== 'DELETE') return;
-
+  const handleConfirmBulkDelete = async () => {
+    if (selectedExams.length === 0 || bulkDeleteConfirmationText !== "DELETE") return;
+    setIsBulkDeleting(true);
     try {
       const res = await fetch(`/api/exams`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedExams })
       });
-
       if (!res.ok) throw new Error('Failed to delete exams');
 
       setExams(prev => prev.filter(exam => !selectedExams.includes(exam.id)));
       setSelectedExams([]);
-      toast({ title: 'Success', description: 'Selected exams deleted successfully.' });
+      setIsBulkDeleteModalOpen(false);
+      toast({ title: 'Success', description: `${selectedExams.length} exams deleted permanently.` });
     } catch {
       toast({ title: 'Error', description: 'Failed to delete exams.', variant: 'destructive' });
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -1221,7 +1241,7 @@ export default function ExamsPage() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={handleBulkDelete}
+                    onClick={openBulkDeleteDialog}
                     className="h-8 text-xs font-bold rounded-xl"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
@@ -1346,14 +1366,18 @@ export default function ExamsPage() {
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="rounded-2xl border-slate-200 shadow-2xl p-1.5 min-w-[180px]">
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleEdit(exam.id)}>
-                                    <Edit className="w-4 h-4 text-blue-500" />
+                                <DropdownMenuContent align="end" className="rounded-2xl border-slate-200 shadow-2xl p-1.5 min-w-[200px]">
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/${exam.id}`)}>
+                                    <Layers className="w-4 h-4 text-blue-500" />
+                                    <span>Manage & Questions</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => handleEdit(exam.id)}>
+                                    <Edit className="w-4 h-4 text-indigo-500" />
                                     <span>Edit Details</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger className="rounded-xl flex items-center gap-2">
-                                      <Monitor className="w-4 h-4 text-indigo-500" />
+                                    <DropdownMenuSubTrigger className="rounded-xl flex items-center gap-2 font-medium cursor-pointer">
+                                      <Monitor className="w-4 h-4 text-cyan-500" />
                                       <span>Change Type</span>
                                     </DropdownMenuSubTrigger>
                                     <DropdownMenuPortal>
@@ -1366,11 +1390,7 @@ export default function ExamsPage() {
                                       </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                   </DropdownMenuSub>
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
-                                    <BarChart3 className="w-4 h-4 text-emerald-500" />
-                                    <span>View Results</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleToggleActive(exam.id, exam.isActive)}>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => handleToggleActive(exam.id, exam.isActive)}>
                                     {exam.isActive ? (
                                       <>
                                         <AlertCircle className="w-4 h-4 text-amber-500" />
@@ -1383,8 +1403,16 @@ export default function ExamsPage() {
                                       </>
                                     )}
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
+                                    <BarChart3 className="w-4 h-4 text-emerald-500" />
+                                    <span>View Results</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/${exam.id}/print`)}>
+                                    <Printer className="w-4 h-4 text-violet-500" />
+                                    <span>Print Exam & Cards</span>
+                                  </DropdownMenuItem>
                                   <DropdownMenuSeparator className="my-1.5" />
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600 font-bold cursor-pointer" onClick={(e) => openDeleteDialog(exam, e)}>
                                     <Trash2 className="w-4 h-4" />
                                     <span>Delete Exam</span>
                                   </DropdownMenuItem>
@@ -1658,6 +1686,125 @@ export default function ExamsPage() {
             </Button>
             <Button onClick={handleSaveEdit} className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white">
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Single Exam Delete Confirmation Dialog ('DELETE' required) */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-3xl border-rose-200 dark:border-rose-900/50 shadow-2xl p-6">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 mb-2">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-xl font-black text-rose-600 dark:text-rose-400">
+              Permanently Delete Exam?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1">
+              You are about to permanently delete <span className="font-bold text-foreground">{examToDelete?.name}</span>. All related questions, student submissions, OMR sheets, and published results will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3">
+            <div className="p-3 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/40 text-[11px] text-rose-700 dark:text-rose-300 font-medium">
+              ⚠️ <strong>This action cannot be undone.</strong> To confirm, please type <span className="font-mono font-bold bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-rose-300 dark:border-rose-800 select-all">DELETE</span> below:
+            </div>
+            <Input
+              value={deleteConfirmationText}
+              onChange={(e) => setDeleteConfirmationText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="font-mono text-center font-bold tracking-widest uppercase rounded-xl border-rose-300 dark:border-rose-800 focus:ring-rose-500"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setExamToDelete(null);
+                setDeleteConfirmationText("");
+              }}
+              disabled={isDeleting}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteConfirmationText !== "DELETE" || isDeleting}
+              className="rounded-xl font-bold bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/20"
+            >
+              {isDeleting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Exam Permanently"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Exam Delete Confirmation Dialog ('DELETE' required) */}
+      <Dialog open={isBulkDeleteModalOpen} onOpenChange={setIsBulkDeleteModalOpen}>
+        <DialogContent className="sm:max-w-[480px] rounded-3xl border-rose-200 dark:border-rose-900/50 shadow-2xl p-6">
+          <DialogHeader>
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 mb-2">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-xl font-black text-rose-600 dark:text-rose-400">
+              Permanently Delete {selectedExams.length} Exams?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1">
+              You are about to permanently delete <span className="font-bold text-foreground">{selectedExams.length} selected examinations</span>. All related questions, submissions, OMR sheets, and results will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3">
+            <div className="p-3 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/40 text-[11px] text-rose-700 dark:text-rose-300 font-medium">
+              ⚠️ <strong>This bulk action cannot be undone.</strong> To confirm, please type <span className="font-mono font-bold bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-rose-300 dark:border-rose-800 select-all">DELETE</span> below:
+            </div>
+            <Input
+              value={bulkDeleteConfirmationText}
+              onChange={(e) => setBulkDeleteConfirmationText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="font-mono text-center font-bold tracking-widest uppercase rounded-xl border-rose-300 dark:border-rose-800 focus:ring-rose-500"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsBulkDeleteModalOpen(false);
+                setBulkDeleteConfirmationText("");
+              }}
+              disabled={isBulkDeleting}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmBulkDelete}
+              disabled={bulkDeleteConfirmationText !== "DELETE" || isBulkDeleting}
+              className="rounded-xl font-bold bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/20"
+            >
+              {isBulkDeleting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting {selectedExams.length} Exams...
+                </>
+              ) : (
+                `Permanently Delete ${selectedExams.length} Exams`
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
