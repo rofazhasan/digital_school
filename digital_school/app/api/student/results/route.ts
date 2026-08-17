@@ -13,36 +13,66 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
 
-    // Fetch results for the student with full exam details
-    const results = await prismadb.result.findMany({
-      where: { studentId },
-      include: {
-        exam: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            type: true,
-            totalMarks: true,
-            date: true,
-            class: { select: { id: true, name: true, section: true } },
-            examSets: {
-              take: 1,
-              select: {
-                questions: {
-                  take: 3,
-                  select: { subject: true }
+    // Parallel fetch of official Results and ExamSubmissions
+    const [results, submissions] = await Promise.all([
+      prismadb.result.findMany({
+        where: { studentId },
+        include: {
+          exam: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              type: true,
+              totalMarks: true,
+              date: true,
+              class: { select: { id: true, name: true, section: true } },
+              examSets: {
+                take: 1,
+                select: {
+                  questions: {
+                    take: 3,
+                    select: { subject: true }
+                  }
+                }
+              }
+            }
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prismadb.examSubmission.findMany({
+        where: { studentId, status: 'SUBMITTED' },
+        include: {
+          exam: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              type: true,
+              totalMarks: true,
+              date: true,
+              class: { select: { id: true, name: true, section: true } },
+              examSets: {
+                take: 1,
+                select: {
+                  questions: {
+                    take: 3,
+                    select: { subject: true }
+                  }
                 }
               }
             }
           }
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { evaluatedAt: 'desc' }
+      })
+    ]);
 
-    // Map results to desired format
-    const mapped = results.map(r => {
+    const resultMap = new Map<string, any>();
+
+    // Map official published results
+    results.forEach(r => {
       let subject = "General";
       if (r.exam?.examSets?.[0]?.questions?.[0]?.subject) {
         subject = r.exam.examSets[0].questions[0].subject;
@@ -55,17 +85,18 @@ export async function GET(request: NextRequest) {
       const score = Number(r.total) || 0;
       const calculatedPct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : (Number(r.percentage) || 0);
 
-      return {
+      resultMap.set(r.examId, {
         id: r.id,
         examId: r.examId,
         examTitle: r.exam?.name || 'Academic Exam',
         subject: subject,
-        type: r.exam?.type || 'ONLINE',
+        type: r.exam?.type || 'OFFLINE',
         totalMarks: totalMarks,
         score: score,
         total: score,
         mcqMarks: r.mcqMarks || 0,
         cqMarks: r.cqMarks || 0,
+        sqMarks: r.sqMarks || 0,
         rank: r.rank,
         grade: r.grade || (calculatedPct >= 80 ? 'A+' : calculatedPct >= 70 ? 'A' : calculatedPct >= 60 ? 'A-' : calculatedPct >= 50 ? 'B' : calculatedPct >= 40 ? 'C' : 'F'),
         percentage: r.percentage ?? calculatedPct,
@@ -74,11 +105,54 @@ export async function GET(request: NextRequest) {
         publishedAt: r.publishedAt,
         date: r.createdAt,
         className: r.exam?.class?.name,
-      };
+        omrScanId: r.omrScanId
+      });
     });
 
+    // Merge online submissions not present in Result
+    submissions.forEach(sub => {
+      if (!resultMap.has(sub.examId)) {
+        let subject = "General";
+        if (sub.exam?.examSets?.[0]?.questions?.[0]?.subject) {
+          subject = sub.exam.examSets[0].questions[0].subject;
+        } else if (sub.exam?.name) {
+          subject = sub.exam.name.split(" ")[0] || "General";
+        }
+
+        const totalMarks = sub.exam?.totalMarks || 100;
+        const score = Number(sub.score) || 0;
+        const calculatedPct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
+
+        resultMap.set(sub.examId, {
+          id: sub.id,
+          examId: sub.examId,
+          examTitle: sub.exam?.name || 'Online Exam',
+          subject: subject,
+          type: sub.exam?.type || 'ONLINE',
+          totalMarks: totalMarks,
+          score: score,
+          total: score,
+          mcqMarks: score,
+          cqMarks: 0,
+          sqMarks: 0,
+          rank: undefined,
+          grade: calculatedPct >= 80 ? 'A+' : calculatedPct >= 70 ? 'A' : calculatedPct >= 60 ? 'A-' : calculatedPct >= 50 ? 'B' : calculatedPct >= 40 ? 'C' : 'F',
+          percentage: calculatedPct,
+          comment: sub.evaluatorNotes || '',
+          isPublished: true,
+          publishedAt: sub.evaluatedAt || sub.createdAt,
+          date: sub.evaluatedAt || sub.createdAt,
+          className: sub.exam?.class?.name
+        });
+      }
+    });
+
+    const unifiedList = Array.from(resultMap.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
     return NextResponse.json(
-      { results: mapped },
+      { results: unifiedList },
       {
         headers: {
           'Cache-Control': 'private, s-maxage=10, stale-while-revalidate=60',

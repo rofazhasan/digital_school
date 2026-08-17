@@ -25,7 +25,14 @@ export async function GET() {
       },
       orderBy: [{ name: 'asc' }, { section: 'asc' }],
     });
-    return NextResponse.json({ classes });
+    return NextResponse.json(
+      { classes },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120'
+        }
+      }
+    );
   } catch (error) {
     console.error('Get classes error:', error);
     return NextResponse.json({ error: 'Failed to fetch classes' }, { status: 500 });

@@ -207,104 +207,54 @@ export default function StudentDashboardPage() {
     }).catch(() => {});
   }, []);
 
-  // Main Dashboard Data Fetch with 0-second SWR background sync
+  // Main Dashboard Data Fetch with single unified endpoint and 0-second SWR background sync
   const fetchDashboardData = useCallback(async (isSilent = false) => {
     if (!isSilent && !user) setLoading(true);
 
     try {
-      const userRes = await fetch('/api/user', { credentials: 'include' });
-      if (!userRes.ok) {
+      const dashRes = await fetch('/api/student/dashboard', { credentials: 'include' });
+      if (dashRes.status === 401) {
         router.push('/login');
         return;
       }
 
-      const userData = await userRes.json();
-      const currentUser = userData.user;
+      if (dashRes.ok) {
+        const data = await dashRes.json();
+        if (data.user) setUser(data.user);
+        if (Array.isArray(data.exams)) setExams(data.exams);
+        if (Array.isArray(data.results)) setResults(data.results);
+        if (Array.isArray(data.submissions)) setExamSubmissions(data.submissions);
+        if (data.attendance) setAttendance(data.attendance);
+        if (data.analytics) setAnalytics(data.analytics);
+        if (Array.isArray(data.notices)) setNotices(data.notices);
+        if (typeof data.unreadNoticeCount === 'number') setUnreadNoticeCount(data.unreadNoticeCount);
+        if (data.instituteSettings) setInstituteSettings(data.instituteSettings);
 
-      if (!currentUser || currentUser.role !== 'STUDENT') {
-        router.push(currentUser?.role === 'SUPER_USER' ? '/super-user/dashboard' : currentUser?.role === 'ADMIN' ? '/admin/dashboard' : currentUser?.role === 'TEACHER' ? '/teacher/dashboard' : '/login');
-        return;
-      }
-
-      setUser(currentUser);
-
-      // Concurrent parallel fetches
-      const [examsRes, subsRes, resultsRes, attRes, analyticsRes, noticesRes] = await Promise.allSettled([
-        fetch('/api/exams?limit=500', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-        fetch('/api/exam-submissions', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-        fetch('/api/student/results', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-        fetch('/api/student/attendance', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
-        fetch('/api/student/analytics', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
-        fetch('/api/student/notices', { credentials: 'include' }).then(r => r.ok ? r.json() : [])
-      ]);
-
-      // Process Exams
-      let processedExams: Exam[] = [];
-      if (examsRes.status === 'fulfilled') {
-        const raw = examsRes.value;
-        const examList = Array.isArray(raw) ? raw : (raw.exams || raw.data?.exams || raw.data || []);
-        const userClassId = currentUser.studentProfile?.classId;
-        if (userClassId && Array.isArray(examList)) {
-          processedExams = examList.filter((e: any) => !e.classId || e.classId === userClassId);
-        } else {
-          processedExams = Array.isArray(examList) ? examList : [];
+        // Cache snapshot in sessionStorage for 0.00s instant next visit
+        try {
+          sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+            user: data.user,
+            exams: data.exams,
+            results: data.results,
+            submissions: data.submissions,
+            attendance: data.attendance,
+            analytics: data.analytics,
+            notices: data.notices,
+            updatedAt: Date.now()
+          }));
+        } catch {}
+      } else {
+        // Fallback to /api/user if non-student or forbidden
+        const userRes = await fetch('/api/user', { credentials: 'include' });
+        if (userRes.ok) {
+          const uData = await userRes.json();
+          if (uData.user?.role !== 'STUDENT') {
+            router.push(uData.user?.role === 'SUPER_USER' ? '/super-user/dashboard' : uData.user?.role === 'ADMIN' ? '/admin/dashboard' : '/teacher/dashboard');
+          }
         }
       }
-      setExams(processedExams);
-
-      // Process Submissions
-      let processedSubs: any[] = [];
-      if (subsRes.status === 'fulfilled') {
-        const raw = subsRes.value;
-        processedSubs = Array.isArray(raw) ? raw : (raw.submissions || raw.data || []);
-        setExamSubmissions(processedSubs);
-      }
-
-      // Process Results
-      let processedResults: Result[] = [];
-      if (resultsRes.status === 'fulfilled') {
-        const raw = resultsRes.value;
-        processedResults = Array.isArray(raw) ? raw : (raw.results || raw.data || []);
-        setResults(processedResults);
-      }
-
-      // Process Attendance & Analytics
-      let processedAtt: any = null;
-      if (attRes.status === 'fulfilled' && attRes.value) {
-        processedAtt = attRes.value.summary || attRes.value;
-        setAttendance(processedAtt);
-      }
-
-      let processedAnalytics: any = null;
-      if (analyticsRes.status === 'fulfilled' && analyticsRes.value) {
-        processedAnalytics = analyticsRes.value.analytics || analyticsRes.value;
-        setAnalytics(processedAnalytics);
-      }
-
-      // Process Notices
-      let processedNotices: Notice[] = [];
-      if (noticesRes.status === 'fulfilled') {
-        const raw = noticesRes.value;
-        processedNotices = Array.isArray(raw) ? raw : (raw.notices || []);
-        setNotices(processedNotices);
-      }
-
-      // Cache all snapshot in sessionStorage for 0-second instant next visit
-      try {
-        sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
-          user: currentUser,
-          exams: processedExams,
-          results: processedResults,
-          submissions: processedSubs,
-          attendance: processedAtt,
-          analytics: processedAnalytics,
-          notices: processedNotices,
-          updatedAt: Date.now()
-        }));
-      } catch {}
-
     } catch (err) {
-      console.error("Dashboard background sync error:", err);
+      console.error("Dashboard sync error:", err);
     } finally {
       setLoading(false);
     }

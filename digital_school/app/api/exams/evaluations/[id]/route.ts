@@ -142,7 +142,7 @@ export async function GET(
       }
     };
 
-    if (tokenData.user.role === "SUPER_USER") {
+    if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
       exam = await prisma.exam.findUnique({
         where: { id: examId },
         include: examInclude as any // Type assertion for complex include

@@ -148,112 +148,127 @@ export async function POST(req: NextRequest) {
       const emailToUse = (result.student?.user?.email || result.student?.guardianEmail || '').trim();
       const phoneToUse = (result.student?.user?.phone || result.student?.guardianPhone || '').trim();
 
-      if (!emailToUse && !phoneToUse) continue;
+    // Update all results to published and assign ranks immediately
+    await Promise.all(
+      resultsWithRanks.map(result =>
+        prisma.result.update({
+          where: { id: result.id },
+          data: {
+            rank: result.rank,
+            isPublished: true,
+            publishedAt: new Date()
+          }
+        })
+      )
+    );
 
-      let emailSuccess = false;
+    // Offload heavy PDF generation, Email & SMS dispatches asynchronously in background
+    (async () => {
+      let sentCount = 0;
+      let failCount = 0;
 
-      if (emailToUse && emailToUse.includes('@')) {
-        try {
-          console.log(`[EMAIL] Processing ${i + 1}/${resultsWithRanks.length}: ${emailToUse}`);
+      const protocol = req.headers.get("x-forwarded-proto") || "http";
+      const host = req.headers.get("host") || "localhost:3000";
+      const baseUrl = `${protocol}://${host}`;
 
-          const breakdown = [{
-            subject: exam.name,
-            marks: result.total,
-            totalMarks: exam.totalMarks,
-            grade: result.grade || 'N/A',
-            mcqMarks: result.mcqMarks,
-            sqMarks: result.sqMarks,
-            cqMarks: result.cqMarks
-          }];
+      for (let i = 0; i < resultsWithRanks.length; i++) {
+        const result = resultsWithRanks[i];
+        const emailToUse = result.student.guardianEmail || result.student.user?.email;
+        const phoneToUse = result.student.guardianPhone || result.student.user?.phone;
 
-          const protocol = req.headers.get("x-forwarded-proto") || "http";
-          const host = req.headers.get("host") || "localhost:3000";
-          const baseUrl = `${protocol}://${host}`;
+        if (!emailToUse && !phoneToUse) continue;
 
-          let attachments = [];
+        let emailSuccess = false;
+
+        if (emailToUse && emailToUse.includes('@')) {
           try {
-            const pdfBuffer = await generateStudentScriptPDF({
-              examId: exam.id,
-              studentId: result.studentId,
-              baseUrl: baseUrl
-            });
-            if (pdfBuffer) {
-              attachments.push({
-                filename: `${result.student.user.name.replace(/\s+/g, '_')}_Result.pdf`,
-                content: pdfBuffer
+            const breakdown = [{
+              subject: exam.name,
+              marks: result.total,
+              totalMarks: exam.totalMarks,
+              grade: result.grade || 'N/A',
+              mcqMarks: result.mcqMarks,
+              sqMarks: result.sqMarks,
+              cqMarks: result.cqMarks
+            }];
+
+            let attachments = [];
+            try {
+              const pdfBuffer = await generateStudentScriptPDF({
+                examId: exam.id,
+                studentId: result.studentId,
+                baseUrl: baseUrl
               });
+              if (pdfBuffer) {
+                attachments.push({
+                  filename: `${result.student.user.name.replace(/\s+/g, '_')}_Result.pdf`,
+                  content: pdfBuffer
+                });
+              }
+            } catch (pdfErr) {
+              console.error("PDF generation skipped/failed:", pdfErr);
             }
-          } catch (pdfErr) {
-            console.error("PDF generation skipped/failed:", pdfErr);
-          }
 
-          await sendEmail({
-            to: emailToUse,
-            subject: `Exam Result Released: ${exam.name}`,
-            react: ExamResultEmail({
-              studentName: result.student.user.name,
-              examName: exam.name,
-              results: breakdown,
-              totalPercentage: result.percentage || 0,
-              finalGrade: result.grade || 'N/A',
-              rank: result.rank || undefined,
-              institute: institute as any,
-              examDate: exam.date.toLocaleDateString(),
-              remarks: result.comment || undefined,
-              examId: exam.id,
-              studentId: result.studentId,
-              baseUrl: baseUrl
-            }) as any,
-            attachments
-          });
-          sentCount++;
-          emailSuccess = true;
-          console.log(`✅ [EMAIL SUCCESS] Sent result email to ${emailToUse}`);
-        } catch (err) {
-          console.error(`❌ [EMAIL FAILED] Failed email to ${emailToUse}:`, err);
-          emailSuccess = false;
-        }
-      }
-
-      if (!emailSuccess && phoneToUse) {
-        try {
-          console.log(`[SMS FALLBACK] Processing ${i + 1}/${resultsWithRanks.length}: ${phoneToUse}`);
-          const firstName = result.student.user?.name?.split(' ')[0] || 'Student';
-          const instName = institute?.name || 'School';
-          const percentage = Math.round(result.percentage || 0);
-
-          const smsMessage = `Dear ${firstName},\nExam Result ${exam.name}: ${result.total}/${exam.totalMarks} (${percentage}% ${result.grade || 'N/A'})${result.rank ? ` Rank:${result.rank}` : ''}\nGood Luck! - ${instName}`;
-
-          const { sendSMS } = await import("@/lib/sms");
-          const smsRes = await sendSMS(phoneToUse, smsMessage);
-          if (smsRes.success) {
+            await sendEmail({
+              to: emailToUse,
+              subject: `Exam Result Released: ${exam.name}`,
+              react: ExamResultEmail({
+                studentName: result.student.user.name,
+                examName: exam.name,
+                results: breakdown,
+                totalPercentage: result.percentage || 0,
+                finalGrade: result.grade || 'N/A',
+                rank: result.rank || undefined,
+                institute: institute as any,
+                examDate: exam.date.toLocaleDateString(),
+                remarks: result.comment || undefined,
+                examId: exam.id,
+                studentId: result.studentId,
+                baseUrl: baseUrl
+              }) as any,
+              attachments
+            });
             sentCount++;
-            console.log(`✅ [SMS SUCCESS] Sent result SMS to ${phoneToUse}`);
-          } else {
-            failCount++;
-            console.error(`❌ [SMS FAILED] Failed SMS to ${phoneToUse}:`, smsRes.error);
+            emailSuccess = true;
+          } catch (err) {
+            console.error(`❌ [EMAIL FAILED] Failed email to ${emailToUse}:`, err);
+            emailSuccess = false;
           }
-        } catch (smsErr) {
-          console.error(`❌ [SMS ERROR] Exception sending SMS to ${phoneToUse}:`, smsErr);
+        }
+
+        if (!emailSuccess && phoneToUse) {
+          try {
+            const firstName = result.student.user?.name?.split(' ')[0] || 'Student';
+            const instName = institute?.name || 'School';
+            const percentage = Math.round(result.percentage || 0);
+
+            const smsMessage = `Dear ${firstName},\nExam Result ${exam.name}: ${result.total}/${exam.totalMarks} (${percentage}% ${result.grade || 'N/A'})${result.rank ? ` Rank:${result.rank}` : ''}\nGood Luck! - ${instName}`;
+
+            const { sendSMS } = await import("@/lib/sms");
+            const smsRes = await sendSMS(phoneToUse, smsMessage);
+            if (smsRes.success) {
+              sentCount++;
+            } else {
+              failCount++;
+            }
+          } catch (smsErr) {
+            failCount++;
+          }
+        } else if (!emailSuccess) {
           failCount++;
         }
-      } else if (!emailSuccess) {
-        failCount++;
-      }
 
-      if (i < resultsWithRanks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        if (i < resultsWithRanks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
       }
-    }
-
-    console.log(`✉️ Batch complete: Successfully sent ${sentCount} emails. Failed: ${failCount}.`);
+      console.log(`✉️ Background notification complete for ${exam.name}: Sent ${sentCount}, Failed ${failCount}`);
+    })().catch(err => console.error("Background notification error:", err));
 
     return NextResponse.json({
       success: true,
-      message: `Results released for exam ${exam.name}. Successfully sent ${sentCount} emails. ${failCount > 0 ? `Failed ${failCount}.` : ''} ${updatedReviews.count} review requests closed.`,
+      message: `Results released instantly for exam ${exam.name}! Notifications are being dispatched in background.`,
       publishedCount: resultsWithRanks.length,
-      sentCount,
-      failCount,
       closedReviewsCount: updatedReviews.count
     });
   } catch (error) {

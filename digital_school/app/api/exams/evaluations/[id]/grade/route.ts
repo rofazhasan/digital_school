@@ -17,7 +17,7 @@ export async function POST(
 
     // Check if user has access to this exam
     let exam;
-    if (tokenData.user.role === "SUPER_USER") {
+    if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
       exam = await prisma.exam.findUnique({
         where: { id: examId },
         include: { examSets: true }
