@@ -124,7 +124,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
   let type = (question.type || question.questionType || "").toLowerCase();
   if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
   if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
-  const text = question.text || question.questionText || question.scenario || "(No text)";
+  const text = question.text || question.questionText || question.question || question.q || question.scenario || "";
   const userAnswer = answer;
   const showResult = submitted && result;
 

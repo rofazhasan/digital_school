@@ -453,32 +453,43 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     }
 
                     if (q.type?.toUpperCase() === 'MTF') {
+                      const mtfQuestionTitle = q.questionText || q.text || q.question || q.q || (isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:');
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-1 border-b border-black/10 pb-0.5">
                             <span className="font-bold text-sm">
-                              {qNum}. {q.questionText || (isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:')}
+                              {qNum}. <UniversalMathJax inline dynamic>{cleanupMath(mtfQuestionTitle)}</UniversalMathJax>
                             </span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
                             <div className="border-r border-black pr-2">
                               <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column A' : 'স্তম্ভ ক'}</p>
-                              {(q.leftColumn || []).map((item: any, i: number) => (
-                                <div key={i} className="flex gap-1">
-                                  <span className="font-bold">{toBengaliNumerals(i + 1)}</span>
-                                  <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                                </div>
-                              ))}
+                              {(q.leftColumn || []).map((item: any, i: number) => {
+                                const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                return (
+                                  <div key={i} className="flex gap-1 items-start my-1">
+                                    <span className="font-bold shrink-0">{toBengaliNumerals(i + 1)}.</span>
+                                    <div className="flex-1">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                             <div>
                               <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column B' : 'স্তম্ভ খ'}</p>
-                              {(q.rightColumn || []).map((item: any, i: number) => (
-                                <div key={i} className="flex gap-1">
-                                  <span className="font-bold">{String.fromCharCode(65 + i)}</span>
-                                  <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                                </div>
-                              ))}
+                              {(q.rightColumn || []).map((item: any, i: number) => {
+                                const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                return (
+                                  <div key={i} className="flex gap-1 items-start my-1">
+                                    <span className="font-bold shrink-0">{String.fromCharCode(65 + i)}.</span>
+                                    <div className="flex-1">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>

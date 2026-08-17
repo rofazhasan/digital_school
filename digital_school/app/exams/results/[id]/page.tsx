@@ -2763,7 +2763,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                        </div>
                                      ) : type !== 'SMCQ' ? (
                                        <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
-                                         <UniversalMathJax dynamic>{cleanupMath(question.questionText || "")}</UniversalMathJax>
+                                         <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || (question as any).question || (question as any).q || "")}</UniversalMathJax>
                                        </div>
                                      ) : null}
 
@@ -2838,15 +2838,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                                   return (
                                                     <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
-                                                      <span className={cn(
-                                                        "w-10 h-10 flex items-center justify-center rounded-2xl text-[11px] font-black shadow-sm transition-colors",
-                                                        isSel ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                                                      )}>
-                                                        {String.fromCharCode(0x0995 + oi)}
+                                                      <span className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                                                        {String.fromCharCode(65 + oi)}
                                                       </span>
-                                                      <span className="flex-1 text-sm font-bold tracking-tight">
+                                                      <div className="flex-1 font-semibold text-sm">
                                                         <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
-                                                      </span>
+                                                      </div>
                                                       <div className="flex-shrink-0">{optIcon}</div>
                                                     </div>
                                                   );
@@ -2898,54 +2895,40 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             }
 
                                             // --- PRECISE isCorrectOpt DETECTION ---
-                                            let isCorrectOpt = false;
-                                            if (type === 'MC') {
-                                              isCorrectOpt = !!(option as any).isCorrect;
-                                            } else if (type === 'AR') {
-                                              // AR: correctOption is 1-indexed
-                                              const correctIdx = (question as any).correctOption ?? (question as any).correct;
-                                              isCorrectOpt = Number(correctIdx) === optIndex + 1;
-                                            } else {
-                                              // MCQ: first check option.isCorrect flag, then fallback to correctOption index
-                                              if ((option as any).isCorrect !== undefined) {
-                                                isCorrectOpt = !!(option as any).isCorrect;
-                                              } else {
-                                                const correctIdx = (question as any).correctOption ?? (question as any).correct ?? (question as any).correctAnswer;
-                                                if (correctIdx !== undefined && correctIdx !== null) {
-                                                  isCorrectOpt = Number(correctIdx) === optIndex;
-                                                }
-                                              }
-                                            }
+                                            const isOptionMarkedCorrect = typeof option === 'object' && option.isCorrect === true;
+                                            const isOptionMatchingCorrectAnswer =
+                                              (question.correctAnswer !== undefined && question.correctAnswer !== null &&
+                                                String(question.correctAnswer).trim() === String(optText).trim()) ||
+                                              (question.correct !== undefined && question.correct !== null &&
+                                                String(question.correct).trim() === String(optText).trim()) ||
+                                              (typeof question.correctAnswer === 'number' && question.correctAnswer === optIndex) ||
+                                              (typeof question.correct === 'number' && question.correct === optIndex) ||
+                                              ((question as any).correctOption !== undefined && (question as any).correctOption === optIndex);
 
-                                            let containerStyle = "";
+                                            const isCorrectOpt = isOptionMarkedCorrect || isOptionMatchingCorrectAnswer;
+
+                                            let containerStyle = "border-border bg-card/50 text-muted-foreground";
+                                            let labelStyle = "bg-muted text-muted-foreground";
                                             let icon = null;
-                                            let labelStyle = "";
 
                                             if (isSelected && isCorrectOpt) {
-                                              // 1. Correct and Selected -> GREEN
-                                              containerStyle = "border-green-500 bg-green-500/10 text-foreground shadow-md ring-1 ring-green-500/20 transform scale-[1.01]";
-                                              icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-500/10" />;
+                                              containerStyle = "border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 ring-1 ring-green-500/30";
                                               labelStyle = "bg-green-500 text-white";
+                                              icon = <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />;
                                             } else if (isSelected && !isCorrectOpt) {
-                                              // 2. Wrong and Selected -> RED
-                                              containerStyle = "border-red-500 bg-red-500/10 text-foreground shadow-md ring-1 ring-red-500/20";
-                                              icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-500/10" />;
+                                              containerStyle = "border-red-500 bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30";
                                               labelStyle = "bg-red-500 text-white";
+                                              icon = <XCircle className="h-5 w-5 text-red-500 shrink-0" />;
                                             } else if (!isSelected && isCorrectOpt) {
-                                              // 3. Correct but NOT Selected -> BLUE/TEAL (Distinct)
-                                              containerStyle = "border-teal-500/50 bg-teal-500/5 text-foreground border-dashed ring-1 ring-teal-500/10";
-                                              icon = <CheckCircle className="h-5 w-5 text-teal-600 flex-shrink-0" />;
-                                              labelStyle = "bg-teal-500 text-white";
-                                            } else {
-                                              // 4. Wrong and NOT Selected -> GRAY (Faded)
-                                              containerStyle = "border-border bg-card text-muted-foreground opacity-60 hover:opacity-100 transition-opacity";
-                                              labelStyle = "bg-muted text-muted-foreground";
+                                              containerStyle = "border-green-500/50 bg-green-500/5 text-green-700 dark:text-green-300 border-dashed";
+                                              labelStyle = "bg-green-500/20 text-green-700 dark:text-green-300";
+                                              icon = <CheckCircle className="h-5 w-5 text-green-500/50 shrink-0" />;
                                             }
 
                                             return (
                                               <div
                                                 key={optIndex}
-                                                className={`p-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${containerStyle}`}
+                                                className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${containerStyle}`}
                                               >
                                                 <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${labelStyle}`}>
                                                   {String.fromCharCode(0x0995 + optIndex)}
@@ -2998,21 +2981,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                           <div className="space-y-2">
                                             <div className="text-xs font-bold text-muted-foreground uppercase">Column A</div>
-                                            {(question as any).leftColumn?.map((item: any, i: number) => (
-                                              <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
-                                                <span className="font-bold mr-2 text-muted-foreground">{i + 1}.</span>
-                                                <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
-                                              </div>
-                                            ))}
+                                            {(question as any).leftColumn?.map((item: any, i: number) => {
+                                              const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                              return (
+                                                <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                                  <span className="font-bold mr-2 text-muted-foreground shrink-0">{i + 1}.</span>
+                                                  <div className="flex-1">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
                                           </div>
                                           <div className="space-y-2">
                                             <div className="text-xs font-bold text-muted-foreground uppercase">Column B</div>
-                                            {(question as any).rightColumn?.map((item: any, i: number) => (
-                                              <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
-                                                <span className="font-bold mr-2 text-muted-foreground">{String.fromCharCode(65 + i)}.</span>
-                                                <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
-                                              </div>
-                                            ))}
+                                            {(question as any).rightColumn?.map((item: any, i: number) => {
+                                              const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                              return (
+                                                <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                                  <span className="font-bold mr-2 text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
+                                                  <div className="flex-1">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
                                           </div>
                                         </div>
                                         <div className="p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
@@ -3055,6 +3048,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   const vStudentRight = studentRightIdx !== undefined && studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
                                                   const vCorrectRight = correctRightIdx !== undefined && correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
 
+                                                  const leftText = typeof item === 'string' ? item : (item?.text || item?.content || '');
+                                                  const rightText = typeof rightItem === 'string' ? rightItem : (rightItem?.text || rightItem?.content || '');
+                                                  const correctRightText = typeof correctRightItem === 'string' ? correctRightItem : (correctRightItem?.text || correctRightItem?.content || '');
+
                                                   // Row styling
                                                   const rowClass = isMatchCorrect
                                                     ? "bg-green-500/5 dark:bg-green-500/10"
@@ -3067,7 +3064,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       <td className="p-3 border-r border-indigo-500/10 font-medium">
                                                         <div className="flex items-center gap-1">
                                                           <span className="font-bold text-muted-foreground shrink-0">{vlLeft}.</span>
-                                                          <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                          <div className="flex-1">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath(leftText)}</UniversalMathJax>
+                                                          </div>
                                                         </div>
                                                       </td>
                                                       <td className={`p-3 border-r border-indigo-500/10 ${isMatchCorrect ? 'text-green-600 dark:text-green-400 font-bold' : isUnanswered ? 'text-muted-foreground italic' : 'text-red-600 dark:text-red-400 font-bold'}`}>
@@ -3076,15 +3075,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                         ) : (
                                                           <div className="flex items-center gap-1">
                                                             {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
-                                                            {rightItem ? <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax> : "Unknown"}
-                                                            {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1" /> : <XCircle className="inline h-4 w-4 ml-1" />}
+                                                            <div className="flex-1">
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(rightText || studentRightId)}</UniversalMathJax>
+                                                            </div>
+                                                            {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1 text-green-600 shrink-0" /> : <XCircle className="inline h-4 w-4 ml-1 text-red-600 shrink-0" />}
                                                           </div>
                                                         )}
                                                       </td>
                                                       <td className="p-3 text-green-600 dark:text-green-400 font-medium">
                                                         <div className="flex items-center gap-1">
                                                           {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
-                                                          {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                          <div className="flex-1">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath(correctRightText || correctRightId || "N/A")}</UniversalMathJax>
+                                                          </div>
                                                         </div>
                                                       </td>
                                                     </tr>

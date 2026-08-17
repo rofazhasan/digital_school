@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, X, AlertCircle } from "lucide-react";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, cleanupMath } from "@/lib/utils";
 
 interface MTFGridProps {
     question: any;
@@ -32,8 +32,12 @@ export const MTFGrid = ({
 
     // Helper to get text for right item
     const getRightText = (id: string) => {
-        const item = rightColumn.find((r: any) => r.id === id);
-        return item ? item.text : id;
+        const item = rightColumn.find((r: any) => r.id === id || r.text === id);
+        return item ? (typeof item === 'string' ? item : (item.text || item.content || item.value || id)) : id;
+    };
+
+    const getLeftText = (lc: any) => {
+        return typeof lc === 'string' ? lc : (lc?.text || lc?.content || lc?.value || lc?.id || '');
     };
 
     return (
@@ -64,7 +68,7 @@ export const MTFGrid = ({
                                         {lc.id}
                                     </div>
                                     <div className="text-xl font-bold text-foreground/90">
-                                        <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                                        <UniversalMathJax inline dynamic>{cleanupMath(getLeftText(lc))}</UniversalMathJax>
                                     </div>
                                 </div>
 
@@ -92,6 +96,7 @@ export const MTFGrid = ({
                                     const isSelected = currentMatchId === rc.id;
                                     const isItemCorrect = showResult && cAns === rc.id;
                                     const isWrongSelection = showResult && isSelected && !isItemCorrect;
+                                    const rText = typeof rc === 'string' ? rc : (rc.text || rc.content || rc.value || rc.id || '');
 
                                     return (
                                         <button
@@ -107,7 +112,7 @@ export const MTFGrid = ({
                                             )}
                                         >
                                             <span className="text-base font-semibold leading-snug">
-                                                <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
+                                                <UniversalMathJax inline dynamic>{cleanupMath(rText)}</UniversalMathJax>
                                             </span>
 
                                             {(isSelected || isItemCorrect || isWrongSelection) && (
@@ -124,7 +129,7 @@ export const MTFGrid = ({
                                 <div className="mt-6 flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Correct Answer:</span>
                                     <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                                        <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
+                                        <UniversalMathJax inline dynamic>{cleanupMath(getRightText(cAns))}</UniversalMathJax>
                                     </div>
                                 </div>
                             )}
@@ -165,14 +170,14 @@ export const MTFGrid = ({
                                     </div>
 
                                     <div className="font-medium text-foreground/90 mb-3">
-                                        <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                                        <UniversalMathJax inline dynamic>{cleanupMath(getLeftText(lc))}</UniversalMathJax>
                                     </div>
 
                                     {currentMatchId ? (
                                         <div className="p-2 bg-muted/30 rounded-lg border border-border text-sm text-muted-foreground flex items-center gap-2">
                                             <div className="w-1 h-8 bg-primary rounded-full"></div>
                                             <div className="line-clamp-2 w-full text-left">
-                                                <UniversalMathJax inline dynamic>{currentMatchText}</UniversalMathJax>
+                                                <UniversalMathJax inline dynamic>{cleanupMath(currentMatchText || "")}</UniversalMathJax>
                                             </div>
                                         </div>
                                     ) : (
@@ -183,7 +188,7 @@ export const MTFGrid = ({
 
                                     {showResult && !isCorrect && (
                                         <div className="mt-2 text-xs text-green-600 font-bold bg-green-500/10 p-2 rounded">
-                                            Correct: {cAns} - {getRightText(cAns)}
+                                            Correct: {cAns} - <UniversalMathJax inline dynamic>{cleanupMath(getRightText(cAns))}</UniversalMathJax>
                                         </div>
                                     )}
                                 </div>
@@ -194,11 +199,12 @@ export const MTFGrid = ({
                                     <DialogTitle>Select Match for {lc.id}</DialogTitle>
                                     <div className="py-2 space-y-2">
                                         <div className="p-3 bg-muted rounded-lg mb-4 text-sm text-muted-foreground text-left">
-                                            <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(getLeftText(lc))}</UniversalMathJax>
                                         </div>
                                         <div className="h-px bg-border my-4" />
                                         {rightColumn.map((rc: any) => {
                                             const isSelected = currentMatchId === rc.id;
+                                            const rText = typeof rc === 'string' ? rc : (rc.text || rc.content || rc.value || rc.id || '');
                                             return (
                                                 <button
                                                     key={rc.id}
@@ -214,8 +220,8 @@ export const MTFGrid = ({
                                                     <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                                                         {rc.id}
                                                     </span>
-                                                    <div className="text-sm font-medium text-foreground text-left">
-                                                        <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
+                                                    <div className="text-sm font-medium text-foreground text-left flex-1">
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(rText)}</UniversalMathJax>
                                                     </div>
                                                 </button>
                                             )
@@ -241,11 +247,11 @@ export const MTFGrid = ({
                                     <span className="font-bold text-muted-foreground">{lc.id}</span>
                                     <div className="flex items-center gap-2">
                                         <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}>
-                                            <UniversalMathJax inline dynamic>{uAns ? getRightText(uAns) : '?'}</UniversalMathJax>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(uAns ? getRightText(uAns) : '?')}</UniversalMathJax>
                                         </span>
                                         <span className="text-muted-foreground/30">→</span>
                                         <span className="text-emerald-700 dark:text-emerald-300 font-bold">
-                                            <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(getRightText(cAns))}</UniversalMathJax>
                                         </span>
                                     </div>
                                 </div>

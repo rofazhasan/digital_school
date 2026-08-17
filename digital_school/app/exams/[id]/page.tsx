@@ -181,21 +181,31 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Column A</span>
-                {Array.isArray(question.leftColumn) && question.leftColumn.map((item: any, i: number) => (
-                  <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
-                    <span className="font-bold text-blue-600">{i + 1}.</span>
-                    <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
-                  </div>
-                ))}
+                {Array.isArray(question.leftColumn) && question.leftColumn.map((item: any, i: number) => {
+                  const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                  return (
+                    <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
+                      <span className="font-bold text-blue-600 shrink-0">{i + 1}.</span>
+                      <div className="flex-1">
+                        <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <div className="space-y-1">
                 <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Column B</span>
-                {Array.isArray(question.rightColumn) && question.rightColumn.map((item: any, i: number) => (
-                  <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
-                    <span className="font-bold text-purple-600">{String.fromCharCode(65 + i)}.</span>
-                    <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
-                  </div>
-                ))}
+                {Array.isArray(question.rightColumn) && question.rightColumn.map((item: any, i: number) => {
+                  const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                  return (
+                    <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
+                      <span className="font-bold text-purple-600 shrink-0">{String.fromCharCode(65 + i)}.</span>
+                      <div className="flex-1">
+                        <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
             {question.matches && (

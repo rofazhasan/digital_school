@@ -1227,12 +1227,13 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         if (q.type === 'MTF') {
                                             const normalizedMatches = Array.isArray(ans?.matches) ? ans.matches : (Array.isArray(ans) ? ans : []);
                                             const qMark = getMTFMark(q, ans);
+                                            const mtfQuestionTitle = q.questionText || q.question || q.text || q.q || 'Match the Columns:';
 
                                             return (
                                                 <div key={q.id || idx} className="break-inside-avoid col-span-full">
                                                     <div className="p-4 rounded border border-gray-200 bg-white shadow-sm relative">
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                        <div className="font-bold mb-3 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
+                                                        <div className="font-bold mb-3 text-sm">{idx + 1}. <Text>{mtfQuestionTitle}</Text></div>
 
                                                         {/* MTF Content: Columns + Table */}
                                                         <div className="space-y-6">
@@ -1240,21 +1241,27 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                             <div className="grid grid-cols-2 gap-2 bg-gray-50/50 p-1 rounded border border-dashed border-gray-200">
                                                                 <div className="space-y-1">
                                                                     <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b pb-0.5 mb-1 px-1">Column A</div>
-                                                                    {(q.leftColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
-                                                                            <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{i + 1}</span>
-                                                                            <div className="flex-1"><Text>{item.text}</Text></div>
-                                                                        </div>
-                                                                    ))}
+                                                                    {(q.leftColumn || []).map((item: any, i: number) => {
+                                                                        const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                                                        return (
+                                                                            <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
+                                                                                <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{i + 1}</span>
+                                                                                <div className="flex-1"><Text>{itemText}</Text></div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                                 <div className="space-y-1">
                                                                     <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b pb-0.5 mb-1 px-1">Column B</div>
-                                                                    {(q.rightColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
-                                                                            <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{String.fromCharCode(65 + i)}</span>
-                                                                            <div className="flex-1"><Text>{item.text}</Text></div>
-                                                                        </div>
-                                                                    ))}
+                                                                    {(q.rightColumn || []).map((item: any, i: number) => {
+                                                                        const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
+                                                                        return (
+                                                                            <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
+                                                                                <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{String.fromCharCode(65 + i)}</span>
+                                                                                <div className="flex-1"><Text>{itemText}</Text></div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
 
@@ -1289,11 +1296,6 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                                     studentRightId = (ans?.matches || ans)?.[lCol.id];
                                                                                 }
 
-                                                                                // Fallback for simple ID-to-ID if structured columns are missing (Legacy)
-                                                                                if (!studentRightId && q.pairs) {
-                                                                                    // ... (legacy logic if needed, but we rely on new schema mostly here)
-                                                                                }
-
                                                                                 const correctRightId = correctMatches[lCol.id];
                                                                                 const rightItem = q.rightColumn?.find((r: any) => r.id === studentRightId);
                                                                                 const studentRightIdx = q.rightColumn?.findIndex((r: any) => r.id === studentRightId);
@@ -1309,29 +1311,37 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                                 const vStudentRight = studentRightIdx !== -1 && studentRightIdx !== undefined ? String.fromCharCode(65 + studentRightIdx) : null;
                                                                                 const vCorrectRight = correctRightIdx !== -1 && correctRightIdx !== undefined ? String.fromCharCode(65 + correctRightIdx) : null;
 
+                                                                                const leftText = typeof lCol === 'string' ? lCol : (lCol?.text || lCol?.content || '');
+                                                                                const rightText = typeof rightItem === 'string' ? rightItem : (rightItem?.text || rightItem?.content || '');
+                                                                                const correctRightText = typeof correctRightItem === 'string' ? correctRightItem : (correctRightItem?.text || correctRightItem?.content || '');
+
                                                                                 return (
                                                                                     <tr key={cidx} className={isMatchCorrect ? "bg-green-50/30" : (isUnanswered ? "bg-white" : "bg-red-50/30")}>
                                                                                         <td className="p-2 border-r border-gray-100 font-medium">
                                                                                             <div className="flex items-center gap-1">
                                                                                                 <span className="font-bold text-gray-400 shrink-0">{vlLeft}.</span>
-                                                                                                <Text>{lCol.text}</Text>
+                                                                                                <Text>{leftText}</Text>
                                                                                             </div>
                                                                                         </td>
                                                                                         <td className="p-2 border-r border-gray-100">
-                                                                                            {isUnanswered ? <span className="text-gray-400 italic text-[10px]">No match</span> : (
+                                                                                            {isUnanswered ? (
+                                                                                                <span className="text-gray-400 italic">No Selection</span>
+                                                                                            ) : (
                                                                                                 <div className="flex items-center gap-1">
-                                                                                                    {isMatchCorrect ? <CheckCircle className="w-3 h-3 text-green-600" /> : <XCircle className="w-3 h-3 text-red-600" />}
-                                                                                                    <span className={isMatchCorrect ? "text-green-700 font-bold flex items-center gap-1" : "text-red-700 font-bold flex items-center gap-1"}>
-                                                                                                        {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
-                                                                                                        {rightItem ? <Text>{rightItem.text}</Text> : "Unknown"}
-                                                                                                    </span>
+                                                                                                    {vStudentRight && <span className="font-bold text-gray-500 shrink-0">{vStudentRight}.</span>}
+                                                                                                    <div className={`flex-1 ${isMatchCorrect ? "text-green-700 font-bold" : "text-red-600 font-medium"}`}>
+                                                                                                        <Text>{rightText || studentRightId}</Text>
+                                                                                                    </div>
+                                                                                                    {isMatchCorrect ? <span className="text-green-600 font-bold ml-auto shrink-0">✓</span> : <span className="text-red-500 font-bold ml-auto shrink-0">✕</span>}
                                                                                                 </div>
                                                                                             )}
                                                                                         </td>
-                                                                                        <td className="p-2 text-green-700 font-bold">
+                                                                                        <td className="p-2 font-medium text-green-700">
                                                                                             <div className="flex items-center gap-1">
-                                                                                                {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
-                                                                                                {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
+                                                                                                {vCorrectRight && <span className="font-bold text-green-800 shrink-0">{vCorrectRight}.</span>}
+                                                                                                <div className="flex-1">
+                                                                                                    <Text>{correctRightText || correctRightId || 'N/A'}</Text>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </td>
                                                                                     </tr>
