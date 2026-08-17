@@ -13,26 +13,26 @@ const cqSubsectionSchema = z.object({
 });
 
 const examSchema = z.object({
-    name: z.string().min(2),
-    description: z.string().optional(),
-    date: z.string(),
-    startTime: z.string(),
-    endTime: z.string(),
-    duration: z.coerce.number().min(1),
-    type: z.enum(["ONLINE", "OFFLINE", "MIXED"]),
-    totalMarks: z.coerce.number().min(1),
-    passMarks: z.coerce.number().min(0),
-    classId: z.string().min(1),
-    allowRetake: z.boolean().optional(),
-    instructions: z.string().optional(),
-    mcqNegativeMarking: z.coerce.number().min(0).max(100).optional(),
-    cqTotalQuestions: z.coerce.number().optional(),
-    cqRequiredQuestions: z.coerce.number().optional(),
-    sqTotalQuestions: z.coerce.number().optional(),
-    sqRequiredQuestions: z.coerce.number().optional(),
-    objectiveTime: z.coerce.number().optional(),
-    cqSqTime: z.coerce.number().optional(),
-    cqSubsections: z.array(cqSubsectionSchema).optional(),
+    name: z.string().min(1, "Exam name is required"),
+    description: z.string().optional().nullable(),
+    date: z.string().min(1, "Date is required"),
+    startTime: z.string().optional().nullable(),
+    endTime: z.string().optional().nullable(),
+    duration: z.coerce.number().min(1).default(60),
+    type: z.enum(["ONLINE", "OFFLINE", "MIXED"]).default("OFFLINE"),
+    totalMarks: z.coerce.number().min(1).default(100),
+    passMarks: z.coerce.number().min(0).default(33),
+    classId: z.string().min(1, "Class is required"),
+    allowRetake: z.boolean().optional().default(false),
+    instructions: z.string().optional().nullable(),
+    mcqNegativeMarking: z.coerce.number().min(0).max(100).optional().default(0),
+    cqTotalQuestions: z.coerce.number().optional().default(0),
+    cqRequiredQuestions: z.coerce.number().optional().default(0),
+    sqTotalQuestions: z.coerce.number().optional().default(0),
+    sqRequiredQuestions: z.coerce.number().optional().default(0),
+    objectiveTime: z.coerce.number().optional().nullable(),
+    cqSqTime: z.coerce.number().optional().nullable(),
+    cqSubsections: z.array(cqSubsectionSchema).optional().nullable(),
 });
 
 const bulkCreateSchema = z.array(examSchema);
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         }
 
         const json = await request.json();
-        const validation = bulkCreateSchema.safeParse(json);
+        const validation = bulkCreateSchema.safeParse(Array.isArray(json) ? json : json?.exams || []);
 
         if (!validation.success) {
             return createApiResponse(null, validation.error.message, 400);
@@ -53,23 +53,43 @@ export async function POST(request: NextRequest) {
 
         const examsData = validation.data;
 
+        if (examsData.length === 0) {
+            return createApiResponse(null, "No valid exams found in payload", 400);
+        }
+
         const createdExams = await prismadb.$transaction(
             examsData.map((exam) => {
-                // Ensure dates are valid Date objects for Prisma
                 const dateObj = new Date(exam.date);
-                const startObj = new Date(exam.startTime);
-                const endObj = new Date(exam.endTime);
-
-                if (isNaN(dateObj.getTime()) || isNaN(startObj.getTime()) || isNaN(endObj.getTime())) {
+                if (isNaN(dateObj.getTime())) {
                     throw new Error(`Invalid date format for exam: ${exam.name}`);
                 }
 
+                const dur = Number(exam.duration) || 60;
+                const startObj = exam.startTime ? new Date(exam.startTime) : dateObj;
+                const endObj = exam.endTime ? new Date(exam.endTime) : new Date(startObj.getTime() + dur * 60000);
+
                 return prismadb.exam.create({
                     data: {
-                        ...exam,
+                        name: exam.name,
+                        description: exam.description || "",
                         date: dateObj,
-                        startTime: startObj,
-                        endTime: endObj,
+                        startTime: isNaN(startObj.getTime()) ? dateObj : startObj,
+                        endTime: isNaN(endObj.getTime()) ? new Date(dateObj.getTime() + dur * 60000) : endObj,
+                        duration: dur,
+                        type: exam.type,
+                        totalMarks: Number(exam.totalMarks) || 100,
+                        passMarks: Number(exam.passMarks) || 33,
+                        classId: exam.classId,
+                        allowRetake: !!exam.allowRetake,
+                        instructions: exam.instructions || null,
+                        mcqNegativeMarking: Number(exam.mcqNegativeMarking) || 0,
+                        cqTotalQuestions: Number(exam.cqTotalQuestions) || 0,
+                        cqRequiredQuestions: Number(exam.cqRequiredQuestions) || 0,
+                        sqTotalQuestions: Number(exam.sqTotalQuestions) || 0,
+                        sqRequiredQuestions: Number(exam.sqRequiredQuestions) || 0,
+                        objectiveTime: exam.objectiveTime ? Number(exam.objectiveTime) : null,
+                        cqSqTime: exam.cqSqTime ? Number(exam.cqSqTime) : null,
+                        cqSubsections: (exam.cqSubsections as any) || null,
                         createdById: auth.user.id,
                         isActive: false,
                     },
@@ -80,16 +100,13 @@ export async function POST(request: NextRequest) {
         // Invalidate cache
         DatabaseCache.invalidate("exams");
 
-        // Also invalidate individual exam caches? No need as they are new.
-        // Invalidate class-specific exam lists if any
-
         return createApiResponse(
             { count: createdExams.length, exams: createdExams },
-            "Exams created successfully",
+            `${createdExams.length} exams imported successfully`,
             201
         );
     } catch (error: any) {
         console.error("POST /api/exams/bulk Error:", error);
-        return createApiResponse(null, "Internal Server Error", 500);
+        return createApiResponse(null, error.message || "Internal Server Error", 500);
     }
 }

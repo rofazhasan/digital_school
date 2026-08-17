@@ -312,78 +312,116 @@ export async function POST(request: NextRequest) {
       return createApiResponse(null, 'Not authenticated', 401);
     }
 
-    const body = await request.json();
-    const {
-      name,
-      description,
-      date,
-      startTime,
-      endTime,
-      duration,
-      type,
-      totalMarks,
-      passMarks,
-      classId,
-      allowRetake,
-      instructions,
-      mcqNegativeMarking,
-      cqTotalQuestions,
-      cqRequiredQuestions,
-      sqTotalQuestions,
-      sqRequiredQuestions,
-      objectiveTime,
-      cqSqTime,
-      cqSubsections,
-    } = body;
+    const body = await request.json().catch(() => ({}));
 
-    if (!name || !date || !startTime || !endTime || !duration || !type || !totalMarks || !passMarks || !classId) {
-      return createApiResponse(null, 'Missing required fields', 400);
+    // Support both single exam object and bulk array in POST /api/exams
+    const isBulk = Array.isArray(body) || Array.isArray(body?.exams);
+    const examList: any[] = Array.isArray(body) ? body : Array.isArray(body?.exams) ? body.exams : [body];
+
+    if (examList.length === 0) {
+      return createApiResponse(null, 'No exam data provided', 400);
     }
 
-    const createdExam = await safeDatabaseOperation(
-      async () => {
-        const db = await DatabaseClient.getInstance();
-        return await db.exam.create({
-          data: {
-            name,
-            description,
-            date: new Date(date),
-            startTime: new Date(startTime),
-            endTime: new Date(endTime),
-            duration,
-            type,
-            totalMarks,
-            passMarks,
-            isActive: false,
-            allowRetake: allowRetake || false,
-            instructions,
-            mcqNegativeMarking: mcqNegativeMarking ?? 0,
-            cqTotalQuestions: cqTotalQuestions ?? 0,
-            cqRequiredQuestions: cqRequiredQuestions ?? 0,
-            sqTotalQuestions: sqTotalQuestions ?? 0,
-            sqRequiredQuestions: sqRequiredQuestions ?? 0,
-            objectiveTime: objectiveTime ?? null,
-            cqSqTime: cqSqTime ?? null,
-            cqSubsections: cqSubsections || null,
-            classId,
-            createdById: auth.user.id,
-          } as any,
-        });
-      },
-      'Create exam'
-    );
+    const parseExamData = (item: any) => {
+      const {
+        name,
+        description,
+        date,
+        startTime,
+        endTime,
+        duration,
+        type,
+        totalMarks,
+        passMarks,
+        classId,
+        allowRetake,
+        instructions,
+        mcqNegativeMarking,
+        cqTotalQuestions,
+        cqRequiredQuestions,
+        sqTotalQuestions,
+        sqRequiredQuestions,
+        objectiveTime,
+        cqSqTime,
+        cqSubsections,
+      } = item;
 
-    // Invalidate exams cache
+      if (!name || !date || !classId) {
+        throw new Error(`Missing required fields for exam "${name || 'Unnamed'}" (name, date, classId are required)`);
+      }
+
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error(`Invalid date format for exam "${name}"`);
+      }
+
+      const dur = duration !== undefined && duration !== null ? Number(duration) : 60;
+      const startObj = startTime ? new Date(startTime) : dateObj;
+      const endObj = endTime ? new Date(endTime) : new Date(startObj.getTime() + dur * 60000);
+
+      return {
+        name,
+        description: description || '',
+        date: dateObj,
+        startTime: isNaN(startObj.getTime()) ? dateObj : startObj,
+        endTime: isNaN(endObj.getTime()) ? new Date(dateObj.getTime() + dur * 60000) : endObj,
+        duration: dur,
+        type: (type || 'OFFLINE').toUpperCase(),
+        totalMarks: totalMarks !== undefined && totalMarks !== null ? Number(totalMarks) : 100,
+        passMarks: passMarks !== undefined && passMarks !== null ? Number(passMarks) : 33,
+        isActive: false,
+        allowRetake: !!allowRetake,
+        instructions: instructions || null,
+        mcqNegativeMarking: mcqNegativeMarking !== undefined ? Number(mcqNegativeMarking) : 0,
+        cqTotalQuestions: cqTotalQuestions ? Number(cqTotalQuestions) : 0,
+        cqRequiredQuestions: cqRequiredQuestions ? Number(cqRequiredQuestions) : 0,
+        sqTotalQuestions: sqTotalQuestions ? Number(sqTotalQuestions) : 0,
+        sqRequiredQuestions: sqRequiredQuestions ? Number(sqRequiredQuestions) : 0,
+        objectiveTime: objectiveTime ? Number(objectiveTime) : null,
+        cqSqTime: cqSqTime ? Number(cqSqTime) : null,
+        cqSubsections: cqSubsections || null,
+        classId,
+        createdById: auth.user.id,
+      };
+    };
+
+    if (isBulk && examList.length > 1) {
+      const parsedList = examList.map(parseExamData);
+      const db = await DatabaseClient.getInstance();
+      const createdExams = await db.$transaction(
+        parsedList.map(data => db.exam.create({ data }))
+      );
+
+      DatabaseCache.invalidate('exams');
+
+      return createApiResponse(
+        { count: createdExams.length, exams: createdExams },
+        `${createdExams.length} exams created successfully`,
+        201
+      );
+    }
+
+    // Single exam creation
+    const examData = parseExamData(examList[0]);
+    const db = await DatabaseClient.getInstance();
+    const createdExam = await db.exam.create({ data: examData });
+
     DatabaseCache.invalidate('exams');
 
-    return createApiResponse({
-      id: createdExam.id,
-      name: createdExam.name,
-      message: 'Exam created successfully',
-    });
+    return createApiResponse(
+      {
+        id: createdExam.id,
+        name: createdExam.name,
+        date: createdExam.date,
+        type: createdExam.type,
+        message: 'Exam created successfully',
+      },
+      'Exam created successfully',
+      201
+    );
   } catch (error: any) {
     console.error('Failed to create exam:', error);
-    return createApiResponse(null, 'Failed to create exam', 500);
+    return createApiResponse(null, error.message || 'Failed to create exam', 500);
   }
 }
 
