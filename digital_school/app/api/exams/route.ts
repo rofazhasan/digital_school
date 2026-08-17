@@ -122,8 +122,10 @@ export async function GET(request: NextRequest) {
   const typeFilter = url.searchParams.get('type') || '';
   const subjectFilter = url.searchParams.get('subject') || '';
   const statusFilter = url.searchParams.get('status') || '';
+  const sortBy = url.searchParams.get('sortBy') || 'date';
+  const sortOrder = url.searchParams.get('sortOrder') || 'asc';
 
-  const cacheKey = `exams:all:${page}:${limit}:${summary}:${search}:${classId}:${typeFilter}:${subjectFilter}:${statusFilter}`;
+  const cacheKey = `exams:all:${page}:${limit}:${summary}:${search}:${classId}:${typeFilter}:${subjectFilter}:${statusFilter}:${sortBy}:${sortOrder}`;
   const cached = DatabaseCache.getSWR(cacheKey);
 
   // If valid cache exists, return immediately (Edge will handle SWR)
@@ -194,10 +196,21 @@ export async function GET(request: NextRequest) {
           });
         }
 
+        let orderByClause: any = { date: 'asc' };
+        if (sortBy === 'created') {
+          orderByClause = { createdAt: sortOrder === 'asc' ? 'asc' : 'desc' };
+        } else if (sortBy === 'name') {
+          orderByClause = { name: sortOrder === 'desc' ? 'desc' : 'asc' };
+        } else if (sortBy === 'marks') {
+          orderByClause = { totalMarks: sortOrder === 'desc' ? 'desc' : 'asc' };
+        } else {
+          orderByClause = { date: sortOrder === 'desc' ? 'desc' : 'asc' };
+        }
+
         const [data, count] = await Promise.all([
           db.exam.findMany({
             where,
-            orderBy: { createdAt: 'desc' },
+            orderBy: orderByClause,
             skip,
             take: limit,
             select: selectFields,
