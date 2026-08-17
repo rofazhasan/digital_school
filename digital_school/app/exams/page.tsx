@@ -202,21 +202,9 @@ function formatExamTimingDisplay(start: Date, end: Date) {
 }
 
 export default function ExamsPage() {
-  const [exams, setExams] = useState<Exam[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = localStorage.getItem("cached_admin_exams");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch (e) {
-        // Ignore cache parse error
-      }
-    }
-    return [];
-  });
-  const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
 
@@ -294,6 +282,18 @@ export default function ExamsPage() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
+    try {
+      const cached = localStorage.getItem("cached_admin_exams");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setExams(parsed);
+          setLoading(false);
+        }
+      }
+    } catch (e) {}
+
     fetchExams();
     fetchUserRole();
   }, []);
@@ -1318,14 +1318,14 @@ export default function ExamsPage() {
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                                   </span>
-                                  LIVE • {countdown.text}
+                                  <span suppressHydrationWarning>LIVE • {countdown.text}</span>
                                 </Badge>
                               )}
 
                               {timingStatus === 'upcoming' && (
                                 <Badge className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 px-2.5 py-0.5 font-bold text-[10px] uppercase flex items-center gap-1">
                                   <Timer className="h-3 w-3" />
-                                  UPCOMING • {countdown.text}
+                                  <span suppressHydrationWarning>UPCOMING • {countdown.text}</span>
                                 </Badge>
                               )}
 
@@ -1492,7 +1492,7 @@ export default function ExamsPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 text-xs font-bold text-foreground truncate" title={formatExamTimingDisplay(timing.start, timing.end)}>
                                 <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                                <span className="truncate">{formatExamTimingDisplay(timing.start, timing.end)}</span>
+                                <span className="truncate" suppressHydrationWarning>{formatExamTimingDisplay(timing.start, timing.end)}</span>
                               </div>
                               <span className="text-[10px] text-muted-foreground block pl-5">
                                 Duration: {exam.duration || 60} mins
