@@ -578,10 +578,11 @@ export default function StudentDashboardPage() {
               <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900/80 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800/80">
                 {[
                   { id: 'dashboard', label: 'Overview', icon: Home },
-                  { id: 'exams', label: 'Exams & Results', icon: FileText },
+                  { id: 'exams', label: 'My Exams', icon: FileText },
+                  { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
                   { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-                  { id: 'analytics', label: 'Deep Analytics', icon: TrendingUp },
-                  { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
+                  { id: 'analytics', label: 'Deep Analytics', icon: TrendingUp, href: '/student/analytics' },
+                  { id: 'focus', label: 'Focus Mode', icon: Target, href: '/student/focus' },
                   { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
                 ].map((item) => (
                   <button
@@ -593,7 +594,7 @@ export default function StudentDashboardPage() {
                       else setActiveTab(item.id);
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 ${
-                      activeTab === item.id
+                      activeTab === item.id && !item.href
                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-muted-foreground hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
                     }`}
@@ -670,10 +671,11 @@ export default function StudentDashboardPage() {
         <div className="flex gap-2">
           {[
             { id: 'dashboard', label: 'Overview', icon: Home },
-            { id: 'exams', label: 'Exams & Results', icon: FileText },
+            { id: 'exams', label: 'My Exams', icon: FileText },
+            { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
             { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-            { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp, href: '/student/analytics' },
+            { id: 'focus', label: 'Focus', icon: Target, href: '/student/focus' },
             { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
           ].map((item) => (
             <button
@@ -685,7 +687,7 @@ export default function StudentDashboardPage() {
                 else setActiveTab(item.id);
               }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                activeTab === item.id
+                activeTab === item.id && !item.href
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                   : 'bg-slate-100 dark:bg-slate-900 text-muted-foreground border border-slate-200 dark:border-slate-800'
               }`}
@@ -1205,15 +1207,14 @@ export default function StudentDashboardPage() {
                       Scheduled & Live Exams ({filteredScheduledExams.length})
                     </button>
                     <button
-                      onClick={() => { triggerHaptic(ImpactStyle.Light); setExamSubTab('results'); }}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        examSubTab === 'results'
-                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      onClick={() => {
+                        triggerHaptic(ImpactStyle.Light);
+                        router.push('/exams/results');
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all text-muted-foreground hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
                     >
                       <Award className="h-3.5 w-3.5" />
-                      Completed & Results ({filteredExamResults.length})
+                      Completed & Results ({filteredExamResults.length}) →
                     </button>
                   </div>
 

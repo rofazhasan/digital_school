@@ -43,6 +43,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       results
+    }, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=10, stale-while-revalidate=60',
+      }
     });
 
   } catch (error) {

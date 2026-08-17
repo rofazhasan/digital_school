@@ -153,13 +153,27 @@ interface DetailedResult {
   };
 }
 
+const RESULTS_PAGE_CACHE_KEY = "exam_results_page_cache_v2";
+
 export default function ExamResultsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  // Instant SWR Hydration
+  const [cached] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(RESULTS_PAGE_CACHE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [user, setUser] = useState<User | null>(cached?.user || null);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
-  const [examResults, setExamResults] = useState<ExamResults[]>([]);
-  const [filteredResults, setFilteredResults] = useState<ExamResults[]>([]);
+  const [examResults, setExamResults] = useState<ExamResults[]>(cached?.examResults || []);
+  const [filteredResults, setFilteredResults] = useState<ExamResults[]>(cached?.examResults || []);
   const [selectedExam, setSelectedExam] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'class'>('date');
@@ -169,69 +183,67 @@ export default function ExamResultsPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
   useEffect(() => {
-    fetchUserAndResults();
+    fetchUserAndResults(Boolean(cached));
   }, [pagination.page]);
 
   useEffect(() => {
     filterAndSortResults();
   }, [examResults, selectedExam, searchTerm, sortBy, sortOrder]);
 
-  const fetchUserAndResults = async () => {
+  const fetchUserAndResults = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && !user) setLoading(true);
 
-      // Fetch current user
-      const userResponse = await fetch('/api/user', {
-        credentials: 'include'
-      });
-      if (!userResponse.ok) {
-        if (userResponse.status === 401) {
-          router.push('/login');
-          return;
-        }
-        throw new Error(`Failed to fetch user: ${userResponse.status}`);
-      }
-      const userData = await userResponse.json();
-      setUser(userData.user || userData);
-
-      // Fetch results based on user role and pagination
+      // Fetch current user & results concurrently
       const queryParams = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString()
       });
 
-      const resultsResponse = await fetch(`/api/exams/results/all?${queryParams.toString()}`, {
-        credentials: 'include'
-      });
+      const [userResponse, resultsResponse] = await Promise.allSettled([
+        fetch('/api/user', { credentials: 'include' }),
+        fetch(`/api/exams/results/all?${queryParams.toString()}`, { credentials: 'include' })
+      ]);
 
-      if (resultsResponse.ok) {
-        const resultsData = await resultsResponse.json();
+      let userData = null;
+      if (userResponse.status === "fulfilled" && userResponse.value.ok) {
+        const u = await userResponse.value.json();
+        userData = u.user || u;
+        setUser(userData);
+      }
 
-        // Handle new paginated data structure
-        let examResultsData = [];
+      let examResultsData: ExamResults[] = [];
+      if (resultsResponse.status === "fulfilled" && resultsResponse.value.ok) {
+        const resultsData = await resultsResponse.value.json();
+
         if (resultsData.examResults) {
           examResultsData = resultsData.examResults;
         } else if (Array.isArray(resultsData)) {
           examResultsData = resultsData;
         }
 
-        setExamResults(examResultsData as ExamResults[]);
+        setExamResults(examResultsData);
 
         if (resultsData.pagination) {
           setPagination(prev => ({
             ...prev,
-            total: resultsData.pagination.total,
-            totalPages: resultsData.pagination.totalPages
+            total: resultsData.pagination.totalCount || resultsData.pagination.total || 0,
+            totalPages: resultsData.pagination.totalPages || 1
           }));
         }
-      } else {
-        console.error('Failed to fetch results:', resultsResponse.status);
-        toast.error('Failed to load exam results');
+
+        // Cache snapshot in sessionStorage
+        try {
+          sessionStorage.setItem(RESULTS_PAGE_CACHE_KEY, JSON.stringify({
+            user: userData,
+            examResults: examResultsData,
+            cachedAt: Date.now()
+          }));
+        } catch {}
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load results');
-      toast.error('Failed to load results. Please try again.');
+      if (!isSilent) toast.error('Failed to load results. Please try again.');
     } finally {
       setLoading(false);
     }

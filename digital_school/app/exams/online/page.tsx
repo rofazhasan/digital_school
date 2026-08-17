@@ -275,11 +275,12 @@ function getPaginationRange(currentPage: number, totalPages: number): (number | 
 }
 
 export default function OnlineExamsPage() {
-  const [user, setUser] = useState<any>(null);
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [results, setResults] = useState<Result[]>([]);
-  const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cached] = useState(() => loadFromLocalCache());
+  const [user, setUser] = useState<any>(() => cached?.user || null);
+  const [exams, setExams] = useState<Exam[]>(() => cached?.exams || []);
+  const [results, setResults] = useState<Result[]>(() => cached?.results || []);
+  const [submissions, setSubmissions] = useState<ExamSubmission[]>(() => cached?.submissions || []);
+  const [loading, setLoading] = useState(() => !cached);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
@@ -363,20 +364,9 @@ export default function OnlineExamsPage() {
     }
   }, []);
 
-  // Initial load: instant render from cache, then revalidate in background
+  // Initial load: revalidate silently in background
   useEffect(() => {
-    const cached = loadFromLocalCache();
-    if (cached) {
-      if (cached.user) setUser(cached.user);
-      if (cached.exams) setExams(cached.exams);
-      if (cached.results) setResults(cached.results);
-      if (cached.submissions) setSubmissions(cached.submissions);
-      setLoading(false);
-      // Background revalidation
-      loadData(false);
-    } else {
-      loadData(false);
-    }
+    loadData(false);
   }, [loadData]);
 
   const userClassId = user?.studentProfile?.class?.id;

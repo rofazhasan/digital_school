@@ -251,6 +251,10 @@ export async function GET(request: NextRequest) {
         totalCount,
         totalPages: Math.ceil(totalCount / limit)
       }
+    }, {
+      headers: {
+        'Cache-Control': 'private, s-maxage=10, stale-while-revalidate=60',
+      }
     });
 
   } catch (error) {
