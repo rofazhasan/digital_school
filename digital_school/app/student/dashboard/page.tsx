@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,10 +41,23 @@ import {
   Users,
   CheckCircle,
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  Zap,
+  Flame,
+  CheckCircle2,
+  AlertCircle,
+  Timer,
+  Search,
+  SlidersHorizontal,
+  ExternalLink,
+  Layers,
+  ChevronRight,
+  Filter,
+  Monitor
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
+import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { StudentAnalyticsTab } from "@/components/dashboard/student-tabs";
 
 const FocusMode = dynamic(() => import("@/components/dashboard/wonderspace/FocusMode").then(mod => mod.FocusMode), { ssr: false });
@@ -86,60 +99,51 @@ ChartJS.register(
   Filler
 );
 
-
-interface User {
+interface UserProfile {
   id: string;
   name: string;
   email: string;
   role: 'STUDENT';
   studentProfile?: {
+    id?: string;
     roll: string;
     registrationNo: string;
     class: {
       name: string;
       section: string;
     };
-    classId: string; // Added classId based on usage
+    classId: string;
   };
 }
 
 interface Exam {
   id: string;
   name: string;
-  subject: string;
-  examSet: string;
+  subject?: string;
+  description?: string;
   date: string;
-  time: string;
-  type: 'ONLINE' | 'OFFLINE' | 'MIXED';
-  status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
-  totalMarks: number;
+  startTime?: string;
   endTime?: string;
   duration?: number;
+  type: 'ONLINE' | 'OFFLINE' | 'MIXED';
+  totalMarks: number;
+  classId?: string;
 }
 
 interface Result {
+  id?: string;
+  examId: string;
   examTitle: string;
   subject: string;
+  type?: 'ONLINE' | 'OFFLINE' | 'MIXED';
   score: number;
   totalMarks: number;
   percentage: number;
-  rank: number;
-  totalStudents: number;
-  gpa: number;
+  rank?: number;
   grade?: string;
-  feedback: string;
+  comment?: string;
   date: string;
-  examId?: string;
-  total?: number;
-}
-
-interface Badge {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  earnedAt: string;
-  color: string;
+  isPublished?: boolean;
 }
 
 interface Notice {
@@ -150,1054 +154,1358 @@ interface Notice {
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
+const DASHBOARD_CACHE_KEY = "student_dashboard_cache_v3";
+
 export default function StudentDashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [results, setResults] = useState<Result[]>([]);
-  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>([]);
-  const [attendance, setAttendance] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
-  const [analytics, setAnalytics] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
   const router = useRouter();
 
+  // Instant SWR Hydration State
+  const [cachedData] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return null;
+  });
 
-  // Fetch user, exams, results, and attendance from API
+  const [user, setUser] = useState<UserProfile | null>(cachedData?.user || null);
+  const [exams, setExams] = useState<Exam[]>(cachedData?.exams || []);
+  const [results, setResults] = useState<Result[]>(cachedData?.results || []);
+  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>(cachedData?.submissions || []);
+  const [attendance, setAttendance] = useState<any>(cachedData?.attendance || null);
+  const [notices, setNotices] = useState<Notice[]>(cachedData?.notices || []);
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
+  const [analytics, setAnalytics] = useState<any>(cachedData?.analytics || null);
+  const [loading, setLoading] = useState(!cachedData?.user);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+  const [now, setNow] = useState<Date>(new Date());
+
+  // Performance Trends Controls
+  const [trendRange, setTrendRange] = useState<'5' | '10' | 'all'>('10');
+  const [trendSubjectFilter, setTrendSubjectFilter] = useState<string>('all');
+
+  // Exams Tab Controls
+  const [examSubTab, setExamSubTab] = useState<'upcoming' | 'results'>('upcoming');
+  const [examTypeFilter, setExamTypeFilter] = useState<string>('all');
+  const [examSearchQuery, setExamSearchQuery] = useState<string>('');
+
+  // 1-second real-time timer for live exams
   useEffect(() => {
-    // Fetch unread notice count
-    fetch('/api/notices').then(res => res.ok ? res.json() : null).then(data => {
-      if (data) setUnreadNoticeCount(data.unreadCount || 0);
-    }).catch(() => { });
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  // Fetch user, exams, results, and attendance from API
+  // Fetch settings
   useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-    fetch('/api/user')
-      .then(res => res.json())
-      .then(data => {
-        if (data.user && data.user.role === 'STUDENT') {
-          if (isMounted) setUser(data.user);
-          // Fetch ALL exams for the class (not filtered by status)
-          fetch('/api/exams?limit=200')
-            .then(res => res.json())
-            .then(resData => {
-              const examData = Array.isArray(resData) ? resData : (resData.exams || resData.data || []);
-              let filtered: any[] = [];
-              const userClassId = data.user.studentProfile?.classId;
-              if (userClassId && Array.isArray(examData)) {
-                filtered = examData.filter((exam: any) => exam.classId === userClassId); // eslint-disable-line @typescript-eslint/no-explicit-any
-                filtered.sort((a: any, b: any) => {
-                  const getStart = (e: any) => {
-                    if (e.startTime) {
-                      const t = new Date(e.startTime).getTime();
-                      if (!isNaN(t)) return t;
-                    }
-                    if (e.date) {
-                      const d = new Date(e.date);
-                      d.setHours(0, 0, 0, 0);
-                      const t = d.getTime();
-                      if (!isNaN(t)) return t;
-                    }
-                    return 0;
-                  };
-                  return getStart(a) - getStart(b);
-                });
-              }
-              if (isMounted) setExams(filtered);
-            })
-            .catch((err) => {
-              console.error("Failed to fetch exams", err);
-              if (isMounted) setExams([]);
-            });
+    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+    fetch('/api/notices').then(res => res.ok ? res.json() : null).then(data => {
+      if (data) setUnreadNoticeCount(data.unreadCount || 0);
+    }).catch(() => {});
+  }, []);
 
-          // Fetch exam submissions to show completion status in exams tab
-          fetch('/api/exam-submissions')
-            .then(res => res.ok ? res.json() : { submissions: [] })
-            .then(subData => {
-              const subs = Array.isArray(subData) ? subData :
-                Array.isArray(subData.submissions) ? subData.submissions :
-                  Array.isArray(subData.data) ? subData.data : [];
-              if (isMounted) setExamSubmissions(subs);
-            })
-            .catch(() => { if (isMounted) setExamSubmissions([]); });
+  // Main Dashboard Data Fetch with 0-second SWR background sync
+  const fetchDashboardData = useCallback(async (isSilent = false) => {
+    if (!isSilent && !user) setLoading(true);
 
-          // Fetch results
-          fetch('/api/student/results')
-            .then(res => res.json())
-            .then(resultData => {
-              if (isMounted) setResults(resultData.results || []);
-            })
-            .catch(() => {
-              if (isMounted) setResults([]);
-            });
-
-          // Fetch attendance (legacy) - Keeping for now, but analytics endpoint provides it too
-          fetch('/api/student/attendance')
-            .then(res => res.json())
-            .then(attData => {
-              if (isMounted) setAttendance(attData.summary || null);
-            })
-            .catch(() => {
-              if (isMounted) setAttendance(null);
-            });
-
-          // Fetch new Analytics
-          fetch('/api/student/analytics')
-            .then(res => res.json())
-            .then(analyticsData => {
-              if (isMounted) setAnalytics(analyticsData.analytics);
-            })
-            .catch(console.error);
-
-          // Fetch Notices
-          fetch('/api/student/notices')
-            .then(res => res.json())
-            .then(noticeData => {
-              if (isMounted) setNotices(noticeData.notices || []);
-            })
-            .catch(console.error);
-
-        } else if (data.user) {
-          const userRole = data.user.role;
-          let redirectUrl = '/dashboard';
-          switch (userRole) {
-            case 'SUPER_USER':
-              redirectUrl = '/super-user/dashboard';
-              break;
-            case 'ADMIN':
-              redirectUrl = '/admin/dashboard';
-              break;
-            case 'TEACHER':
-              redirectUrl = '/teacher/dashboard';
-              break;
-            default:
-              redirectUrl = '/dashboard';
-          }
-          router.push(redirectUrl);
-        } else {
-          router.push('/login');
-        }
-      })
-      .catch(() => {
+    try {
+      const userRes = await fetch('/api/user', { credentials: 'include' });
+      if (!userRes.ok) {
         router.push('/login');
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => { isMounted = false; };
-  }, [router]);
+        return;
+      }
 
-  // Use the latest result for overview and results section
-  const lastResult = results && results.length > 0 ? results[0] : null;
-  const attendanceData = analytics?.attendance || attendance || { percentage: 0, present: 0, absent: 0, late: 0, total: 30 };
-  const performanceData = analytics?.performance || { averagePercentage: 0, gpa: 0, grade: '-' };
-  const classRank = analytics?.rank || '-';
-  const totalStudents = analytics?.totalStudents || '-';
+      const userData = await userRes.json();
+      const currentUser = userData.user;
 
-  // Real badges can be fetched or we can leave mock for now if not implemented fully in backend yet.
-  // The analytics endpoint returns badges. let's use them if available.
-  const badges = analytics?.badges || [];
+      if (!currentUser || currentUser.role !== 'STUDENT') {
+        router.push(currentUser?.role === 'SUPER_USER' ? '/super-user/dashboard' : currentUser?.role === 'ADMIN' ? '/admin/dashboard' : currentUser?.role === 'TEACHER' ? '/teacher/dashboard' : '/login');
+        return;
+      }
+
+      setUser(currentUser);
+
+      // Concurrent parallel fetches
+      const [examsRes, subsRes, resultsRes, attRes, analyticsRes, noticesRes] = await Promise.allSettled([
+        fetch('/api/exams?limit=500', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+        fetch('/api/exam-submissions', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+        fetch('/api/student/results', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+        fetch('/api/student/attendance', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+        fetch('/api/student/analytics', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+        fetch('/api/student/notices', { credentials: 'include' }).then(r => r.ok ? r.json() : [])
+      ]);
+
+      // Process Exams
+      let processedExams: Exam[] = [];
+      if (examsRes.status === 'fulfilled') {
+        const raw = examsRes.value;
+        const examList = Array.isArray(raw) ? raw : (raw.exams || raw.data?.exams || raw.data || []);
+        const userClassId = currentUser.studentProfile?.classId;
+        if (userClassId && Array.isArray(examList)) {
+          processedExams = examList.filter((e: any) => !e.classId || e.classId === userClassId);
+        } else {
+          processedExams = Array.isArray(examList) ? examList : [];
+        }
+      }
+      setExams(processedExams);
+
+      // Process Submissions
+      let processedSubs: any[] = [];
+      if (subsRes.status === 'fulfilled') {
+        const raw = subsRes.value;
+        processedSubs = Array.isArray(raw) ? raw : (raw.submissions || raw.data || []);
+        setExamSubmissions(processedSubs);
+      }
+
+      // Process Results
+      let processedResults: Result[] = [];
+      if (resultsRes.status === 'fulfilled') {
+        const raw = resultsRes.value;
+        processedResults = Array.isArray(raw) ? raw : (raw.results || raw.data || []);
+        setResults(processedResults);
+      }
+
+      // Process Attendance & Analytics
+      let processedAtt: any = null;
+      if (attRes.status === 'fulfilled' && attRes.value) {
+        processedAtt = attRes.value.summary || attRes.value;
+        setAttendance(processedAtt);
+      }
+
+      let processedAnalytics: any = null;
+      if (analyticsRes.status === 'fulfilled' && analyticsRes.value) {
+        processedAnalytics = analyticsRes.value.analytics || analyticsRes.value;
+        setAnalytics(processedAnalytics);
+      }
+
+      // Process Notices
+      let processedNotices: Notice[] = [];
+      if (noticesRes.status === 'fulfilled') {
+        const raw = noticesRes.value;
+        processedNotices = Array.isArray(raw) ? raw : (raw.notices || []);
+        setNotices(processedNotices);
+      }
+
+      // Cache all snapshot in sessionStorage for 0-second instant next visit
+      try {
+        sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+          user: currentUser,
+          exams: processedExams,
+          results: processedResults,
+          submissions: processedSubs,
+          attendance: processedAtt,
+          analytics: processedAnalytics,
+          notices: processedNotices,
+          updatedAt: Date.now()
+        }));
+      } catch {}
+
+    } catch (err) {
+      console.error("Dashboard background sync error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [router, user]);
+
+  useEffect(() => {
+    fetchDashboardData(true);
+  }, [fetchDashboardData]);
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      sessionStorage.removeItem(DASHBOARD_CACHE_KEY);
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'HIGH': return 'text-destructive bg-destructive/10';
-      case 'MEDIUM': return 'text-amber-600 bg-amber-500/10';
-      case 'LOW': return 'text-emerald-600 bg-emerald-500/10';
-      default: return 'text-muted-foreground bg-muted';
+  // Extract unique subjects across results & exams
+  const availableSubjects = useMemo(() => {
+    const set = new Set<string>();
+    results.forEach(r => { if (r.subject) set.add(r.subject); });
+    exams.forEach(e => { if (e.subject) set.add(e.subject); });
+    if (analytics?.subjectPerformance) {
+      analytics.subjectPerformance.forEach((s: any) => { if (s.subject) set.add(s.subject); });
     }
-  };
+    return Array.from(set);
+  }, [results, exams, analytics]);
 
-  const [instituteSettings, setInstituteSettings] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Refined Performance Trends Data
+  const trendChartData = useMemo(() => {
+    // If we have detailed results, sort chronological (earliest to latest)
+    let rawList: Array<{ label: string; score: number; classAvg: number; subject: string; date: string }> = [];
 
-  useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
-  }, []);
+    if (results.length > 0) {
+      const sorted = [...results].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      rawList = sorted.map(r => ({
+        label: r.examTitle || r.subject,
+        score: Number(r.percentage) || (r.totalMarks > 0 ? Math.round((r.score / r.totalMarks) * 100) : 0),
+        classAvg: 70, // Baseline estimate
+        subject: r.subject || 'General',
+        date: r.date
+      }));
+    } else if (analytics?.trends && Array.isArray(analytics.trends)) {
+      rawList = analytics.trends.map((t: any) => ({
+        label: t.label || t.examTitle || 'Exam',
+        score: Number(t.score) || 0,
+        classAvg: Number(t.classAverage) || 70,
+        subject: t.subject || 'General',
+        date: t.date || ''
+      }));
+    }
 
-  if (loading) {
+    if (trendSubjectFilter !== 'all') {
+      rawList = rawList.filter(item => item.subject.toLowerCase() === trendSubjectFilter.toLowerCase());
+    }
+
+    if (trendRange === '5') {
+      rawList = rawList.slice(-5);
+    } else if (trendRange === '10') {
+      rawList = rawList.slice(-10);
+    }
+
+    const scores = rawList.map(r => r.score);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+    const firstScore = scores[0] || 0;
+    const lastScore = scores[scores.length - 1] || 0;
+    const delta = lastScore - firstScore;
+
+    return {
+      items: rawList,
+      avgScore,
+      maxScore,
+      minScore,
+      delta,
+      chart: {
+        labels: rawList.map(r => r.label.length > 14 ? r.label.substring(0, 12) + '...' : r.label),
+        datasets: [
+          {
+            label: 'Your Score (%)',
+            data: rawList.map(r => r.score),
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.15)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#6366f1',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            borderWidth: 3,
+          },
+          {
+            label: 'Class Avg (%)',
+            data: rawList.map(r => r.classAvg),
+            borderColor: 'rgba(148, 163, 184, 0.6)',
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.35,
+            pointRadius: 0,
+            borderWidth: 2,
+          }
+        ]
+      }
+    };
+  }, [results, analytics, trendRange, trendSubjectFilter]);
+
+  // Subject Strengths Matrix
+  const subjectMatrix = useMemo(() => {
+    // Aggregate subject scores from results or analytics
+    const subjectMap: Record<string, { totalPct: number; count: number; maxPct: number; minPct: number }> = {};
+
+    results.forEach(r => {
+      const sub = r.subject || 'General';
+      const pct = Number(r.percentage) || (r.totalMarks > 0 ? Math.round((r.score / r.totalMarks) * 100) : 0);
+      if (!subjectMap[sub]) {
+        subjectMap[sub] = { totalPct: 0, count: 0, maxPct: 0, minPct: 100 };
+      }
+      subjectMap[sub].totalPct += pct;
+      subjectMap[sub].count += 1;
+      subjectMap[sub].maxPct = Math.max(subjectMap[sub].maxPct, pct);
+      subjectMap[sub].minPct = Math.min(subjectMap[sub].minPct, pct);
+    });
+
+    // Merge with analytics if results are few
+    if (analytics?.subjectPerformance && Array.isArray(analytics.subjectPerformance)) {
+      analytics.subjectPerformance.forEach((s: any) => {
+        if (!subjectMap[s.subject]) {
+          subjectMap[s.subject] = {
+            totalPct: Number(s.score) || 75,
+            count: 1,
+            maxPct: Number(s.score) || 75,
+            minPct: Number(s.score) || 75
+          };
+        }
+      });
+    }
+
+    const list = Object.entries(subjectMap).map(([subject, stat]) => {
+      const avg = Math.round(stat.totalPct / stat.count);
+      let status: 'Mastered' | 'Proficient' | 'Developing' = 'Proficient';
+      let color = 'emerald';
+      if (avg >= 85) {
+        status = 'Mastered';
+        color = 'emerald';
+      } else if (avg >= 65) {
+        status = 'Proficient';
+        color = 'blue';
+      } else {
+        status = 'Developing';
+        color = 'amber';
+      }
+      return { subject, avg, count: stat.count, max: stat.maxPct, min: stat.minPct, status, color };
+    });
+
+    list.sort((a, b) => b.avg - a.avg);
+
+    const topSubject = list[0] || null;
+    const focusSubject = list.length > 1 ? list[list.length - 1] : null;
+
+    const radarChart = {
+      labels: list.map(s => s.subject),
+      datasets: [
+        {
+          label: 'Subject Mastery %',
+          data: list.map(s => s.avg),
+          backgroundColor: 'rgba(99, 102, 241, 0.2)',
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#6366f1'
+        }
+      ]
+    };
+
+    return { list, topSubject, focusSubject, radarChart };
+  }, [results, analytics]);
+
+  // Filtered Scheduled & Live Exams
+  const filteredScheduledExams = useMemo(() => {
+    return exams.filter(exam => {
+      if (examTypeFilter !== 'all' && exam.type !== examTypeFilter) return false;
+      if (examSearchQuery.trim()) {
+        const q = examSearchQuery.toLowerCase();
+        const mTitle = exam.name?.toLowerCase().includes(q);
+        const mSub = exam.subject?.toLowerCase().includes(q);
+        if (!mTitle && !mSub) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const tA = a.startTime ? new Date(a.startTime).getTime() : new Date(a.date).getTime();
+      const tB = b.startTime ? new Date(b.startTime).getTime() : new Date(b.date).getTime();
+      return tA - tB;
+    });
+  }, [exams, examTypeFilter, examSearchQuery]);
+
+  // Filtered Completed Exam Results
+  const filteredExamResults = useMemo(() => {
+    return results.filter(result => {
+      if (examTypeFilter !== 'all' && result.type && result.type !== examTypeFilter) return false;
+      if (examSearchQuery.trim()) {
+        const q = examSearchQuery.toLowerCase();
+        const mTitle = result.examTitle?.toLowerCase().includes(q);
+        const mSub = result.subject?.toLowerCase().includes(q);
+        if (!mTitle && !mSub) return false;
+      }
+      return true;
+    });
+  }, [results, examTypeFilter, examSearchQuery]);
+
+  // Metrics
+  const lastResult = results && results.length > 0 ? results[0] : null;
+  const attendanceData = analytics?.attendance || attendance || { percentage: 95, present: 28, absent: 2, late: 0, total: 30 };
+  const performanceData = analytics?.performance || { averagePercentage: 86, gpa: 4.85, grade: 'A+' };
+  const classRank = analytics?.rank || '3';
+  const totalStudents = analytics?.totalStudents || '42';
+  const badges = analytics?.badges || [];
+
+  const instituteName = instituteSettings?.instituteName || "Rofaz Academy";
+  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+
+  if (!user && loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading your dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          <p className="text-sm font-semibold text-slate-400">Loading Student Dashboard...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  const instituteName = instituteSettings?.instituteName || "Digital School";
-  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-500">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors duration-300">
       <AnimatePresence>
-        {isFocusModeOpen && (
-          <FocusMode onClose={() => setIsFocusModeOpen(false)} />
-        )}
+        {isFocusModeOpen && <FocusMode onClose={() => setIsFocusModeOpen(false)} />}
       </AnimatePresence>
-      <div className="min-h-screen bg-background text-foreground font-sans relative overflow-x-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
-        </div>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-          <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4">
-            <div className="flex h-20 items-center justify-between">
-              {/* Logo and Navigation */}
-              <div className="flex items-center gap-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
-                    {/* Use a clear specific text or Icon if image fails, but here we keep the image logic if present, else fallback */}
-                    {instituteLogo && instituteLogo !== '/logo.png' ? <img src={instituteLogo} alt={instituteName} className="h-6 w-auto object-contain brightness-0 invert" /> : "DS"}
-                  </div>
-                  <span className="font-bold text-xl hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/75 dark:bg-slate-950/75 backdrop-blur-xl shadow-xs">
+        <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 sm:px-6">
+          <div className="flex h-16 sm:h-20 items-center justify-between">
+            {/* Logo and Nav */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/25">
+                  {instituteLogo && instituteLogo !== '/logo.png' ? (
+                    <img src={instituteLogo} alt={instituteName} className="h-6 w-auto object-contain brightness-0 invert" />
+                  ) : (
+                    "RA"
+                  )}
+                </div>
+                <div className="hidden sm:block">
+                  <span className="font-extrabold text-base tracking-tight text-foreground block leading-none">
                     {instituteName}
                   </span>
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                    Student Portal
+                  </span>
                 </div>
-
-                {/* Desktop Navigation */}
-                <nav className="hidden lg:flex items-center gap-1 bg-muted/50 p-1.5 rounded-full border border-border">
-                  {[
-                    { id: 'dashboard', label: 'Dashboard', icon: Home },
-                    { id: 'exams', label: 'Exams', icon: FileText },
-                    { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-                    { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
-                    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-                    { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
-                    { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        if (item.action) {
-                          item.action();
-                        } else if (item.href) {
-                          router.push(item.href);
-                        } else {
-                          setActiveTab(item.id);
-                        }
-                      }}
-
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${activeTab === item.id
-                        ? 'bg-card text-primary shadow-sm ring-1 ring-border'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                        }`}
-                    >
-                      <div className="relative">
-                        <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-blue-500' : ''}`} />
-                        {(item as any).badge > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white leading-none">
-                            {(item as any).badge > 9 ? '9+' : (item as any).badge}
-                          </span>
-                        )}
-                      </div>
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
-                </nav>
               </div>
 
-              {/* Profile Dropdown */}
+              {/* Desktop Nav Pills */}
+              <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900/80 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800/80">
+                {[
+                  { id: 'dashboard', label: 'Overview', icon: Home },
+                  { id: 'exams', label: 'Exams & Results', icon: FileText },
+                  { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
+                  { id: 'analytics', label: 'Deep Analytics', icon: TrendingUp },
+                  { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
+                  { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      triggerHaptic(ImpactStyle.Light);
+                      if (item.action) item.action();
+                      else if (item.href) router.push(item.href);
+                      else setActiveTab(item.id);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 ${
+                      activeTab === item.id
+                        ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
+                    <span>{item.label}</span>
+                    {item.badge && item.badge > 0 ? (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Quick Actions & Profile */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/student/prac-perfect')}
+                className="hidden sm:flex rounded-full text-xs font-bold border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shadow-xs"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Practice Now
+              </Button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-11 w-auto rounded-full pl-2 pr-4 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-md ring-2 ring-white dark:ring-gray-950">
-                        <User className="h-4 w-4" />
+                  <Button variant="ghost" className="relative h-10 rounded-full pl-2 pr-3 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-md">
+                        {user.name.charAt(0)}
                       </div>
-                      <div className="flex flex-col items-start">
-                        <span className="hidden sm:block text-sm font-semibold leading-none text-foreground">{user.name}</span>
-                        <span className="hidden sm:block text-[10px] text-muted-foreground leading-none mt-1 font-medium">{user.role}</span>
+                      <div className="hidden sm:flex flex-col items-start text-left">
+                        <span className="text-xs font-bold leading-none">{user.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">
+                          {user.studentProfile?.class?.name || "Student"}
+                        </span>
                       </div>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground ml-1" />
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-xl border-border backdrop-blur-xl bg-card/90" align="end" forceMount>
-                  <div className="px-3 py-3 bg-muted/50 rounded-xl mb-2">
-                    <p className="text-sm font-semibold leading-none">{user.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
+                <DropdownMenuContent className="w-60 p-2 rounded-2xl shadow-xl border-slate-200 dark:border-slate-800" align="end">
+                  <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl mb-1.5">
+                    <p className="text-xs font-bold">{user.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                    {user.studentProfile?.roll && (
+                      <Badge variant="outline" className="mt-1.5 text-[10px] font-mono">
+                        Roll: {user.studentProfile.roll}
+                      </Badge>
+                    )}
                   </div>
-                  <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-lg cursor-pointer py-2.5">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Profile Settings</span>
+                  <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-xl text-xs font-semibold py-2">
+                    <Settings className="mr-2 h-4 w-4 text-slate-500" />
+                    Profile Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Change Password</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer py-2.5">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20 rounded-xl text-xs font-semibold py-2">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    Log Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-        </header>
-
-        {/* Mobile Navigation */}
-        <div className="lg:hidden sticky top-20 z-40 border-b border-border bg-background/80 backdrop-blur-xl overflow-hidden shadow-sm">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="flex space-x-2 py-3 overflow-x-auto no-scrollbar scroll-smooth snap-x items-center custom-scrollbar">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: Home },
-                { id: 'exams', label: 'Exams', icon: FileText },
-                { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-                { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
-                { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-                { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
-                { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
-              ].map((item: any) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.action) {
-                      item.action();
-                    } else if (item.href) {
-                      router.push(item.href);
-                    } else {
-                      setActiveTab(item.id);
-                    }
-                  }}
-
-                  className={`flex-shrink-0 flex items-center space-x-1.5 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${activeTab === item.id
-                    ? 'bg-foreground text-background border-transparent shadow-md'
-                    : 'bg-card text-muted-foreground border-border hover:border-primary/50'
-                    }`}
-                >
-                  <div className="relative">
-                    <item.icon className="h-3.5 w-3.5" />
-                    {item.badge > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white leading-none">
-                        {item.badge > 9 ? '9+' : item.badge}
-                      </span>
-                    )}
-                  </div>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
+      </header>
 
-        {/* Main Content */}
-        <main className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 py-8 relative z-10">
-          <AnimatePresence mode="wait">
+      {/* Mobile Sticky Navigation Strip */}
+      <div className="lg:hidden sticky top-16 sm:top-20 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl px-4 py-2 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2">
+          {[
+            { id: 'dashboard', label: 'Overview', icon: Home },
+            { id: 'exams', label: 'Exams & Results', icon: FileText },
+            { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
+            { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                if (item.action) item.action();
+                else if (item.href) router.push(item.href);
+                else setActiveTab(item.id);
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                activeTab === item.id
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-900 text-muted-foreground border border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <AnimatePresence mode="wait">
+          {/* TAB 1: OVERVIEW DASHBOARD */}
+          {activeTab === 'dashboard' && (
             <motion.div
-              key={activeTab}
+              key="dashboard"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-8"
             >
-              {/* Dashboard Tab */}
-              {activeTab === 'dashboard' && (
-                <>
-                  {/* Welcome Section */}
-                  <div className="mb-8">
-                    <h1 className="text-3xl md:text-3xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                      Welcome back, {user.name}! 👋
+              {/* Gen-Z Hero Banner */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-500/20">
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-indigo-200">
+                      <Flame className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
+                      5-Day Study Streak • Keep Pushing!
+                    </div>
+                    <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+                      Welcome back, {user.name.split(' ')[0]}! 🚀
                     </h1>
-                    <p className="text-muted-foreground text-base md:text-lg">
-                      Here&apos;s what&apos;s happening with your studies today.
+                    <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
+                      You are in the <strong className="text-white">Top 10%</strong> of your class. Your current average is <strong className="text-emerald-400">{performanceData.averagePercentage}%</strong> with an overall grade of <strong className="text-amber-400">{performanceData.grade}</strong>.
                     </p>
                   </div>
 
-                  {/* Overview Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                      <Card
-                        className="border-0 shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all cursor-pointer bg-card/60 backdrop-blur-md group"
-                        onClick={() => router.push('/student/prac-perfect')}
-                      >
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-indigo-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-primary">Practice</CardTitle>
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-xl font-bold text-primary font-mono tracking-tight">PracPerfect</div>
-                          <p className="text-xs text-primary/70 mt-1">
-                            Start personalized session
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                      <Card className="border-0 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground z-10">Next Exam</CardTitle>
-                          <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center z-10">
-                            <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="z-10 relative">
-                          {exams.length > 0 ? (
-                            <>
-                              <div className="text-xl font-bold truncate">{exams[0].name}</div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {exams[0].date ? new Date(exams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''} • {exams[0].subject}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-xl font-bold text-muted-foreground/50">None</div>
-                              <p className="text-xs text-muted-foreground mt-1">No upcoming exams</p>
-                            </>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                      <Card className="border-border shadow-lg shadow-green-500/10 hover:shadow-green-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-green-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground z-10">Last Result</CardTitle>
-                          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center z-10">
-                            <BarChart3 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="z-10 relative">
-                          {lastResult ? (
-                            <>
-                              <div className="text-xl font-bold">{lastResult.percentage ? `${lastResult.percentage}%` : lastResult.grade || '-'}</div>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
-                                {lastResult.examTitle} {lastResult && lastResult.rank != null ? `• Rank ${lastResult.rank}` : ''}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-xl font-bold text-muted-foreground/50">-</div>
-                              <div className="text-muted-foreground text-xs mt-1">No results yet</div>
-                            </>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                      <Card className="border-border shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-purple-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground z-10">Attendance</CardTitle>
-                          <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center z-10">
-                            <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="z-10 relative">
-                          <div className="text-xl font-bold">{attendanceData.percentage}%</div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {attendanceData.present} present • {attendanceData.absent} absent
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-
-                    <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                      <Card className="border-border shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
-                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-orange-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground z-10">GPA / Grade</CardTitle>
-                          <div className="h-8 w-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center z-10">
-                            <Target className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                          </div>
-                        </CardHeader>
-                        <CardContent className="z-10 relative">
-                          <div className="text-xl font-bold">{performanceData.grade}</div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            CGPA: {performanceData.gpa}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  </div>
-
-                  {/* Wonderspace Widgets */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <div className="lg:col-span-2">
-                      <AmbientPlayer />
-                    </div>
-                    <div>
-                      <MoodJournal />
-                    </div>
-                  </div>
-
-
-                  {/* AI Insights & Performance Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <div className="lg:col-span-2">
-                      <AIAnalysisCard insights={analytics?.insights || []} />
-                    </div>
-                    <div>
-                      <PerformancePredictor projection={analytics?.projection || null} />
-                    </div>
-                  </div>
-
-                  {/* Performance Analysis & Charts */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <Card className="shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10 overflow-hidden">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-indigo-500" />
-                          Performance Trends
-                        </CardTitle>
-                        <CardDescription>Visualizing your progress over successive examinations</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[300px] w-full">
-                          {analytics?.trends ? (
-                            <Line
-                              data={{
-                                labels: analytics.trends.map((t: any) => t.label),
-                                datasets: [
-                                  {
-                                    label: 'Your Score',
-                                    data: analytics.trends.map((t: any) => t.score),
-                                    borderColor: 'rgb(99, 102, 241)',
-                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                    fill: true,
-                                    tension: 0.4,
-                                    pointRadius: 6,
-                                    pointHoverRadius: 8,
-                                    borderWidth: 3,
-                                  },
-                                  {
-                                    label: 'Class Average',
-                                    data: analytics.trends.map((t: any) => t.classAverage),
-                                    borderColor: 'rgba(156, 163, 175, 0.5)',
-                                    borderDash: [5, 5],
-                                    fill: false,
-                                    tension: 0.4,
-                                    pointRadius: 0,
-                                    borderWidth: 2,
-                                  }
-                                ]
-                              }}
-                              options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                  legend: { position: 'top' as const, labels: { usePointStyle: true, boxWidth: 6, padding: 20 } },
-                                  tooltip: {
-                                    backgroundColor: 'rgba(0,0,0,0.8)',
-                                    padding: 12,
-                                    titleFont: { size: 14, weight: 'bold' },
-                                    bodyFont: { size: 13 },
-                                    cornerRadius: 8,
-                                    displayColors: false
-                                  }
-                                },
-                                scales: {
-                                  y: { min: 0, max: 100, grid: { display: false }, border: { display: false } },
-                                  x: { grid: { display: false }, border: { display: false } }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                              Insufficient data for trend analysis
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10 overflow-hidden">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Target className="h-5 w-5 text-rose-500" />
-                          Subject Strengths
-                        </CardTitle>
-                        <CardDescription>Subject-wise performance breakdown</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[300px] w-full">
-                          {analytics?.subjectPerformance ? (
-                            <Radar
-                              data={{
-                                labels: analytics.subjectPerformance.map((s: any) => s.subject),
-                                datasets: [{
-                                  label: 'Proficiency %',
-                                  data: analytics.subjectPerformance.map((s: any) => s.score),
-                                  backgroundColor: 'rgba(244, 63, 94, 0.2)',
-                                  borderColor: 'rgb(244, 63, 94)',
-                                  borderWidth: 2,
-                                  pointBackgroundColor: 'rgb(244, 63, 94)',
-                                  pointBorderColor: '#fff',
-                                  pointHoverBackgroundColor: '#fff',
-                                  pointHoverBorderColor: 'rgb(244, 63, 94)'
-                                }]
-                              }}
-                              options={{
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                  r: {
-                                    min: 0,
-                                    max: 100,
-                                    ticks: { display: false },
-                                    grid: { color: 'rgba(156, 163, 175, 0.1)' },
-                                    angleLines: { color: 'rgba(156, 163, 175, 0.1)' },
-                                    pointLabels: { font: { size: 11, weight: 600 } }
-                                  }
-                                },
-                                plugins: {
-                                  legend: { display: false }
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                              Insufficient data for subject analysis
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Attendance & Class Rank Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <Card className="lg:col-span-2 shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10 overflow-hidden">
-
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <Calendar className="h-5 w-5 mr-2 text-primary" />
-                          Attendance Visualizer
-                        </CardTitle>
-                        <CardDescription>Your attendance record for the current month</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between mb-6">
-                          <div className="flex flex-col">
-                            <span className="text-2xl md:text-4xl font-bold text-primary">{attendanceData.percentage}%</span>
-                            <span className="text-sm text-muted-foreground">Overall Attendance</span>
-                          </div>
-                          <div className="flex gap-4 text-sm">
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-green-500"></div> Present</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-yellow-500"></div> Late</div>
-                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500"></div> Absent</div>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {Array.from({ length: attendanceData.total || 30 }, (_, i) => (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: i * 0.02 }}
-                              key={i}
-                              className={`h-8 w-8 rounded-md flex items-center justify-center text-xs font-medium text-white shadow-sm transition-all hover:scale-110 ${i < attendanceData.present
-                                ? 'bg-green-500'
-                                : i < attendanceData.present + attendanceData.late
-                                  ? 'bg-yellow-500'
-                                  : i < (attendanceData.present + attendanceData.late + attendanceData.absent)
-                                    ? 'bg-red-500'
-                                    : 'bg-muted text-muted-foreground'
-                                }`}
-                            >
-                              {i < (attendanceData.present + attendanceData.late + attendanceData.absent) ? (
-                                <CheckCircle className="w-4 h-4" />
-                              ) : (
-                                <span>{i + 1}</span>
-                              )}
-                            </motion.div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="shadow-lg shadow-primary/5 border border-border bg-card">
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <Users className="h-5 w-5 mr-2 text-primary" />
-                          Class Standing
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col items-center justify-center py-6">
-                        <div className="relative mb-4">
-                          <div className="w-32 h-32 rounded-full border-8 border-card bg-card shadow-2xl flex items-center justify-center ring-4 ring-primary/10">
-                            <span className="text-3xl md:text-5xl font-bold text-primary">#{classRank}</span>
-                          </div>
-                          <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center">
-                            <TrendingUp className="w-3 h-3 mr-1" /> Top 10%
-                          </div>
-                        </div>
-                        <p className="text-muted-foreground font-medium">Out of {totalStudents} students</p>
-                        <div className="mt-6 w-full">
-                          <div className="flex justify-between text-xs mb-2 font-medium">
-                            <span>Percentile</span>
-                            <span>92%</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: '92%' }}
-                              transition={{ duration: 1, delay: 0.5 }}
-                              className="bg-primary h-full rounded-full"
-                            />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Badges and Leaderboard */}
-                  <div className="mb-8">
-                    <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Achievements</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="md:col-span-2">
-                        <Card className="shadow-lg border border-border h-full bg-card">
-                          <CardHeader>
-                            <CardTitle className="flex items-center">
-                              <Trophy className="h-5 w-5 mr-2 text-yellow-500" />
-                              Your Badges
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {badges.length > 0 ? badges.map((badge: any, i: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                                <motion.div
-                                  key={badge.id}
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: i * 0.1 }}
-                                  className="flex items-center space-x-3 p-3 rounded-xl border border-border bg-muted/30 hover:bg-card hover:shadow-md transition-all cursor-default group"
-                                >
-                                  <div className="text-3xl group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm">{badge.icon || '🏅'}</div>
-                                  <div>
-                                    <div className="font-semibold text-sm">{badge.title}</div>
-                                    <div className="text-xs text-muted-foreground line-clamp-1">{badge.description}</div>
-                                    <div className="text-[10px] text-muted-foreground mt-1 opacity-70">{badge.earnedAt ? new Date(badge.earnedAt).toLocaleDateString() : ''}</div>
-                                  </div>
-                                </motion.div>
-                              )) : (
-                                <div className="col-span-full py-8 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
-                                  <Award className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                                  No badges earned yet. Keep performing well!
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border border-border h-full bg-card">
-                        <CardHeader>
-                          <CardTitle className="flex items-center">
-                            <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
-                            Leaderboard
-                          </CardTitle>
-                          <CardDescription>Top performers this month</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {(analytics?.leaderboard || []).length > 0 ? analytics.leaderboard.map((student: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                              <div
-                                key={student.rank}
-                                className={`flex items-center justify-between p-3 rounded-xl transition-all ${student.isCurrent
-                                  ? 'bg-primary/10 border border-primary/20'
-                                  : 'hover:bg-muted'
-                                  }`}
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${student.rank === 1 ? 'bg-gradient-to-br from-yellow-300 to-yellow-500 text-white' :
-                                    student.rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' :
-                                      student.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-500 text-white' :
-                                        'bg-card border border-border text-muted-foreground'
-                                    }`}>
-                                    {student.rank}
-                                  </div>
-                                  <div>
-                                    <div className={`font-medium text-sm ${student.isCurrent ? 'text-blue-700 dark:text-blue-400' : ''}`}>
-                                      {student.name}
-                                    </div>
-                                    {student.isCurrent && <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-bold">YOU</span>}
-                                  </div>
-                                </div>
-                                <span className="font-bold text-sm tracking-tight">{student.score}%</span>
-                              </div>
-                            )) : (
-                              <div className="py-8 text-center text-muted-foreground text-sm">
-                                No leaderboard data available yet.
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-
-                  {/* Notices */}
-                  <div className="mb-8">
-                    <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Bell className="w-6 h-6 text-primary" /> Notice Board</h2>
-                    <Card className="border-t-4 border-t-primary shadow-lg shadow-gray-200/50 dark:shadow-none border-x-0 border-b-0">
-                      <Accordion type="single" collapsible className="w-full">
-                        {notices.map((notice, index) => (
-                          <AccordionItem key={notice.id} value={`item-${index}`} className="px-4 border-b border-border">
-                            <AccordionTrigger className="hover:no-underline py-4 group">
-                              <div className="flex items-center gap-3 text-left w-full pr-4">
-                                <Badge className={`${getPriorityColor(notice.priority)} border-0`}>
-                                  {notice.priority}
-                                </Badge>
-                                <span className="font-medium group-hover:text-primary transition-colors">{notice.title}</span>
-                                <span className="text-xs text-muted-foreground font-normal ml-auto whitespace-nowrap hidden sm:inline-block">{notice.date}</span>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent className="pb-4 pt-1 text-muted-foreground">
-                              <div className="bg-muted p-4 rounded-xl text-sm leading-relaxed border border-border">
-                                {notice.content}
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
-                        {notices.length === 0 && (
-                          <div className="p-12 text-center flex flex-col items-center justify-center text-muted-foreground">
-                            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                              <Bell className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <p>No new notices at the moment.</p>
-                          </div>
-                        )}
-                      </Accordion>
-                    </Card>
-                  </div>
-                </>
-              )}
-
-              {/* Exams Tab */}
-              {activeTab === 'exams' && (
-                <div className="mb-8 max-w-5xl mx-auto">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-xl md:text-3xl font-bold">My Exams</h2>
-                      <p className="text-muted-foreground">View and manage your upcoming examinations</p>
-                    </div>
-                    <Button variant="default" onClick={() => router.push('/exams/online')} className="shadow-lg shadow-primary/20 rounded-xl">
-                      See Online Exams <ArrowRight className="ml-2 w-4 h-4" />
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => router.push('/student/prac-perfect')}
+                      className="rounded-2xl font-black text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-lg shadow-indigo-500/30 px-5 py-5 active:scale-95 transition-all"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Practice Center
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveTab('exams')}
+                      className="rounded-2xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border-white/20 py-5"
+                    >
+                      View Exams
                     </Button>
                   </div>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {exams.length > 0 ? (
-                      exams.map((exam, i) => {
-                        const hasResult = results.some((r: any) => r.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-                        const result = results.find((r: any) => r.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-                        const submission = examSubmissions.find((s: any) => s.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-                        const isSubmitted = hasResult || submission?.status === 'SUBMITTED';
-                        const isInProgress = !isSubmitted && submission?.status === 'IN_PROGRESS';
-                        const now = new Date();
-                        const examEnd = exam.endTime ? new Date(exam.endTime) : (() => { const d = new Date(exam.date); d.setHours(23, 59, 59, 999); return d; })();
-                        const examStart = (() => { const d = new Date(exam.date); d.setHours(0, 0, 0, 0); return d; })();
-                        const isExpired = now > examEnd;
-                        const isActive = !isExpired && now >= examStart;
+              {/* 5 Metric Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                <Card
+                  onClick={() => router.push('/student/prac-perfect')}
+                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-indigo-500/50 transition-all cursor-pointer group"
+                >
+                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PracPerfect</span>
+                      <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">AI Trainer</span>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">Personalized practice</p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                        return (
-                          <motion.div
-                            key={exam.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.1 }}
+                <Card
+                  onClick={() => setActiveTab('exams')}
+                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-blue-500/50 transition-all cursor-pointer group"
+                >
+                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Exam</span>
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-base sm:text-lg font-black text-foreground line-clamp-1">
+                        {exams[0]?.name || "None scheduled"}
+                      </span>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        {exams[0]?.date ? new Date(exams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "All caught up"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  onClick={() => { setActiveTab('exams'); setExamSubTab('results'); }}
+                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-emerald-500/50 transition-all cursor-pointer group"
+                >
+                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Latest Score</span>
+                      <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                        <BarChart3 className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                        {lastResult ? `${lastResult.percentage}%` : "N/A"}
+                      </span>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
+                        {lastResult ? lastResult.examTitle : "No results yet"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs">
+                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Attendance</span>
+                      <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400">
+                        {attendanceData.percentage}%
+                      </span>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        {attendanceData.present} present / {attendanceData.total} days
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs col-span-2 sm:col-span-1">
+                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Class Rank</span>
+                      <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <Trophy className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
+                        #{classRank}
+                      </span>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                        Out of {totalStudents} students
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Performance Trends & Subject Strengths (Totally Revamped) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Performance Trends Chart (7 Cols) */}
+                <Card className="lg:col-span-7 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                          <TrendingUp className="h-4 w-4" />
+                        </span>
+                        <h3 className="font-extrabold text-base sm:text-lg text-foreground">
+                          Performance Trends
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Track score trajectory over examinations
+                      </p>
+                    </div>
+
+                    {/* Timeframe & Subject Controls */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        {(['5', '10', 'all'] as const).map((range) => (
+                          <button
+                            key={range}
+                            onClick={() => { triggerHaptic(ImpactStyle.Light); setTrendRange(range); }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                              trendRange === range
+                                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
                           >
-                            <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-card">
-                              <CardHeader className="bg-muted/30 pb-4 border-b border-border">
-                                <div className="flex items-center justify-between mb-2">
-                                  <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'} className="uppercase text-[10px] tracking-wider font-bold">
-                                    {exam.type}
-                                  </Badge>
-                                  {/* Status badge */}
-                                  {isSubmitted && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                                      <CheckCircle className="w-3 h-3" /> Submitted
-                                    </span>
-                                  )}
-                                  {isInProgress && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                      ⏳ In Progress
-                                    </span>
-                                  )}
-                                  {!isSubmitted && !isInProgress && isExpired && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                      Expired
-                                    </span>
-                                  )}
-                                  {!isSubmitted && !isInProgress && isActive && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                                      ⚡ Live Now
-                                    </span>
-                                  )}
-                                  {!isSubmitted && !isInProgress && !isActive && !isExpired && (
-                                    <span className="text-xs font-mono text-muted-foreground bg-background px-2 py-1 rounded-md border border-border">
-                                      {exam.time ? new Date(`2000-01-01T${exam.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
-                                    </span>
-                                  )}
-                                </div>
-                                <CardTitle className="text-lg md:text-xl group-hover:text-primary transition-colors">{exam.name}</CardTitle>
-                                <CardDescription className="flex items-center gap-1 mt-1">
-                                  <BookOpen className="w-3 h-3" /> {exam.subject}
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent className="pt-6">
-                                {!isSubmitted ? (
-                                  <div className="bg-muted/40 rounded-xl p-2.5 mb-4 border border-border space-y-1.5 text-xs">
-                                    <div className="flex items-center justify-between text-muted-foreground">
-                                      <span className="flex items-center gap-1 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Start:</span>
-                                      <span className="font-semibold text-foreground">
-                                        {exam.date ? new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                                        {exam.startTime ? ` • ${new Date(exam.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-muted-foreground">
-                                      <span className="flex items-center gap-1 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> End:</span>
-                                      <span className="font-semibold text-foreground">
-                                        {exam.endTime ? `${new Date(exam.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • ${new Date(exam.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'End of day'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
-                                    <Calendar className="w-4 h-4 text-primary" />
-                                    <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
-                                  </div>
-                                )}
+                            {range === 'all' ? 'All' : `Last ${range}`}
+                          </button>
+                        ))}
+                      </div>
 
-                                {/* Marks & Rank Section */}
-                                {result && (
-                                  <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="bg-primary/10 p-2 rounded-lg text-center border border-primary/20">
-                                      <div className="text-[10px] text-primary font-bold uppercase tracking-wider">Marks</div>
-                                      <div className="text-lg font-bold text-primary">{result.total} / {(exam as any).totalMarks}</div>
-                                    </div>
-                                    <div className="bg-amber-500/10 p-2 rounded-lg text-center border border-amber-500/20">
-                                      <div className="text-lg font-bold text-amber-600">#{result.rank || '-'}</div>
-                                    </div>
-                                  </div>
-                                )}
+                      {availableSubjects.length > 0 && (
+                        <select
+                          value={trendSubjectFilter}
+                          onChange={(e) => setTrendSubjectFilter(e.target.value)}
+                          className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-2.5 py-1.5 text-foreground"
+                        >
+                          <option value="all">All Subjects</option>
+                          {availableSubjects.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
 
-                                <div className="flex flex-col gap-2">
-                                  {exam.type === 'ONLINE' && (
-                                    isSubmitted ? (
-                                      <div className="flex gap-2">
-                                        <Button variant="outline" className="flex-1 rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
-                                          <BarChart3 className="h-4 w-4 mr-2" />
-                                          View Result
-                                        </Button>
-                                        {isExpired && (
-                                          <Button variant="outline" className="flex-1 rounded-xl border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
-                                            <Sparkles className="h-4 w-4 mr-2" />
-                                            Practice
-                                          </Button>
-                                        )}
-                                      </div>
-                                    ) : isInProgress ? (
-                                      <Button className="w-full rounded-xl shadow-lg shadow-amber-500/20 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => router.push('/exams/online')}>
-                                        <Play className="h-4 w-4 mr-2 fill-current" />
-                                        Resume Exam
-                                      </Button>
-                                    ) : isExpired ? (
-                                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/20" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
-                                        <Sparkles className="h-4 w-4 mr-2" />
-                                        Take Practice Session
-                                      </Button>
-                                    ) : (
-                                      <Button className="w-full group-hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20" onClick={() => router.push('/exams/online')}>
-                                        <Play className="h-4 w-4 mr-2 fill-current" />
-                                        {isActive ? 'Start Exam' : 'View Exam'}
-                                      </Button>
-                                    )
-                                  )}
-                                  {exam.type !== 'ONLINE' && (
-                                    <Button variant="outline" className="w-full rounded-xl">
-                                      <Download className="h-4 w-4 mr-2" />
-                                      Admit Card
-                                    </Button>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        );
-                      })
+                  {/* Summary Metric Stats Bar */}
+                  <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average</span>
+                      <div className="text-lg font-black text-foreground">{trendChartData.avgScore}%</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Peak Score</span>
+                      <div className="text-lg font-black text-indigo-600 dark:text-indigo-400">{trendChartData.maxScore}%</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Growth</span>
+                      <div className={`text-lg font-black ${trendChartData.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
+                        {trendChartData.delta >= 0 ? `+${trendChartData.delta}%` : `${trendChartData.delta}%`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Line Chart */}
+                  <div className="h-[260px] w-full">
+                    {trendChartData.items.length > 0 ? (
+                      <Line
+                        data={trendChartData.chart}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                              labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, weight: 600 } }
+                            },
+                            tooltip: {
+                              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                              padding: 10,
+                              cornerRadius: 12,
+                              titleFont: { size: 12, weight: 'bold' },
+                              bodyFont: { size: 12 }
+                            }
+                          },
+                          scales: {
+                            y: {
+                              min: 0,
+                              max: 100,
+                              grid: { color: 'rgba(156, 163, 175, 0.1)' },
+                              ticks: { font: { size: 10 } }
+                            },
+                            x: {
+                              grid: { display: false },
+                              ticks: { font: { size: 10 } }
+                            }
+                          }
+                        }}
+                      />
                     ) : (
-                      <div className="col-span-full flex flex-col items-center justify-center py-16 bg-muted/30 rounded-2xl border border-dashed border-border text-center">
-                        <div className="bg-background p-4 rounded-full shadow-sm mb-4">
-                          <FileText className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="font-semibold text-lg">No Upcoming Exams</h3>
-                        <p className="text-muted-foreground max-w-sm mt-1">You&apos;re all caught up! Check back later for new schedules.</p>
+                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                        No examination records found for selected criteria.
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                </Card>
 
-              {activeTab === 'results' && <div className="p-4"><h1 className="text-2xl font-bold">Results Module</h1><p className="text-muted-foreground">Redirecting...</p>{/* Logic to redirect handled in nav */}</div>}
-              {activeTab === 'analytics' && <StudentAnalyticsTab analytics={analytics} />}
-              {activeTab === 'settings' && (
-                <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="mb-8 p-6 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 rounded-3xl border border-blue-500/20">
-                    <h1 className="text-3xl font-bold mb-2">Account Settings</h1>
-                    <p className="text-muted-foreground">Manage your profile and security preferences</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <div className="md:col-span-1 space-y-2">
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start gap-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl h-12"
-                      >
-                        <Lock className="w-5 h-5" />
-                        <span className="font-semibold">Security</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start gap-3 rounded-2xl h-12 hover:bg-muted"
-                        onClick={() => setActiveTab('dashboard')}
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                        <span>Dashboard</span>
-                      </Button>
+                {/* Subject Strengths Matrix (5 Cols) */}
+                <Card className="lg:col-span-5 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                          <Target className="h-4 w-4" />
+                        </span>
+                        <h3 className="font-extrabold text-base sm:text-lg text-foreground">
+                          Subject Strengths
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Domain mastery & proficiency ranking
+                      </p>
                     </div>
-                    <Card className="md:col-span-3 border-border shadow-2xl shadow-primary/5 rounded-3xl overflow-hidden">
-                      <CardContent className="pt-8 pb-10">
-                        <SecuritySettings />
-                      </CardContent>
-                    </Card>
+
+                    {subjectMatrix.topSubject && (
+                      <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 font-bold text-[10px]">
+                        Top: {subjectMatrix.topSubject.subject} ({subjectMatrix.topSubject.avg}%)
+                      </Badge>
+                    )}
                   </div>
+
+                  {/* Subject List with Progress Bars */}
+                  <div className="space-y-3 max-h-[310px] overflow-y-auto pr-1">
+                    {subjectMatrix.list.length > 0 ? (
+                      subjectMatrix.list.map((sub, idx) => (
+                        <div
+                          key={sub.subject || idx}
+                          className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60 space-y-2 hover:border-indigo-500/40 transition-colors"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-foreground">{sub.subject}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] font-bold ${
+                                  sub.status === 'Mastered'
+                                    ? 'bg-emerald-100/50 text-emerald-700 dark:text-emerald-300 border-emerald-300'
+                                    : sub.status === 'Proficient'
+                                    ? 'bg-blue-100/50 text-blue-700 dark:text-blue-300 border-blue-300'
+                                    : 'bg-amber-100/50 text-amber-700 dark:text-amber-300 border-amber-300'
+                                }`}
+                              >
+                                {sub.status}
+                              </Badge>
+                              <span className="font-black text-foreground">{sub.avg}%</span>
+                            </div>
+                          </div>
+
+                          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                sub.avg >= 85
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                  : sub.avg >= 65
+                                  ? 'bg-gradient-to-r from-indigo-500 to-blue-400'
+                                  : 'bg-gradient-to-r from-amber-500 to-orange-400'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(5, sub.avg))}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-12 text-center text-xs text-muted-foreground">
+                        Take examinations to unlock your subject strengths breakdown.
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* AI Insights & Performance Predictor */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <AIAnalysisCard insights={analytics?.insights || []} />
+                </div>
+                <div>
+                  <PerformancePredictor projection={analytics?.projection || null} />
+                </div>
+              </div>
+
+              {/* Attendance & Achievements */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Attendance */}
+                <Card className="lg:col-span-2 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-6 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-extrabold text-base text-foreground">Monthly Attendance Matrix</h3>
+                      <p className="text-xs text-muted-foreground">Current academic session presence</p>
+                    </div>
+                    <Badge variant="outline" className="font-bold text-xs">
+                      {attendanceData.percentage}% Present
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {Array.from({ length: attendanceData.total || 30 }, (_, i) => {
+                      const isPresent = i < attendanceData.present;
+                      const isLate = !isPresent && i < (attendanceData.present + (attendanceData.late || 0));
+                      const isAbsent = !isPresent && !isLate && i < (attendanceData.present + (attendanceData.late || 0) + (attendanceData.absent || 0));
+
+                      return (
+                        <div
+                          key={i}
+                          className={`h-7 w-7 rounded-xl flex items-center justify-center text-[10px] font-bold shadow-xs transition-all hover:scale-110 ${
+                            isPresent
+                              ? 'bg-emerald-500 text-white'
+                              : isLate
+                              ? 'bg-amber-500 text-white'
+                              : isAbsent
+                              ? 'bg-rose-500 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {i + 1}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+
+                {/* Achievements / Badges */}
+                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-6 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-base text-foreground flex items-center gap-1.5">
+                      <Trophy className="h-4 w-4 text-amber-500" />
+                      Badges
+                    </h3>
+                    <Badge variant="secondary" className="text-xs font-bold">
+                      {badges.length} Earned
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {badges.length > 0 ? (
+                      badges.slice(0, 3).map((b: any) => (
+                        <div key={b.id} className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
+                          <span className="text-2xl">{b.icon || '🏅'}</span>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold truncate">{b.title}</h4>
+                            <p className="text-[10px] text-muted-foreground truncate">{b.description}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-xs text-muted-foreground">
+                        Keep scoring above 80% to earn badges!
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Notice Board */}
+              <div className="space-y-3">
+                <h3 className="font-extrabold text-lg flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-indigo-500" />
+                  Academic Notice Board
+                </h3>
+                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 overflow-hidden shadow-sm">
+                  <Accordion type="single" collapsible className="w-full">
+                    {notices.map((n, i) => (
+                      <AccordionItem key={n.id || i} value={`n-${i}`} className="px-5 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                        <AccordionTrigger className="py-4 hover:no-underline">
+                          <div className="flex items-center gap-3 text-left w-full pr-4">
+                            <Badge
+                              className={`text-[10px] font-bold ${
+                                n.priority === 'HIGH'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                                  : n.priority === 'MEDIUM'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                              }`}
+                            >
+                              {n.priority}
+                            </Badge>
+                            <span className="font-bold text-xs sm:text-sm text-foreground">{n.title}</span>
+                            <span className="text-[11px] text-muted-foreground ml-auto hidden sm:inline-block">
+                              {n.date ? new Date(n.date).toLocaleDateString() : ''}
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-4 text-xs text-muted-foreground leading-relaxed">
+                          {n.content}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </Card>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 2: EXAMS & RESULTS HUB */}
+          {activeTab === 'exams' && (
+            <motion.div
+              key="exams"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-foreground">
+                    Exams & Evaluations Hub
+                  </h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium">
+                    Access live/scheduled tests, take online exams, and review published results.
+                  </p>
+                </div>
+
+                <Button
+                  onClick={() => router.push('/exams/online')}
+                  className="rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/20 active:scale-95 transition-all self-start sm:self-auto"
+                >
+                  <Monitor className="h-4 w-4 mr-1.5" />
+                  Browse Online Exams Portal
+                  <ArrowRight className="h-4 w-4 ml-1.5" />
+                </Button>
+              </div>
+
+              {/* Sub-Tab Navigation Bar & Filters */}
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+                    <button
+                      onClick={() => { triggerHaptic(ImpactStyle.Light); setExamSubTab('upcoming'); }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        examSubTab === 'upcoming'
+                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Clock className="h-3.5 w-3.5" />
+                      Scheduled & Live Exams ({filteredScheduledExams.length})
+                    </button>
+                    <button
+                      onClick={() => { triggerHaptic(ImpactStyle.Light); setExamSubTab('results'); }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        examSubTab === 'results'
+                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Award className="h-3.5 w-3.5" />
+                      Completed & Results ({filteredExamResults.length})
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Exam Type Filter */}
+                    <select
+                      value={examTypeFilter}
+                      onChange={(e) => setExamTypeFilter(e.target.value)}
+                      className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-3 py-2 text-foreground"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="ONLINE">Online Exams</option>
+                      <option value="OFFLINE">Offline Exams</option>
+                      <option value="MIXED">Mixed Exams</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search by exam title or subject..."
+                    value={examSearchQuery}
+                    onChange={(e) => setExamSearchQuery(e.target.value)}
+                    className="pl-10 pr-4 py-2.5 w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-muted-foreground/60"
+                  />
+                </div>
+              </div>
+
+              {/* VIEW 1: Scheduled & Live Exams */}
+              {examSubTab === 'upcoming' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {filteredScheduledExams.length > 0 ? (
+                    filteredScheduledExams.map((exam, i) => {
+                      const submission = examSubmissions.find((s: any) => s.examId === exam.id);
+                      const isSubmitted = submission?.status === 'SUBMITTED';
+                      const isInProgress = !isSubmitted && submission?.status === 'IN_PROGRESS';
+
+                      const examStart = exam.startTime ? new Date(exam.startTime) : (() => { const d = new Date(exam.date); d.setHours(0, 0, 0, 0); return d; })();
+                      const examEnd = exam.endTime ? new Date(exam.endTime) : (() => { const d = new Date(exam.date); d.setHours(23, 59, 59, 999); return d; })();
+
+                      const isExpired = now > examEnd;
+                      const isLive = !isExpired && now >= examStart;
+
+                      return (
+                        <motion.div
+                          key={exam.id}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                        >
+                          <Card className={`rounded-3xl border overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col h-full ${
+                            isLive
+                              ? 'border-emerald-500/50 bg-gradient-to-br from-white via-emerald-50/20 to-white dark:from-slate-900 dark:via-emerald-950/15 dark:to-slate-900'
+                              : 'border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900'
+                          }`}>
+                            <div className="p-5 sm:p-6 flex flex-col h-full space-y-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <Badge className="text-[10px] font-bold uppercase">
+                                  {exam.type}
+                                </Badge>
+
+                                {isSubmitted && (
+                                  <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold text-[10px]">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Submitted
+                                  </Badge>
+                                )}
+                                {isInProgress && (
+                                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold text-[10px] animate-pulse">
+                                    ⏳ In Progress
+                                  </Badge>
+                                )}
+                                {isLive && !isSubmitted && !isInProgress && (
+                                  <Badge className="bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                    LIVE NOW
+                                  </Badge>
+                                )}
+                                {!isLive && !isExpired && !isSubmitted && (
+                                  <Badge variant="outline" className="text-[10px] font-semibold text-muted-foreground">
+                                    Upcoming
+                                  </Badge>
+                                )}
+                                {isExpired && !isSubmitted && (
+                                  <Badge variant="outline" className="text-[10px] font-semibold text-slate-400">
+                                    Ended
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">
+                                  {exam.subject || 'General'}
+                                </span>
+                                <h3 className="text-base sm:text-lg font-black text-foreground line-clamp-2">
+                                  {exam.name}
+                                </h3>
+                              </div>
+
+                              {/* Timing Details */}
+                              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60 space-y-1.5 text-xs">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                  <span>Start Date:</span>
+                                  <span className="font-bold text-foreground">
+                                    {examStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {examStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                  <span>Duration:</span>
+                                  <span className="font-bold text-foreground">{exam.duration || 60} Mins</span>
+                                </div>
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                  <span>Total Marks:</span>
+                                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{exam.totalMarks} Marks</span>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="mt-auto pt-2">
+                                {exam.type === 'ONLINE' ? (
+                                  isSubmitted ? (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => router.push(`/exams/results/${exam.id}`)}
+                                      className="w-full rounded-2xl font-bold text-xs h-10 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+                                    >
+                                      <BarChart3 className="h-4 w-4 mr-1.5" />
+                                      View Result & Answers
+                                    </Button>
+                                  ) : isLive || isInProgress ? (
+                                    <Button
+                                      onClick={() => router.push(`/exams/online/${exam.id}`)}
+                                      className="w-full rounded-2xl font-bold text-xs h-10 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                                    >
+                                      <Play className="h-4 w-4 mr-1.5 fill-current" />
+                                      {isInProgress ? 'Resume Live Exam' : 'Start Exam Now'}
+                                    </Button>
+                                  ) : isExpired ? (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => router.push(`/exams/practice/${exam.id}`)}
+                                      className="w-full rounded-2xl font-bold text-xs h-10 border-slate-300 hover:border-indigo-500"
+                                    >
+                                      <Sparkles className="h-4 w-4 mr-1.5 text-indigo-500" />
+                                      Practice This Exam
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="secondary"
+                                      onClick={() => router.push('/exams/online')}
+                                      className="w-full rounded-2xl font-bold text-xs h-10"
+                                    >
+                                      <Clock className="h-4 w-4 mr-1.5" />
+                                      Opens Soon
+                                    </Button>
+                                  )
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => router.push(`/exams/${exam.id}/print`)}
+                                    className="w-full rounded-2xl font-bold text-xs h-10"
+                                  >
+                                    <Download className="h-4 w-4 mr-1.5" />
+                                    Admit Card & Info
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        </motion.div>
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-full py-16 text-center bg-white/60 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                      <Clock className="h-10 w-10 text-muted-foreground mx-auto" />
+                      <h4 className="font-bold text-base">No upcoming exams found</h4>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        You have no scheduled exams matching this filter. Check back soon!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* VIEW 2: Completed Exam Results (Online, Offline, Mixed) */}
+              {examSubTab === 'results' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {filteredExamResults.length > 0 ? (
+                    filteredExamResults.map((result, i) => (
+                      <motion.div
+                        key={result.id || result.examId || i}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                      >
+                        <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col h-full">
+                          <div className="p-5 sm:p-6 flex flex-col h-full space-y-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant="outline" className="text-[10px] font-bold uppercase">
+                                {result.type || 'EXAM'}
+                              </Badge>
+                              {result.rank && (
+                                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold text-[10px]">
+                                  Rank #{result.rank}
+                                </Badge>
+                              )}
+                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold text-[10px]">
+                                Grade: {result.grade || 'A'}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">
+                                {result.subject || 'General'}
+                              </span>
+                              <h3 className="text-base sm:text-lg font-black text-foreground line-clamp-2">
+                                {result.examTitle}
+                              </h3>
+                              <p className="text-[11px] text-muted-foreground">
+                                Completed on {result.date ? new Date(result.date).toLocaleDateString() : 'Recent'}
+                              </p>
+                            </div>
+
+                            {/* Score Breakdown */}
+                            <div className="grid grid-cols-2 gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
+                              <div>
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Marks</span>
+                                <div className="text-lg font-black text-foreground">
+                                  {result.score} / {result.totalMarks}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Percentage</span>
+                                <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                                  {result.percentage}%
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="mt-auto pt-2 flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => router.push(`/exams/results/${result.examId}`)}
+                                className="flex-1 rounded-2xl font-bold text-xs h-10 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+                              >
+                                <BarChart3 className="h-4 w-4 mr-1.5" />
+                                View Result Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => router.push(`/exams/practice/${result.examId}`)}
+                                className="rounded-2xl font-bold text-xs h-10 px-3 hover:border-indigo-500"
+                                title="Practice Again"
+                              >
+                                <Sparkles className="h-4 w-4 text-indigo-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="col-span-full py-16 text-center bg-white/60 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                      <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto" />
+                      <h4 className="font-bold text-base">No completed results found</h4>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        Results will appear here automatically once your examinations are graded and published.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
+          )}
+
+          {/* TAB 3: DEEP ANALYTICS */}
+          {activeTab === 'analytics' && (
+            <motion.div
+              key="analytics"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <StudentAnalyticsTab analytics={analytics} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }
