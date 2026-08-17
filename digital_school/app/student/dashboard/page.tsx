@@ -545,29 +545,33 @@ export default function StudentDashboardPage() {
               {/* Desktop Nav Pills */}
               <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900/80 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800/80">
                 {[
-                  { id: 'dashboard', label: 'Overview', icon: Home },
-                  { id: 'exams', label: 'My Exams', icon: FileText },
+                  { id: 'dashboard', label: 'Overview', icon: Home, action: () => setActiveTab('dashboard') },
+                  { id: 'exams', label: 'My Exams', icon: FileText, action: () => setActiveTab('exams') },
+                  { id: 'analytics', label: 'Analytics', icon: TrendingUp, action: () => setActiveTab('analytics') },
+                  { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
                   { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
                   { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-                  { id: 'analytics', label: 'Deep Analytics', icon: TrendingUp, href: '/student/analytics' },
-                  { id: 'focus', label: 'Focus Mode', icon: Target, href: '/student/focus' },
                   { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
                 ].map((item) => (
                   <button
                     key={item.id}
                     onClick={() => {
                       triggerHaptic(ImpactStyle.Light);
-                      if (item.action) item.action();
-                      else if (item.href) router.push(item.href);
-                      else setActiveTab(item.id);
+                      if (item.action) {
+                        item.action();
+                      } else if (item.href) {
+                        router.push(item.href);
+                      } else {
+                        setActiveTab(item.id);
+                      }
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 ${
-                      activeTab === item.id && !item.href
+                      activeTab === item.id && !item.href && item.id !== 'focus'
                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-muted-foreground hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
                     }`}
                   >
-                    <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
+                    <item.icon className={`h-4 w-4 ${activeTab === item.id && item.id !== 'focus' ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
                     <span>{item.label}</span>
                     {item.badge && item.badge > 0 ? (
                       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white">
@@ -638,24 +642,28 @@ export default function StudentDashboardPage() {
       <div className="lg:hidden sticky top-16 sm:top-20 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl px-4 py-2 overflow-x-auto no-scrollbar">
         <div className="flex gap-2">
           {[
-            { id: 'dashboard', label: 'Overview', icon: Home },
-            { id: 'exams', label: 'My Exams', icon: FileText },
+            { id: 'dashboard', label: 'Overview', icon: Home, action: () => setActiveTab('dashboard') },
+            { id: 'exams', label: 'My Exams', icon: FileText, action: () => setActiveTab('exams') },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp, action: () => setActiveTab('analytics') },
+            { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
             { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
             { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
-            { id: 'analytics', label: 'Analytics', icon: TrendingUp, href: '/student/analytics' },
-            { id: 'focus', label: 'Focus', icon: Target, href: '/student/focus' },
             { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => {
                 triggerHaptic(ImpactStyle.Light);
-                if (item.action) item.action();
-                else if (item.href) router.push(item.href);
-                else setActiveTab(item.id);
+                if (item.action) {
+                  item.action();
+                } else if (item.href) {
+                  router.push(item.href);
+                } else {
+                  setActiveTab(item.id);
+                }
               }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                activeTab === item.id && !item.href
+                activeTab === item.id && !item.href && item.id !== 'focus'
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                   : 'bg-slate-100 dark:bg-slate-900 text-muted-foreground border border-slate-200 dark:border-slate-800'
               }`}
