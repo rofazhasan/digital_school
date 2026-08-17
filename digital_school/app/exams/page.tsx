@@ -100,6 +100,9 @@ export type Exam = {
   sqRequiredQuestions?: number;
   objectiveTime?: number;
   cqSqTime?: number;
+  hasSets?: boolean;
+  setsCount?: number;
+  generatedSet?: any;
 };
 
 type TimingFilter = 'all' | 'live' | 'upcoming' | 'finished';
@@ -1346,6 +1349,18 @@ export default function ExamsPage() {
                                 {exam.type}
                               </Badge>
 
+                              {/* Sets Status (Green Tick When Sets Generated) */}
+                              {(exam.hasSets || exam.generatedSet || (exam.setsCount && exam.setsCount > 0)) ? (
+                                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1 uppercase">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                                  <span>Sets Ready ({exam.setsCount || 1})</span>
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] font-medium text-muted-foreground/60 border-dashed border-slate-300 dark:border-slate-700 px-1.5 py-0.5 flex items-center gap-1">
+                                  <span>No Sets</span>
+                                </Badge>
+                              )}
+
                               {exam.allowRetake && (
                                 <Badge variant="outline" className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 border-indigo-200 px-1.5 py-0.5 flex items-center gap-1 uppercase">
                                   <RefreshCw className="w-2.5 h-2.5" /> Retake
@@ -1407,7 +1422,7 @@ export default function ExamsPage() {
                                     <BarChart3 className="w-4 h-4 text-emerald-500" />
                                     <span>View Results</span>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/${exam.id}/print`)}>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => window.open(`/exams/${exam.id}/print`, '_blank')}>
                                     <Printer className="w-4 h-4 text-violet-500" />
                                     <span>Print Exam & Cards</span>
                                   </DropdownMenuItem>

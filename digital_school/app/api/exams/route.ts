@@ -165,10 +165,30 @@ export async function GET(request: NextRequest) {
           type: true,
           allowRetake: true,
           duration: true,
+          generatedSet: true,
           mcqNegativeMarking: true, // Always include for cards
           mcNegativeMarking: true,  // Include for redundancy
           class: { select: { id: true, name: true } },
           createdBy: { select: { id: true, name: true } },
+          _count: {
+            select: {
+              examSets: true,
+              results: true,
+            }
+          },
+          examSets: {
+            take: 5,
+            select: {
+              id: true,
+              name: true,
+              questions: {
+                take: 5,
+                select: {
+                  subject: true,
+                }
+              }
+            }
+          }
         };
 
         if (!summary) {
@@ -182,17 +202,6 @@ export async function GET(request: NextRequest) {
             objectiveTime: true,
             cqSqTime: true,
             cqSubsections: true,
-            examSets: {
-              take: 1,
-              select: {
-                questions: {
-                  take: 5,
-                  select: {
-                    subject: true,
-                  }
-                }
-              }
-            }
           });
         }
 
@@ -243,6 +252,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      const setsCount = exam._count?.examSets || exam.examSets?.length || 0;
+      const hasGeneratedSet = Boolean(exam.generatedSet);
+      const hasSets = setsCount > 0 || hasGeneratedSet;
+
       return {
         id: exam.id,
         name: exam.name,
@@ -261,6 +274,9 @@ export async function GET(request: NextRequest) {
         duration: exam.duration,
         mcqNegativeMarking: exam.mcqNegativeMarking,
         mcNegativeMarking: exam.mcNegativeMarking,
+        hasSets,
+        setsCount: setsCount > 0 ? setsCount : (hasGeneratedSet ? 1 : 0),
+        generatedSet: exam.generatedSet || null,
         cqTotalQuestions: summary ? undefined : exam.cqTotalQuestions,
         cqRequiredQuestions: summary ? undefined : exam.cqRequiredQuestions,
         sqTotalQuestions: summary ? undefined : exam.sqTotalQuestions,
