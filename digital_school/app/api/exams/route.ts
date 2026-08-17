@@ -165,7 +165,6 @@ export async function GET(request: NextRequest) {
           type: true,
           allowRetake: true,
           duration: true,
-          generatedSet: true,
           mcqNegativeMarking: true, // Always include for cards
           mcNegativeMarking: true,  // Include for redundancy
           class: { select: { id: true, name: true } },
@@ -173,20 +172,6 @@ export async function GET(request: NextRequest) {
           _count: {
             select: {
               examSets: true,
-              results: true,
-            }
-          },
-          examSets: {
-            take: 5,
-            select: {
-              id: true,
-              name: true,
-              questions: {
-                take: 5,
-                select: {
-                  subject: true,
-                }
-              }
             }
           }
         };
@@ -233,28 +218,8 @@ export async function GET(request: NextRequest) {
     );
 
     const examsData = (exams as any[]).map((exam) => {
-      let examSubject = '';
-      if (!summary) {
-        const sampleQuestions = (exam.examSets || []).flatMap((set: any) => set.questions || []);
-        if (sampleQuestions.length > 0) {
-          const subjectCounts: { [key: string]: number } = {};
-          sampleQuestions.forEach((q: any) => {
-            if (q.subject) subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
-          });
-
-          const entries = Object.entries(subjectCounts);
-          if (entries.length > 0) {
-            const mostCommonSubject = entries.reduce((a, b) =>
-              (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
-            );
-            examSubject = mostCommonSubject[0] || '';
-          }
-        }
-      }
-
-      const setsCount = exam._count?.examSets || exam.examSets?.length || 0;
-      const hasGeneratedSet = Boolean(exam.generatedSet);
-      const hasSets = setsCount > 0 || hasGeneratedSet;
+      const setsCount = exam._count?.examSets || 0;
+      const hasSets = setsCount > 0;
 
       return {
         id: exam.id,
@@ -263,7 +228,7 @@ export async function GET(request: NextRequest) {
         date: exam.date,
         startTime: exam.startTime,
         endTime: exam.endTime,
-        subject: examSubject || exam.class?.name || '',
+        subject: exam.class?.name || '',
         totalMarks: exam.totalMarks,
         isActive: exam.isActive,
         createdBy: exam.createdBy?.name || '',
@@ -275,8 +240,7 @@ export async function GET(request: NextRequest) {
         mcqNegativeMarking: exam.mcqNegativeMarking,
         mcNegativeMarking: exam.mcNegativeMarking,
         hasSets,
-        setsCount: setsCount > 0 ? setsCount : (hasGeneratedSet ? 1 : 0),
-        generatedSet: exam.generatedSet || null,
+        setsCount,
         cqTotalQuestions: summary ? undefined : exam.cqTotalQuestions,
         cqRequiredQuestions: summary ? undefined : exam.cqRequiredQuestions,
         sqTotalQuestions: summary ? undefined : exam.sqTotalQuestions,

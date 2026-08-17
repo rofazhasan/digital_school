@@ -202,8 +202,20 @@ function formatExamTimingDisplay(start: Date, end: Date) {
 }
 
 export default function ExamsPage() {
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [results, setResults] = useState<any[]>([]);
+  const [exams, setExams] = useState<Exam[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("cached_admin_exams");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        // Ignore cache parse error
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
@@ -284,7 +296,6 @@ export default function ExamsPage() {
   useEffect(() => {
     fetchExams();
     fetchUserRole();
-    fetchResults();
   }, []);
 
   // Debounce search input
@@ -305,18 +316,6 @@ export default function ExamsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const fetchResults = async () => {
-    try {
-      const response = await fetch("/api/results");
-      if (response.ok) {
-        const result = await response.json();
-        setResults(result.results || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch results:", error);
-    }
-  };
-
   const fetchUserRole = async () => {
     try {
       const response = await fetch("/api/user");
@@ -333,9 +332,13 @@ export default function ExamsPage() {
   };
 
   const fetchExams = async () => {
-    setLoading(true);
+    if (exams.length === 0) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     try {
-      const response = await fetch("/api/exams?limit=1000");
+      const response = await fetch("/api/exams?limit=200");
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
 
@@ -351,16 +354,16 @@ export default function ExamsPage() {
       }
 
       setExams(data);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("cached_admin_exams", JSON.stringify(data));
+        } catch (e) {}
+      }
     } catch (error) {
       console.error("Error fetching exams:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch exams.",
-        variant: "destructive"
-      });
-      setExams([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -1255,18 +1258,18 @@ export default function ExamsPage() {
             )}
           </div>
 
-          {/* Loading State */}
-          {loading && (
+          {/* Loading State - only when no cached exams exist */}
+          {loading && exams.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
               <p className="text-sm font-semibold text-muted-foreground animate-pulse">
-                Loading academic exams in priority date-ascending order...
+                Loading academic exams...
               </p>
             </div>
           )}
 
           {/* Exam Cards Grid */}
-          {!loading && paginatedExams.length > 0 && (
+          {paginatedExams.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               <AnimatePresence mode="popLayout">
                 {paginatedExams.map((exam, index) => {
@@ -1537,7 +1540,7 @@ export default function ExamsPage() {
           )}
 
           {/* Pagination Controls */}
-          {!loading && totalPages > 1 && (
+          {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-slate-200 dark:border-slate-800">
               <div className="text-xs sm:text-sm text-muted-foreground font-medium">
                 Showing <strong className="text-foreground font-bold">{(currentPage - 1) * pageSize + 1}</strong> to{" "}
