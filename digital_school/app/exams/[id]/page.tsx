@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +27,7 @@ import { CheckSquare } from "lucide-react";
 import { cleanupMath } from "@/lib/utils";
 
 import { CMARenderer, MPCRenderer } from '@/components/ui/QuestionRenderers';
+import { BulkAddExamQuestionsDialog } from './BulkAddExamQuestionsDialog';
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
@@ -459,6 +460,15 @@ export default function ExamBuilderPage() {
   const [sets, setSets] = useState<any[]>([]); // Add this state if not present
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+
+  const handleBulkAddQuestions = (newQuestions: Question[]) => {
+    setSelectedQuestions((prev) => {
+      const existingIds = new Set(prev.map((q) => q.id));
+      const filtered = newQuestions.filter((q) => !existingIds.has(q.id));
+      return [...prev, ...filtered];
+    });
+  };
 
   // API Call Logic
   const fetchExamData = useCallback(
@@ -1056,6 +1066,14 @@ export default function ExamBuilderPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" size="sm" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
                   <Button variant="secondary" size="sm" onClick={() => router.push('/question-bank')} className="bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-100"><BookOpen className="mr-2 h-4 w-4" /> Question Bank</Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setBulkDialogOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Bulk Add Questions
+                  </Button>
                   <Button variant="outline" onClick={() => router.push(`/exams/${examId}/print`)}><Printer className="mr-2 h-4 w-4" />Print Sets ({exam.examSets.length})</Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
@@ -1078,7 +1096,17 @@ export default function ExamBuilderPage() {
                 <CardHeader>
                   <div className="flex justify-between items-center flex-wrap gap-2">
                     <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5" />Question Bank</CardTitle>
-                    <Badge variant="secondary">{questionsData?.meta.total ?? 0} Questions Found</Badge>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkDialogOpen(true)}
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Bulk Import
+                      </Button>
+                      <Badge variant="secondary">{questionsData?.meta.total ?? 0} Questions Found</Badge>
+                    </div>
                   </div>
                   <CardDescription>Filter and select questions for the exam.</CardDescription>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
@@ -1467,6 +1495,17 @@ export default function ExamBuilderPage() {
                 Delete All Sets
               </Button>
             </div>
+          )}
+
+          {/* Bulk Add Exam Questions Dialog */}
+          {exam && (
+            <BulkAddExamQuestionsDialog
+              isOpen={bulkDialogOpen}
+              onOpenChange={setBulkDialogOpen}
+              exam={exam}
+              onAddQuestionsToSet={handleBulkAddQuestions}
+              onQuestionsPermanentlySaved={() => fetchExamData(filters, dateRange)}
+            />
           )}
         </div>
       </div>
