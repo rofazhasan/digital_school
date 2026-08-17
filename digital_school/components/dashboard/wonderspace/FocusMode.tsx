@@ -82,14 +82,24 @@ export function FocusMode({ onClose }: FocusModeProps) {
                 className="relative z-10 w-full max-w-2xl"
             >
                 <GlassCard className="p-8 md:p-12 border-white/20 shadow-2xl overflow-visible">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onClose}
-                        className="absolute -top-4 -right-4 bg-background/80 backdrop-blur px-2 py-2 rounded-full border border-border shadow-md hover:bg-muted"
-                    >
-                        <X className="w-5 h-5" />
-                    </Button>
+                    <div className="flex items-center justify-between w-full mb-6">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onClose}
+                            className="rounded-full text-xs font-bold bg-background/80 backdrop-blur border-border hover:bg-muted"
+                        >
+                            ← Back to Dashboard
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onClose}
+                            className="bg-background/80 backdrop-blur rounded-full border border-border shadow-md hover:bg-muted h-8 w-8"
+                        >
+                            <X className="w-4 h-4" />
+                        </Button>
+                    </div>
 
                     <div className="flex flex-col items-center gap-12 text-center">
                         {/* Mode Switcher */}

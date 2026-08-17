@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Bell, AlertTriangle, Info, CheckCircle, Search, Filter,
     ExternalLink, User, Calendar, Clock, Eye, EyeOff,
     Megaphone, BookOpen, Trophy, Palmtree, Building2,
     Landmark, Banknote, ChevronDown, ChevronUp, X,
-    RefreshCw, Loader2, BellOff
+    RefreshCw, Loader2, BellOff, ArrowLeft, Sparkles, CheckCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 
-// Priority and category configs shared between this page and admin-tabs
+const NOTICES_CACHE_KEY = "student_notices_cache_v2";
+
+// Priority and category configs
 const PRIORITY_CONFIG = {
     URGENT: {
         label: 'জরুরি',
@@ -93,110 +97,96 @@ function formatRelativeDate(dateStr: string) {
     const date = new Date(dateStr);
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (diff < 60) return 'এইমাত্র';
-    if (diff < 3600) return `${Math.floor(diff / 60)} মিনিট আগে`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} ঘন্টা আগে`;
-    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} দিন আগে`;
-    return date.toLocaleDateString('bn-BD', { day: '2-digit', month: 'long', year: 'numeric' });
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} days ago`;
+    return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function formatDateBangla(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-BD', {
-        day: '2-digit', month: 'long', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    });
-}
-
-// Expanded notice card
-function NoticeCard({ notice, isRead, onMarkRead }: {
+function NoticeCard({
+    notice,
+    isRead,
+    onMarkRead,
+}: {
     notice: Notice;
     isRead: boolean;
     onMarkRead: (id: string) => void;
 }) {
     const [expanded, setExpanded] = useState(false);
-    const pc = PRIORITY_CONFIG[notice.priority];
-    const cc = CATEGORY_CONFIG[notice.category] || CATEGORY_CONFIG['General'];
-    const Icon = pc.icon;
-    const CategoryIcon = cc.icon;
-    const links = (notice.links as NoticeLink[]) || [];
-    const isExpired = notice.expiresAt && new Date(notice.expiresAt) < new Date();
-    const isLong = notice.description.length > 200;
+    const priority = PRIORITY_CONFIG[notice.priority] || PRIORITY_CONFIG.LOW;
+    const PriorityIcon = priority.icon;
+    const cat = CATEGORY_CONFIG[notice.category] || CATEGORY_CONFIG.Other;
+    const CatIcon = cat.icon;
 
-    const handleToggle = () => {
-        setExpanded(prev => !prev);
-        if (!isRead) onMarkRead(notice.id);
-    };
+    const isLong = notice.description.length > 220;
+    const displayDesc = isLong && !expanded
+        ? notice.description.slice(0, 220) + '...'
+        : notice.description;
+
+    const isExpired = notice.expiresAt && new Date(notice.expiresAt) < new Date();
+    const links = notice.links || [];
 
     return (
         <motion.div
-            layout
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: -20, height: 0 }}
-            className={`relative border-l-4 ${pc.borderLeft} rounded-2xl border border-border/60 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 ${!isRead ? 'bg-card' : 'bg-card/60'}`}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className={`relative rounded-3xl border transition-all duration-300 overflow-hidden shadow-xs hover:shadow-md ${
+                !isRead
+                    ? 'bg-white/95 dark:bg-slate-900/95 border-indigo-200/80 dark:border-indigo-800/80'
+                    : 'bg-white/60 dark:bg-slate-900/50 border-slate-200/70 dark:border-slate-800/70 opacity-90'
+            }`}
         >
-            {/* Priority glow background */}
-            <div className={`absolute inset-0 bg-gradient-to-r ${pc.bg} pointer-events-none`} />
-
-            {/* Unread indicator */}
-            {!isRead && (
-                <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full ${pc.dot} ${pc.pulse ? 'animate-pulse' : ''}`} />
-                </div>
-            )}
-
-            <div className="relative p-4 md:p-6">
-                {/* Header row */}
+            <div className={`border-l-4 ${priority.borderLeft} p-5 sm:p-6`}>
                 <div className="flex items-start gap-4">
-                    {/* Priority icon box */}
-                    <div className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center border ${pc.color}`}>
-                        <Icon className="h-5 w-5" />
+                    {/* Category Icon */}
+                    <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 flex-shrink-0">
+                        <CatIcon className={`h-5 w-5 ${cat.color}`} />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        {/* Badges */}
+                        {/* Tags Header */}
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${pc.badge}`}>
-                                {pc.label}
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${priority.badge}`}>
+                                <PriorityIcon className={`h-3 w-3 ${priority.pulse ? 'animate-pulse' : ''}`} />
+                                {priority.labelEn}
                             </span>
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground`}>
-                                <CategoryIcon className={`h-3 w-3 ${cc.color}`} />
-                                {cc.label}
-                            </span>
+                            <Badge variant="outline" className="text-[10px] font-bold rounded-full border-slate-200 dark:border-slate-700">
+                                {cat.label}
+                            </Badge>
+                            {!isRead && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-indigo-500 text-white animate-pulse">
+                                    NEW
+                                </span>
+                            )}
                             {isExpired && (
-                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-500 dark:bg-red-950/50">মেয়াদ শেষ</span>
+                                <Badge variant="secondary" className="text-[9px] text-muted-foreground">
+                                    Expired
+                                </Badge>
                             )}
                         </div>
 
                         {/* Title */}
-                        <h2 className={`font-bold text-base md:text-lg leading-tight text-foreground mb-1 ${!isRead ? '' : 'text-foreground/75'}`}
-                            style={{ fontFamily: '"Hind Siliguri", "Noto Sans Bengali", sans-serif' }}>
+                        <h3 className={`text-base sm:text-lg font-black leading-snug text-foreground ${!isRead ? 'font-black' : 'font-bold'}`}>
                             {notice.title}
-                        </h2>
+                        </h3>
 
-                        {/* Body */}
-                        <div
-                            className={`text-sm text-muted-foreground leading-relaxed transition-all duration-300 ${isLong && !expanded ? 'line-clamp-3' : ''}`}
-                            style={{ fontFamily: '"Hind Siliguri", "Noto Sans Bengali", sans-serif', whiteSpace: 'pre-wrap' }}
-                        >
-                            {notice.description}
-                        </div>
+                        {/* Content */}
+                        <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed whitespace-pre-line font-medium">
+                            {displayDesc}
+                        </p>
 
-                        {/* Expand/collapse for long notices */}
                         {isLong && (
                             <button
-                                onClick={handleToggle}
-                                className="mt-1 text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                                onClick={() => { triggerHaptic(ImpactStyle.Light); setExpanded(!expanded); }}
+                                className="mt-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
                             >
-                                {expanded ? (
-                                    <><ChevronUp className="h-3 w-3" /> কম দেখুন</>
-                                ) : (
-                                    <><ChevronDown className="h-3 w-3" /> আরও পড়ুন</>
-                                )}
+                                {expanded ? <>Show less <ChevronUp className="h-3 w-3" /></> : <>Read full notice <ChevronDown className="h-3 w-3" /></>}
                             </button>
                         )}
 
-                        {/* Links */}
+                        {/* External Links */}
                         {links.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3">
                                 {links.map((link, i) => (
@@ -205,48 +195,46 @@ function NoticeCard({ notice, isRead, onMarkRead }: {
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-colors dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
                                     >
                                         <ExternalLink className="h-3 w-3" />
-                                        {link.label || 'লিংক দেখুন'}
+                                        {link.label || 'Open Resource'}
                                     </a>
                                 ))}
                             </div>
                         )}
 
                         {/* Footer */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-3 border-t border-border/40">
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-4 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground font-medium">
                                 <span className="flex items-center gap-1">
                                     <User className="h-3 w-3" />
-                                    {notice.postedBy?.name}
+                                    {notice.postedBy?.name || 'Academic Office'}
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
                                     {formatRelativeDate(notice.createdAt)}
                                 </span>
                                 {notice.expiresAt && !isExpired && (
-                                    <span className="flex items-center gap-1 text-amber-600">
+                                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
                                         <Clock className="h-3 w-3" />
-                                        মেয়াদ: {new Date(notice.expiresAt).toLocaleDateString('en-BD')}
+                                        Valid until: {new Date(notice.expiresAt).toLocaleDateString()}
                                     </span>
                                 )}
                             </div>
 
-                            {/* Mark read button */}
-                            {!isRead && (
+                            {!isRead ? (
                                 <button
                                     onClick={() => onMarkRead(notice.id)}
-                                    className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors font-medium"
+                                    className="text-xs font-bold flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors"
                                 >
-                                    <Eye className="h-3.5 w-3.5" />
-                                    পড়া হয়েছে চিহ্নিত করুন
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    Mark as Read
                                 </button>
-                            )}
-                            {isRead && (
-                                <span className="text-xs flex items-center gap-1 text-muted-foreground/60">
-                                    <EyeOff className="h-3 w-3" />
-                                    পড়া হয়েছে
+                            ) : (
+                                <span className="text-[11px] font-semibold flex items-center gap-1 text-slate-400">
+                                    <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
+                                    Read
                                 </span>
                             )}
                         </div>
@@ -257,48 +245,64 @@ function NoticeCard({ notice, isRead, onMarkRead }: {
     );
 }
 
-// ============================================================
-// MAIN PAGE
-// ============================================================
 export default function StudentNoticesPage() {
-    const [notices, setNotices] = useState<Notice[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const router = useRouter();
+
+    // 0-Second SWR Hydration
+    const [cached] = useState(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const raw = sessionStorage.getItem(NOTICES_CACHE_KEY);
+                if (raw) return JSON.parse(raw);
+            } catch {}
+        }
+        return null;
+    });
+
+    const [notices, setNotices] = useState<Notice[]>(cached?.notices || []);
+    const [loading, setLoading] = useState(!cached?.notices);
+    const [unreadCount, setUnreadCount] = useState(cached?.unreadCount || 0);
     const [readIds, setReadIds] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState('');
     const [filterPriority, setFilterPriority] = useState<string>('ALL');
     const [filterCategory, setFilterCategory] = useState<string>('ALL');
     const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
-    const fetchNotices = useCallback(async () => {
-        setLoading(true);
+    const fetchNotices = useCallback(async (isSilent = false) => {
+        if (!isSilent && notices.length === 0) setLoading(true);
         try {
-            const res = await fetch('/api/notices');
+            const res = await fetch('/api/notices', { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
-                setNotices(data.notices || []);
-                setUnreadCount(data.unreadCount || 0);
+                const list = data.notices || [];
+                const unread = data.unreadCount || 0;
+                setNotices(list);
+                setUnreadCount(unread);
+                try {
+                    sessionStorage.setItem(NOTICES_CACHE_KEY, JSON.stringify({ notices: list, unreadCount: unread, cachedAt: Date.now() }));
+                } catch {}
             }
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [notices.length]);
 
-    useEffect(() => { fetchNotices(); }, [fetchNotices]);
+    useEffect(() => {
+        fetchNotices(true);
+    }, [fetchNotices]);
 
     const handleMarkRead = useCallback(async (id: string) => {
+        triggerHaptic(ImpactStyle.Light);
         if (readIds.has(id)) return;
         setReadIds(prev => new Set([...prev, id]));
         setUnreadCount(prev => Math.max(0, prev - 1));
         try {
-            await fetch(`/api/notices/${id}/read`, { method: 'POST' });
-        } catch (e) {
-            // Silently fail — optimistic update stays
-        }
+            await fetch(`/api/notices/${id}/read`, { method: 'POST', credentials: 'include' });
+        } catch (e) {}
     }, [readIds]);
 
     const isRead = useCallback((notice: Notice) => {
-        return readIds.has(notice.id) || notice.readBy.length > 0;
+        return readIds.has(notice.id) || (notice.readBy && notice.readBy.length > 0);
     }, [readIds]);
 
     const filtered = notices.filter(n => {
@@ -311,10 +315,9 @@ export default function StudentNoticesPage() {
     });
 
     const urgentNotices = filtered.filter(n => n.priority === 'URGENT');
-    const otherNotices = filtered.filter(n => n.priority !== 'URGENT');
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors">
             {/* Top banner for URGENT notices */}
             <AnimatePresence>
                 {urgentNotices.some(n => !isRead(n)) && (
@@ -322,161 +325,136 @@ export default function StudentNoticesPage() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="bg-red-600 dark:bg-red-800 text-white overflow-hidden"
+                        className="bg-rose-600 text-white overflow-hidden shadow-md"
                     >
-                        <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
-                            <AlertTriangle className="h-5 w-5 flex-shrink-0 animate-pulse" />
-                            <span className="font-bold text-sm" style={{ fontFamily: '"Hind Siliguri", sans-serif' }}>
-                                {urgentNotices.filter(n => !isRead(n)).length}টি জরুরি নোটিশ রয়েছে! নিচে স্ক্রল করুন।
-                            </span>
+                        <div className="max-w-5xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 font-bold text-xs sm:text-sm">
+                                <AlertTriangle className="h-4 w-4 animate-bounce" />
+                                <span>{urgentNotices.filter(n => !isRead(n)).length} Urgent Academic Notices require your attention!</span>
+                            </div>
+                            <Badge className="bg-white/20 text-white font-bold text-[10px]">Action Required</Badge>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <div className="max-w-5xl mx-auto px-4 md:px-6 py-8">
-                {/* Page Header */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <Bell className="h-8 w-8 text-primary" />
-                                {unreadCount > 0 && (
-                                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-                                        {unreadCount > 9 ? '9+' : unreadCount}
-                                    </span>
-                                )}
-                            </div>
-                            <div>
-                                <h1 className="text-2xl md:text-3xl font-extrabold text-foreground" style={{ fontFamily: '"Hind Siliguri", "Noto Sans Bengali", sans-serif' }}>
-                                    নোটিশ বোর্ড
-                                </h1>
-                                <p className="text-muted-foreground text-sm">Official Notice Board</p>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={fetchNotices} className="h-9 gap-1.5 text-muted-foreground">
-                            <RefreshCw className="h-4 w-4" />
-                            <span className="hidden sm:inline">রিফ্রেশ</span>
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+                {/* Gen-Z Navigation Header with Back Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { triggerHaptic(ImpactStyle.Light); router.push('/student/dashboard'); }}
+                        className="self-start rounded-full font-bold text-xs bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500 hover:text-indigo-600 transition-all gap-1.5 px-4 h-9"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Student Dashboard
+                    </Button>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => fetchNotices(false)}
+                            className="rounded-full text-xs font-bold gap-1.5 text-muted-foreground h-9"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Refresh
                         </Button>
                     </div>
-
-                    {/* Stats row */}
-                    <div className="flex flex-wrap gap-3 text-sm mt-4">
-                        {[
-                            { label: 'মোট নোটিশ', value: notices.length, color: 'text-foreground' },
-                            { label: 'অপঠিত', value: unreadCount, color: 'text-red-500' },
-                            { label: 'জরুরি', value: notices.filter(n => n.priority === 'URGENT').length, color: 'text-orange-500' },
-                        ].map((s, i) => (
-                            <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border border-border">
-                                <span className={`font-bold ${s.color}`}>{s.value}</span>
-                                <span className="text-muted-foreground">{s.label}</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
 
-                {/* Filter area */}
-                <div className="space-y-3 mb-6">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="নোটিশ খুঁজুন... / Search notices..."
-                            className="pl-10 h-11 rounded-xl bg-muted/40 border-border"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
-                        {search && (
-                            <button className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setSearch('')}>
-                                <X className="h-4 w-4" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Filter chips */}
-                    <div className="flex flex-wrap gap-2">
-                        {/* Unread toggle */}
-                        <button
-                            onClick={() => setShowUnreadOnly(p => !p)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${showUnreadOnly
-                                    ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                                    : 'bg-muted/30 text-muted-foreground border-border hover:border-red-400'
-                                }`}
-                        >
+                {/* Hero Header */}
+                <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white shadow-xl relative overflow-hidden border border-indigo-500/20">
+                    <div className="relative z-10 space-y-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-200 backdrop-blur-md">
                             <Bell className="h-3.5 w-3.5" />
-                            অপঠিত
-                        </button>
+                            Official Announcement Channel
+                        </div>
+                        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+                            Student Notice Board 📢
+                        </h1>
+                        <p className="text-xs sm:text-sm text-slate-300 max-w-lg font-medium">
+                            Stay informed on exam dates, schedule adjustments, academic holidays, and institutional announcements.
+                        </p>
 
-                        {/* Priority filters */}
-                        {['ALL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'].map(p => (
-                            <button
-                                key={p}
-                                onClick={() => setFilterPriority(p)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterPriority === p
-                                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                                        : 'bg-muted/30 text-muted-foreground border-border hover:border-primary/50'
-                                    }`}
-                            >
-                                {p === 'ALL' ? 'সব' : PRIORITY_CONFIG[p as keyof typeof PRIORITY_CONFIG]?.label || p}
-                            </button>
-                        ))}
-
-                        <span className="w-px h-6 bg-border self-center" />
-
-                        {/* Category filter */}
-                        <select
-                            value={filterCategory}
-                            onChange={e => setFilterCategory(e.target.value)}
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold border border-border bg-muted/30 text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-                        >
-                            <option value="ALL">সব বিভাগ</option>
-                            {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
-                                <option key={key} value={key}>{cfg.label}</option>
-                            ))}
-                        </select>
+                        {/* Metric stats row */}
+                        <div className="flex flex-wrap gap-2.5 pt-3">
+                            <Badge className="bg-white/15 hover:bg-white/20 text-white font-bold text-xs py-1 px-3 rounded-full border-white/20">
+                                Total: {notices.length} Notices
+                            </Badge>
+                            <Badge className="bg-rose-500/30 text-rose-200 font-bold text-xs py-1 px-3 rounded-full border-rose-400/30">
+                                {unreadCount} Unread
+                            </Badge>
+                            <Badge className="bg-amber-500/30 text-amber-200 font-bold text-xs py-1 px-3 rounded-full border-amber-400/30">
+                                {notices.filter(n => n.priority === 'URGENT').length} Urgent
+                            </Badge>
+                        </div>
                     </div>
                 </div>
 
-                {/* Notice List */}
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-4">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                        <p className="text-sm" style={{ fontFamily: '"Hind Siliguri", sans-serif' }}>নোটিশ লোড হচ্ছে...</p>
+                {/* Filter & Search Bar */}
+                <div className="p-4 rounded-3xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3">
+                    <div className="relative">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
+                        <Input
+                            placeholder="Search notices by keyword, title, or topic..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-10 h-11 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-medium"
+                        />
                     </div>
-                ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-                        <BellOff className="h-14 w-14 mb-4 opacity-20" />
-                        <p className="text-lg font-semibold" style={{ fontFamily: '"Hind Siliguri", sans-serif' }}>কোনো নোটিশ পাওয়া যায়নি</p>
-                        <p className="text-sm mt-1">No notices found for your selected filters.</p>
-                        {(search || filterPriority !== 'ALL' || filterCategory !== 'ALL' || showUnreadOnly) && (
-                            <Button
-                                variant="outline" size="sm" className="mt-4"
-                                onClick={() => { setSearch(''); setFilterPriority('ALL'); setFilterCategory('ALL'); setShowUnreadOnly(false); }}
-                            >
-                                ফিল্টার পরিষ্কার করুন
-                            </Button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <AnimatePresence>
-                            {filtered.map((notice) => (
-                                <NoticeCard
-                                    key={notice.id}
-                                    notice={notice}
-                                    isRead={isRead(notice)}
-                                    onMarkRead={handleMarkRead}
-                                />
-                            ))}
-                        </AnimatePresence>
 
-                        {filtered.length > 0 && (
-                            <p className="text-center text-xs text-muted-foreground py-4">
-                                মোট {filtered.length}টি নোটিশ দেখানো হচ্ছে
-                            </p>
-                        )}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {['ALL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'].map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => { triggerHaptic(ImpactStyle.Light); setFilterPriority(p); }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                        filterPriority === p
+                                            ? 'bg-indigo-600 text-white shadow-xs'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    {p === 'ALL' ? 'All Priority' : p}
+                                </button>
+                            ))}
+                        </div>
+
+                        <label className="flex items-center gap-2 text-xs font-bold cursor-pointer text-muted-foreground hover:text-foreground">
+                            <input
+                                type="checkbox"
+                                checked={showUnreadOnly}
+                                onChange={(e) => setShowUnreadOnly(e.target.checked)}
+                                className="rounded text-indigo-600 focus:ring-indigo-500"
+                            />
+                            Show Unread Only
+                        </label>
                     </div>
-                )}
+                </div>
+
+                {/* Notices List */}
+                <div className="space-y-4">
+                    {filtered.length > 0 ? (
+                        filtered.map((notice) => (
+                            <NoticeCard
+                                key={notice.id}
+                                notice={notice}
+                                isRead={isRead(notice)}
+                                onMarkRead={handleMarkRead}
+                            />
+                        ))
+                    ) : (
+                        <div className="py-16 text-center bg-white/60 dark:bg-slate-900/40 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                            <BellOff className="h-10 w-10 text-muted-foreground mx-auto" />
+                            <h4 className="font-bold text-base">No notices found</h4>
+                            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                                There are no announcements matching your current search or filter criteria.
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

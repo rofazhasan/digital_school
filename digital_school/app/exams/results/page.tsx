@@ -505,12 +505,13 @@ export default function ExamResultsPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
-              variant="ghost"
-              onClick={() => router.push('/exams/online')}
-              className="text-slate-400 hover:text-white hover:bg-white/5 border border-white/5"
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(isStudent ? '/student/dashboard' : '/dashboard')}
+              className="rounded-full font-bold text-xs bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500 hover:text-indigo-600 transition-all gap-1.5 px-4 h-9"
             >
-              <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
-              Back
+              <ArrowRight className="w-4 h-4 mr-1.5 rotate-180" />
+              Back to Dashboard
             </Button>
             {isStudent && user.studentProfile && (
               <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
