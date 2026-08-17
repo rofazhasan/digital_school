@@ -159,26 +159,16 @@ const DASHBOARD_CACHE_KEY = "student_dashboard_cache_v3";
 export default function StudentDashboardPage() {
   const router = useRouter();
 
-  // Instant SWR Hydration State
-  const [cachedData] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-        if (raw) return JSON.parse(raw);
-      } catch {}
-    }
-    return null;
-  });
-
-  const [user, setUser] = useState<UserProfile | null>(cachedData?.user || null);
-  const [exams, setExams] = useState<Exam[]>(cachedData?.exams || []);
-  const [results, setResults] = useState<Result[]>(cachedData?.results || []);
-  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>(cachedData?.submissions || []);
-  const [attendance, setAttendance] = useState<any>(cachedData?.attendance || null);
-  const [notices, setNotices] = useState<Notice[]>(cachedData?.notices || []);
+  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
+  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>([]);
+  const [attendance, setAttendance] = useState<any>(null);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
-  const [analytics, setAnalytics] = useState<any>(cachedData?.analytics || null);
-  const [loading, setLoading] = useState(!cachedData?.user);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
   const [instituteSettings, setInstituteSettings] = useState<any>(null);
@@ -197,14 +187,6 @@ export default function StudentDashboardPage() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // Fetch settings
-  useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
-    fetch('/api/notices').then(res => res.ok ? res.json() : null).then(data => {
-      if (data) setUnreadNoticeCount(data.unreadCount || 0);
-    }).catch(() => {});
   }, []);
 
   // Main Dashboard Data Fetch with single unified endpoint and 0-second SWR background sync
@@ -230,7 +212,7 @@ export default function StudentDashboardPage() {
         if (typeof data.unreadNoticeCount === 'number') setUnreadNoticeCount(data.unreadNoticeCount);
         if (data.instituteSettings) setInstituteSettings(data.instituteSettings);
 
-        // Cache snapshot in sessionStorage for 0.00s instant next visit
+        // Cache snapshot in sessionStorage for instant next visit
         try {
           sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
             user: data.user,
@@ -260,7 +242,24 @@ export default function StudentDashboardPage() {
     }
   }, [router, user]);
 
+  // Client-side Mount and SWR Cache Hydration
   useEffect(() => {
+    setMounted(true);
+    try {
+      const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.user) setUser(parsed.user);
+        if (Array.isArray(parsed.exams)) setExams(parsed.exams);
+        if (Array.isArray(parsed.results)) setResults(parsed.results);
+        if (Array.isArray(parsed.submissions)) setExamSubmissions(parsed.submissions);
+        if (parsed.attendance) setAttendance(parsed.attendance);
+        if (parsed.analytics) setAnalytics(parsed.analytics);
+        if (Array.isArray(parsed.notices)) setNotices(parsed.notices);
+        if (parsed.user) setLoading(false);
+      }
+    } catch {}
+
     fetchDashboardData(true);
   }, [fetchDashboardData]);
 
@@ -481,7 +480,7 @@ export default function StudentDashboardPage() {
   const instituteName = instituteSettings?.instituteName || "Rofaz Academy";
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
-  if (!user && loading) {
+  if (!mounted || (!user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
         <div className="flex flex-col items-center gap-4">
