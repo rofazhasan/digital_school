@@ -166,13 +166,25 @@ function getCachedData() {
   }
 }
 
+const DEFAULT_FALLBACK_USER: UserProfile = {
+  id: "student",
+  name: "Student",
+  email: "",
+  role: "STUDENT",
+  studentProfile: {
+    id: "sp-initial",
+    roll: "01",
+    class: { name: "Class 10", section: "A" }
+  }
+};
+
 export default function StudentDashboardPage() {
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<UserProfile | null>(() => {
+  const [user, setUser] = useState<UserProfile>(() => {
     const c = getCachedData();
-    return c?.user || null;
+    return c?.user || DEFAULT_FALLBACK_USER;
   });
   const [exams, setExams] = useState<Exam[]>(() => {
     const c = getCachedData();
@@ -543,18 +555,11 @@ export default function StudentDashboardPage() {
   const instituteName = instituteSettings?.instituteName || "Rofaz Academy";
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
-  if (!mounted || (!user && loading)) {
+  if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-          <p className="text-sm font-semibold text-slate-400">Loading Student Dashboard...</p>
-        </div>
-      </div>
+      <div className="min-h-screen bg-slate-950" />
     );
   }
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors duration-300">

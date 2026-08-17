@@ -67,8 +67,8 @@ export async function GET(req: NextRequest) {
       prisma.exam.findMany({
         where: {
           OR: [
-            ...(classId ? [{ classId }] : []),
-            { isActive: true }
+            { isActive: true },
+            ...(classId ? [{ classId }] : [])
           ]
         },
         select: {
@@ -91,47 +91,14 @@ export async function GET(req: NextRequest) {
               id: true,
               questionsJson: true,
               questions: {
-                take: 3,
+                take: 1,
                 select: { subject: true }
               }
             }
           }
         },
         orderBy: { date: "asc" },
-        take: 100
-      }).then(async (examsList) => {
-        if (examsList.length > 0) return examsList;
-        // Fallback: If class-filtered query returns empty, fetch any active exams
-        return await prisma.exam.findMany({
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            date: true,
-            startTime: true,
-            endTime: true,
-            duration: true,
-            type: true,
-            totalMarks: true,
-            passMarks: true,
-            isActive: true,
-            mcqNegativeMarking: true,
-            class: { select: { id: true, name: true, section: true } },
-            examSets: {
-              take: 1,
-              select: {
-                id: true,
-                questionsJson: true,
-                questions: {
-                  take: 3,
-                  select: { subject: true }
-                }
-              }
-            }
-          },
-          orderBy: { date: "asc" },
-          take: 100
-        });
+        take: 30
       }).catch(() => []),
 
       // 3. Official Published Results
@@ -149,13 +116,14 @@ export async function GET(req: NextRequest) {
               examSets: {
                 take: 1,
                 select: {
-                  questions: { take: 3, select: { subject: true } }
+                  questions: { take: 1, select: { subject: true } }
                 }
               }
             }
           }
         },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
+        take: 30
       }).catch(() => []),
 
       // 4. Online Exam Submissions
@@ -173,13 +141,14 @@ export async function GET(req: NextRequest) {
               examSets: {
                 take: 1,
                 select: {
-                  questions: { take: 3, select: { subject: true } }
+                  questions: { take: 1, select: { subject: true } }
                 }
               }
             }
           }
         },
-        orderBy: { evaluatedAt: "desc" }
+        orderBy: { evaluatedAt: "desc" },
+        take: 30
       }).catch(() => []),
 
       // 5. Attendance Records for this class
@@ -187,7 +156,7 @@ export async function GET(req: NextRequest) {
         ? prisma.attendance.findMany({
             where: { classId },
             select: { id: true, date: true, present: true, absent: true, late: true },
-            take: 100,
+            take: 30,
             orderBy: { date: "desc" }
           }).catch(() => [])
         : Promise.resolve([]),
@@ -219,7 +188,7 @@ export async function GET(req: NextRequest) {
           postedBy: { select: { id: true, name: true, role: true } }
         },
         orderBy: { createdAt: "desc" },
-        take: 30
+        take: 20
       }).catch(() => []),
 
       // 8. Institute Settings / Institute Profile
