@@ -43,7 +43,8 @@ import {
   SlidersHorizontal,
   X,
   Layers,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -72,7 +73,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
-import { Capacitor } from "@capacitor/core";
 import { copyToClipboard } from "@/lib/native/interaction";
 
 export type Exam = {
@@ -244,7 +244,7 @@ export default function ExamsPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // Real-time 1s tick for countdowns
+  // Real-time 1s tick for smooth countdowns
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
@@ -252,7 +252,7 @@ export default function ExamsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Keyboard shortcut for search
+  // Keyboard shortcut for search ('/' to focus, 'Escape' to clear)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement !== searchInputRef.current) {
@@ -277,7 +277,7 @@ export default function ExamsPage() {
     const handler = setTimeout(() => {
       setDebouncedSearch(filters.search);
       setCurrentPage(1);
-    }, 300);
+    }, 250);
     return () => clearTimeout(handler);
   }, [filters.search]);
 
@@ -532,6 +532,7 @@ export default function ExamsPage() {
   };
 
   const resetFilters = () => {
+    triggerHaptic(ImpactStyle.Light);
     setFilters({
       search: '',
       status: 'all',
@@ -590,6 +591,18 @@ export default function ExamsPage() {
     };
   }, [exams, now]);
 
+  // Active filters count for badge
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.search.trim()) count++;
+    if (filters.timing !== 'all') count++;
+    if (filters.status !== 'all' || activeTab !== 'all') count++;
+    if (filters.type !== 'all') count++;
+    if (filters.subject !== 'all') count++;
+    if (filters.negativeMarking && filters.negativeMarking !== 'all') count++;
+    return count;
+  }, [filters, activeTab]);
+
   // Filter and Exact Priority Sort
   const filteredAndSortedExams = useMemo(() => {
     const filtered = exams.filter(exam => {
@@ -603,25 +616,24 @@ export default function ExamsPage() {
         if (!matchesName && !matchesDesc && !matchesSubject && !matchesAuthor) return false;
       }
 
-      // Status
+      // Status Filter
       if (filters.status === 'active' && !exam.isActive) return false;
       if (filters.status === 'pending' && exam.isActive) return false;
 
-      // Type
+      // Type Filter
       if (filters.type !== 'all' && exam.type !== filters.type) return false;
 
-      // Subject
+      // Subject Filter
       if (filters.subject !== 'all' && exam.subject?.toLowerCase() !== filters.subject.toLowerCase()) return false;
 
-      // Negative Marking
+      // Negative Marking Filter
       if (filters.negativeMarking === 'with' && (!exam.mcqNegativeMarking || exam.mcqNegativeMarking <= 0)) return false;
       if (filters.negativeMarking === 'without' && (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0)) return false;
 
-      // Tab Filtering
+      // Status Tab Filtering
       if (activeTab === 'active' && !exam.isActive) return false;
       if (activeTab === 'pending' && exam.isActive) return false;
       if (activeTab === 'online' && exam.type !== 'ONLINE') return false;
-      if (activeTab === 'negative-marking' && (!exam.mcqNegativeMarking || exam.mcqNegativeMarking <= 0)) return false;
 
       // Timing Filter (All, Live, Upcoming, Finished)
       if (filters.timing !== 'all') {
@@ -793,9 +805,14 @@ export default function ExamsPage() {
           {/* Overview Metrics Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             <div
-              onClick={() => { setFilters(p => ({ ...p, timing: 'all' })); setCurrentPage(1); }}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                setFilters(p => ({ ...p, timing: 'all', status: 'all' }));
+                setActiveTab('all');
+                setCurrentPage(1);
+              }}
               className={`cursor-pointer group p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
-                filters.timing === 'all'
+                filters.timing === 'all' && activeTab === 'all'
                   ? "bg-blue-500/10 border-blue-500/30 shadow-md ring-2 ring-blue-500/20"
                   : "bg-white/80 dark:bg-slate-900/80 border-slate-200/80 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
               }`}
@@ -811,7 +828,12 @@ export default function ExamsPage() {
             </div>
 
             <div
-              onClick={() => { setFilters(p => ({ ...p, timing: 'live' })); setCurrentPage(1); }}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                setFilters(p => ({ ...p, timing: 'live', status: 'all' }));
+                setActiveTab('all');
+                setCurrentPage(1);
+              }}
               className={`cursor-pointer group p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
                 filters.timing === 'live'
                   ? "bg-emerald-500/10 border-emerald-500/30 shadow-md ring-2 ring-emerald-500/20"
@@ -832,7 +854,12 @@ export default function ExamsPage() {
             </div>
 
             <div
-              onClick={() => { setFilters(p => ({ ...p, timing: 'upcoming' })); setCurrentPage(1); }}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                setFilters(p => ({ ...p, timing: 'upcoming', status: 'all' }));
+                setActiveTab('all');
+                setCurrentPage(1);
+              }}
               className={`cursor-pointer group p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
                 filters.timing === 'upcoming'
                   ? "bg-indigo-500/10 border-indigo-500/30 shadow-md ring-2 ring-indigo-500/20"
@@ -850,7 +877,12 @@ export default function ExamsPage() {
             </div>
 
             <div
-              onClick={() => { setActiveTab('active'); setCurrentPage(1); }}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                setFilters(p => ({ ...p, status: 'active', timing: 'all' }));
+                setActiveTab('active');
+                setCurrentPage(1);
+              }}
               className={`cursor-pointer group p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
                 activeTab === 'active'
                   ? "bg-teal-500/10 border-teal-500/30 shadow-md ring-2 ring-teal-500/20"
@@ -868,7 +900,12 @@ export default function ExamsPage() {
             </div>
 
             <div
-              onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+              onClick={() => {
+                triggerHaptic(ImpactStyle.Light);
+                setFilters(p => ({ ...p, status: 'pending', timing: 'all' }));
+                setActiveTab('pending');
+                setCurrentPage(1);
+              }}
               className={`cursor-pointer group col-span-2 sm:col-span-1 p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
                 activeTab === 'pending'
                   ? "bg-amber-500/10 border-amber-500/30 shadow-md ring-2 ring-amber-500/20"
@@ -894,7 +931,7 @@ export default function ExamsPage() {
                 <Button
                   variant={filters.timing === 'all' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setFilters(p => ({ ...p, timing: 'all' })); setCurrentPage(1); }}
+                  onClick={() => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, timing: 'all' })); setCurrentPage(1); }}
                   className={`rounded-xl font-bold text-xs h-8 px-3.5 transition-all ${
                     filters.timing === 'all'
                       ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
@@ -906,7 +943,7 @@ export default function ExamsPage() {
                 <Button
                   variant={filters.timing === 'live' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setFilters(p => ({ ...p, timing: 'live' })); setCurrentPage(1); }}
+                  onClick={() => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, timing: 'live' })); setCurrentPage(1); }}
                   className={`rounded-xl font-bold text-xs h-8 px-3.5 transition-all ${
                     filters.timing === 'live'
                       ? "bg-emerald-600 text-white shadow-emerald-600/30 shadow-md"
@@ -919,7 +956,7 @@ export default function ExamsPage() {
                 <Button
                   variant={filters.timing === 'upcoming' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setFilters(p => ({ ...p, timing: 'upcoming' })); setCurrentPage(1); }}
+                  onClick={() => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, timing: 'upcoming' })); setCurrentPage(1); }}
                   className={`rounded-xl font-bold text-xs h-8 px-3.5 transition-all ${
                     filters.timing === 'upcoming'
                       ? "bg-indigo-600 text-white shadow-indigo-600/30 shadow-md"
@@ -932,7 +969,7 @@ export default function ExamsPage() {
                 <Button
                   variant={filters.timing === 'finished' ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setFilters(p => ({ ...p, timing: 'finished' })); setCurrentPage(1); }}
+                  onClick={() => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, timing: 'finished' })); setCurrentPage(1); }}
                   className={`rounded-xl font-bold text-xs h-8 px-3.5 transition-all ${
                     filters.timing === 'finished'
                       ? "bg-slate-700 text-white shadow-slate-700/30 shadow-md"
@@ -945,7 +982,19 @@ export default function ExamsPage() {
 
               {/* Status Tab Switcher */}
               <div className="flex items-center gap-2">
-                <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCurrentPage(1); }}>
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(val) => {
+                    triggerHaptic(ImpactStyle.Light);
+                    setActiveTab(val);
+                    setFilters(p => ({
+                      ...p,
+                      status: val === 'active' ? 'active' : val === 'pending' ? 'pending' : 'all',
+                      type: val === 'online' ? 'ONLINE' : 'all'
+                    }));
+                    setCurrentPage(1);
+                  }}
+                >
                   <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl h-9">
                     <TabsTrigger value="all" className="rounded-xl text-xs font-bold px-3">All Status</TabsTrigger>
                     <TabsTrigger value="active" className="rounded-xl text-xs font-bold px-3">Active</TabsTrigger>
@@ -958,10 +1007,14 @@ export default function ExamsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`rounded-xl font-semibold text-xs h-9 px-3 ${showFilters ? "bg-slate-100 dark:bg-slate-800 text-primary" : "text-muted-foreground"}`}
+                  className={`rounded-xl font-semibold text-xs h-9 px-3 ${
+                    showFilters || activeFiltersCount > 0
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                      : "text-muted-foreground"
+                  }`}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
-                  Filters
+                  Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
                 </Button>
               </div>
             </div>
@@ -991,7 +1044,11 @@ export default function ExamsPage() {
               {/* Exact Priority Sort Selector */}
               <Select
                 value={filters.sortBy}
-                onValueChange={(v) => { setFilters(p => ({ ...p, sortBy: v })); setCurrentPage(1); }}
+                onValueChange={(v) => {
+                  triggerHaptic(ImpactStyle.Light);
+                  setFilters(p => ({ ...p, sortBy: v }));
+                  setCurrentPage(1);
+                }}
               >
                 <SelectTrigger className="w-full rounded-2xl bg-slate-50 dark:bg-slate-950/50 border-slate-200/80 dark:border-slate-800/80 text-xs sm:text-sm font-medium h-10">
                   <SelectValue placeholder="Sort Order" />
@@ -1000,8 +1057,8 @@ export default function ExamsPage() {
                   <SelectItem value="priority_asc">
                     <span className="font-semibold text-blue-600 dark:text-blue-400">✨ Priority:</span> Live → Upcoming → Passed (Date Asc)
                   </SelectItem>
-                  <SelectItem value="date">📅 Date: Ascending / Descending</SelectItem>
-                  <SelectItem value="marks">🎯 Total Marks</SelectItem>
+                  <SelectItem value="date">📅 Date: Earliest First</SelectItem>
+                  <SelectItem value="marks">🎯 Total Marks: Highest First</SelectItem>
                   <SelectItem value="name">🔤 Title: A to Z</SelectItem>
                   <SelectItem value="created">🕒 Recently Created</SelectItem>
                 </SelectContent>
@@ -1010,7 +1067,11 @@ export default function ExamsPage() {
               {/* Subject Selector */}
               <Select
                 value={filters.subject}
-                onValueChange={(v) => { setFilters(p => ({ ...p, subject: v })); setCurrentPage(1); }}
+                onValueChange={(v) => {
+                  triggerHaptic(ImpactStyle.Light);
+                  setFilters(p => ({ ...p, subject: v }));
+                  setCurrentPage(1);
+                }}
               >
                 <SelectTrigger className="w-full rounded-2xl bg-slate-50 dark:bg-slate-950/50 border-slate-200/80 dark:border-slate-800/80 text-xs sm:text-sm font-medium h-10">
                   <SelectValue placeholder="All Subjects" />
@@ -1024,6 +1085,56 @@ export default function ExamsPage() {
               </Select>
             </div>
 
+            {/* Active Filter Chips Bar */}
+            {activeFiltersCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] font-bold text-muted-foreground mr-1">Active Filters:</span>
+                {filters.search.trim() && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium">
+                    Search: "{filters.search}"
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setFilters(p => ({ ...p, search: "" }))} />
+                  </Badge>
+                )}
+                {filters.timing !== 'all' && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                    Timing: {filters.timing === 'live' ? 'Live Now' : filters.timing === 'upcoming' ? 'Upcoming' : 'Passed / Ended'}
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setFilters(p => ({ ...p, timing: 'all' }))} />
+                  </Badge>
+                )}
+                {activeTab !== 'all' && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300">
+                    Status: {activeTab}
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => { setActiveTab('all'); setFilters(p => ({ ...p, status: 'all' })); }} />
+                  </Badge>
+                )}
+                {filters.subject !== 'all' && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
+                    Subject: {filters.subject}
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setFilters(p => ({ ...p, subject: 'all' }))} />
+                  </Badge>
+                )}
+                {filters.type !== 'all' && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">
+                    Type: {filters.type}
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setFilters(p => ({ ...p, type: 'all' }))} />
+                  </Badge>
+                )}
+                {filters.negativeMarking && filters.negativeMarking !== 'all' && (
+                  <Badge variant="secondary" className="rounded-lg text-xs gap-1 py-1 font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
+                    Negative Marking: {filters.negativeMarking === 'with' ? 'With Negative' : 'Without Negative'}
+                    <X className="h-3 w-3 cursor-pointer hover:text-rose-500" onClick={() => setFilters(p => ({ ...p, negativeMarking: 'all' }))} />
+                  </Badge>
+                )}
+
+                <button
+                  onClick={resetFilters}
+                  className="text-xs font-bold text-rose-500 hover:text-rose-600 ml-1 flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <RotateCcw className="h-3 w-3" /> Clear All
+                </button>
+              </div>
+            )}
+
             {/* Advanced Filters Drawer */}
             <AnimatePresence>
               {showFilters && (
@@ -1036,7 +1147,7 @@ export default function ExamsPage() {
                 >
                   <div>
                     <Label className="text-[11px] font-bold text-muted-foreground uppercase mb-1 block">Exam Type</Label>
-                    <Select value={filters.type} onValueChange={(v) => { setFilters(p => ({ ...p, type: v })); setCurrentPage(1); }}>
+                    <Select value={filters.type} onValueChange={(v) => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, type: v })); setCurrentPage(1); }}>
                       <SelectTrigger className="w-full rounded-xl bg-slate-50 dark:bg-slate-950/50 text-xs h-9">
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
@@ -1051,7 +1162,7 @@ export default function ExamsPage() {
 
                   <div>
                     <Label className="text-[11px] font-bold text-muted-foreground uppercase mb-1 block">Negative Marking</Label>
-                    <Select value={filters.negativeMarking || 'all'} onValueChange={(v) => { setFilters(p => ({ ...p, negativeMarking: v })); setCurrentPage(1); }}>
+                    <Select value={filters.negativeMarking || 'all'} onValueChange={(v) => { triggerHaptic(ImpactStyle.Light); setFilters(p => ({ ...p, negativeMarking: v })); setCurrentPage(1); }}>
                       <SelectTrigger className="w-full rounded-xl bg-slate-50 dark:bg-slate-950/50 text-xs h-9">
                         <SelectValue placeholder="All Exams" />
                       </SelectTrigger>
@@ -1065,7 +1176,7 @@ export default function ExamsPage() {
 
                   <div>
                     <Label className="text-[11px] font-bold text-muted-foreground uppercase mb-1 block">Page Size</Label>
-                    <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(1); }}>
+                    <Select value={pageSize.toString()} onValueChange={(v) => { triggerHaptic(ImpactStyle.Light); setPageSize(parseInt(v)); setCurrentPage(1); }}>
                       <SelectTrigger className="w-full rounded-xl bg-slate-50 dark:bg-slate-950/50 text-xs h-9">
                         <SelectValue />
                       </SelectTrigger>
@@ -1291,7 +1402,7 @@ export default function ExamsPage() {
                               <button
                                 onClick={(e) => handleCopyId(exam.id, e)}
                                 title="Copy Exam ID"
-                                className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                               >
                                 {copiedId === exam.id ? (
                                   <Check className="w-3 h-3 text-emerald-500" />
