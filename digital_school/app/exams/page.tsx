@@ -338,7 +338,7 @@ export default function ExamsPage() {
       setRefreshing(true);
     }
     try {
-      const response = await fetch("/api/exams?limit=200");
+      const response = await fetch("/api/exams?limit=1000");
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
 
