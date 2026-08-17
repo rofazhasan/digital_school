@@ -4,13 +4,11 @@ import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { generateStudentScriptPDF } from "@/lib/script-pdf-generator";
-import path from "path";
-import fs from "fs";
 
 export async function POST(req: NextRequest) {
   try {
     const tokenData = await getTokenFromRequest(req);
-    if (!tokenData || tokenData.user.role !== "SUPER_USER") {
+    if (!tokenData || !["SUPER_USER", "ADMIN"].includes(tokenData.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
-    // Early Check: If all results are already published, skip everything
+    // Early Check: If all results are already published, return immediately
     const allPublished = exam.results.length > 0 && exam.results.every(r => r.isPublished);
     if (allPublished) {
       return NextResponse.json({
@@ -91,15 +89,9 @@ export async function POST(req: NextRequest) {
 
     // Calculate ranks with proper tie handling
     const resultsWithRanks = allResults.map((result, index) => {
-      // Find how many students have the same or higher marks
-      const sameOrHigherCount = allResults.filter(r => r.total >= result.total).length;
-      // Find how many students have exactly the same marks
       const sameCount = allResults.filter(r => r.total === result.total).length;
-
-      // If multiple students have the same marks, they get the same rank
       let rank = index + 1;
       if (sameCount > 1) {
-        // Find the first occurrence of this score
         const firstIndex = allResults.findIndex(r => r.total === result.total);
         rank = firstIndex + 1;
       }
@@ -110,45 +102,7 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    console.log(`📊 Rank Calculation Debug:`, {
-      examId,
-      totalResults: allResults.length,
-      resultsWithRanks: resultsWithRanks.map(r => ({
-        studentName: r.student.user.name,
-        total: r.total,
-        rank: r.rank
-      }))
-    });
-
-    // Update all results with ranks and publish them
-    const updatePromises = resultsWithRanks.map(result =>
-      prisma.result.update({
-        where: { id: result.id },
-        data: {
-          rank: result.rank,
-          isPublished: true,
-          publishedAt: new Date()
-        }
-      })
-    );
-
-    await Promise.all(updatePromises);
-
-    // Fetch institute data for branding once
-    const institute = await prisma.institute.findFirst({
-      select: { name: true, address: true, phone: true, logoUrl: true }
-    });
-
-    // Sequential notification sending for stability (Email -> SMS Fallback)
-    let sentCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < resultsWithRanks.length; i++) {
-      const result = resultsWithRanks[i];
-      const emailToUse = (result.student?.user?.email || result.student?.guardianEmail || '').trim();
-      const phoneToUse = (result.student?.user?.phone || result.student?.guardianPhone || '').trim();
-
-    // Update all results to published and assign ranks immediately
+    // Update all results with ranks and publish them immediately
     await Promise.all(
       resultsWithRanks.map(result =>
         prisma.result.update({
@@ -162,7 +116,12 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    // Offload heavy PDF generation, Email & SMS dispatches asynchronously in background
+    // Fetch institute data for branding
+    const institute = await prisma.institute.findFirst({
+      select: { name: true, address: true, phone: true, logoUrl: true }
+    });
+
+    // Non-blocking background notification worker (Email + SMS)
     (async () => {
       let sentCount = 0;
       let failCount = 0;
