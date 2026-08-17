@@ -610,27 +610,27 @@ export default function ExamResultsPage() {
               return (
                 <div key={examResult.exam.id} className="space-y-6">
                   {/* Exam Banner */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-indigo-500/20 shadow-sm backdrop-blur-xl">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/30 shadow-inner">
-                        <Trophy className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-indigo-500/20 shadow-sm backdrop-blur-xl">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/30 shadow-inner shrink-0">
+                        <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600 dark:text-indigo-400" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{examResult.exam.name}</h2>
-                        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">{examResult.exam.name}</h2>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                           <Calendar className="w-3.5 h-3.5" />
-                          {new Date(examResult.exam.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
-                          <span className="mx-1 opacity-20 dark:opacity-30">|</span>
-                          <span className="font-semibold text-slate-600 dark:text-slate-300">{examResult.exam.totalMarks} Total Marks</span>
+                          <span>{new Date(examResult.exam.date).toLocaleDateString(undefined, { dateStyle: 'medium' })}</span>
+                          <span className="opacity-30">•</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">{examResult.exam.totalMarks} Marks</span>
                         </div>
                       </div>
                     </div>
                     {!isStudent && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 w-full sm:w-auto">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 border-slate-200 dark:border-white/5 shadow-sm"
+                          className="flex-1 sm:flex-initial bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 border-slate-200 dark:border-white/5 shadow-sm"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                         >
                           <Download className="w-4 h-4 mr-2" /> PDF
@@ -638,7 +638,7 @@ export default function ExamResultsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border-slate-200 dark:border-white/5 shadow-sm"
+                          className="flex-1 sm:flex-initial bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border-slate-200 dark:border-white/5 shadow-sm"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                         >
                           <Download className="w-4 h-4 mr-2" /> CSV
@@ -647,8 +647,8 @@ export default function ExamResultsPage() {
                     )}
                   </div>
 
-                  {/* Desktop Grid Layout */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Desktop / Mobile Grid Layout */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                     {/* LEFT COLUMN: Analytics & Personal Result */}
                     <div className="lg:col-span-4 space-y-6">
                       {isStudent && myResult ? (

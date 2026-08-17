@@ -731,9 +731,8 @@ export default function OnlineExamsPage() {
               )}
             </div>
           </div>
-
           {/* Status Filter Chips with real-time counts */}
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="flex overflow-x-auto no-scrollbar sm:flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80 pb-1">
             {(Object.entries(STATUS_CONFIGS) as [StatusFilter, typeof STATUS_CONFIGS[StatusFilter]][]).map(([key, cfg]) => {
               const Icon = cfg.icon as any;
               const isActive = statusFilter === key;
@@ -743,7 +742,7 @@ export default function OnlineExamsPage() {
                 <button
                   key={key}
                   onClick={() => setStatusFilter(key as any)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${isActive
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 transition-all duration-200 ${isActive
                     ? `${cfg.bg} ${cfg.color} ring-1 ${cfg.ring} border-transparent shadow-sm`
                     : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                     }`}
@@ -761,13 +760,13 @@ export default function OnlineExamsPage() {
 
           {/* Subject Pills (if multiple subjects exist) */}
           {availableSubjects.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
-              <span className="text-slate-400 font-semibold text-[11px] mr-1">Subject:</span>
+            <div className="flex overflow-x-auto no-scrollbar sm:flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs pb-1">
+              <span className="text-slate-400 font-semibold text-[11px] mr-1 shrink-0">Subject:</span>
               <button
                 onClick={() => setSelectedSubject("all")}
-                className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-colors ${selectedSubject === "all"
-                  ? "bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                className={`px-2.5 py-1 rounded-lg font-medium shrink-0 transition-colors ${selectedSubject === "all"
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
                   }`}
               >
                 All Subjects
@@ -776,9 +775,9 @@ export default function OnlineExamsPage() {
                 <button
                   key={sub}
                   onClick={() => setSelectedSubject(sub)}
-                  className={`px-2.5 py-1 rounded-lg font-medium text-xs transition-colors ${selectedSubject.toLowerCase() === sub.toLowerCase()
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  className={`px-2.5 py-1 rounded-lg font-medium shrink-0 transition-colors ${selectedSubject === sub
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
                     }`}
                 >
                   {sub}

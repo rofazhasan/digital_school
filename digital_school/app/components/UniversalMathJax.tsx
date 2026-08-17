@@ -262,14 +262,23 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
 
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss or complex chemfig fallbacks
+    // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss, safely guarded
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.MathJax && typeof (window.MathJax as any).typesetPromise === 'function' && containerRef.current) {
-            // Only trigger if there's still unrendered math (contains \ or $)
-            if (renderedText.includes('\\') || renderedText.includes('$')) {
-                (window.MathJax as any).typesetPromise([containerRef.current]).catch(() => {});
+        if (typeof window === 'undefined' || !containerRef.current) return;
+
+        try {
+            const mj = (window as any).MathJax;
+            // Only trigger if MathJax is fully loaded and ready, and there is unrendered math
+            if (mj && typeof mj.typesetPromise === 'function' && (renderedText.includes('\\ce{') || renderedText.includes('\\begin{'))) {
+                if (mj.startup?.promise) {
+                    mj.startup.promise.then(() => {
+                        if (containerRef.current && mj.typesetPromise) {
+                            mj.typesetPromise([containerRef.current]).catch(() => {});
+                        }
+                    }).catch(() => {});
+                }
             }
-        }
+        } catch (e) {}
     }, [renderedText, cacheVersion]);
 
     if (inline) {

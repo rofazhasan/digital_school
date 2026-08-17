@@ -713,34 +713,34 @@ export default function StudentDashboardPage() {
               className="space-y-8"
             >
               {/* Gen-Z Hero Banner */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-500/20">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white p-4 sm:p-8 shadow-xl border border-indigo-500/20">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-indigo-200">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[11px] sm:text-xs font-bold text-indigo-200">
                       <Flame className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
                       5-Day Study Streak • Keep Pushing!
                     </div>
-                    <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+                    <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight text-white">
                       Welcome back, {user.name.split(' ')[0]}! 🚀
                     </h1>
-                    <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
+                    <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium leading-relaxed">
                       You are in the <strong className="text-white">Top 10%</strong> of your class. Your current average is <strong className="text-emerald-400">{performanceData.averagePercentage}%</strong> with an overall grade of <strong className="text-amber-400">{performanceData.grade}</strong>.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto pt-2 sm:pt-0">
                     <Button
                       onClick={() => router.push('/student/prac-perfect')}
-                      className="rounded-2xl font-black text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-lg shadow-indigo-500/30 px-5 py-5 active:scale-95 transition-all"
+                      className="flex-1 sm:flex-initial rounded-2xl font-black text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-lg shadow-indigo-500/30 px-4 sm:px-5 py-3 sm:py-5 active:scale-95 transition-all"
                     >
-                      <Sparkles className="h-4 w-4 mr-2" />
+                      <Sparkles className="h-4 w-4 mr-1.5" />
                       Practice Center
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => setActiveTab('exams')}
-                      className="rounded-2xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border-white/20 py-5"
+                      className="flex-1 sm:flex-initial rounded-2xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border-white/20 py-3 sm:py-5"
                     >
                       View Exams
                     </Button>
@@ -749,101 +749,101 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* 5 Metric Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
                 <Card
                   onClick={() => router.push('/student/prac-perfect')}
-                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-indigo-500/50 transition-all cursor-pointer group"
+                  className="rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-indigo-500/50 transition-all cursor-pointer group"
                 >
-                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                  <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PracPerfect</span>
-                      <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
-                        <Sparkles className="h-4 w-4" />
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">PracPerfect</span>
+                      <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform">
+                        <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">AI Trainer</span>
-                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">Personalized practice</p>
+                    <div className="mt-2 sm:mt-3">
+                      <span className="text-base sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">AI Trainer</span>
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5">Practice</p>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card
                   onClick={() => setActiveTab('exams')}
-                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-blue-500/50 transition-all cursor-pointer group"
+                  className="rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-blue-500/50 transition-all cursor-pointer group"
                 >
-                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                  <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Exam</span>
-                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                        <Clock className="h-4 w-4" />
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Exam</span>
+                      <div className="p-1.5 sm:p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <span className="text-base sm:text-lg font-black text-foreground line-clamp-1">
-                        {exams[0]?.name || "None scheduled"}
+                    <div className="mt-2 sm:mt-3">
+                      <span className="text-sm sm:text-lg font-black text-foreground line-clamp-1">
+                        {exams[0]?.name || "None"}
                       </span>
-                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                        {exams[0]?.date ? new Date(exams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "All caught up"}
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
+                        {exams[0]?.date ? new Date(exams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "Caught up"}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card
-                  onClick={() => { setActiveTab('exams'); setExamSubTab('results'); }}
-                  className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-emerald-500/50 transition-all cursor-pointer group"
+                  onClick={() => router.push('/exams/results')}
+                  className="rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs hover:border-emerald-500/50 transition-all cursor-pointer group"
                 >
-                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                  <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Latest Score</span>
-                      <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                        <BarChart3 className="h-4 w-4" />
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Latest Score</span>
+                      <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                        <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    <div className="mt-2 sm:mt-3">
+                      <span className="text-base sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                         {lastResult ? `${lastResult.percentage}%` : "N/A"}
                       </span>
-                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
-                        {lastResult ? lastResult.examTitle : "No results yet"}
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
+                        {lastResult ? lastResult.examTitle : "No results"}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs">
-                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                <Card className="rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs">
+                  <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Attendance</span>
-                      <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                        <Calendar className="h-4 w-4" />
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Attendance</span>
+                      <div className="p-1.5 sm:p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <span className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400">
+                    <div className="mt-2 sm:mt-3">
+                      <span className="text-base sm:text-2xl font-black text-purple-600 dark:text-purple-400">
                         {attendanceData.percentage}%
                       </span>
-                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                        {attendanceData.present} present / {attendanceData.total} days
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
+                        {attendanceData.present}/{attendanceData.total} days
                       </p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs col-span-2 sm:col-span-1">
-                  <CardContent className="p-4 sm:p-5 flex flex-col justify-between h-full">
+                <Card className="rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs col-span-2 sm:col-span-1">
+                  <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Class Rank</span>
-                      <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                        <Trophy className="h-4 w-4" />
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Class Rank</span>
+                      <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
+                    <div className="mt-2 sm:mt-3">
+                      <span className="text-base sm:text-2xl font-black text-amber-600 dark:text-amber-400">
                         #{classRank}
                       </span>
-                      <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
                         Out of {totalStudents} students
                       </p>
                     </div>
@@ -852,9 +852,9 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* Performance Trends & Subject Strengths (Totally Revamped) */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                 {/* Performance Trends Chart (7 Cols) */}
-                <Card className="lg:col-span-7 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-5">
+                <Card className="lg:col-span-7 rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -865,7 +865,7 @@ export default function StudentDashboardPage() {
                           Performance Trends
                         </h3>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
                         Track score trajectory over examinations
                       </p>
                     </div>
@@ -892,7 +892,7 @@ export default function StudentDashboardPage() {
                         <select
                           value={trendSubjectFilter}
                           onChange={(e) => setTrendSubjectFilter(e.target.value)}
-                          className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-2.5 py-1.5 text-foreground"
+                          className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-2.5 py-1.5 text-foreground max-w-[130px] sm:max-w-none truncate"
                         >
                           <option value="all">All Subjects</option>
                           {availableSubjects.map(s => (
@@ -904,25 +904,25 @@ export default function StudentDashboardPage() {
                   </div>
 
                   {/* Summary Metric Stats Bar */}
-                  <div className="grid grid-cols-3 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 p-2.5 sm:p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average</span>
-                      <div className="text-lg font-black text-foreground">{trendChartData.avgScore}%</div>
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average</span>
+                      <div className="text-base sm:text-lg font-black text-foreground">{trendChartData.avgScore}%</div>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Peak Score</span>
-                      <div className="text-lg font-black text-indigo-600 dark:text-indigo-400">{trendChartData.maxScore}%</div>
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Peak</span>
+                      <div className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400">{trendChartData.maxScore}%</div>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Growth</span>
-                      <div className={`text-lg font-black ${trendChartData.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Growth</span>
+                      <div className={`text-base sm:text-lg font-black ${trendChartData.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
                         {trendChartData.delta >= 0 ? `+${trendChartData.delta}%` : `${trendChartData.delta}%`}
                       </div>
                     </div>
                   </div>
 
                   {/* Line Chart */}
-                  <div className="h-[260px] w-full">
+                  <div className="h-[220px] sm:h-[260px] w-full">
                     {trendChartData.items.length > 0 ? (
                       <Line
                         data={trendChartData.chart}
@@ -932,14 +932,14 @@ export default function StudentDashboardPage() {
                           plugins: {
                             legend: {
                               position: 'top',
-                              labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, weight: 600 } }
+                              labels: { usePointStyle: true, boxWidth: 6, font: { size: 10, weight: 600 } }
                             },
                             tooltip: {
                               backgroundColor: 'rgba(15, 23, 42, 0.9)',
                               padding: 10,
                               cornerRadius: 12,
-                              titleFont: { size: 12, weight: 'bold' },
-                              bodyFont: { size: 12 }
+                              titleFont: { size: 11, weight: 'bold' },
+                              bodyFont: { size: 11 }
                             }
                           },
                           scales: {
@@ -947,11 +947,11 @@ export default function StudentDashboardPage() {
                               min: 0,
                               max: 100,
                               grid: { color: 'rgba(156, 163, 175, 0.1)' },
-                              ticks: { font: { size: 10 } }
+                              ticks: { font: { size: 9 } }
                             },
                             x: {
                               grid: { display: false },
-                              ticks: { font: { size: 10 } }
+                              ticks: { font: { size: 9 } }
                             }
                           }
                         }}
@@ -965,7 +965,7 @@ export default function StudentDashboardPage() {
                 </Card>
 
                 {/* Subject Strengths Matrix (5 Cols) */}
-                <Card className="lg:col-span-5 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-5">
+                <Card className="lg:col-span-5 rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
