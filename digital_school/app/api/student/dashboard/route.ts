@@ -3,9 +3,9 @@ import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { calculateGrade, calculateGPA } from "@/lib/utils";
 
-// Server-side in-memory cache (keyed by studentId) for sub-10ms responses
+// Server-side in-memory cache (keyed by studentId) for sub-5ms instant responses
 const dashboardCache = new Map<string, { data: any; expiresAt: number }>();
-const CACHE_TTL_MS = 10000; // 10 seconds SWR
+const CACHE_TTL_MS = 60000; // 60 seconds SWR
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (cached && Date.now() < cached.expiresAt) {
       return NextResponse.json(cached.data, {
         headers: {
-          "Cache-Control": "private, s-maxage=5, stale-while-revalidate=30",
+          "Cache-Control": "private, s-maxage=30, stale-while-revalidate=120",
           "X-Cache": "HIT"
         }
       });

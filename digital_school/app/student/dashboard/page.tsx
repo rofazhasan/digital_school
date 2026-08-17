@@ -154,24 +154,64 @@ interface Notice {
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
-const DASHBOARD_CACHE_KEY = "student_dashboard_cache_v3";
+const DASHBOARD_CACHE_KEY = "student_dashboard_cache_v4";
+
+function getCachedData() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DASHBOARD_CACHE_KEY) || sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function StudentDashboardPage() {
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [results, setResults] = useState<Result[]>([]);
-  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>([]);
-  const [attendance, setAttendance] = useState<any>(null);
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    const c = getCachedData();
+    return c?.user || null;
+  });
+  const [exams, setExams] = useState<Exam[]>(() => {
+    const c = getCachedData();
+    return Array.isArray(c?.exams) ? c.exams : [];
+  });
+  const [results, setResults] = useState<Result[]>(() => {
+    const c = getCachedData();
+    return Array.isArray(c?.results) ? c.results : [];
+  });
+  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>(() => {
+    const c = getCachedData();
+    return Array.isArray(c?.submissions) ? c.submissions : [];
+  });
+  const [attendance, setAttendance] = useState<any>(() => {
+    const c = getCachedData();
+    return c?.attendance || null;
+  });
+  const [notices, setNotices] = useState<Notice[]>(() => {
+    const c = getCachedData();
+    return Array.isArray(c?.notices) ? c.notices : [];
+  });
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(() => {
+    const c = getCachedData();
+    return typeof c?.unreadNoticeCount === "number" ? c.unreadNoticeCount : 0;
+  });
+  const [analytics, setAnalytics] = useState<any>(() => {
+    const c = getCachedData();
+    return c?.analytics || null;
+  });
+  const [loading, setLoading] = useState(() => {
+    const c = getCachedData();
+    return !c?.user;
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
-  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+  const [instituteSettings, setInstituteSettings] = useState<any>(() => {
+    const c = getCachedData();
+    return c?.instituteSettings || null;
+  });
   const [now, setNow] = useState<Date>(new Date());
 
   // Performance Trends Controls
@@ -216,9 +256,9 @@ export default function StudentDashboardPage() {
         if (typeof data.unreadNoticeCount === 'number') setUnreadNoticeCount(data.unreadNoticeCount);
         if (data.instituteSettings) setInstituteSettings(data.instituteSettings);
 
-        // Cache snapshot in sessionStorage for instant next visit
+        // Cache snapshot in localStorage & sessionStorage for instant 0-second loading
         try {
-          sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({
+          const payload = JSON.stringify({
             user: data.user,
             exams: data.exams,
             results: data.results,
@@ -226,8 +266,12 @@ export default function StudentDashboardPage() {
             attendance: data.attendance,
             analytics: data.analytics,
             notices: data.notices,
+            unreadNoticeCount: data.unreadNoticeCount,
+            instituteSettings: data.instituteSettings,
             updatedAt: Date.now()
-          }));
+          });
+          localStorage.setItem(DASHBOARD_CACHE_KEY, payload);
+          sessionStorage.setItem(DASHBOARD_CACHE_KEY, payload);
         } catch {}
       } else {
         const userRes = await fetch('/api/user', { credentials: 'include' });
@@ -249,20 +293,19 @@ export default function StudentDashboardPage() {
   // Client-side Mount and SWR Cache Hydration
   useEffect(() => {
     setMounted(true);
-    try {
-      const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.user) setUser(parsed.user);
-        if (Array.isArray(parsed.exams)) setExams(parsed.exams);
-        if (Array.isArray(parsed.results)) setResults(parsed.results);
-        if (Array.isArray(parsed.submissions)) setExamSubmissions(parsed.submissions);
-        if (parsed.attendance) setAttendance(parsed.attendance);
-        if (parsed.analytics) setAnalytics(parsed.analytics);
-        if (Array.isArray(parsed.notices)) setNotices(parsed.notices);
-        if (parsed.user) setLoading(false);
-      }
-    } catch {}
+    const cached = getCachedData();
+    if (cached) {
+      if (cached.user) setUser(cached.user);
+      if (Array.isArray(cached.exams)) setExams(cached.exams);
+      if (Array.isArray(cached.results)) setResults(cached.results);
+      if (Array.isArray(cached.submissions)) setExamSubmissions(cached.submissions);
+      if (cached.attendance) setAttendance(cached.attendance);
+      if (cached.analytics) setAnalytics(cached.analytics);
+      if (Array.isArray(cached.notices)) setNotices(cached.notices);
+      if (typeof cached.unreadNoticeCount === "number") setUnreadNoticeCount(cached.unreadNoticeCount);
+      if (cached.instituteSettings) setInstituteSettings(cached.instituteSettings);
+      if (cached.user) setLoading(false);
+    }
 
     fetchDashboardData(true);
   }, [fetchDashboardData]);
@@ -270,6 +313,7 @@ export default function StudentDashboardPage() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem(DASHBOARD_CACHE_KEY);
       sessionStorage.removeItem(DASHBOARD_CACHE_KEY);
       router.push('/login');
     } catch (error) {
