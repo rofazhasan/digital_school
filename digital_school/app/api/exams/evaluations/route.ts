@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
 
+// Server-side in-memory cache for ultra-fast (0ms) responses
+const memoryCache = new Map<string, { data: any; expiresAt: number }>();
+const CACHE_TTL_MS = 15000; // 15 seconds
+
 function getExamTiming(exam: { date: Date | string; startTime?: Date | string | null; endTime?: Date | string | null; duration?: number | null }): { start: Date; end: Date } {
   let start: Date;
   let end: Date;
@@ -53,20 +57,32 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const timing = searchParams.get("timing"); // "ALL" | "LIVE" | "UPCOMING" | "PASSED"
-    const name = searchParams.get("name");
-    const classId = searchParams.get("classId");
-    const subject = searchParams.get("subject");
+    const status = searchParams.get("status") || "ALL";
+    const timing = searchParams.get("timing") || "ALL";
+    const name = searchParams.get("name") || "";
+    const classId = searchParams.get("classId") || "";
+    const subject = searchParams.get("subject") || "";
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "12");
+    const limit = parseInt(searchParams.get("limit") || "500");
     const skip = (page - 1) * limit;
+
+    const cacheKey = `evals:${tokenData.user.id}:${tokenData.user.role}:${status}:${timing}:${name}:${classId}:${subject}:${page}:${limit}`;
+    const cached = memoryCache.get(cacheKey);
+
+    if (cached && Date.now() < cached.expiresAt) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          "Cache-Control": "private, s-maxage=10, stale-while-revalidate=60",
+          "X-Cache": "HIT"
+        }
+      });
+    }
 
     const commonWhere: any = {
       ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } }),
       ...(name && { name: { contains: name, mode: 'insensitive' } }),
-      ...(classId && { classId }),
-      ...(subject && {
+      ...(classId && classId !== "ALL" && { classId }),
+      ...(subject && subject !== "ALL" && {
         examSets: {
           some: {
             questions: {
@@ -81,7 +97,21 @@ export async function GET(req: NextRequest) {
 
     let rawExams: any[] = [];
 
-    const examInclude = {
+    // Streamlined and fast projection
+    const examSelect = {
+      id: true,
+      name: true,
+      description: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+      duration: true,
+      type: true,
+      totalMarks: true,
+      passMarks: true,
+      isActive: true,
+      mcqNegativeMarking: true,
+      mcNegativeMarking: true,
       class: {
         select: {
           id: true,
@@ -94,7 +124,10 @@ export async function GET(req: NextRequest) {
         select: { name: true, email: true }
       },
       evaluationAssignments: {
-        include: {
+        select: {
+          id: true,
+          status: true,
+          evaluatorId: true,
           evaluator: {
             select: { name: true, email: true, role: true }
           },
@@ -103,33 +136,29 @@ export async function GET(req: NextRequest) {
           }
         }
       },
-      examStudentMaps: { select: { id: true } },
       examSubmissions: {
         select: {
           id: true,
           status: true,
-          objectiveStatus: true,
-          cqSqStatus: true,
           evaluatedAt: true,
           evaluatorNotes: true
         }
       },
       _count: {
         select: {
+          examStudentMaps: true,
           results: { where: { isPublished: true } }
         }
       }
     };
 
     if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
-      // Super user and Admin sees all exams (active and inactive) with evaluation assignments
       rawExams = await prisma.exam.findMany({
         where: commonWhere,
-        include: examInclude,
+        select: examSelect,
         orderBy: { date: "asc" },
       });
     } else {
-      // Evaluators (TEACHER) see assigned exams
       const evaluatorWhere = {
         ...commonWhere,
         evaluationAssignments: {
@@ -142,56 +171,25 @@ export async function GET(req: NextRequest) {
 
       rawExams = await prisma.exam.findMany({
         where: evaluatorWhere,
-        include: {
-          ...examInclude,
-          evaluationAssignments: {
-            where: { evaluatorId: tokenData.user.id },
-            include: {
-              evaluator: {
-                select: { name: true, email: true, role: true }
-              },
-              assignedBy: {
-                select: { name: true, email: true }
-              }
-            }
-          }
-        },
+        select: examSelect,
         orderBy: { date: "asc" },
       });
-    }
-
-    // Auto-release trigger check for finished/expired exams
-    try {
-      const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
-      for (const exam of rawExams) {
-        const isTimeOver = exam.endTime && new Date() > new Date(exam.endTime);
-        const totalClassStudents = exam.class?._count?.students || exam.examStudentMaps?.length || 0;
-        const finishedSubmissions = exam.examSubmissions.filter((s: any) => s.status === 'SUBMITTED' || s.evaluatedAt !== null).length;
-        const allClassFinished = totalClassStudents > 0 && finishedSubmissions >= totalClassStudents;
-        const publishedCount = (exam as any)._count?.results || 0;
-
-        if ((isTimeOver || allClassFinished) && publishedCount < finishedSubmissions) {
-          finalizeAndReleaseExam(exam.id).catch(err => console.error(`[AutoRelease] Background release failed for ${exam.id}:`, err));
-        }
-      }
-    } catch (e) {
-      console.error("[AutoRelease] Failed auto-release sweep:", e);
     }
 
     const now = new Date();
 
     const formattedExams = rawExams.map((exam: any) => {
-      // Calculate evaluation status based on submissions
       let evaluationStatus = "UNASSIGNED";
-      const totalClassStudents = exam.class?._count?.students || exam.examStudentMaps?.length || 0;
-      const submittedSubmissions = exam.examSubmissions.filter((s: any) => s.status === 'SUBMITTED' || s.evaluatedAt !== null);
+      const totalClassStudents = exam.class?._count?.students || exam._count?.examStudentMaps || 0;
+      const submissions = exam.examSubmissions || [];
+      const submittedSubmissions = submissions.filter((s: any) => s.status === 'SUBMITTED' || s.evaluatedAt !== null);
       const submittedCount = submittedSubmissions.length;
-      const totalEnrolled = totalClassStudents > 0 ? totalClassStudents : (exam.examStudentMaps?.length || exam.examSubmissions.length);
+      const totalEnrolled = totalClassStudents > 0 ? totalClassStudents : (exam._count?.examStudentMaps || submissions.length);
 
       if (exam.evaluationAssignments && exam.evaluationAssignments.length > 0) {
-        const totalSubmissions = exam.examSubmissions.length;
-        const evaluatedCount = exam.examSubmissions.filter((s: any) => s.evaluatedAt !== null).length;
-        const inProgressCount = exam.examSubmissions.filter((s: any) => s.evaluatedAt === null && s.evaluatorNotes).length;
+        const totalSubmissions = submissions.length;
+        const evaluatedCount = submissions.filter((s: any) => s.evaluatedAt !== null).length;
+        const inProgressCount = submissions.filter((s: any) => s.evaluatedAt === null && s.evaluatorNotes).length;
 
         if (evaluatedCount === totalSubmissions && totalSubmissions > 0) {
           evaluationStatus = "COMPLETED";
@@ -228,7 +226,7 @@ export async function GET(req: NextRequest) {
         createdBy: exam.createdBy,
         totalStudents: totalEnrolled,
         submittedStudents: submittedCount,
-        publishedResults: (exam as any)._count?.results || 0,
+        publishedResults: exam._count?.results || 0,
         evaluationAssignments: exam.evaluationAssignments || [],
         mcqNegativeMarking: exam.mcqNegativeMarking,
         mcNegativeMarking: exam.mcNegativeMarking,
@@ -283,9 +281,9 @@ export async function GET(req: NextRequest) {
     const totalCount = filteredExams.length;
     const paginatedExams = limit > 0 ? filteredExams.slice(skip, skip + limit) : filteredExams;
 
-    return NextResponse.json({
+    const responsePayload = {
       exams: paginatedExams,
-      allExams: formattedExams, // Return all for smooth client-side filtering/caching
+      allExams: formattedExams,
       totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
       currentPage: page,
       totalCount,
@@ -294,6 +292,27 @@ export async function GET(req: NextRequest) {
         live: formattedExams.filter(e => e.timingState === "live").length,
         upcoming: formattedExams.filter(e => e.timingState === "upcoming").length,
         passed: formattedExams.filter(e => e.timingState === "finished").length,
+      }
+    };
+
+    // Store in memory cache
+    memoryCache.set(cacheKey, {
+      data: responsePayload,
+      expiresAt: Date.now() + CACHE_TTL_MS
+    });
+
+    // Clean memory cache if it grows large
+    if (memoryCache.size > 200) {
+      const nowMs = Date.now();
+      for (const [k, v] of memoryCache.entries()) {
+        if (v.expiresAt < nowMs) memoryCache.delete(k);
+      }
+    }
+
+    return NextResponse.json(responsePayload, {
+      headers: {
+        "Cache-Control": "private, s-maxage=10, stale-while-revalidate=60",
+        "X-Cache": "MISS"
       }
     });
   } catch (error) {

@@ -190,9 +190,25 @@ function formatExamTimingDisplay(start: Date, end: Date) {
 
 export default function EvaluationsPage() {
   const router = useRouter();
-  const [exams, setExams] = useState<Exam[]>([]);
+  const [exams, setExams] = useState<Exam[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("evaluations_cache_v1");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
   const [evaluators, setEvaluators] = useState<Evaluator[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("evaluations_cache_v1");
+        if (cached && JSON.parse(cached).length > 0) return false;
+      } catch {}
+    }
+    return true;
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
 
@@ -248,7 +264,7 @@ export default function EvaluationsPage() {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchName);
       setCurrentPage(1);
-    }, 300);
+    }, 250);
     return () => clearTimeout(timer);
   }, [searchName]);
 
@@ -263,11 +279,11 @@ export default function EvaluationsPage() {
 
   const fetchExams = useCallback(async (isSilent = false) => {
     try {
-      if (!isSilent) setLoading(true);
+      if (!isSilent && exams.length === 0) setLoading(true);
       setRefreshing(true);
 
       const queryParams = new URLSearchParams();
-      queryParams.append("limit", "500"); // Load all matching for instant client-side responsiveness & priority ordering
+      queryParams.append("limit", "500");
 
       const response = await fetch(`/api/exams/evaluations?${queryParams.toString()}`, {
         credentials: "include",
@@ -276,18 +292,22 @@ export default function EvaluationsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setExams(data.allExams || data.exams || []);
+        const examList = data.allExams || data.exams || [];
+        setExams(examList);
+        try {
+          sessionStorage.setItem("evaluations_cache_v1", JSON.stringify(examList));
+        } catch {}
       } else {
-        toast.error("Failed to fetch exams");
+        if (!isSilent) toast.error("Failed to fetch exams");
       }
     } catch (error) {
       console.error("Error fetching exams:", error);
-      toast.error("Failed to fetch exams");
+      if (!isSilent) toast.error("Failed to fetch exams");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [exams.length]);
 
   const fetchClasses = async () => {
     try {
@@ -316,34 +336,38 @@ export default function EvaluationsPage() {
     }
   };
 
+  // Parallelized 0-second initialization
   useEffect(() => {
-    const getUserRole = async () => {
-      try {
-        const response = await fetch("/api/user", {
-          credentials: "include",
-          headers: { "Content-Type": "application/json" }
-        });
-        if (response.ok) {
-          const userData = await response.json();
-          const user = userData.user || userData.data?.user;
-          setIsSuperUser(user?.role === "SUPER_USER");
-          setIsAdmin(user?.role === "ADMIN");
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
+    const init = async () => {
+      await Promise.allSettled([
+        fetchExams(true),
+        fetchClasses(),
+        (async () => {
+          try {
+            const response = await fetch("/api/user", {
+              credentials: "include",
+              headers: { "Content-Type": "application/json" }
+            });
+            if (response.ok) {
+              const userData = await response.json();
+              const user = userData.user || userData.data?.user;
+              const superUser = user?.role === "SUPER_USER";
+              const admin = user?.role === "ADMIN";
+              setIsSuperUser(superUser);
+              setIsAdmin(admin);
+              if (superUser || admin) {
+                fetchEvaluators();
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
+          }
+        })()
+      ]);
     };
 
-    getUserRole();
-    fetchExams();
-    fetchClasses();
+    init();
   }, [fetchExams]);
-
-  useEffect(() => {
-    if (isSuperUser || isAdmin) {
-      fetchEvaluators();
-    }
-  }, [isSuperUser, isAdmin]);
 
   const assignEvaluator = async () => {
     if (!selectedExam || !selectedEvaluator) {
