@@ -349,8 +349,8 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
         </div>
       )}
 
-      {/* CQ / Descriptive Sub-Questions Preview */}
-      {q.subQuestions && q.subQuestions.length > 0 && (
+      {/* CQ / Descriptive Sub-Questions Preview (exclude CMA & MPC) */}
+      {q.type !== 'CMA' && q.type !== 'MPC' && q.subQuestions && q.subQuestions.length > 0 && (
         <div className="space-y-1 pt-1.5 border-t border-gray-200/50 dark:border-gray-700/50 text-[11px]">
           {q.subQuestions.map((sub: any, i: number) => (
             <div key={i} className="text-gray-700 dark:text-gray-300">

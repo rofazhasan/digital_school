@@ -23,12 +23,24 @@ interface SingleQuestionPageSheetProps {
   watermarkText?: string;
   paperSize?: 'a4' | 'legal' | 'letter';
   singleStyle?: 'vertical' | 'split';
+  isShuffled?: boolean;
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E', 'F'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ'];
-const ENGLISH_SUB_LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'];
+const ENGLISH_SUB_LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o'];
+
+// Safe Fisher-Yates Shuffle
+function shuffleList<T>(arr: T[]): T[] {
+  if (!Array.isArray(arr) || arr.length <= 1) return arr || [];
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 const MathText = ({ children }: { children: any }) => {
   let content = '';
@@ -152,38 +164,73 @@ export function normalizeQuestionData(q: any) {
     ].filter(o => Boolean(o.text));
   }
 
-  // Normalize option objects and ensure isCorrect is resolved accurately
+  // Normalize option objects and ensure ALL isCorrect options are resolved accurately (especially for MC multiple-correct answers)
   if (Array.isArray(options) && options.length > 0) {
-    let foundIdx = options.findIndex((o: any) => typeof o === 'object' && (o.isCorrect === true || String(o.isCorrect) === 'true'));
-    let dbCorrectIdx = foundIdx;
-    if (dbCorrectIdx === -1) {
-      if (q.correctOption !== undefined && q.correctOption !== null) {
-        const num = Number(q.correctOption);
-        dbCorrectIdx = num > 0 && num <= options.length ? num - 1 : num;
-      } else if (q.correctAnswer) {
-        const str = String(q.correctAnswer).trim().toUpperCase();
-        const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
-        if (letterMap[str] !== undefined) dbCorrectIdx = letterMap[str];
-        else if (!isNaN(parseInt(str))) dbCorrectIdx = parseInt(str);
+    const correctIndicesSet = new Set<number>();
+
+    // 1. Check if options already contain isCorrect flags
+    options.forEach((opt: any, idx: number) => {
+      if (typeof opt === 'object' && (opt.isCorrect === true || String(opt.isCorrect) === 'true')) {
+        correctIndicesSet.add(idx);
+      }
+    });
+
+    // 2. If no object flags found or if correctAnswers is provided, check top-level fields
+    if (correctIndicesSet.size === 0) {
+      const rawCorrect = q.correctAnswers || q.correct_answers || q.correctOptions || q.correct_options || q.correctOption || q.correctAnswer;
+      const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'ক': 0, 'খ': 1, 'গ': 2, 'ঘ': 3, 'ঙ': 4, 'চ': 5 };
+
+      if (Array.isArray(rawCorrect)) {
+        rawCorrect.forEach((item: any) => {
+          if (typeof item === 'number') {
+            correctIndicesSet.add(item > 0 && item <= options.length && q.is1Indexed ? item - 1 : item);
+          } else if (typeof item === 'string') {
+            const u = item.trim().toUpperCase();
+            if (letterMap[u] !== undefined) correctIndicesSet.add(letterMap[u]);
+            else if (!isNaN(parseInt(u))) correctIndicesSet.add(parseInt(u));
+          }
+        });
+      } else if (typeof rawCorrect === 'number') {
+        correctIndicesSet.add(rawCorrect > 0 && rawCorrect <= options.length && q.is1Indexed ? rawCorrect - 1 : rawCorrect);
+      } else if (typeof rawCorrect === 'string') {
+        const str = rawCorrect.trim();
+        if (str.includes(',') || str.includes(' ') || str.includes('|')) {
+          str.split(/[\s,\|]+/).forEach(tok => {
+            const u = tok.trim().toUpperCase();
+            if (letterMap[u] !== undefined) correctIndicesSet.add(letterMap[u]);
+            else if (!isNaN(parseInt(u))) {
+              const n = parseInt(u);
+              correctIndicesSet.add(n > 0 && n <= options.length && q.is1Indexed ? n - 1 : n);
+            }
+          });
+        } else {
+          const upper = str.toUpperCase();
+          if (/^[A-F]+$/.test(upper) && upper.length > 1) {
+            for (let i = 0; i < upper.length; i++) {
+              if (letterMap[upper[i]] !== undefined) correctIndicesSet.add(letterMap[upper[i]]);
+            }
+          } else if (letterMap[upper] !== undefined) {
+            correctIndicesSet.add(letterMap[upper]);
+          } else if (!isNaN(parseInt(str))) {
+            const n = parseInt(str);
+            correctIndicesSet.add(n > 0 && n <= options.length && q.is1Indexed ? n - 1 : n);
+          }
+        }
       }
     }
 
     options = options.map((opt: any, idx: number) => {
       const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
-      const isOptCorrect = foundIdx !== -1
-        ? idx === foundIdx
-        : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
       return {
         ...optObj,
-        isCorrect: isOptCorrect
+        isCorrect: correctIndicesSet.has(idx)
       };
     });
   }
 
-
-  // 5. Sub-Questions (CQ / Descriptive)
+  // 5. Sub-Questions (CQ / Descriptive only - exclude CMA & MPC to prevent double rendering)
   let subQuestions: any[] = [];
-  const rawSub = q.subQuestions || q.sub_questions || q.parts || q.subquestions;
+  const rawSub = (type === 'CMA' || type === 'MPC') ? [] : (q.subQuestions || q.sub_questions || q.subquestions);
   if (Array.isArray(rawSub)) {
     subQuestions = rawSub.map((sub: any) => {
       const qText = sub.questionText || sub.question || sub.text || "";
@@ -219,7 +266,7 @@ export function normalizeQuestionData(q: any) {
     } catch (e) {}
   }
 
-  // 6. Matching Columns (MTF Two Side)
+  // 6. Matching Columns (MTF Two Side with stable ID pairs and shuffle support)
   let leftColumn: any[] = [];
   let rightColumn: any[] = [];
   const rawLeft = q.leftColumn || q.left_column || q.left || (q.options && q.options.leftColumn);
@@ -233,6 +280,27 @@ export function normalizeQuestionData(q: any) {
   if (Array.isArray(rawRight)) rightColumn = rawRight;
   else if (typeof rawRight === 'string') {
     try { const p = JSON.parse(rawRight); if (Array.isArray(p)) rightColumn = p; } catch (e) {}
+  }
+
+  // Ensure left and right items have IDs
+  leftColumn = leftColumn.map((item: any, i: number) => {
+    if (typeof item === 'string') return { id: `left-${i}`, text: item };
+    return { ...item, id: item.id || `left-${i}` };
+  });
+
+  rightColumn = rightColumn.map((item: any, i: number) => {
+    if (typeof item === 'string') return { id: `right-${i}`, text: item };
+    return { ...item, id: item.id || `right-${i}` };
+  });
+
+  // Ensure matches dictionary exists
+  let matches: Record<string, string> = q.matches || {};
+  if (Object.keys(matches).length === 0 && leftColumn.length > 0 && rightColumn.length > 0) {
+    leftColumn.forEach((lItem: any, i: number) => {
+      if (rightColumn[i]) {
+        matches[lItem.id] = rightColumn[i].id;
+      }
+    });
   }
 
   // 7. Images
@@ -276,21 +344,24 @@ export function normalizeQuestionData(q: any) {
     if (!explanation && q.options.hint) explanation = q.options.hint;
   }
 
-  // Fallback 1: Auto-generate Model Answer for MCQ / INT / MTF / CQ / CMA / MPC if empty
+  // Fallback 1: Auto-generate Model Answer for MCQ / MC / INT / MTF / CQ / CMA / MPC if empty
   if (!modelAnswer) {
-    if (type === 'MCQ' || type === 'MC' || type === 'SMCQ') {
-      const correctIdx = options.findIndex((o: any) => o.isCorrect || q.correctOption === options.indexOf(o));
-      if (correctIdx !== -1) {
-        const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
-        const text = typeof options[correctIdx] === 'string' ? options[correctIdx] : (options[correctIdx].text || '');
-        modelAnswer = `${labels[correctIdx] || ''} ${text}`.trim();
+    if (type === 'MCQ' || type === 'MC' || type === 'SMCQ' || type === 'AR') {
+      const correctOpts = options
+        .map((opt: any, idx: number) => ({ opt, idx }))
+        .filter(({ opt }) => opt.isCorrect);
+
+      if (correctOpts.length > 0) {
+        const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)', '(ঙ)', '(চ)'];
+        modelAnswer = correctOpts
+          .map(({ opt, idx }) => `${labels[idx] || `(${idx + 1})`} ${typeof opt === 'string' ? opt : (opt.text || '')}`)
+          .join(', ');
       } else if (q.correctAnswer) {
         modelAnswer = `উত্তর: ${q.correctAnswer}`;
       }
     } else if (type === 'INT' && integerAnswer !== undefined) {
       modelAnswer = `সঠিক পূর্ণসংখ্যার উত্তর: ${integerAnswer}`;
     } else if (type === 'MTF' && leftColumn.length > 0) {
-      const matches = q.matches || {};
       const pairs = leftColumn.map((item: any, i: number) => {
         const rId = matches[item.id];
         const rIdx = rightColumn.findIndex((r: any) => r.id === rId);
@@ -408,7 +479,8 @@ export default function SingleQuestionPageSheet({
   showStudentHeader = false,
   watermarkText = "",
   paperSize = 'a4',
-  singleStyle = 'split'
+  singleStyle = 'split',
+  isShuffled = false
 }: SingleQuestionPageSheetProps) {
   const isBn = language === 'bn';
   const mcqLabels = isBn ? MCQ_LABELS_BN : MCQ_LABELS_EN;
@@ -477,9 +549,24 @@ export default function SingleQuestionPageSheet({
           ? (QUESTION_TYPE_LABELS_BN[qTypeKey] || question.type || '')
           : (QUESTION_TYPE_LABELS_EN[qTypeKey] || question.type || '');
 
-        const optionsList = (qTypeKey === 'AR' && (!question.options || question.options.length < 2))
+        let optionsList = (qTypeKey === 'AR' && (!question.options || question.options.length < 2))
           ? getArOptions(isBn)
-          : question.options;
+          : [...(question.options || [])];
+
+        // Shuffle options if isShuffled is enabled
+        if (isShuffled || rawQuestion.isShuffled) {
+          if (['MCQ', 'MC', 'SMCQ', 'AR'].includes(qTypeKey) && optionsList.length > 1) {
+            optionsList = shuffleList(optionsList);
+          }
+        }
+
+        // For MTF: Scramble right column so students have a real matching test (preserving matches IDs)
+        let displayRightColumn = [...(question.rightColumn || [])];
+        if (qTypeKey === 'MTF' && displayRightColumn.length > 1) {
+          if (isShuffled || !showAnswers) {
+            displayRightColumn = shuffleList(displayRightColumn);
+          }
+        }
 
         const lineCount = calculateAdaptiveLineCount(question, singleStyle === 'split');
         const numExtraPages = extraPages[qId] || 0;
@@ -648,8 +735,8 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* Sub Questions (CQ / Descriptive) */}
-                        {question.subQuestions && question.subQuestions.length > 0 && (
+                        {/* Sub Questions (CQ / Descriptive only) */}
+                        {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
                           <div className="space-y-2.5 mt-3">
                             {question.subQuestions.map((sub: any, subIdx: number) => {
                               const subLabel = subLabels[subIdx] || `${subIdx + 1}`;
@@ -692,7 +779,7 @@ export default function SingleQuestionPageSheet({
                         )}
 
                         {/* Matching Columns (MTF Two Side Type) */}
-                        {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || question.rightColumn.length > 0) && (
+                        {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || displayRightColumn.length > 0) && (
                           <div className="grid grid-cols-2 gap-2 border p-3 rounded-lg my-2 text-xs">
                             <div>
                               <h4 className="font-bold border-b pb-1 mb-1">{isBn ? "কলাম A" : "Column A"}</h4>
@@ -704,7 +791,7 @@ export default function SingleQuestionPageSheet({
                             </div>
                             <div>
                               <h4 className="font-bold border-b pb-1 mb-1">{isBn ? "কলাম B" : "Column B"}</h4>
-                              {question.rightColumn.map((item: any, i: number) => (
+                              {displayRightColumn.map((item: any, i: number) => (
                                 <div key={i} className="py-0.5">
                                   <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
                                 </div>
@@ -1009,8 +1096,8 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
-                      {/* Sub Questions (CQ / Descriptive) */}
-                      {question.subQuestions && question.subQuestions.length > 0 && (
+                      {/* Sub Questions (CQ / Descriptive only) */}
+                      {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
                         <div className="space-y-3 pl-4 mt-4">
                           {question.subQuestions.map((sub: any, subIdx: number) => {
                             const subLabel = subLabels[subIdx] || `${subIdx + 1}`;
@@ -1071,7 +1158,7 @@ export default function SingleQuestionPageSheet({
                       )}
 
                       {/* Matching Columns (MTF Two Side Type) */}
-                      {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || question.rightColumn.length > 0) && (
+                      {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || displayRightColumn.length > 0) && (
                         <div className="grid grid-cols-2 gap-4 border p-4 rounded-lg my-3">
                           <div>
                             <h4 className="font-bold text-sm border-b pb-1 mb-2">{isBn ? "কলাম A" : "Column A"}</h4>
@@ -1083,7 +1170,7 @@ export default function SingleQuestionPageSheet({
                           </div>
                           <div>
                             <h4 className="font-bold text-sm border-b pb-1 mb-2">{isBn ? "কলাম B" : "Column B"}</h4>
-                            {question.rightColumn.map((item: any, i: number) => (
+                            {displayRightColumn.map((item: any, i: number) => (
                               <div key={i} className="text-sm py-1">
                                 <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
                               </div>

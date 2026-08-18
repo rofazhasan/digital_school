@@ -83,7 +83,7 @@ export default function PrintSheetPage() {
       let processed = { ...q };
 
       // 1. MCQ, MC, SMCQ Option Shuffling & Answer Key Remapping
-      if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ') && Array.isArray(q.options) && q.options.length > 0) {
+      if ((q.type === 'MCQ' || q.type === 'MC') && Array.isArray(q.options) && q.options.length > 0) {
         const shuffledOptions = shuffleArray(q.options);
         processed.options = shuffledOptions;
 
@@ -94,6 +94,16 @@ export default function PrintSheetPage() {
         if (correctIndices.length > 0) {
           processed.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
         }
+      }
+
+      // SMCQ sub-question option shuffling
+      if (q.type === 'SMCQ' && Array.isArray(q.subQuestions)) {
+        processed.subQuestions = q.subQuestions.map((sq: any) => {
+          if (Array.isArray(sq.options) && sq.options.length > 0) {
+            return { ...sq, options: shuffleArray(sq.options) };
+          }
+          return sq;
+        });
       }
 
       // 2. AR Questions: Ensure 4 options with correctness mapping
@@ -552,6 +562,7 @@ export default function PrintSheetPage() {
               watermarkText={watermarkText}
               paperSize={paperSize}
               singleStyle={singleStyle}
+              isShuffled={isShuffled}
             />
           )}
 
