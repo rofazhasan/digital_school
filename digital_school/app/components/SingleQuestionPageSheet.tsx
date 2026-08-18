@@ -228,42 +228,74 @@ export function normalizeQuestionData(q: any) {
     });
   }
 
-  // 5. Sub-Questions (CQ / Descriptive only - exclude CMA & MPC to prevent double rendering)
+  // 5. Sub-Questions (CQ / Descriptive / SMCQ - exclude CMA & MPC to prevent double rendering)
   let subQuestions: any[] = [];
   const rawSub = (type === 'CMA' || type === 'MPC') ? [] : (q.subQuestions || q.sub_questions || q.subquestions);
-  if (Array.isArray(rawSub)) {
-    subQuestions = rawSub.map((sub: any) => {
-      const qText = sub.questionText || sub.question || sub.text || "";
+  const parseSubList = (list: any[]) => {
+    return list.map((sub: any, sIdx: number) => {
+      const qText = sub.questionText || sub.question || sub.text || sub.prompt || "";
       const mAns = sub.modelAnswer || sub.model_answer || sub.answer || sub.solution || sub.correctAnswer || "";
       const exp = sub.explanation || sub.expl || sub.hint || sub.note || "";
+      
+      let subOptions = sub.options;
+      if (typeof subOptions === 'string') {
+        try { subOptions = JSON.parse(subOptions); } catch (e) {}
+      }
+      let subOptsArray: any[] = [];
+      if (Array.isArray(subOptions)) {
+        subOptsArray = subOptions.map((o: any, oidx: number) => {
+          const oObj = typeof o === 'string' ? { text: o } : { ...o };
+          const isCorrect = oObj.isCorrect === true || String(oObj.isCorrect) === 'true' ||
+            sub.correctOption === oidx ||
+            sub.correctAnswer === String.fromCharCode(65 + oidx) ||
+            sub.correctAnswer === ['ক', 'খ', 'গ', 'ঘ'][oidx];
+          return {
+            ...oObj,
+            isCorrect
+          };
+        });
+      }
+
       return {
         ...sub,
         questionText: qText,
         question: qText,
         modelAnswer: mAns,
         answer: mAns,
-        explanation: exp
+        explanation: exp,
+        options: subOptsArray
       };
     });
+  };
+
+  if (Array.isArray(rawSub)) {
+    subQuestions = parseSubList(rawSub);
   } else if (typeof rawSub === 'string') {
     try {
       const parsed = JSON.parse(rawSub);
-      if (Array.isArray(parsed)) {
-        subQuestions = parsed.map((sub: any) => {
-          const qText = sub.questionText || sub.question || sub.text || "";
-          const mAns = sub.modelAnswer || sub.model_answer || sub.answer || sub.solution || sub.correctAnswer || "";
-          const exp = sub.explanation || sub.expl || sub.hint || sub.note || "";
-          return {
-            ...sub,
-            questionText: qText,
-            question: qText,
-            modelAnswer: mAns,
-            answer: mAns,
-            explanation: exp
-          };
-        });
-      }
+      if (Array.isArray(parsed)) subQuestions = parseSubList(parsed);
     } catch (e) {}
+  }
+
+  // 5.5. Reason Options for DR (Diagnostic Reasoning)
+  let reasonOptions: any[] = [];
+  const rawReason = q.reasonOptions || q.reason_options || (q.options && q.options.reasonOptions);
+  if (Array.isArray(rawReason)) reasonOptions = rawReason;
+  else if (typeof rawReason === 'string') {
+    try { const p = JSON.parse(rawReason); if (Array.isArray(p)) reasonOptions = p; } catch (e) {}
+  }
+  if (reasonOptions.length > 0) {
+    reasonOptions = reasonOptions.map((r: any, rIdx: number) => {
+      const rObj = typeof r === 'string' ? { text: r } : { ...r };
+      const isCorrect = rObj.isCorrect === true || String(rObj.isCorrect) === 'true' ||
+        q.correctReasonOption === rIdx ||
+        q.correctReason === String.fromCharCode(65 + rIdx) ||
+        q.correctReason === `R${rIdx + 1}`;
+      return {
+        ...rObj,
+        isCorrect
+      };
+    });
   }
 
   // 6. Matching Columns (MTF Two Side with stable ID pairs and shuffle support)
@@ -344,22 +376,35 @@ export function normalizeQuestionData(q: any) {
     if (!explanation && q.options.hint) explanation = q.options.hint;
   }
 
-  // Fallback 1: Auto-generate Model Answer for MCQ / MC / INT / MTF / CQ / CMA / MPC if empty
-  if (!modelAnswer) {
-    if (type === 'MCQ' || type === 'MC' || type === 'SMCQ' || type === 'AR') {
-      const correctOpts = options
-        .map((opt: any, idx: number) => ({ opt, idx }))
-        .filter(({ opt }) => opt.isCorrect);
+  // Fallback 1: Auto-generate Model Answer for MCQ / MC / INT / MTF / CQ / CMA / MPC / DR if empty or short code
+  if (type === 'MCQ' || type === 'MC' || type === 'SMCQ' || type === 'AR') {
+    const correctOpts = options
+      .map((opt: any, idx: number) => ({ opt, idx }))
+      .filter(({ opt }) => opt.isCorrect);
 
-      if (correctOpts.length > 0) {
-        const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)', '(ঙ)', '(চ)'];
-        modelAnswer = correctOpts
-          .map(({ opt, idx }) => `${labels[idx] || `(${idx + 1})`} ${typeof opt === 'string' ? opt : (opt.text || '')}`)
-          .join(', ');
-      } else if (q.correctAnswer) {
-        modelAnswer = `উত্তর: ${q.correctAnswer}`;
+    if (correctOpts.length > 0) {
+      const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)', '(ঙ)', '(চ)'];
+      const formattedMulti = correctOpts
+        .map(({ opt, idx }) => `${labels[idx] || `(${idx + 1})`} ${typeof opt === 'string' ? opt : (opt.text || '')}`)
+        .join(', ');
+      if (!modelAnswer || /^[A-Fa-f0-9\s,\|ক-ঙ]+$/.test(modelAnswer.trim())) {
+        modelAnswer = formattedMulti;
       }
-    } else if (type === 'INT' && integerAnswer !== undefined) {
+    } else if (q.correctAnswer && !modelAnswer) {
+      modelAnswer = `উত্তর: ${q.correctAnswer}`;
+    }
+  } else if (type === 'DR') {
+    const correctTier1 = options.map((opt: any, idx: number) => ({ opt, idx })).filter(({ opt }) => opt.isCorrect);
+    const correctTier2 = reasonOptions.map((r: any, idx: number) => ({ r, idx })).filter(({ r }) => r.isCorrect);
+    const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+    const rLabels = ['R1', 'R2', 'R3', 'R4'];
+    const t1Text = correctTier1.map(({ opt, idx }) => `${labels[idx] || `(${idx + 1})`} ${typeof opt === 'string' ? opt : opt.text || ''}`).join(', ');
+    const t2Text = correctTier2.map(({ r, idx }) => `(${rLabels[idx] || `R${idx + 1}`}) ${typeof r === 'string' ? r : r.text || ''}`).join(', ');
+    if (!modelAnswer || /^[A-Fa-f0-9\s,\|ক-ঙR]+$/.test(modelAnswer.trim())) {
+      modelAnswer = `Tier 1: ${t1Text || '—'}\nTier 2: ${t2Text || '—'}`;
+    }
+  } else if (!modelAnswer) {
+    if (type === 'INT' && integerAnswer !== undefined) {
       modelAnswer = `সঠিক পূর্ণসংখ্যার উত্তর: ${integerAnswer}`;
     } else if (type === 'MTF' && leftColumn.length > 0) {
       const pairs = leftColumn.map((item: any, i: number) => {
@@ -703,12 +748,17 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* Options List (MCQ / MC / AR / SMCQ) */}
+                        {/* Options List (MCQ / MC / AR / SMCQ / DR) */}
                         {optionsList.length > 0 && (
                           <div className="space-y-2 mt-3">
+                            {qTypeKey === 'MC' && (
+                              <div className="text-blue-700 font-bold text-[11px] bg-blue-50 border border-blue-200 px-2 py-1 rounded inline-block">
+                                {isBn ? '☑ সকল সঠিক উত্তর নির্বাচন করো' : '☑ Select all correct answers'}
+                              </div>
+                            )}
                             {optionsList.map((opt: any, optIdx: number) => {
                               const optLabel = mcqLabels[optIdx] || `${optIdx + 1}`;
-                              const isCorrect = opt.isCorrect || rawQuestion.correctOption === optIdx;
+                              const isCorrect = Boolean(opt.isCorrect);
 
                               return (
                                 <div
@@ -719,7 +769,7 @@ export default function SingleQuestionPageSheet({
                                       : 'border-gray-200 print:border-gray-300'
                                   }`}
                                 >
-                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
+                                  <span className={`w-6 h-6 ${qTypeKey === 'MC' ? 'rounded-md' : 'rounded-full'} flex items-center justify-center text-xs font-bold border shrink-0 ${
                                     showAnswers && isCorrect
                                       ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
                                       : 'bg-gray-100 text-gray-800 border-gray-300 print:bg-white print:text-black'
@@ -729,13 +779,54 @@ export default function SingleQuestionPageSheet({
                                   <span className="flex-1">
                                     <MathText>{typeof opt === 'string' ? opt : opt.text || ""}</MathText>
                                   </span>
+                                  {showAnswers && isCorrect && (
+                                    <span className="text-[10px] font-bold text-green-700 print:text-black uppercase shrink-0">
+                                      ✓ {isBn ? "সঠিক" : "Correct"}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
                           </div>
                         )}
 
-                        {/* Sub Questions (CQ / Descriptive only) */}
+                        {/* DR Diagnostic Reasoning: Tier 2 Reason Options */}
+                        {qTypeKey === 'DR' && question.reasonOptions && question.reasonOptions.length > 0 && (
+                          <div className="space-y-2 mt-3 p-2.5 bg-amber-50/50 border border-amber-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
+                            <span className="font-bold text-amber-900 block mb-1">
+                              {isBn ? 'কারণ নির্বাচন (Tier 2: Reasoning):' : 'Reason Selection (Tier 2: Reasoning):'}
+                            </span>
+                            <div className="space-y-1.5">
+                              {question.reasonOptions.map((rOpt: any, rIdx: number) => {
+                                const rLabel = ['R1', 'R2', 'R3', 'R4'][rIdx] || `R${rIdx + 1}`;
+                                const isRCorrect = Boolean(rOpt.isCorrect);
+                                return (
+                                  <div
+                                    key={rIdx}
+                                    className={`p-2 rounded-lg border flex items-center gap-2 transition-colors ${
+                                      showAnswers && isRCorrect
+                                        ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
+                                        : 'border-gray-200 bg-white print:border-gray-300'
+                                    }`}
+                                  >
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                                      showAnswers && isRCorrect
+                                        ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
+                                        : 'bg-amber-100 text-amber-900 border-amber-300 print:bg-white print:text-black'
+                                    }`}>
+                                      {rLabel}
+                                    </span>
+                                    <span className="flex-1">
+                                      <MathText>{typeof rOpt === 'string' ? rOpt : rOpt.text || ""}</MathText>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sub Questions (CQ / Descriptive / SMCQ) */}
                         {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
                           <div className="space-y-2.5 mt-3">
                             {question.subQuestions.map((sub: any, subIdx: number) => {
@@ -757,6 +848,37 @@ export default function SingleQuestionPageSheet({
                                       </span>
                                     )}
                                   </div>
+
+                                  {/* Sub-Question Options (For SMCQ) */}
+                                  {sub.options && sub.options.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1.5 pt-1 border-t border-gray-200">
+                                      {sub.options.map((sOpt: any, sOidx: number) => {
+                                        const sOptLabel = mcqLabels[sOidx] || `${sOidx + 1}`;
+                                        const isSCorrect = Boolean(sOpt.isCorrect);
+                                        return (
+                                          <div
+                                            key={sOidx}
+                                            className={`p-1.5 rounded border flex items-center gap-1.5 text-xs ${
+                                              showAnswers && isSCorrect
+                                                ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
+                                                : 'border-gray-200 bg-white print:border-gray-300'
+                                            }`}
+                                          >
+                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0 ${
+                                              showAnswers && isSCorrect
+                                                ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
+                                                : 'bg-gray-100 text-gray-800 border-gray-300 print:bg-white print:text-black'
+                                            }`}>
+                                              {sOptLabel}
+                                            </span>
+                                            <span className="flex-1">
+                                              <MathText>{typeof sOpt === 'string' ? sOpt : sOpt.text || ""}</MathText>
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
 
                                   {/* Graph / Chart */}
                                   {sub.chartConfig && (
@@ -1059,44 +1181,92 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
-                      {/* Options List */}
+                      {/* Options List (MCQ / MC / AR / SMCQ / DR) */}
                       {optionsList.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4 mt-3">
-                          {optionsList.map((opt: any, optIdx: number) => {
-                            const optLabel = mcqLabels[optIdx] || `${optIdx + 1}`;
-                            const isCorrect = opt.isCorrect || rawQuestion.correctOption === optIdx;
+                        <div className="space-y-3 pl-4 mt-3">
+                          {qTypeKey === 'MC' && (
+                            <div className="text-blue-700 font-bold text-xs bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg inline-block">
+                              {isBn ? '☑ সকল সঠিক উত্তর নির্বাচন করো' : '☑ Select all correct answers'}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {optionsList.map((opt: any, optIdx: number) => {
+                              const optLabel = mcqLabels[optIdx] || `${optIdx + 1}`;
+                              const isCorrect = Boolean(opt.isCorrect);
 
-                            return (
-                              <div
-                                key={optIdx}
-                                className={`p-3 rounded-lg border flex items-center gap-3 transition-colors ${
-                                  showAnswers && isCorrect
-                                    ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
-                                    : 'border-gray-200 print:border-gray-300'
-                                }`}
-                              >
-                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border shrink-0 ${
-                                  showAnswers && isCorrect
-                                    ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
-                                    : 'bg-gray-100 text-gray-800 border-gray-300 print:bg-white print:text-black'
-                                }`}>
-                                  {optLabel}
-                                </span>
-                                <span className="flex-1 text-sm md:text-base">
-                                  <MathText>{typeof opt === 'string' ? opt : opt.text || ""}</MathText>
-                                </span>
-                                {showAnswers && isCorrect && (
-                                  <span className="text-xs font-bold text-green-700 print:text-black uppercase shrink-0">
-                                    ✓ {isBn ? "সঠিক উত্তর" : "Correct"}
+                              return (
+                                <div
+                                  key={optIdx}
+                                  className={`p-3 rounded-lg border flex items-center gap-3 transition-colors ${
+                                    showAnswers && isCorrect
+                                      ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
+                                      : 'border-gray-200 print:border-gray-300'
+                                  }`}
+                                >
+                                  <span className={`w-7 h-7 ${qTypeKey === 'MC' ? 'rounded-lg' : 'rounded-full'} flex items-center justify-center text-sm font-bold border shrink-0 ${
+                                    showAnswers && isCorrect
+                                      ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
+                                      : 'bg-gray-100 text-gray-800 border-gray-300 print:bg-white print:text-black'
+                                  }`}>
+                                    {optLabel}
                                   </span>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  <span className="flex-1 text-sm md:text-base">
+                                    <MathText>{typeof opt === 'string' ? opt : opt.text || ""}</MathText>
+                                  </span>
+                                  {showAnswers && isCorrect && (
+                                    <span className="text-xs font-bold text-green-700 print:text-black uppercase shrink-0">
+                                      ✓ {isBn ? "সঠিক উত্তর" : "Correct"}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
-                      {/* Sub Questions (CQ / Descriptive only) */}
+                      {/* DR Diagnostic Reasoning: Tier 2 Reason Options (Vertical Mode) */}
+                      {qTypeKey === 'DR' && question.reasonOptions && question.reasonOptions.length > 0 && (
+                        <div className="space-y-3 pl-4 mt-4 p-4 bg-amber-50/50 border border-amber-200 rounded-lg text-sm print:bg-transparent print:border-gray-400">
+                          <span className="font-bold text-amber-900 block text-sm mb-1">
+                            {isBn ? 'কারণ নির্বাচন (Tier 2: Reasoning):' : 'Reason Selection (Tier 2: Reasoning):'}
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {question.reasonOptions.map((rOpt: any, rIdx: number) => {
+                              const rLabel = ['R1', 'R2', 'R3', 'R4'][rIdx] || `R${rIdx + 1}`;
+                              const isRCorrect = Boolean(rOpt.isCorrect);
+                              return (
+                                <div
+                                  key={rIdx}
+                                  className={`p-3 rounded-lg border flex items-center gap-3 transition-colors ${
+                                    showAnswers && isRCorrect
+                                      ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
+                                      : 'border-gray-200 bg-white print:border-gray-300'
+                                  }`}
+                                >
+                                  <span className={`px-2 py-1 rounded text-xs font-bold border shrink-0 ${
+                                    showAnswers && isRCorrect
+                                      ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
+                                      : 'bg-amber-100 text-amber-900 border-amber-300 print:bg-white print:text-black'
+                                  }`}>
+                                    {rLabel}
+                                  </span>
+                                  <span className="flex-1 text-sm">
+                                    <MathText>{typeof rOpt === 'string' ? rOpt : rOpt.text || ""}</MathText>
+                                  </span>
+                                  {showAnswers && isRCorrect && (
+                                    <span className="text-xs font-bold text-green-700 print:text-black uppercase shrink-0">
+                                      ✓ {isBn ? "সঠিক কারণ" : "Correct Reason"}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sub Questions (CQ / Descriptive / SMCQ) */}
                       {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
                         <div className="space-y-3 pl-4 mt-4">
                           {question.subQuestions.map((sub: any, subIdx: number) => {
@@ -1118,6 +1288,37 @@ export default function SingleQuestionPageSheet({
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Sub-Question Options (For SMCQ in Vertical layout) */}
+                                {sub.options && sub.options.length > 0 && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-200">
+                                    {sub.options.map((sOpt: any, sOidx: number) => {
+                                      const sOptLabel = mcqLabels[sOidx] || `${sOidx + 1}`;
+                                      const isSCorrect = Boolean(sOpt.isCorrect);
+                                      return (
+                                        <div
+                                          key={sOidx}
+                                          className={`p-2 rounded-lg border flex items-center gap-2 text-sm ${
+                                            showAnswers && isSCorrect
+                                              ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
+                                              : 'border-gray-200 bg-white print:border-gray-300'
+                                          }`}
+                                        >
+                                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${
+                                            showAnswers && isSCorrect
+                                              ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
+                                              : 'bg-gray-100 text-gray-800 border-gray-300 print:bg-white print:text-black'
+                                          }`}>
+                                            {sOptLabel}
+                                          </span>
+                                          <span className="flex-1">
+                                            <MathText>{typeof sOpt === 'string' ? sOpt : sOpt.text || ""}</MathText>
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
 
                                 {/* Sub Question Model Answer when showAnswers is true */}
                                 {showAnswers && (sub.modelAnswer || sub.explanation) && (
