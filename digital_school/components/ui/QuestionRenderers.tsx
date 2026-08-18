@@ -52,6 +52,9 @@ export function LiveExpressionInput({
             {[
               { label: 'x²', insert: '^2' },
               { label: 'a/b', insert: '/' },
+              { label: 'ⁿCᵣ', insert: '\\binom{n}{r}' },
+              { label: 'ⁿPᵣ', insert: 'P(n, r)' },
+              { label: 'n!', insert: '!' },
               { label: '√x', insert: 'sqrt()' },
               { label: '10ⁿ', insert: '10^' },
               { label: 'π', insert: '\\pi' },

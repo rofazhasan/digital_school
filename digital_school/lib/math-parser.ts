@@ -365,6 +365,19 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
     s = nextS;
   }
 
+  // Convert binomial coefficients: \binom{n}{r}, \dbinom{n}{r}, \tbinom{n}{r} -> binom(n, r)
+  while (/\\+(binom|dbinom|tbinom)/.test(s)) {
+    const nextS = s.replace(/\\+(binom|dbinom|tbinom)\{([^{}]+)\}\{([^{}]+)\}/g, 'binom($2, $3)');
+    if (nextS === s) break;
+    s = nextS;
+  }
+
+  // Convert combinations and permutations notations:
+  // ^{n+1}C_{r} or ^nC_r or ^n C_r -> binom(n, r)
+  s = s.replace(/\^\{?([^{}]+)\}?\s*(?:\\mathrm\{[Cc]\}|[Cc])\s*_?\{?([^{}]+)\}?/g, 'binom($1, $2)');
+  // ^{n+1}P_{r} or ^nP_r or ^n P_r -> perm(n, r)
+  s = s.replace(/\^\{?([^{}]+)\}?\s*(?:\\mathrm\{[Pp]\}|[Pp])\s*_?\{?([^{}]+)\}?/g, 'perm($1, $2)');
+
   // Convert sqrt
   s = s.replace(/\\+sqrt\{([^{}]+)\}/g, 'sqrt($1)');
   s = s.replace(/\\+sqrt\[([^{}]+)\]\{([^{}]+)\}/g, '(($2)^(1/($1)))');
@@ -394,6 +407,19 @@ export function normalizeCanonicalMathOrChemical(raw: string | number | undefine
   if (raw === undefined || raw === null) return '';
   let str = normalizeBengaliNumeralsAndText(raw);
   str = stripLatexAndMathFormatting(str);
+
+  // Standardize combinations: C(n, r), nCr, (n+1)Cr, (n+1) choose r -> binom(n, r)
+  str = str.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+)/g, 'binom($1,$2)');
+  str = str.replace(/([a-zA-Z0-9_]+)\s*[Cc]\s*([a-zA-Z0-9_]+)/g, 'binom($1,$2)');
+  str = str.replace(/(.+?)\s+(?:choose|\\choose)\s+(.+?)/g, 'binom($1,$2)');
+
+  // Standardize permutations: P(n, r), nPr, (n+1)Pr -> perm(n, r)
+  str = str.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+)/g, 'perm($1,$2)');
+  str = str.replace(/([a-zA-Z0-9_]+)\s*[Pp]\s*([a-zA-Z0-9_]+)/g, 'perm($1,$2)');
 
   // Standardize ion charges and superscripts:
   // e.g. "D^2+", "D^(2+)", "D^+2" -> "D^{2+}"
@@ -438,14 +464,24 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   let expr = normalizeBengaliNumeralsAndText(rawStr);
   expr = stripLatexAndMathFormatting(expr);
 
+  // Standardize combinations and permutations
+  expr = expr.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+)/g, 'binom($1,$2)');
+  expr = expr.replace(/\b([a-zA-Z0-9_]+)\s*[Cc]\s*([a-zA-Z0-9_]+)\b/g, 'binom($1,$2)');
+
+  expr = expr.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+)/g, 'perm($1,$2)');
+  expr = expr.replace(/\b([a-zA-Z0-9_]+)\s*[Pp]\s*([a-zA-Z0-9_]+)\b/g, 'perm($1,$2)');
+
   // Convert scientific notation: 1.5x10^8 or 1.5*10^8 or 1.5*10^(8) or 1.5 \times 10^{8} -> 1.5e8
   expr = expr.replace(/(\d+(?:\.\d+)?)\s*(?:\*|x|X)\s*10\^\(?([-+]?\d+)\)?/g, '$1e$2');
 
   // Multi-letter functions and named constants (pi, theta, sin, etc.)
-  const knownKeywords = [
-    'sqrt', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'abs', 'prev',
-    'pi', 'theta', 'lambda', 'omega', 'delta', 'alpha', 'beta', 'gamma', 'rho', 'sigma', 'phi'
-  ];
+  const funcKeywords = ['sqrt', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'abs', 'prev', 'binom', 'perm'];
+  const constKeywords = ['pi', 'theta', 'lambda', 'omega', 'delta', 'alpha', 'beta', 'gamma', 'rho', 'sigma', 'phi'];
+  const knownKeywords = [...funcKeywords, ...constKeywords];
 
   // Tokenize string to preserve multi-letter functions and add explicit multiplication between variables/tokens
   // e.g. "2pir" -> "2 * pi * r", "GMm" -> "G * M * m", "2 pi r" -> "2 * pi * r", "2x" -> "2 * x", "3v/2" -> "(3*v)/2"
@@ -453,19 +489,6 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   let i = 0;
   while (i < expr.length) {
     const ch = expr[i];
-
-    // If whitespace, convert to multiplication between valid math tokens
-    if (/\s/.test(ch)) {
-      if (formatted.length > 0 && /[a-zA-Z0-9_\)]/.test(formatted[formatted.length - 1])) {
-        let j = i + 1;
-        while (j < expr.length && /\s/.test(expr[j])) j++;
-        if (j < expr.length && /[a-zA-Z0-9_\(]/.test(expr[j])) {
-          formatted += '*';
-        }
-      }
-      i++;
-      continue;
-    }
 
     // Check if substring starts with a known keyword
     let matchedKw: string | null = null;
@@ -482,7 +505,9 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
       }
       formatted += matchedKw;
       i += matchedKw.length;
-      if (i < expr.length && /[a-zA-Z0-9_\(]/.test(expr[i])) {
+      if (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+        formatted += '*';
+      } else if (i < expr.length && expr[i] === '(' && !funcKeywords.includes(matchedKw)) {
         formatted += '*';
       }
       continue;
@@ -508,7 +533,11 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
 
     if (ch === '(') {
       if (formatted.length > 0 && /[a-zA-Z0-9_\)]/.test(formatted[formatted.length - 1])) {
-        formatted += '*';
+        // Check if preceding token was a function keyword
+        const isPrecededByFunc = funcKeywords.some(fn => formatted.endsWith(fn));
+        if (!isPrecededByFunc) {
+          formatted += '*';
+        }
       }
       formatted += ch;
       i++;
@@ -540,8 +569,23 @@ export function formatExpressionToLatex(expr: string): string {
   // Strip leading/trailing dollar signs first for uniform processing
   let latex = raw.replace(/^\$\$([\s\S]*)\$\$$/, '$1').replace(/^\$([\s\S]*)\$$/, '$1').trim();
 
+  // Convert combinations and permutations in ASCII:
+  // binom(n+1, r) or C(n+1, r) or (n+1)Cr -> \binom{n+1}{r}
+  latex = latex.replace(/\\?binom\s*\(([^,]+),\s*([^)]+)\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\b([a-zA-Z0-9_]+)\s*[Cc]\s*([a-zA-Z0-9_]+)\b/g, '\\binom{$1}{$2}');
+
+  // perm(n+1, r) or P(n+1, r) or (n+1)Pr -> ^{n+1}\mathrm{P}_{r}
+  latex = latex.replace(/\\?perm\s*\(([^,]+),\s*([^)]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\b([a-zA-Z0-9_]+)\s*[Pp]\s*([a-zA-Z0-9_]+)\b/g, '^{$1}\\mathrm{P}_{$2}');
+
   // If it's already full LaTeX with commands
-  if (!latex.includes('\\frac') && !latex.includes('\\sqrt')) {
+  if (!latex.includes('\\frac') && !latex.includes('\\sqrt') && !latex.includes('\\binom')) {
     latex = latex.replace(/(\d+)\*([a-zA-Z])/g, '$1$2');
     latex = latex.replace(/\*/g, ' \\cdot ');
 
@@ -561,6 +605,39 @@ export function formatExpressionToLatex(expr: string): string {
   }
 
   return `$${latex}$`;
+}
+
+// Math evaluation helper functions for combinations, permutations, and factorials
+function _calcFactorial(k: number): number {
+  if (k < 0) return NaN;
+  if (k <= 1) return 1;
+  let res = 1;
+  for (let i = 2; i <= Math.min(k, 170); i++) res *= i;
+  return res;
+}
+
+function _calcBinom(n: number, r: number): number {
+  n = Math.round(n);
+  r = Math.round(r);
+  if (r < 0 || r > n) return 0;
+  if (r === 0 || r === n) return 1;
+  if (r > n / 2) r = n - r;
+  let res = 1;
+  for (let i = 1; i <= r; i++) {
+    res = (res * (n - i + 1)) / i;
+  }
+  return res;
+}
+
+function _calcPerm(n: number, r: number): number {
+  n = Math.round(n);
+  r = Math.round(r);
+  if (r < 0 || r > n) return 0;
+  let res = 1;
+  for (let i = 0; i < r; i++) {
+    res *= (n - i);
+  }
+  return res;
 }
 
 /**
@@ -585,20 +662,27 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
 
     text = text.replace(/(?<![a-zA-Z0-9_])pi(?![a-zA-Z0-9_])/gi, `(${Math.PI})`);
 
+    // Convert binom(n, r) and perm(n, r)
+    let norm = text.replace(/\bbinom\s*\(([^,]+),\s*([^)]+)\)/g, '_calcBinom($1, $2)');
+    norm = norm.replace(/\bperm\s*\(([^,]+),\s*([^)]+)\)/g, '_calcPerm($1, $2)');
+
+    // Convert factorials: (n)! or 5!
+    norm = norm.replace(/(\d+|\([^\(\)]+\))!/g, '_calcFactorial($1)');
+
     // Convert powers: ^(...) or ^\d+ -> **(...) or **\d+
-    let norm = text.replace(/\^/g, '**');
+    norm = norm.replace(/\^/g, '**');
 
     // Convert sqrt
     norm = norm.replace(/sqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
 
-    // Sanitize string to allow only numbers, operators, Math.sqrt, scientific notation
-    if (/[^0-9\.\+\*\/\(\)\,\sMath\.powsqrt\-eE]/.test(norm)) {
+    // Sanitize string to allow only numbers, operators, Math.sqrt, _calcBinom, _calcPerm, _calcFactorial, scientific notation
+    if (/[^0-9\.\+\*\/\(\)\,\sMath\.powsqrt\-eE_calcBinomPermFactorial]/.test(norm)) {
       return null;
     }
 
     // Function constructor safe evaluation
-    const evalFunc = new Function(`return ${norm};`);
-    const res = Number(evalFunc());
+    const evalFunc = new Function('_calcBinom', '_calcPerm', '_calcFactorial', `return ${norm};`);
+    const res = Number(evalFunc(_calcBinom, _calcPerm, _calcFactorial));
     return isFinite(res) && !isNaN(res) ? res : null;
   } catch {
     return null;
