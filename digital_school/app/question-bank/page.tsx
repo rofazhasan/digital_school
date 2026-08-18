@@ -355,7 +355,7 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
           {q.subQuestions.map((sub: any, i: number) => (
             <div key={i} className="text-gray-700 dark:text-gray-300">
               <span className="font-bold text-indigo-400 mr-1">({['ক', 'খ', 'গ', 'ঘ'][i] || i + 1})</span>
-              <UniversalMathJax inline dynamic>{cleanupMath(sub.question || sub.questionText || '')}</UniversalMathJax>
+              <UniversalMathJax inline dynamic>{cleanupMath(sub.question || sub.questionText || sub.prompt || sub.text || '')}</UniversalMathJax>
             </div>
           ))}
         </div>
@@ -387,10 +387,10 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
             <div key={i} className="flex justify-between items-center bg-cyan-50/40 dark:bg-cyan-950/20 px-2 py-1 rounded border border-cyan-100 dark:border-cyan-900/50">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 <span className="font-bold text-cyan-600 mr-1">({part.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i] || i + 1})</span>
-                <UniversalMathJax inline dynamic>{cleanupMath(part.prompt || part.text || part.question || '')}</UniversalMathJax>
+                <UniversalMathJax inline dynamic>{cleanupMath(part.prompt || part.text || part.question || part.questionText || '')}</UniversalMathJax>
               </span>
               <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold ml-2 shrink-0">
-                {part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '—'} {part.unit ? `(${part.unit})` : ''}
+                <UniversalMathJax inline dynamic>{cleanupMath(String(part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '—'))}</UniversalMathJax> {part.unit ? `(${part.unit})` : ''}
               </span>
             </div>
           ))}
@@ -405,10 +405,10 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
             <div key={i} className="flex justify-between items-center bg-indigo-50/40 dark:bg-indigo-950/20 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-900/50">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 <span className="font-bold text-indigo-600 mr-1">Stage {i + 1}:</span>
-                <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || '')}</UniversalMathJax>
+                <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || stage.questionText || '')}</UniversalMathJax>
               </span>
               <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold ml-2 shrink-0">
-                {stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? '—'} {stage.unit ? `(${stage.unit})` : ''}
+                <UniversalMathJax inline dynamic>{cleanupMath(String(stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? '—'))}</UniversalMathJax> {stage.unit ? `(${stage.unit})` : ''}
               </span>
             </div>
           ))}

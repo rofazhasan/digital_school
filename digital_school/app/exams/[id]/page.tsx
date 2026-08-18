@@ -1455,9 +1455,14 @@ export default function ExamBuilderPage() {
                               <span className="font-bold text-indigo-900 dark:text-indigo-300 uppercase text-[10px]">Constructed Multi-Answer Parts:</span>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {(((q as any).parts || (q as any).cmaParts || q.subQuestions) || []).map((part: any, pIdx: number) => (
-                                  <div key={pIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px]">
-                                    <div className="font-bold">{part.label || `Part ${pIdx + 1}`}: {part.prompt || part.text || ''}</div>
-                                    <div className="text-emerald-600 dark:text-emerald-400 font-mono">Answer: {part.expectedAnswer || part.modelAnswer} {part.unit || ''}</div>
+                                  <div key={pIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px] space-y-1">
+                                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                                      <span className="text-indigo-600 dark:text-indigo-400 mr-1">({part.label || `Part ${pIdx + 1}`})</span>
+                                      <UniversalMathJax inline dynamic>{cleanupMath(part.prompt || part.text || part.question || '')}</UniversalMathJax>
+                                    </div>
+                                    <div className="text-emerald-600 dark:text-emerald-400 font-mono">
+                                      Answer: <UniversalMathJax inline dynamic>{cleanupMath(String(part.expectedAnswer ?? part.modelAnswer ?? ''))}</UniversalMathJax> {part.unit || ''}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1468,9 +1473,14 @@ export default function ExamBuilderPage() {
                               <span className="font-bold text-blue-900 dark:text-blue-300 uppercase text-[10px]">Multi-Step Problem Chain Stages:</span>
                               <div className="space-y-1.5">
                                 {(((q as any).stages || (q as any).mpcStages || q.subQuestions) || []).map((stage: any, sIdx: number) => (
-                                  <div key={sIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px] flex justify-between items-center">
-                                    <span>Step {sIdx + 1}: {stage.stageTitle || stage.prompt || stage.text}</span>
-                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">Expected: {stage.expectedAnswer || stage.modelAnswer}</span>
+                                  <div key={sIdx} className="p-2 bg-white dark:bg-slate-900 border rounded text-[11px] flex justify-between items-center gap-2">
+                                    <div>
+                                      <span className="font-bold text-blue-600 dark:text-blue-400 mr-1.5">Step {sIdx + 1}:</span>
+                                      <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || stage.prompt || stage.text || stage.question || '')}</UniversalMathJax>
+                                    </div>
+                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                                      Expected: <UniversalMathJax inline dynamic>{cleanupMath(String(stage.expectedAnswer ?? stage.modelAnswer ?? ''))}</UniversalMathJax> {stage.unit || ''}
+                                    </span>
                                   </div>
                                 ))}
                               </div>

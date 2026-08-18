@@ -30,13 +30,23 @@ const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E', 'F'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ'];
 const ENGLISH_SUB_LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm'];
 
-const MathText = ({ children }: { children: string }) => (
-  <span className="whitespace-pre-wrap">
-    <UniversalMathJax inline dynamic>
-      {cleanupMath(children || "")}
-    </UniversalMathJax>
-  </span>
-);
+const MathText = ({ children }: { children: any }) => {
+  let content = '';
+  if (typeof children === 'string') {
+    content = children.replace(/\|\|/g, '\n');
+  } else if (typeof children === 'number') {
+    content = String(children);
+  } else if (children && typeof children === 'object') {
+    content = children.text || children.prompt || children.question || children.questionText || children.title || '';
+  }
+  return (
+    <span className="whitespace-pre-wrap inline-block max-w-full">
+      <UniversalMathJax inline dynamic>
+        {cleanupMath(content)}
+      </UniversalMathJax>
+    </span>
+  );
+};
 
 const QUESTION_TYPE_LABELS_BN: Record<string, string> = {
   MCQ: "বহুনির্বাচনী",
@@ -238,7 +248,22 @@ export function normalizeQuestionData(q: any) {
     }
   }
 
-  // 8. Model Answer & Explanation Resolvers with All Possible Field Aliases
+  // 8. CMA Parts & MPC Stages
+  let parts: any[] = [];
+  const rawParts = q.parts || q.cmaParts || (type === 'CMA' ? (q.subQuestions || q.sub_questions) : []);
+  if (Array.isArray(rawParts)) parts = rawParts;
+  else if (typeof rawParts === 'string') {
+    try { const p = JSON.parse(rawParts); if (Array.isArray(p)) parts = p; } catch (e) {}
+  }
+
+  let stages: any[] = [];
+  const rawStages = q.stages || q.mpcStages || (type === 'MPC' ? (q.subQuestions || q.sub_questions) : []);
+  if (Array.isArray(rawStages)) stages = rawStages;
+  else if (typeof rawStages === 'string') {
+    try { const p = JSON.parse(rawStages); if (Array.isArray(p)) stages = p; } catch (e) {}
+  }
+
+  // 9. Model Answer & Explanation Resolvers with All Possible Field Aliases
   let modelAnswer = q.modelAnswer || q.model_answer || q.answer || q.solution || q.correctAnswer || q.correctOptionText || "";
   let explanation = q.explanation || q.expl || q.hint || q.note || q.solutionExplanation || "";
 
@@ -251,7 +276,7 @@ export function normalizeQuestionData(q: any) {
     if (!explanation && q.options.hint) explanation = q.options.hint;
   }
 
-  // Fallback 1: Auto-generate Model Answer for MCQ / INT / MTF / CQ if empty
+  // Fallback 1: Auto-generate Model Answer for MCQ / INT / MTF / CQ / CMA / MPC if empty
   if (!modelAnswer) {
     if (type === 'MCQ' || type === 'MC' || type === 'SMCQ') {
       const correctIdx = options.findIndex((o: any) => o.isCorrect || q.correctOption === options.indexOf(o));
@@ -273,6 +298,14 @@ export function normalizeQuestionData(q: any) {
         return `(${i + 1} → ${rLabel})`;
       });
       if (pairs.length > 0) modelAnswer = pairs.join(', ');
+    } else if (type === 'CMA' && parts.length > 0) {
+      const cmaAns = parts
+        .map((p: any, i: number) => `(${p.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i] || i + 1}) ${p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '—'} ${p.unit ? `(${p.unit})` : ''}`);
+      if (cmaAns.length > 0) modelAnswer = cmaAns.join('\n');
+    } else if (type === 'MPC' && stages.length > 0) {
+      const mpcAns = stages
+        .map((s: any, i: number) => `(Stage ${i + 1}: ${s.stageTitle || s.prompt || s.text || ''}) ${s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '—'} ${s.unit ? `(${s.unit})` : ''}`);
+      if (mpcAns.length > 0) modelAnswer = mpcAns.join('\n');
     } else if ((type === 'CQ' || type === 'DESCRIPTIVE') && subQuestions.length > 0) {
       const subAns = subQuestions
         .filter((s: any) => Boolean(s.modelAnswer))
@@ -306,6 +339,10 @@ export function normalizeQuestionData(q: any) {
     subQuestions,
     leftColumn,
     rightColumn,
+    parts,
+    stages,
+    scenario: q.scenario || '',
+    formula: q.formula || '',
     images,
     modelAnswer,
     explanation,
@@ -683,20 +720,29 @@ export default function SingleQuestionPageSheet({
                               {isBn ? 'কনস্ট্রাক্টেড উত্তর ক্ষেত্রসমূহ (CMA):' : 'Constructed Answer Fields (CMA):'}
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {(rawQuestion.parts || rawQuestion.cmaParts || rawQuestion.subQuestions || []).map((part: any, pIdx: number) => (
-                                <div key={pIdx} className="p-2 border rounded bg-white flex flex-col gap-1 text-xs">
-                                  <div className="flex justify-between items-center font-semibold text-gray-800">
-                                    <span>{part.label || part.text || `Part ${pIdx + 1}`}</span>
-                                    {part.marks && <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">[{part.marks}m]</span>}
+                              {(question.parts || rawQuestion.parts || rawQuestion.cmaParts || rawQuestion.subQuestions || []).map((part: any, pIdx: number) => {
+                                const promptText = part.prompt || part.text || part.question || part.questionText || `Part ${pIdx + 1}`;
+                                const partLabel = part.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'][pIdx] || `${pIdx + 1}`;
+                                const expectedVal = part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '—';
+                                return (
+                                  <div key={pIdx} className="p-2 border rounded bg-white flex flex-col gap-1 text-xs">
+                                    <div className="flex justify-between items-start font-semibold text-gray-800 gap-2">
+                                      <div>
+                                        <span className="font-bold text-cyan-700 mr-1">({partLabel})</span>
+                                        <MathText>{promptText}</MathText>
+                                      </div>
+                                      {part.marks && <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded shrink-0">[{part.marks}m]</span>}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="font-mono text-xs bg-gray-50 border px-2 py-1 rounded min-w-[80px] font-bold text-slate-800">
+                                        {showAnswers ? <MathText>{expectedVal}</MathText> : '________'}
+                                      </span>
+                                      {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
+                                      {part.tolerance !== undefined && <span className="text-[9px] text-gray-400">±{part.tolerance}</span>}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="font-mono text-xs bg-gray-50 border px-2 py-1 rounded min-w-[80px] font-bold text-slate-800">
-                                      {showAnswers ? (part.expectedAnswer ?? part.modelAnswer ?? '—') : '________'}
-                                    </span>
-                                    {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -707,31 +753,39 @@ export default function SingleQuestionPageSheet({
                             <span className="font-bold text-indigo-900 block mb-1">
                               {isBn ? 'বহু-ধাপী সমস্যা শৃঙ্খল ধাপসমূহ (MPC):' : 'Multi-Step Problem Chain Stages (MPC):'}
                             </span>
-                            {rawQuestion.scenario && (
+                            {(question.scenario || rawQuestion.scenario) && (
                               <div className="p-2 bg-white border border-indigo-200 rounded italic text-xs mb-2">
-                                <MathText>{rawQuestion.scenario}</MathText>
+                                <MathText>{question.scenario || rawQuestion.scenario}</MathText>
                               </div>
                             )}
                             <div className="space-y-2">
-                              {(rawQuestion.stages || rawQuestion.mpcStages || rawQuestion.subQuestions || []).map((stage: any, sIdx: number) => (
-                                <div key={sIdx} className="p-2.5 border rounded bg-white flex flex-col gap-1 text-xs">
-                                  <div className="flex justify-between items-center font-bold text-indigo-950">
-                                    <span>Stage {sIdx + 1}: {stage.stageTitle || stage.text || ''}</span>
-                                    {stage.marks && <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">[{stage.marks}m]</span>}
+                              {(question.stages || rawQuestion.stages || rawQuestion.mpcStages || rawQuestion.subQuestions || []).map((stage: any, sIdx: number) => {
+                                const stageTitle = stage.stageTitle || stage.prompt || stage.text || stage.question || stage.questionText || `Stage ${sIdx + 1}`;
+                                const expectedVal = stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? '—';
+                                return (
+                                  <div key={sIdx} className="p-2.5 border rounded bg-white flex flex-col gap-1.5 text-xs">
+                                    <div className="flex justify-between items-start font-bold text-indigo-950 gap-2">
+                                      <div>
+                                        <span className="font-bold text-indigo-700 mr-1.5">Stage {sIdx + 1}:</span>
+                                        <MathText>{stageTitle}</MathText>
+                                      </div>
+                                      {stage.marks && <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded shrink-0">[{stage.marks}m]</span>}
+                                    </div>
+                                    {stage.formula && (
+                                      <span className="text-[10px] text-indigo-600 font-mono">
+                                        EPH Formula: <MathText>{stage.formula}</MathText>
+                                      </span>
+                                    )}
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-gray-500 font-medium text-[11px]">{isBn ? 'ধাপ উত্তর: ' : 'Stage Answer: '}</span>
+                                      <span className="font-mono text-xs bg-indigo-50 border border-indigo-300 px-2 py-0.5 rounded font-bold text-indigo-900">
+                                        {showAnswers ? <MathText>{expectedVal}</MathText> : 'Answer Space...'}
+                                      </span>
+                                      {stage.unit && <span className="text-[10px] text-gray-500">({stage.unit})</span>}
+                                    </div>
                                   </div>
-                                  {stage.formula && (
-                                    <span className="text-[10px] text-indigo-600 font-mono">
-                                      EPH Dynamic Formula: {stage.formula}
-                                    </span>
-                                  )}
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-gray-500 font-medium text-[11px]">{isBn ? 'ধাপ উত্তর: ' : 'Stage Answer: '}</span>
-                                    <span className="font-mono text-xs bg-indigo-50 border border-indigo-300 px-2 py-0.5 rounded font-bold text-indigo-900">
-                                      {showAnswers ? (stage.expectedAnswer ?? stage.modelAnswer ?? '—') : 'Answer Space...'}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -1034,6 +1088,83 @@ export default function SingleQuestionPageSheet({
                                 <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CMA Constructed Multi-Answer Fields (Vertical Mode) */}
+                      {qTypeKey === 'CMA' && (
+                        <div className="space-y-3 my-3 p-4 bg-cyan-50/50 border border-cyan-200 rounded-lg text-sm print:bg-transparent print:border-gray-400">
+                          <span className="font-bold text-cyan-900 block text-base mb-1">
+                            {isBn ? 'কনস্ট্রাক্টেড উত্তর ক্ষেত্রসমূহ (CMA):' : 'Constructed Answer Fields (CMA):'}
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(question.parts || rawQuestion.parts || rawQuestion.cmaParts || rawQuestion.subQuestions || []).map((part: any, pIdx: number) => {
+                              const promptText = part.prompt || part.text || part.question || part.questionText || `Part ${pIdx + 1}`;
+                              const partLabel = part.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'][pIdx] || `${pIdx + 1}`;
+                              const expectedVal = part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '—';
+                              return (
+                                <div key={pIdx} className="p-3 border rounded-lg bg-white flex flex-col gap-1.5 text-sm shadow-sm">
+                                  <div className="flex justify-between items-start font-semibold text-gray-800 gap-2">
+                                    <div>
+                                      <span className="font-bold text-cyan-700 mr-1.5">({partLabel})</span>
+                                      <MathText>{promptText}</MathText>
+                                    </div>
+                                    {part.marks && <span className="text-xs bg-gray-100 px-2 py-0.5 rounded shrink-0">[{part.marks}m]</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="font-mono text-sm bg-gray-50 border px-3 py-1 rounded min-w-[100px] font-bold text-slate-800">
+                                      {showAnswers ? <MathText>{expectedVal}</MathText> : '________'}
+                                    </span>
+                                    {part.unit && <span className="text-xs text-gray-500">({part.unit})</span>}
+                                    {part.tolerance !== undefined && <span className="text-xs text-gray-400">±{part.tolerance}</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* MPC Multi-Step Problem Chain Stages (Vertical Mode) */}
+                      {qTypeKey === 'MPC' && (
+                        <div className="space-y-3 my-3 p-4 bg-indigo-50/50 border border-indigo-200 rounded-lg text-sm print:bg-transparent print:border-gray-400">
+                          <span className="font-bold text-indigo-900 block text-base mb-1">
+                            {isBn ? 'বহু-ধাপী সমস্যা শৃঙ্খল ধাপসমূহ (MPC):' : 'Multi-Step Problem Chain Stages (MPC):'}
+                          </span>
+                          {(question.scenario || rawQuestion.scenario) && (
+                            <div className="p-3 bg-white border border-indigo-200 rounded-lg italic text-sm mb-3">
+                              <MathText>{question.scenario || rawQuestion.scenario}</MathText>
+                            </div>
+                          )}
+                          <div className="space-y-3">
+                            {(question.stages || rawQuestion.stages || rawQuestion.mpcStages || rawQuestion.subQuestions || []).map((stage: any, sIdx: number) => {
+                              const stageTitle = stage.stageTitle || stage.prompt || stage.text || stage.question || stage.questionText || `Stage ${sIdx + 1}`;
+                              const expectedVal = stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? '—';
+                              return (
+                                <div key={sIdx} className="p-3.5 border rounded-lg bg-white flex flex-col gap-2 text-sm shadow-sm">
+                                  <div className="flex justify-between items-start font-bold text-indigo-950 gap-2">
+                                    <div>
+                                      <span className="font-bold text-indigo-700 mr-2">Stage {sIdx + 1}:</span>
+                                      <MathText>{stageTitle}</MathText>
+                                    </div>
+                                    {stage.marks && <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded shrink-0">[{stage.marks}m]</span>}
+                                  </div>
+                                  {stage.formula && (
+                                    <span className="text-xs text-indigo-600 font-mono">
+                                      EPH Formula: <MathText>{stage.formula}</MathText>
+                                    </span>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-gray-500 font-medium text-xs">{isBn ? 'ধাপ উত্তর: ' : 'Stage Answer: '}</span>
+                                    <span className="font-mono text-sm bg-indigo-50 border border-indigo-300 px-3 py-1 rounded font-bold text-indigo-900">
+                                      {showAnswers ? <MathText>{expectedVal}</MathText> : 'Answer Space...'}
+                                    </span>
+                                    {stage.unit && <span className="text-xs text-gray-500">({stage.unit})</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
