@@ -277,27 +277,6 @@ export function normalizeQuestionData(q: any) {
     } catch (e) {}
   }
 
-  // 5.5. Reason Options for DR (Diagnostic Reasoning)
-  let reasonOptions: any[] = [];
-  const rawReason = q.reasonOptions || q.reason_options || (q.options && q.options.reasonOptions);
-  if (Array.isArray(rawReason)) reasonOptions = rawReason;
-  else if (typeof rawReason === 'string') {
-    try { const p = JSON.parse(rawReason); if (Array.isArray(p)) reasonOptions = p; } catch (e) {}
-  }
-  if (reasonOptions.length > 0) {
-    reasonOptions = reasonOptions.map((r: any, rIdx: number) => {
-      const rObj = typeof r === 'string' ? { text: r } : { ...r };
-      const isCorrect = rObj.isCorrect === true || String(rObj.isCorrect) === 'true' ||
-        q.correctReasonOption === rIdx ||
-        q.correctReason === String.fromCharCode(65 + rIdx) ||
-        q.correctReason === `R${rIdx + 1}`;
-      return {
-        ...rObj,
-        isCorrect
-      };
-    });
-  }
-
   // 6. Matching Columns (MTF Two Side with stable ID pairs and shuffle support)
   let leftColumn: any[] = [];
   let rightColumn: any[] = [];
@@ -376,7 +355,7 @@ export function normalizeQuestionData(q: any) {
     if (!explanation && q.options.hint) explanation = q.options.hint;
   }
 
-  // Fallback 1: Auto-generate Model Answer for MCQ / MC / INT / MTF / CQ / CMA / MPC / DR if empty or short code
+  // Fallback 1: Auto-generate Model Answer for MCQ / MC / INT / MTF / CQ / CMA / MPC if empty or short code
   if (type === 'MCQ' || type === 'MC' || type === 'SMCQ' || type === 'AR') {
     const correctOpts = options
       .map((opt: any, idx: number) => ({ opt, idx }))
@@ -392,16 +371,6 @@ export function normalizeQuestionData(q: any) {
       }
     } else if (q.correctAnswer && !modelAnswer) {
       modelAnswer = `উত্তর: ${q.correctAnswer}`;
-    }
-  } else if (type === 'DR') {
-    const correctTier1 = options.map((opt: any, idx: number) => ({ opt, idx })).filter(({ opt }) => opt.isCorrect);
-    const correctTier2 = reasonOptions.map((r: any, idx: number) => ({ r, idx })).filter(({ r }) => r.isCorrect);
-    const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
-    const rLabels = ['R1', 'R2', 'R3', 'R4'];
-    const t1Text = correctTier1.map(({ opt, idx }) => `${labels[idx] || `(${idx + 1})`} ${typeof opt === 'string' ? opt : opt.text || ''}`).join(', ');
-    const t2Text = correctTier2.map(({ r, idx }) => `(${rLabels[idx] || `R${idx + 1}`}) ${typeof r === 'string' ? r : r.text || ''}`).join(', ');
-    if (!modelAnswer || /^[A-Fa-f0-9\s,\|ক-ঙR]+$/.test(modelAnswer.trim())) {
-      modelAnswer = `Tier 1: ${t1Text || '—'}\nTier 2: ${t2Text || '—'}`;
     }
   } else if (!modelAnswer) {
     if (type === 'INT' && integerAnswer !== undefined) {
@@ -613,6 +582,31 @@ export default function SingleQuestionPageSheet({
           }
         }
 
+        // DYNAMIC MODEL ANSWER: Always dynamically reflects shuffled option positions or shuffled MTF columns!
+        let dynamicModelAnswer = question.modelAnswer;
+
+        if (['MCQ', 'MC', 'SMCQ', 'AR'].includes(qTypeKey) && optionsList.length > 0) {
+          const correctOpts = optionsList
+            .map((opt: any, oidx: number) => ({ opt, oidx }))
+            .filter(({ opt }) => opt.isCorrect);
+
+          if (correctOpts.length > 0) {
+            const labels = isBn ? MCQ_LABELS_BN : MCQ_LABELS_EN;
+            dynamicModelAnswer = correctOpts
+              .map(({ opt, oidx }) => `(${labels[oidx] || oidx + 1}) ${typeof opt === 'string' ? opt : (opt.text || '')}`)
+              .join(', ');
+          }
+        } else if (qTypeKey === 'MTF' && question.leftColumn.length > 0 && displayRightColumn.length > 0) {
+          const matches = question.matches || {};
+          const pairs = question.leftColumn.map((item: any, i: number) => {
+            const rId = matches[item.id];
+            const rIdx = displayRightColumn.findIndex((r: any) => r.id === rId);
+            const rLabel = rIdx !== -1 ? (mcqLabels[rIdx] || String.fromCharCode(65 + rIdx)) : '?';
+            return `(${i + 1} → ${rLabel})`;
+          });
+          if (pairs.length > 0) dynamicModelAnswer = pairs.join(', ');
+        }
+
         const lineCount = calculateAdaptiveLineCount(question, singleStyle === 'split');
         const numExtraPages = extraPages[qId] || 0;
 
@@ -790,41 +784,7 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* DR Diagnostic Reasoning: Tier 2 Reason Options */}
-                        {qTypeKey === 'DR' && question.reasonOptions && question.reasonOptions.length > 0 && (
-                          <div className="space-y-2 mt-3 p-2.5 bg-amber-50/50 border border-amber-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
-                            <span className="font-bold text-amber-900 block mb-1">
-                              {isBn ? 'কারণ নির্বাচন (Tier 2: Reasoning):' : 'Reason Selection (Tier 2: Reasoning):'}
-                            </span>
-                            <div className="space-y-1.5">
-                              {question.reasonOptions.map((rOpt: any, rIdx: number) => {
-                                const rLabel = ['R1', 'R2', 'R3', 'R4'][rIdx] || `R${rIdx + 1}`;
-                                const isRCorrect = Boolean(rOpt.isCorrect);
-                                return (
-                                  <div
-                                    key={rIdx}
-                                    className={`p-2 rounded-lg border flex items-center gap-2 transition-colors ${
-                                      showAnswers && isRCorrect
-                                        ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
-                                        : 'border-gray-200 bg-white print:border-gray-300'
-                                    }`}
-                                  >
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
-                                      showAnswers && isRCorrect
-                                        ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
-                                        : 'bg-amber-100 text-amber-900 border-amber-300 print:bg-white print:text-black'
-                                    }`}>
-                                      {rLabel}
-                                    </span>
-                                    <span className="flex-1">
-                                      <MathText>{typeof rOpt === 'string' ? rOpt : rOpt.text || ""}</MathText>
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+
 
                         {/* Sub Questions (CQ / Descriptive / SMCQ) */}
                         {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
@@ -1062,12 +1022,12 @@ export default function SingleQuestionPageSheet({
                             )}
 
                             {/* Main Model Answer Block */}
-                            {question.modelAnswer && (!question.subQuestions || question.subQuestions.length === 0) && (
+                            {dynamicModelAnswer && (!question.subQuestions || question.subQuestions.length === 0) && (
                               <div className="p-3 border border-emerald-300 rounded-lg bg-white print:border-black text-xs space-y-1">
                                 <strong className="block text-[10px] uppercase font-bold text-emerald-800 print:text-black">
                                   {isBn ? "সঠিক মডেল উত্তর:" : "Model Answer:"}
                                 </strong>
-                                <MathText>{question.modelAnswer}</MathText>
+                                <MathText>{dynamicModelAnswer}</MathText>
                               </div>
                             )}
 
@@ -1225,46 +1185,7 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
-                      {/* DR Diagnostic Reasoning: Tier 2 Reason Options (Vertical Mode) */}
-                      {qTypeKey === 'DR' && question.reasonOptions && question.reasonOptions.length > 0 && (
-                        <div className="space-y-3 pl-4 mt-4 p-4 bg-amber-50/50 border border-amber-200 rounded-lg text-sm print:bg-transparent print:border-gray-400">
-                          <span className="font-bold text-amber-900 block text-sm mb-1">
-                            {isBn ? 'কারণ নির্বাচন (Tier 2: Reasoning):' : 'Reason Selection (Tier 2: Reasoning):'}
-                          </span>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {question.reasonOptions.map((rOpt: any, rIdx: number) => {
-                              const rLabel = ['R1', 'R2', 'R3', 'R4'][rIdx] || `R${rIdx + 1}`;
-                              const isRCorrect = Boolean(rOpt.isCorrect);
-                              return (
-                                <div
-                                  key={rIdx}
-                                  className={`p-3 rounded-lg border flex items-center gap-3 transition-colors ${
-                                    showAnswers && isRCorrect
-                                      ? 'bg-green-50 border-green-500 font-semibold print:bg-gray-100 print:border-black'
-                                      : 'border-gray-200 bg-white print:border-gray-300'
-                                  }`}
-                                >
-                                  <span className={`px-2 py-1 rounded text-xs font-bold border shrink-0 ${
-                                    showAnswers && isRCorrect
-                                      ? 'bg-green-600 text-white border-green-600 print:bg-black print:text-white'
-                                      : 'bg-amber-100 text-amber-900 border-amber-300 print:bg-white print:text-black'
-                                  }`}>
-                                    {rLabel}
-                                  </span>
-                                  <span className="flex-1 text-sm">
-                                    <MathText>{typeof rOpt === 'string' ? rOpt : rOpt.text || ""}</MathText>
-                                  </span>
-                                  {showAnswers && isRCorrect && (
-                                    <span className="text-xs font-bold text-green-700 print:text-black uppercase shrink-0">
-                                      ✓ {isBn ? "সঠিক কারণ" : "Correct Reason"}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+
 
                       {/* Sub Questions (CQ / Descriptive / SMCQ) */}
                       {qTypeKey !== 'CMA' && qTypeKey !== 'MPC' && question.subQuestions && question.subQuestions.length > 0 && (
@@ -1475,12 +1396,12 @@ export default function SingleQuestionPageSheet({
                             <span>💡</span>
                             <span>{isBn ? "মডেল উত্তর ও ব্যাখ্যা (Model Answer & Solution):" : "Model Answer & Detailed Solution:"}</span>
                           </div>
-                          {question.modelAnswer && (
+                          {dynamicModelAnswer && (
                             <div className="text-gray-900 print:text-black text-sm md:text-base leading-relaxed">
                               <strong className="block text-xs uppercase font-bold text-green-700 print:text-black mb-1">
                                 {isBn ? "উত্তর:" : "Answer:"}
                               </strong>
-                              <MathText>{question.modelAnswer}</MathText>
+                              <MathText>{dynamicModelAnswer}</MathText>
                             </div>
                           )}
                           {question.explanation && (
