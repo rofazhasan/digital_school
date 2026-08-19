@@ -91,7 +91,22 @@ assert(areExpressionsEquivalent("P(n, r)", "^{n}\\mathrm{P}_r"), "Permutations: 
 assert(areExpressionsEquivalent("E=mc^2", "E = m * c^2"), "Formula with c: E=mc^2 == E=m*c^2");
 assert(areExpressionsEquivalent("p*v=n*r*t", "pv = nRT"), "Formula with p: p*v=n*r*t == pv=nRT");
 
-// 3. Auto LaTeX Formatting for Preview without manual $ $
+// 2.3 Coordinates, Tuples & Multi-Value Lists
+console.log('\n--- 2.3 Coordinates, Tuples & Multi-Value Lists ---');
+assert(areExpressionsEquivalent("13/5,0", "2.6,0"), "Coordinates: 13/5,0 == 2.6,0");
+assert(areExpressionsEquivalent("13/5, 0", "2.6, 0"), "Coordinates with space: 13/5, 0 == 2.6, 0");
+assert(areExpressionsEquivalent("(13/5, 0)", "(2.6, 0)"), "Parenthesized coordinates: (13/5, 0) == (2.6, 0)");
+assert(areExpressionsEquivalent("[13/5, 0]", "[2.6, 0]"), "Bracketed coordinates: [13/5, 0] == [2.6, 0]");
+assert(areExpressionsEquivalent("(13/5, 0)", "2.6, 0"), "Wrapped vs unwrapped: (13/5, 0) == 2.6, 0");
+assert(areExpressionsEquivalent("13/5; 0", "2.6; 0"), "Semicolon separated list: 13/5; 0 == 2.6; 0");
+assert(areExpressionsEquivalent("(1/2, 3/4)", "(0.5, 0.75)"), "Fraction coordinates: (1/2, 3/4) == (0.5, 0.75)");
+
+// 2.4 Tolerance Level Accuracy
+console.log('\n--- 2.4 Tolerance Level Accuracy ---');
+assert(areExpressionsEquivalent("2.605", "2.6", 0.01), "Tolerance within limit: 2.605 ~ 2.6 (tol 0.01)");
+assert(!areExpressionsEquivalent("2.65", "2.6", 0.01), "Tolerance exceeded: 2.65 != 2.6 (tol 0.01)");
+assert(areExpressionsEquivalent("2.605, 0", "2.6, 0", 0.01), "Tuple tolerance within limit: 2.605,0 ~ 2.6,0 (tol 0.01)");
+assert(!areExpressionsEquivalent("2.65, 0", "2.6, 0", 0.01), "Tuple tolerance exceeded: 2.65,0 != 2.6,0 (tol 0.01)");
 console.log('\n--- 3. Auto LaTeX Preview Formatting ---');
 const fmtD2 = formatExpressionToLatex("D^2+");
 assert(fmtD2 === "$D^{2+}$", `Auto-wrapped preview for D^2+: got ${fmtD2}`);

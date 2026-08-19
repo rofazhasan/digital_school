@@ -22,8 +22,8 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
   // All Unicode minus, dash, hyphen variations to standard ASCII '-'
   text = text.replace(/[\u2212\u2010\u2011\u2012\u2013\u2014\u2015\uFE63\uFF0D]/g, '-');
 
-  // Normalize spaces around dots / decimals (e.g. "9 . 8" or "৯ . ৮" -> "9.8" or "৯.৮")
-  text = text.replace(/(\d|[\u09E6-\u09EF])\s*[\.\,\u0964\u0965]\s*(\d|[\u09E6-\u09EF])/g, '$1.$2');
+  // Normalize spaces around dots / decimals and Bengali danda (e.g. "9 . 8" or "৯ . ৮" -> "9.8" or "৯.৮")
+  text = text.replace(/(\d|[\u09E6-\u09EF])\s*[\.\u0964\u0965]\s*(\d|[\u09E6-\u09EF])/g, '$1.$2');
 
   // Bengali digits 0-9 (০-৯) to standard ASCII 0-9
   const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
@@ -292,9 +292,9 @@ export function areConceptsEquivalent(textA: string | number | undefined | null,
     if (hasA && hasB) return true;
   }
 
-  // If expressions contain algebraic operators or variable terms, do not apply linguistic token overlap
-  const isAlgebraic = /[+\-*/^=><()]|\d+[a-zA-Z]|[a-zA-Z]+\d+/.test(rawA) || /[+\-*/^=><()]|\d+[a-zA-Z]|[a-zA-Z]+\d+/.test(rawB);
-  if (isAlgebraic) {
+  // If expressions contain algebraic operators, digits, or numbers, do not apply linguistic token overlap
+  const isAlgebraicOrNumeric = /[+\-*/^=><(),;]|\d|[\u09E6-\u09EF]/.test(rawA) || /[+\-*/^=><(),;]|\d|[\u09E6-\u09EF]/.test(rawB);
+  if (isAlgebraicOrNumeric) {
     return false;
   }
 
@@ -713,6 +713,12 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
       return null;
     }
 
+    // Do not evaluate comma-separated lists/tuples as JavaScript comma operators
+    const commaWithoutFunc = norm.replace(/_calcBinom\([^()]+\)/g, '').replace(/_calcPerm\([^()]+\)/g, '');
+    if (commaWithoutFunc.includes(',')) {
+      return null;
+    }
+
     // Function constructor safe evaluation
     const evalFunc = new Function('_calcBinom', '_calcPerm', '_calcFactorial', `return ${norm};`);
     const res = Number(evalFunc(_calcBinom, _calcPerm, _calcFactorial));
@@ -781,7 +787,52 @@ export function areExpressionsEquivalent(
   if (cleanStu.toLowerCase().replace(/\s+/g, '') === cleanExp.toLowerCase().replace(/\s+/g, '')) return true;
   if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
 
-  // 7. Equation Symmetry & Transposition Check (e.g. F = ma vs ma = F, a^3+b^3+c=0 vs c+a^3+b^3=0 vs a^3+b^3=-c)
+  // 7. Coordinate, Tuple & Multi-Value List Comparison (e.g. (13/5, 0) == (2.6, 0), 13/5,0 == 2.6,0, (1/2, 3/4) == (0.5, 0.75))
+  const splitTupleOrList = (str: string): string[] => {
+    let s = str.trim();
+    if ((s.startsWith('(') && s.endsWith(')')) || (s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+      s = s.slice(1, -1).trim();
+    }
+    const items: string[] = [];
+    let current = '';
+    let depth = 0;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '(' || ch === '[' || ch === '{') depth++;
+      else if (ch === ')' || ch === ']' || ch === '}') depth--;
+      else if ((ch === ',' || ch === ';') && depth === 0) {
+        if (current.trim()) items.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim()) items.push(current.trim());
+    return items;
+  };
+
+  const sTuple = splitTupleOrList(cleanStu);
+  const eTuple = splitTupleOrList(cleanExp);
+  if (sTuple.length > 1 && sTuple.length === eTuple.length) {
+    const allMatch = sTuple.every((sEl, idx) => areExpressionsEquivalent(sEl, eTuple[idx], tolerance));
+    if (allMatch) return true;
+
+    // For set notation {a, b} or bracketed lists, allow permutation matching
+    if ((cleanStu.startsWith('{') && cleanExp.startsWith('{')) || (cleanStu.startsWith('[') && cleanExp.startsWith('['))) {
+      const unmatched = [...eTuple];
+      let setMatches = 0;
+      for (const sEl of sTuple) {
+        const foundIdx = unmatched.findIndex(eEl => areExpressionsEquivalent(sEl, eEl, tolerance));
+        if (foundIdx !== -1) {
+          setMatches++;
+          unmatched.splice(foundIdx, 1);
+        }
+      }
+      if (setMatches === sTuple.length) return true;
+    }
+  }
+
+  // 8. Equation Symmetry & Transposition Check (e.g. F = ma vs ma = F, a^3+b^3+c=0 vs c+a^3+b^3=0 vs a^3+b^3=-c)
   if (cleanStu.includes('=') && cleanExp.includes('=')) {
     const sParts = cleanStu.split('=').map(s => s.trim());
     const eParts = cleanExp.split('=').map(s => s.trim());
