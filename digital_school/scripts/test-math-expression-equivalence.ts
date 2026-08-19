@@ -61,7 +61,7 @@ assert(
   'Iron(III) Ion: Fe^{3+} == Fe^3+'
 );
 
-// 2. Algebraic Equivalence
+// 2. Algebraic Expressions & Formulas
 console.log('\n--- 2. Algebraic Expressions & Formulas ---');
 assert(areExpressionsEquivalent("2x + 1", "1 + 2x"), "Equivalent: 2x+1 == 1+2x");
 assert(areExpressionsEquivalent("x^2 + 2x + 1", "(x + 1)^2"), "Equivalent: x^2+2x+1 == (x+1)^2");
@@ -71,6 +71,25 @@ assert(areExpressionsEquivalent("0.5*m*v^2", "\\frac{1}{2}mv^2"), "Equivalent: 0
 assert(areExpressionsEquivalent("3.14159", "3.14", 0.01), "Equivalent: Float tolerance matching (3.14159 ~ 3.14)");
 assert(!areExpressionsEquivalent("2x + 1", "2x + 2"), "Non-equivalent: 2x+1 != 2x+2");
 assert(!areExpressionsEquivalent("D^2+", "D^3+"), "Non-equivalent: D^2+ != D^3+");
+
+// 2.1 Equation Symmetry, Rearrangement & Transposition
+console.log('\n--- 2.1 Equation Symmetry & Rearrangement ---');
+assert(areExpressionsEquivalent("a^3+b^3+c=0", "$a^3+b^3+c=0$"), "Equation: a^3+b^3+c=0 == $a^3+b^3+c=0$");
+assert(areExpressionsEquivalent("c+a^3+b^3=0", "$a^3+b^3+c=0$"), "Equation rearranged: c+a^3+b^3=0 == $a^3+b^3+c=0$");
+assert(areExpressionsEquivalent("0=c+a^3+b^3", "$a^3+b^3+c=0$"), "Equation flipped: 0=c+a^3+b^3 == $a^3+b^3+c=0$");
+assert(areExpressionsEquivalent("a^3+b^3=-c", "$a^3+b^3+c=0$"), "Equation transposed: a^3+b^3=-c == $a^3+b^3+c=0$");
+assert(areExpressionsEquivalent("-c=a^3+b^3", "$a^3+b^3+c=0$"), "Equation transposed side: -c=a^3+b^3 == $a^3+b^3+c=0$");
+
+// 2.2 Combinations & Permutations
+console.log('\n--- 2.2 Combinations & Permutations ---');
+assert(areExpressionsEquivalent("5C2", "10"), "Combinations: 5C2 == 10");
+assert(areExpressionsEquivalent("5P2", "20"), "Permutations: 5P2 == 20");
+assert(areExpressionsEquivalent("nCr", "\\binom{n}{r}"), "Combinations: nCr == \\binom{n}{r}");
+assert(areExpressionsEquivalent("C(n, r)", "\\binom{n}{r}"), "Combinations: C(n, r) == \\binom{n}{r}");
+assert(areExpressionsEquivalent("^{n+1}\\mathrm{C}_r", "\\binom{n+1}{r}"), "Combinations: ^{n+1}\\mathrm{C}_r == \\binom{n+1}{r}");
+assert(areExpressionsEquivalent("P(n, r)", "^{n}\\mathrm{P}_r"), "Permutations: P(n, r) == ^{n}\\mathrm{P}_r");
+assert(areExpressionsEquivalent("E=mc^2", "E = m * c^2"), "Formula with c: E=mc^2 == E=m*c^2");
+assert(areExpressionsEquivalent("p*v=n*r*t", "pv = nRT"), "Formula with p: p*v=n*r*t == pv=nRT");
 
 // 3. Auto LaTeX Formatting for Preview without manual $ $
 console.log('\n--- 3. Auto LaTeX Preview Formatting ---');

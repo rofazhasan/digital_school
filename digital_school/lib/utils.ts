@@ -1,8 +1,26 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+export type ClassValue = ClassValue[] | Record<string, boolean | null | undefined> | string | number | null | boolean | undefined;
+
+let _clsx: any = null;
+let _twMerge: any = null;
+
+try {
+  _clsx = require("clsx").clsx || require("clsx");
+} catch {}
+
+try {
+  _twMerge = require("tailwind-merge").twMerge || require("tailwind-merge");
+} catch {}
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  if (_clsx && _twMerge) {
+    return _twMerge(_clsx(inputs));
+  }
+  return inputs
+    .flat(Infinity as any)
+    .filter(Boolean)
+    .map(x => (typeof x === 'object' && x !== null ? Object.keys(x).filter(k => (x as any)[k]).join(' ') : String(x)))
+    .join(' ')
+    .trim();
 }
 
 /**

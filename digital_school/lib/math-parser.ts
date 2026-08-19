@@ -292,6 +292,12 @@ export function areConceptsEquivalent(textA: string | number | undefined | null,
     if (hasA && hasB) return true;
   }
 
+  // If expressions contain algebraic operators or variable terms, do not apply linguistic token overlap
+  const isAlgebraic = /[+\-*/^=><()]|\d+[a-zA-Z]|[a-zA-Z]+\d+/.test(rawA) || /[+\-*/^=><()]|\d+[a-zA-Z]|[a-zA-Z]+\d+/.test(rawB);
+  if (isAlgebraic) {
+    return false;
+  }
+
   // 2. Token Containment & Stemming (e.g. "জনন কোষ" vs "জনন", "মাইটোসিস কোষ বিভাজন" vs "মাইটোসিস")
   const tokensA = cleanA.split(' ').map(stripBengaliSuffix).filter(Boolean);
   const tokensB = cleanB.split(' ').map(stripBengaliSuffix).filter(Boolean);
@@ -373,30 +379,31 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   }
 
   // Convert combinations and permutations notations:
-  // ^{n+1}C_{r} or ^nC_r or ^n C_r -> binom(n, r)
-  s = s.replace(/\^\{?([^{}]+)\}?\s*(?:\\mathrm\{[Cc]\}|[Cc])\s*_?\{?([^{}]+)\}?/g, 'binom($1, $2)');
-  // ^{n+1}P_{r} or ^nP_r or ^n P_r -> perm(n, r)
-  s = s.replace(/\^\{?([^{}]+)\}?\s*(?:\\mathrm\{[Pp]\}|[Pp])\s*_?\{?([^{}]+)\}?/g, 'perm($1, $2)');
+  // ^{n+1}\mathrm{C}_{r} or ^{n}\mathrm{C}_r or ^nC_r or ^n\mathrm{C}_r -> binom(n, r)
+  s = s.replace(/\^\{([^{}]+)\}\s*(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*_\{?([a-zA-Z0-9_\+\-]+)\}?/g, 'binom($1, $2)');
+  s = s.replace(/\^\{([^{}]+)\}\s*(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*_\{?([a-zA-Z0-9_\+\-]+)\}?/g, 'perm($1, $2)');
+  s = s.replace(/\^([a-zA-Z0-9]+)\s*(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*_\{?([a-zA-Z0-9_\+\-]+)\}?/g, 'binom($1, $2)');
+  s = s.replace(/\^([a-zA-Z0-9]+)\s*(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*_\{?([a-zA-Z0-9_\+\-]+)\}?/g, 'perm($1, $2)');
 
   // Convert explicit function calls: C(n, r), P(n, r)
-  s = s.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1, $2)');
-  s = s.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1, $2)');
+  s = s.replace(/\b(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1, $2)');
+  s = s.replace(/\b(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1, $2)');
 
   // Convert (expr) C (expr) or (expr) P (expr)
-  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|[Cc])\s*\(([^()]+)\)/g, 'binom($1, $2)');
-  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|[Pp])\s*\(([^()]+)\)/g, 'perm($1, $2)');
+  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1, $2)');
+  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1, $2)');
 
   // Convert (expr) C token or (expr) P token
-  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|[Cc])\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1, $2)');
-  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|[Pp])\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1, $2)');
+  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*([a-zA-Z0-9_]+)/g, 'binom($1, $2)');
+  s = s.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*([a-zA-Z0-9_]+)/g, 'perm($1, $2)');
 
   // Convert token C (expr) or token P (expr)
-  s = s.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*(?:\\mathrm\{[Cc]\}|[Cc])\s*\(([^()]+)\)/g, 'binom($1, $2)');
-  s = s.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*(?:\\mathrm\{[Pp]\}|[Pp])\s*\(([^()]+)\)/g, 'perm($1, $2)');
+  s = s.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1, $2)');
+  s = s.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1, $2)');
 
-  // Convert standard nCr, 5C2, n+1Cr, nCr-1, nPr, 5P2, n+1Pr, nPr-1
-  s = s.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*(?:\\mathrm\{[Cc]\}|C)\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1, $2)');
-  s = s.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*(?:\\mathrm\{[Pp]\}|P)\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1, $2)');
+  // Convert standard nCr, 5C2, nPr, 5P2 (where C/P is uppercase or \mathrm{C}/\mathrm{P})
+  s = s.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Cc]\}|C)\s*(\d+|[rRkK])\b/g, 'binom($1, $2)');
+  s = s.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Pp]\}|P)\s*(\d+|[rRkK])\b/g, 'perm($1, $2)');
 
   // Convert sqrt
   s = s.replace(/\\+sqrt\{([^{}]+)\}/g, 'sqrt($1)');
@@ -429,27 +436,27 @@ export function normalizeCanonicalMathOrChemical(raw: string | number | undefine
   str = stripLatexAndMathFormatting(str);
 
   // Standardize combinations: C(n, r), nCr, (n+1)Cr, (n+1) choose r -> binom(n, r)
-  str = str.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
-  str = str.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
-  str = str.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1,$2)');
-  str = str.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
-  str = str.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1,$2)');
+  str = str.replace(/\b(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*([a-zA-Z0-9_]+)/g, 'binom($1,$2)');
+  str = str.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  str = str.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Cc]\}|C)\s*(\d+|[rRkK])\b/g, 'binom($1,$2)');
   str = str.replace(/(.+?)\s+(?:choose|\\choose)\s+(.+?)/g, 'binom($1,$2)');
 
   // Standardize permutations: P(n, r), nPr, (n+1)Pr -> perm(n, r)
-  str = str.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
-  str = str.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
-  str = str.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1,$2)');
-  str = str.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
-  str = str.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1,$2)');
+  str = str.replace(/\b(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  str = str.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*([a-zA-Z0-9_]+)/g, 'perm($1,$2)');
+  str = str.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  str = str.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Pp]\}|P)\s*(\d+|[rRkK])\b/g, 'perm($1,$2)');
 
   // Standardize ion charges and superscripts:
   // e.g. "D^2+", "D^(2+)", "D^+2" -> "D^{2+}"
-  str = str.replace(/\^\(?\s*(\d+)\s*([+-])\s*\)?/g, '^{$1$2}');
-  str = str.replace(/\^\(?\s*([+-])\s*(\d+)\s*\)?/g, '^{$2$1}');
+  str = str.replace(/\^\(?\s*(\d+)\s*([+-])\s*\)?(?![a-zA-Z0-9_\(])/g, '^{$1$2}');
+  str = str.replace(/\^\(?\s*([+-])\s*(\d+)\s*\)?(?![a-zA-Z0-9_\(])/g, '^{$2$1}');
   str = str.replace(/\^\(?\s*(\+\+)\s*\)?/g, '^{2+}');
   str = str.replace(/\^\(?\s*(--)\s*\)?/g, '^{2-}');
-  str = str.replace(/\^\(?\s*([+-])\s*\)?/g, '^{$1}');
+  str = str.replace(/\^\(?\s*([+-])\s*\)?(?![a-zA-Z0-9_\(])/g, '^{$1}');
 
   // Simple token superscript: x^2 -> x^{2}, a^b -> a^{b}
   str = str.replace(/\^([a-zA-Z0-9])(?![a-zA-Z0-9_{])/g, '^{$1}');
@@ -487,17 +494,17 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   expr = stripLatexAndMathFormatting(expr);
 
   // Standardize combinations and permutations
-  expr = expr.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
-  expr = expr.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
-  expr = expr.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1,$2)');
-  expr = expr.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*\(([^()]+)\)/g, 'binom($1,$2)');
-  expr = expr.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'binom($1,$2)');
+  expr = expr.replace(/\b(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'binom($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*([a-zA-Z0-9_]+)/g, 'binom($1,$2)');
+  expr = expr.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, 'binom($1,$2)');
+  expr = expr.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Cc]\}|C)\s*(\d+|[rRkK])\b/g, 'binom($1,$2)');
 
-  expr = expr.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
-  expr = expr.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
-  expr = expr.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1,$2)');
-  expr = expr.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*\(([^()]+)\)/g, 'perm($1,$2)');
-  expr = expr.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, 'perm($1,$2)');
+  expr = expr.replace(/\b(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, 'perm($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  expr = expr.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*([a-zA-Z0-9_]+)/g, 'perm($1,$2)');
+  expr = expr.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, 'perm($1,$2)');
+  expr = expr.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Pp]\}|P)\s*(\d+|[rRkK])\b/g, 'perm($1,$2)');
 
   // Convert scientific notation: 1.5x10^8 or 1.5*10^8 or 1.5*10^(8) or 1.5 \times 10^{8} -> 1.5e8
   expr = expr.replace(/(\d+(?:\.\d+)?)\s*(?:\*|x|X)\s*10\^\(?([-+]?\d+)\)?/g, '$1e$2');
@@ -596,19 +603,19 @@ export function formatExpressionToLatex(expr: string): string {
   // Convert combinations and permutations in ASCII:
   // binom(n+1, r) or C(n+1, r) or (n+1)Cr or nCr or n+1Cr -> \binom{n}{r}
   latex = latex.replace(/\\?binom\s*\(([^,]+),\s*([^)]+)\)/g, '\\binom{$1}{$2}');
-  latex = latex.replace(/\b[Cc]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '\\binom{$1}{$2}');
-  latex = latex.replace(/\(([^()]+)\)\s*[Cc]\s*\(([^()]+)\)/g, '\\binom{$1}{$2}');
-  latex = latex.replace(/\(([^()]+)\)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, '\\binom{$1}{$2}');
-  latex = latex.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*\(([^()]+)\)/g, '\\binom{$1}{$2}');
-  latex = latex.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Cc]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\b(?:\\mathrm\{[Cc]\}|\\text\{[Cc]\}|C)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Cc]\}|C)\s*([a-zA-Z0-9_]+)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Cc]\}|C)\s*\(([^()]+)\)/g, '\\binom{$1}{$2}');
+  latex = latex.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Cc]\}|C)\s*(\d+|[rRkK])\b/g, '\\binom{$1}{$2}');
 
   // perm(n+1, r) or P(n+1, r) or (n+1)Pr or nPr or n+1Pr -> ^{n}\mathrm{P}_{r}
   latex = latex.replace(/\\?perm\s*\(([^,]+),\s*([^)]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
-  latex = latex.replace(/\b[Pp]\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '^{$1}\\mathrm{P}_{$2}');
-  latex = latex.replace(/\(([^()]+)\)\s*[Pp]\s*\(([^()]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
-  latex = latex.replace(/\(([^()]+)\)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, '^{$1}\\mathrm{P}_{$2}');
-  latex = latex.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*\(([^()]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
-  latex = latex.replace(/([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)\s*[Pp]\s*([a-zA-Z0-9_]+(?:\s*[\+\-]\s*[a-zA-Z0-9_]+)?)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\b(?:\\mathrm\{[Pp]\}|\\text\{[Pp]\}|P)\s*\(\s*([^(),]+)\s*,\s*([^(),]+)\s*\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\(([^()]+)\)\s*(?:\\mathrm\{[Pp]\}|P)\s*([a-zA-Z0-9_]+)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/([a-zA-Z0-9_]+)\s*(?:\\mathrm\{[Pp]\}|P)\s*\(([^()]+)\)/g, '^{$1}\\mathrm{P}_{$2}');
+  latex = latex.replace(/\b(\d+|[nNkKmM])\s*(?:\\mathrm\{[Pp]\}|P)\s*(\d+|[rRkK])\b/g, '^{$1}\\mathrm{P}_{$2}');
 
   // If it's already full LaTeX with commands
   if (!latex.includes('\\frac') && !latex.includes('\\sqrt') && !latex.includes('\\binom')) {
@@ -616,8 +623,8 @@ export function formatExpressionToLatex(expr: string): string {
     latex = latex.replace(/\*/g, ' \\cdot ');
 
     // Normalize ion charges and power superscripts: D^2+ -> D^{2+}, x^2 -> x^{2}
-    latex = latex.replace(/\^\{?\s*(\d+)\s*([+-])\s*\}?/g, '^{$1$2}');
-    latex = latex.replace(/\^\{?\s*([+-])\s*(\d+)\s*\}?/g, '^{$2$1}');
+    latex = latex.replace(/\^\{?\s*(\d+)\s*([+-])\s*\}?(?![a-zA-Z0-9_\(])/g, '^{$1$2}');
+    latex = latex.replace(/\^\{?\s*([+-])\s*(\d+)\s*\}?(?![a-zA-Z0-9_\(])/g, '^{$2$1}');
     latex = latex.replace(/\^\{?\s*(\+\+)\s*\}?/g, '^{2+}');
     latex = latex.replace(/\^\{?\s*(--)\s*\}?/g, '^{2-}');
     latex = latex.replace(/([a-zA-Z0-9]+)\^([a-zA-Z0-9]+)/g, '$1^{$2}');
@@ -774,7 +781,7 @@ export function areExpressionsEquivalent(
   if (cleanStu.toLowerCase().replace(/\s+/g, '') === cleanExp.toLowerCase().replace(/\s+/g, '')) return true;
   if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
 
-  // 7. Equation Symmetry Check (e.g. F = ma vs ma = F)
+  // 7. Equation Symmetry & Transposition Check (e.g. F = ma vs ma = F, a^3+b^3+c=0 vs c+a^3+b^3=0 vs a^3+b^3=-c)
   if (cleanStu.includes('=') && cleanExp.includes('=')) {
     const sParts = cleanStu.split('=').map(s => s.trim());
     const eParts = cleanExp.split('=').map(s => s.trim());
@@ -783,6 +790,14 @@ export function areExpressionsEquivalent(
         (areExpressionsEquivalent(sParts[0], eParts[0], tolerance) && areExpressionsEquivalent(sParts[1], eParts[1], tolerance)) ||
         (areExpressionsEquivalent(sParts[0], eParts[1], tolerance) && areExpressionsEquivalent(sParts[1], eParts[0], tolerance))
       ) {
+        return true;
+      }
+
+      // Check algebraic zero-form difference: (sLHS - sRHS) vs (eLHS - eRHS) and -(eLHS - eRHS)
+      const sDiff = `(${sParts[0]}) - (${sParts[1]})`;
+      const eDiff = `(${eParts[0]}) - (${eParts[1]})`;
+      const eDiffNeg = `0 - ((${eParts[0]}) - (${eParts[1]}))`;
+      if (areExpressionsEquivalent(sDiff, eDiff, tolerance) || areExpressionsEquivalent(sDiff, eDiffNeg, tolerance)) {
         return true;
       }
     }
