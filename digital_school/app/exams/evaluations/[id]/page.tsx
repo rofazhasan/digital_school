@@ -53,7 +53,10 @@ import {
   BookOpen,
   Info,
   Layout,
-  X
+  X,
+  Minus,
+  Layers,
+  Sparkles
 } from "lucide-react";
 import {
   Tooltip,
@@ -110,6 +113,230 @@ const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
 const normalize = (val: any) => String(val || "").trim().toLowerCase();
+
+export function evaluateMTFDetails(question: any, studentAnswer: any) {
+  const rawLeft = question?.leftColumn || (question?.pairs ? question.pairs.map((p: any, i: number) => ({ id: String(i + 1), text: p?.left || p?.text || p })) : []);
+  const rawRight = question?.rightColumn || (question?.pairs ? question.pairs.map((p: any, i: number) => ({ id: String.fromCharCode(65 + i), text: p?.right || p?.text || p })) : []);
+
+  const leftColumn: { id: string; text: string }[] = rawLeft.map((item: any, i: number) => ({
+    id: String(typeof item === 'object' && item?.id ? item.id : i + 1),
+    text: typeof item === 'string' ? item : (item?.text || item?.content || item?.value || item?.id || '')
+  }));
+
+  const rightColumn: { id: string; text: string }[] = rawRight.map((item: any, i: number) => ({
+    id: String(typeof item === 'object' && item?.id ? item.id : String.fromCharCode(65 + i)),
+    text: typeof item === 'string' ? item : (item?.text || item?.content || item?.value || item?.id || '')
+  }));
+
+  let correctMatches: Record<string, string> = {};
+  const rawCorrectMatches = question?.matches || question?.correctMatches || {};
+
+  if (Array.isArray(rawCorrectMatches)) {
+    rawCorrectMatches.forEach((m: any) => {
+      if (m?.leftId && m?.rightId) correctMatches[String(m.leftId)] = String(m.rightId);
+      else if (m?.leftIndex !== undefined && m?.rightIndex !== undefined) {
+        const lId = leftColumn[m.leftIndex]?.id;
+        const rId = rightColumn[m.rightIndex]?.id;
+        if (lId && rId) correctMatches[lId] = rId;
+      }
+    });
+  } else if (typeof rawCorrectMatches === 'object' && rawCorrectMatches !== null) {
+    Object.entries(rawCorrectMatches).forEach(([k, v]) => {
+      correctMatches[String(k)] = String(v);
+    });
+  } else if (question?.pairs && Array.isArray(question.pairs)) {
+    leftColumn.forEach((lItem: any, idx: number) => {
+      const rItem = rightColumn[idx];
+      if (lItem && rItem) correctMatches[lItem.id] = rItem.id;
+    });
+  }
+
+  let studentMatches: Record<string, string> = {};
+  const rawStd = (studentAnswer && typeof studentAnswer === 'object' && studentAnswer.matches !== undefined)
+    ? studentAnswer.matches
+    : studentAnswer;
+
+  if (Array.isArray(rawStd)) {
+    rawStd.forEach((m: any) => {
+      if (m?.leftId && (m?.studentRightId || m?.rightId)) {
+        studentMatches[String(m.leftId)] = String(m.studentRightId || m.rightId);
+      } else if (m?.leftIndex !== undefined && m?.rightIndex !== undefined) {
+        const lId = leftColumn[m.leftIndex]?.id;
+        const rId = rightColumn[m.rightIndex]?.id;
+        if (lId && rId) studentMatches[lId] = rId;
+      }
+    });
+  } else if (typeof rawStd === 'object' && rawStd !== null) {
+    Object.entries(rawStd).forEach(([k, v]) => {
+      studentMatches[String(k)] = String(v);
+    });
+  }
+
+  let correctCount = 0;
+  let answeredCount = 0;
+  const totalPairs = Math.max(leftColumn.length, 1);
+  const marksPerPair = (Number(question?.marks) || 0) / totalPairs;
+
+  const rows = leftColumn.map((leftItem, lIdx) => {
+    const studentRightId = studentMatches[leftItem.id] || studentMatches[String(lIdx + 1)];
+    const correctRightId = correctMatches[leftItem.id] || correctMatches[String(lIdx + 1)];
+
+    const hasAnswered = studentRightId !== undefined && studentRightId !== null && String(studentRightId).trim() !== '' && studentRightId !== 'No answer provided';
+    if (hasAnswered) answeredCount++;
+
+    const studentRightItem = rightColumn.find((r: any) => r.id === studentRightId || r.text === studentRightId);
+    const studentRightIdx = rightColumn.findIndex((r: any) => r.id === studentRightId || r.text === studentRightId);
+
+    const correctRightItem = rightColumn.find((r: any) => r.id === correctRightId || r.text === correctRightId);
+    const correctRightIdx = rightColumn.findIndex((r: any) => r.id === correctRightId || r.text === correctRightId);
+
+    let isMatchCorrect = false;
+    if (hasAnswered && correctRightId) {
+      if (studentRightId === correctRightId) {
+        isMatchCorrect = true;
+      } else if (studentRightItem && correctRightItem && (studentRightItem.id === correctRightItem.id || studentRightItem.text === correctRightItem.text)) {
+        isMatchCorrect = true;
+      } else if (studentRightIdx !== -1 && studentRightIdx === correctRightIdx) {
+        isMatchCorrect = true;
+      }
+    }
+
+    if (isMatchCorrect) correctCount++;
+
+    const vlLeft = toBengaliNumerals(lIdx + 1);
+    const vStudentRight = studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
+    const vCorrectRight = correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
+
+    const leftText = leftItem.text || leftItem.id;
+    const studentRightText = studentRightItem ? studentRightItem.text : (studentRightId || 'Unmatched');
+    const correctRightText = correctRightItem ? correctRightItem.text : (correctRightId || 'N/A');
+
+    return {
+      leftItem,
+      lIdx,
+      vlLeft,
+      leftText,
+      studentRightId,
+      studentRightItem,
+      studentRightIdx,
+      vStudentRight,
+      studentRightText,
+      correctRightId,
+      correctRightItem,
+      correctRightIdx,
+      vCorrectRight,
+      correctRightText,
+      isMatchCorrect,
+      hasAnswered
+    };
+  });
+
+  const rawScore = correctCount * marksPerPair;
+  const score = Math.round(rawScore * 100) / 100;
+
+  return {
+    leftColumn,
+    rightColumn,
+    rows,
+    correctCount,
+    answeredCount,
+    totalPairs,
+    marksPerPair,
+    score
+  };
+}
+
+export function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
+  const options = question?.options || [];
+  const selectedIndices: number[] = Array.isArray(studentAnswer?.selectedOptions)
+    ? studentAnswer.selectedOptions
+    : (Array.isArray(studentAnswer) ? studentAnswer : []);
+
+  const correctIndices = options
+    .map((opt: any, idx: number) => ((typeof opt === 'object' ? opt?.isCorrect : false) ? idx : -1))
+    .filter((idx: number) => idx !== -1);
+
+  const totalCorrect = correctIndices.length;
+  const totalMarks = Number(question?.marks) || 1;
+
+  let correctSelected = 0;
+  let wrongSelected = 0;
+
+  selectedIndices.forEach(idx => {
+    if (correctIndices.includes(idx)) {
+      correctSelected++;
+    } else {
+      wrongSelected++;
+    }
+  });
+
+  const isFullCorrect = selectedIndices.length > 0 && totalCorrect > 0 && correctSelected === totalCorrect && wrongSelected === 0;
+
+  let score = 0;
+  if (isFullCorrect) {
+    score = totalMarks;
+  } else if (selectedIndices.length > 0) {
+    const marksPerCorrect = totalCorrect > 0 ? totalMarks / totalCorrect : 0;
+    const partialEarned = correctSelected * marksPerCorrect;
+    const wrongPenalty = negPct > 0 ? (wrongSelected * (negPct / 100) * totalMarks) : 0;
+    score = Math.max(0, Math.round((partialEarned - wrongPenalty) * 100) / 100);
+  }
+
+  const isPartial = !isFullCorrect && (score > 0 || correctSelected > 0);
+  const hasAttempted = selectedIndices.length > 0;
+
+  return {
+    options,
+    selectedIndices,
+    correctIndices,
+    totalCorrect,
+    correctSelected,
+    wrongSelected,
+    isFullCorrect,
+    isPartial,
+    hasAttempted,
+    score
+  };
+}
+
+export function evaluateINTDetails(question: any, studentAnswer: any, negPct = 0) {
+  const rawCorrect = (question as any)?.correctAnswer ?? question?.modelAnswer ?? question?.correct ?? (question as any)?.answer ?? (question as any)?.explanation ?? '';
+  const rawStudent = studentAnswer?.answer !== undefined ? studentAnswer.answer : (studentAnswer?.value !== undefined ? studentAnswer.value : studentAnswer);
+
+  const hasAttempted = rawStudent !== undefined && rawStudent !== null && String(rawStudent).trim() !== '' && rawStudent !== 'No answer provided';
+  const totalMarks = Number(question?.marks) || 1;
+
+  let isCorrect = false;
+  if (hasAttempted && rawCorrect !== undefined && rawCorrect !== null && String(rawCorrect).trim() !== '') {
+    const strStudent = String(rawStudent).trim().toLowerCase();
+    const strCorrect = String(rawCorrect).trim().toLowerCase();
+
+    if (strStudent === strCorrect) {
+      isCorrect = true;
+    } else {
+      const numStudent = parseFloat(strStudent);
+      const numCorrect = parseFloat(strCorrect);
+      if (!isNaN(numStudent) && !isNaN(numCorrect) && Math.abs(numStudent - numCorrect) < 0.0001) {
+        isCorrect = true;
+      }
+    }
+  }
+
+  let score = 0;
+  if (isCorrect) {
+    score = totalMarks;
+  } else if (hasAttempted && negPct > 0) {
+    score = -Math.round(((totalMarks * negPct) / 100) * 100) / 100;
+  }
+
+  return {
+    studentVal: rawStudent,
+    correctVal: rawCorrect,
+    hasAttempted,
+    isCorrect,
+    score
+  };
+}
 
 interface LiveStudent {
   id: string;
@@ -255,6 +482,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc'>('all');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'PARTIAL' | 'WRONG' | 'UNANSWERED'>('ALL');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -276,6 +504,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [reviewResponse, setReviewResponse] = useState('');
   const [selectedReview, setSelectedReview] = useState<any>(null);
   const [showResponseDialog, setShowResponseDialog] = useState(false);
+
+  // --- World-Class UI & Power Features State ---
+  const [isStudentSwitcherOpen, setIsStudentSwitcherOpen] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentFilterTab, setStudentFilterTab] = useState<'ALL' | 'COMPLETED' | 'PENDING'>('ALL');
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [lightboxData, setLightboxData] = useState<{ isOpen: boolean; url: string; zoom: number; rotation: number; title: string } | null>(null);
 
   // Annotation State
   const [isAnnotationOpen, setIsAnnotationOpen] = useState(false);
@@ -1749,85 +1984,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const currentStudent = exam?.submissions?.[currentStudentIndex];
 
-  // Get filtered questions based on type (Case-insensitive)
-  const activeQuestions = useMemo(() => {
-    if (currentStudent?.examSetId && exam?.questionsBySet?.[currentStudent.examSetId]) {
-      return exam.questionsBySet[currentStudent.examSetId];
-    }
-    return exam?.questions || [];
-  }, [currentStudent, exam]);
-
-  const filteredQuestions = activeQuestions?.filter(q => {
-    if (questionTypeFilter === 'all') return true;
-    const qType = (q?.type || '').toLowerCase();
-    return qType === questionTypeFilter.toLowerCase();
-  }) || [];
-
-
-
-  const currentQuestion = filteredQuestions?.[currentQuestionIndex];
-
-  // Ensure currentQuestionIndex is always valid when filteredQuestions changes
-  useEffect(() => {
-    if ((filteredQuestions?.length || 0) > 0 && currentQuestionIndex >= (filteredQuestions?.length || 0)) {
-      setCurrentQuestionIndex((filteredQuestions?.length || 0) - 1);
-    }
-  }, [filteredQuestions?.length, currentQuestionIndex]);
-
-  // Fetch annotations when student changes
-  useEffect(() => {
-    if (currentStudent?.student?.id) {
-      fetchAnnotations(currentStudent?.student?.id);
-    }
-  }, [currentStudent?.student?.id]);
-
-  // Keyboard navigation for questions (Arrow keys)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore navigation if user is typing in an input, textarea, or contentEditable element
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-
-      if (e.key === 'ArrowRight') {
-        if (currentQuestionIndex < (filteredQuestions?.length || 0) - 1) {
-          setCurrentQuestionIndex(prev => prev + 1);
-        }
-      } else if (e.key === 'ArrowLeft') {
-        if (currentQuestionIndex > 0) {
-          setCurrentQuestionIndex(prev => prev - 1);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentQuestionIndex, filteredQuestions?.length]);
-
-  // Helper function to get the correct image URL (annotated if exists, original otherwise)
-  const getImageUrl = (originalUrl: string, questionId: string, imageIndex: number) => {
-    const key = `${questionId}_${imageIndex}`;
-    return annotations[key] || originalUrl;
-  };
-
-  // Use exam's total marks from the database
-  const totalMarks = exam?.totalMarks || 0;
-
-  // Try to get answer with different possible formats
-  let currentAnswer = currentStudent?.answers?.[currentQuestion?.id || ''];
-  if (!currentAnswer && currentQuestion?.id) {
-    // Try with _images suffix
-    currentAnswer = currentStudent?.answers?.[`${currentQuestion?.id}_images`];
-  }
-
+  // Robust Auto-score calculator supporting exact fractional partial marks for all question types
   const getAutoScore = (question: Question, allAnswers: any) => {
     if (!allAnswers || typeof allAnswers !== 'object') {
-      // Extra safety: currentStudent?.answers might be null/undefined
       return 0;
     }
 
-    // Create a local safe copy to ensure it doesn't disappear/shadow
     const safeAnswers = allAnswers;
     const qId = question?.id;
     if (!qId) return 0;
@@ -1877,12 +2039,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         return qMark;
       }
 
-
-
       if (type === 'mcq') {
         const userAnswer = answer;
         let isCorrect = false;
-        // Robust check for option-based correct flag
         if (question?.options && Array.isArray(question?.options)) {
           const correctOptIndex = (question?.options?.findIndex((opt: any) => opt?.isCorrect) ?? -1);
           if (correctOptIndex !== -1 && question?.options?.[correctOptIndex]) {
@@ -1892,17 +2051,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             }
           }
         }
-        // Fallback to simple correct answer check
         if (!isCorrect) {
           const correctAnswer = question?.correct;
           if (correctAnswer !== undefined) {
             isCorrect = String(userAnswer || "").trim() === String(correctAnswer || "").trim();
           }
         }
-        if (isCorrect) return question?.marks || 0;
-        // Apply negative marking for wrong MCQ answers
+        if (isCorrect) return Number(question?.marks) || 1;
         const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0) return -((question?.marks || 0) * negPct) / 100;
+        if (negPct && negPct > 0 && userAnswer !== undefined && userAnswer !== null && userAnswer !== '' && userAnswer !== 'No answer provided') {
+          return -Math.round((((Number(question?.marks) || 1) * negPct) / 100) * 100) / 100;
+        }
         return 0;
       }
 
@@ -1914,9 +2073,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         try {
           subQs.forEach((subQ: any, sIdx: number) => {
             const subKey = `${question.id}_sub_${sIdx}`;
-            // Use safeAnswers from closure
             const subAnswer = safeAnswers[subKey];
-            if (subAnswer === undefined) return;
+            if (subAnswer === undefined || subAnswer === null || subAnswer === '' || subAnswer === 'No answer provided') return;
 
             const normalize = (s: any) => String(s || "").trim().toLowerCase();
             const userAns = normalize(subAnswer);
@@ -1951,78 +2109,28 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           console.error("Critical error in SMCQ score calculation:", forEachErr);
         }
 
-        return smcqScore;
+        return Math.round(smcqScore * 100) / 100;
       }
 
       if (type === 'mc') {
-        const selected = answer?.selectedOptions || [];
-        const corrects = question?.options?.map((o, i) => o?.isCorrect ? i : -1)?.filter(i => i !== -1) || [];
-        if (selected?.length === corrects?.length && selected?.every((v: number) => corrects?.includes(v))) return question?.marks || 0;
-        // Apply negative marking for wrong MC answers
-        const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0 && selected?.length > 0) return -((question?.marks || 0) * negPct) / 100;
-        return 0;
+        return evaluateMCDetails(question, answer, exam?.mcqNegativeMarking || 0).score;
       }
 
       if (type === 'ar') {
-        const selected = Number(answer?.selectedOption);
-        const correct = Number(question?.correct || (question as any)?.correctOption || 0);
-        if (selected === correct && correct > 0) return question?.marks || 0;
-        // Apply negative marking for wrong AR answers
+        const selected = Number(answer?.selectedOption !== undefined ? answer.selectedOption : answer);
+        const correct = Number(question?.correct || (question as any)?.correctOption || (question as any)?.correctAnswer || 0);
+        if (selected === correct && correct > 0) return Number(question?.marks) || 1;
         const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0 && selected > 0) return -((question?.marks || 0) * negPct) / 100;
+        if (negPct && negPct > 0 && selected > 0) return -Math.round((((Number(question?.marks) || 1) * negPct) / 100) * 100) / 100;
         return 0;
       }
 
       if (type === 'int' || type === 'numeric') {
-        const rawCorrect = (question as any).correctAnswer ?? question.modelAnswer ?? question.correct ?? (question as any).answer ?? (question as any).explanation ?? '0';
-        const correctVal = parseInt(String(rawCorrect).trim()) || 0;
-        const studentVal = parseInt(String(answer?.answer ?? 0).trim()) || 0;
-
-        if (isNaN(studentVal)) return 0;
-        if (studentVal === correctVal) return question?.marks || 0;
-
-        // Apply negative marking for wrong INT answers
-        const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0 && answer?.answer !== undefined && answer?.answer !== '') {
-          return -((question?.marks || 0) * negPct) / 100;
-        }
-        return 0;
+        return evaluateINTDetails(question, answer, exam?.mcqNegativeMarking || 0).score;
       }
 
       if (type === 'mtf') {
-        let score = 0;
-        const totalPairs = (question as any).leftColumn?.length || (question as any).pairs?.length || 0;
-        if (totalPairs === 0) return 0;
-        const marksPerPair = (question?.marks || 0) / totalPairs;
-
-        const stdMatches = answer || {};
-
-        // Strategy 1: Check Object-based matches (New Schema: { leftId: rightId })
-        // We iterate over the LEFT column and check if the student's mapped value is correct
-        if ((question as any)?.leftColumn && (question as any)?.rightColumn && !Array.isArray(stdMatches?.matches)) {
-          (question as any)?.leftColumn?.forEach((leftItem: any) => {
-            const studentRightId = stdMatches?.[leftItem?.id];
-            const correctRightId = (question as any)?.correctMatches?.[leftItem?.id];
-
-            if (studentRightId && correctRightId && studentRightId === correctRightId) {
-              score += marksPerPair;
-            }
-          });
-          return Math.round(score);
-        }
-
-        // Strategy 2: Legacy Array-based matches
-        const matches = stdMatches?.matches || [];
-        const pairs = (question as any)?.pairs || [];
-        if (pairs?.length > 0) {
-          matches?.forEach((m: any) => {
-            if (pairs?.[m?.leftIndex]?.right === pairs?.[m?.rightIndex]?.right) {
-              score += marksPerPair;
-            }
-          });
-          return Math.round(score);
-        }
+        return evaluateMTFDetails(question, answer).score;
       }
     } catch (e) {
       console.error("Error in getAutoScore:", e);
@@ -2031,6 +2139,244 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
     return 0;
   };
+
+  // Helper to evaluate question status: CORRECT, PARTIAL, WRONG, UNANSWERED
+  const getQuestionEvaluationStatus = (question: Question, allAnswers: any): 'CORRECT' | 'PARTIAL' | 'WRONG' | 'UNANSWERED' => {
+    if (!question) return 'UNANSWERED';
+    const safeAnswers = allAnswers || {};
+    const type = (question?.type || '').toLowerCase();
+    const answer = safeAnswers[question.id];
+    const maxMarks = Number(question.marks || question.mark || 0);
+
+    if (['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'].includes(type)) {
+      if (type === 'smcq') {
+        const subQs = question.subQuestions || question.sub_questions || [];
+        const hasAnyAns = subQs.some((_: any, i: number) => {
+          const v = safeAnswers[`${question.id}_sub_${i}`];
+          return v !== undefined && v !== null && v !== '' && v !== 'No answer provided';
+        });
+        if (!hasAnyAns) return 'UNANSWERED';
+      } else if (type === 'mtf') {
+        const mtfDetails = evaluateMTFDetails(question, answer);
+        if (mtfDetails.answeredCount === 0) return 'UNANSWERED';
+      } else if (type === 'mc') {
+        const selected = Array.isArray(answer?.selectedOptions) ? answer.selectedOptions : (Array.isArray(answer) ? answer : []);
+        if (selected.length === 0) return 'UNANSWERED';
+      } else if (type === 'int' || type === 'numeric') {
+        const ansVal = answer?.answer !== undefined ? answer.answer : (answer?.value !== undefined ? answer.value : answer);
+        if (ansVal === undefined || ansVal === null || String(ansVal).trim() === '' || ansVal === 'No answer provided') return 'UNANSWERED';
+      } else if (type === 'cma' || type === 'mpc') {
+        if (!answer || (typeof answer === 'object' && Object.keys(answer).length === 0)) return 'UNANSWERED';
+      } else {
+        if (answer === undefined || answer === null || String(answer).trim() === '' || answer === 'No answer provided') return 'UNANSWERED';
+      }
+
+      const score = getAutoScore(question, safeAnswers);
+      if (score >= maxMarks && maxMarks > 0) return 'CORRECT';
+
+      if (type === 'mc') {
+        const mcDetails = evaluateMCDetails(question, answer, exam?.mcqNegativeMarking || 0);
+        if (mcDetails.isPartial || score > 0) return 'PARTIAL';
+      } else if (type === 'mtf') {
+        const mtfDetails = evaluateMTFDetails(question, answer);
+        if (mtfDetails.correctCount > 0 && mtfDetails.correctCount < mtfDetails.totalPairs) return 'PARTIAL';
+        if (score > 0) return 'PARTIAL';
+      } else if (type === 'smcq') {
+        if (score > 0 && score < maxMarks) return 'PARTIAL';
+      } else if (type === 'cma' || type === 'mpc') {
+        if (score > 0 && score < maxMarks) return 'PARTIAL';
+      }
+
+      if (score > 0 && score < maxMarks) return 'PARTIAL';
+      return 'WRONG';
+    }
+
+    // Subjective (CQ, SQ, DESCRIPTIVE)
+    const subQs = question.subQuestions || question.sub_questions || question.parts || [];
+    let hasAns = false;
+    let earned = 0;
+
+    if (subQs.length > 0) {
+      let anySubAnswered = false;
+      subQs.forEach((_: any, i: number) => {
+        const subAns = safeAnswers[`${question.id}_sub_${i}`] || safeAnswers[`${question.id}_desc_${i}`] || safeAnswers[`${question.id}_sub_${i}_image`];
+        const subMark = safeAnswers[`${question.id}_sub_${i}_marks`] ?? safeAnswers[`${question.id}_desc_${i}_marks`];
+        if (subAns !== undefined && subAns !== null && subAns !== '') anySubAnswered = true;
+        if (typeof subMark === 'number') earned += subMark;
+      });
+      hasAns = anySubAnswered || Boolean(safeAnswers[question.id]) || Boolean(safeAnswers[`${question.id}_images`]) || Boolean(safeAnswers[`${question.id}_image`]);
+    } else {
+      hasAns = Boolean(safeAnswers[question.id]) || Boolean(safeAnswers[`${question.id}_image`]) || Boolean(safeAnswers[`${question.id}_images`]);
+      earned = Number(safeAnswers[`${question.id}_marks`] || 0);
+    }
+
+    if (!hasAns && earned === 0) return 'UNANSWERED';
+    if (earned >= maxMarks && maxMarks > 0) return 'CORRECT';
+    if (earned > 0 && earned < maxMarks) return 'PARTIAL';
+    return 'WRONG';
+  };
+
+  // Get active questions based on set
+  const activeQuestions = useMemo(() => {
+    if (currentStudent?.examSetId && exam?.questionsBySet?.[currentStudent.examSetId]) {
+      return exam.questionsBySet[currentStudent.examSetId];
+    }
+    return exam?.questions || [];
+  }, [currentStudent, exam]);
+
+  // Counts of each result status for current student
+  const statusCounts = useMemo(() => {
+    const counts = { ALL: 0, CORRECT: 0, PARTIAL: 0, WRONG: 0, UNANSWERED: 0 };
+    if (!activeQuestions) return counts;
+    counts.ALL = activeQuestions.length;
+    activeQuestions.forEach(q => {
+      const st = getQuestionEvaluationStatus(q, currentStudent?.answers);
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    return counts;
+  }, [activeQuestions, currentStudent?.answers]);
+
+  // Filtered questions based on Type & Status filter
+  const filteredQuestions = useMemo(() => {
+    return activeQuestions?.filter(q => {
+      if (questionTypeFilter !== 'all') {
+        const qType = (q?.type || '').toLowerCase();
+        if (qType !== questionTypeFilter.toLowerCase()) return false;
+      }
+      if (filterStatus !== 'ALL') {
+        const st = getQuestionEvaluationStatus(q, currentStudent?.answers);
+        if (st !== filterStatus) return false;
+      }
+      return true;
+    }) || [];
+  }, [activeQuestions, questionTypeFilter, filterStatus, currentStudent?.answers]);
+
+  const currentQuestion = filteredQuestions?.[currentQuestionIndex];
+
+  // Ensure currentQuestionIndex is always valid when filteredQuestions changes
+  useEffect(() => {
+    if ((filteredQuestions?.length || 0) > 0 && currentQuestionIndex >= (filteredQuestions?.length || 0)) {
+      setCurrentQuestionIndex((filteredQuestions?.length || 0) - 1);
+    }
+  }, [filteredQuestions?.length, currentQuestionIndex]);
+
+  // Fetch annotations when student changes
+  useEffect(() => {
+    if (currentStudent?.student?.id) {
+      fetchAnnotations(currentStudent?.student?.id);
+    }
+  }, [currentStudent?.student?.id]);
+
+  // Auto-grade all objective questions for the current student in one click
+  const handleAutoGradeAllObjective = async () => {
+    if (!currentStudent || !activeQuestions) return;
+    if (!canEditMarks()) {
+      toast.error("Cannot edit marks for this student (already submitted or locked).");
+      return;
+    }
+
+    const objectiveTypes = ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'];
+    const objectiveQuestions = activeQuestions.filter(q => objectiveTypes.includes((q?.type || '').toLowerCase()));
+    if (objectiveQuestions.length === 0) {
+      toast.info("No objective questions found in this exam set.");
+      return;
+    }
+
+    let gradedCount = 0;
+    let totalAssigned = 0;
+
+    for (const q of objectiveQuestions) {
+      const score = getAutoScore(q, currentStudent?.answers);
+      const qMarks = Number(q.marks || q.mark || 0);
+      const safeScore = Math.max(0, Math.min(qMarks, score));
+      
+      await updateMarks(q.id, safeScore);
+      gradedCount++;
+      totalAssigned += safeScore;
+    }
+
+    triggerGradingHaptic('CORRECT');
+    toast.success(`Auto-graded ${gradedCount} objective questions! Total points: ${Math.round(totalAssigned * 100) / 100}`);
+  };
+
+  // Expanded Productivity Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // Question Navigation (Arrow keys)
+      if (e.key === 'ArrowRight') {
+        if (currentQuestionIndex < (filteredQuestions?.length || 0) - 1) {
+          setCurrentQuestionIndex(prev => prev + 1);
+          triggerHaptic(ImpactStyle.Light);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentQuestionIndex > 0) {
+          setCurrentQuestionIndex(prev => prev - 1);
+          triggerHaptic(ImpactStyle.Light);
+        }
+      } 
+      // Student Navigation ([ and ])
+      else if (e.key === ']' || e.key === 'PageDown') {
+        if (exam?.submissions && currentStudentIndex < exam.submissions.length - 1) {
+          const newIndex = currentStudentIndex + 1;
+          setCurrentStudentIndex(newIndex);
+          setCurrentQuestionIndex(0);
+          if (exam?.submissions?.[newIndex]) {
+            fetchExamData(exam.submissions[newIndex]?.student?.id);
+          }
+          triggerHaptic(ImpactStyle.Medium);
+        }
+      } else if (e.key === '[' || e.key === 'PageUp') {
+        if (currentStudentIndex > 0) {
+          const newIndex = currentStudentIndex - 1;
+          setCurrentStudentIndex(newIndex);
+          setCurrentQuestionIndex(0);
+          if (exam?.submissions?.[newIndex]) {
+            fetchExamData(exam.submissions[newIndex]?.student?.id);
+          }
+          triggerHaptic(ImpactStyle.Medium);
+        }
+      }
+      // Toggle Student Switcher (S key)
+      else if (e.key === 's' || e.key === 'S') {
+        if (!e.ctrlKey && !e.metaKey) {
+          setIsStudentSwitcherOpen(prev => !prev);
+        }
+      }
+      // Toggle Reference Key (R key)
+      else if (e.key === 'r' || e.key === 'R') {
+        if (!e.ctrlKey && !e.metaKey) {
+          setShowReference(prev => !prev);
+        }
+      }
+      // Toggle Shortcuts Cheat-sheet (? key)
+      else if (e.key === '?') {
+        setIsShortcutsOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentQuestionIndex, filteredQuestions?.length, currentStudentIndex, exam?.submissions]);
+
+  // Helper function to get the correct image URL (annotated if exists, original otherwise)
+  const getImageUrl = (originalUrl: string, questionId: string, imageIndex: number) => {
+    const key = `${questionId}_${imageIndex}`;
+    return annotations[key] || originalUrl;
+  };
+
+  // Use exam's total marks from the database
+  const totalMarks = exam?.totalMarks || 0;
+
+  // Try to get answer with different possible formats
+  let currentAnswer = currentStudent?.answers?.[currentQuestion?.id || ''];
+  if (!currentAnswer && currentQuestion?.id) {
+    currentAnswer = currentStudent?.answers?.[`${currentQuestion?.id}_images`];
+  }
 
   // Check if evaluator can edit marks for current student
   const canEditMarks = () => {
@@ -2683,188 +3029,260 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               </TabsContent>
 
               <TabsContent value="evaluation">
-                {/* Student Navigation */}
+                {/* Overall Exam Evaluation Progress Header Banner */}
+                {exam?.submissions && exam.submissions.length > 0 && (
+                  <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 border border-indigo-500/20 shadow-sm backdrop-blur-md">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/25 shrink-0">
+                          <Trophy className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">Exam Grading Progress</span>
+                            <Badge variant="outline" className="bg-background/80 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold">
+                              {Math.round(((exam.submissions.filter(s => s.status === 'COMPLETED').length) / (exam.submissions.length || 1)) * 100)}% Completed
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {exam.submissions.filter(s => s.status === 'COMPLETED').length} of {exam.submissions.length} students evaluated
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsStudentSwitcherOpen(true)}
+                          className="rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-xs font-bold gap-1.5 shadow-sm"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          <span>Student List (S)</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsShortcutsOpen(true)}
+                          className="rounded-xl border-border text-xs font-bold gap-1.5 text-muted-foreground hover:text-foreground"
+                          title="View Keyboard Shortcuts (?)"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          <span>Shortcuts (?)</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-3 w-full bg-muted/60 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all duration-500 shadow-sm"
+                        style={{ width: `${Math.round(((exam.submissions.filter(s => s.status === 'COMPLETED').length) / (exam.submissions.length || 1)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Student Switcher & Action Ribbon */}
                 <div className="mb-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                    <div className="flex items-center justify-center lg:justify-start gap-4 Order-2 lg:order-1">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl bg-card border border-border shadow-sm">
+                    <div className="flex items-center justify-between sm:justify-start gap-3 order-2 lg:order-1">
                       <Button
                         variant="outline"
                         onClick={() => {
                           const newIndex = Math.max(0, currentStudentIndex - 1);
                           setCurrentStudentIndex(newIndex);
-                          setCurrentQuestionIndex(0); // Reset to first question when switching student
-                          // Refetch exam data with the new student's questions
+                          setCurrentQuestionIndex(0);
                           if (exam?.submissions?.[newIndex]) {
-                            fetchExamData(exam?.submissions?.[newIndex]?.student?.id);
+                            fetchExamData(exam.submissions[newIndex]?.student?.id);
                           }
                         }}
                         disabled={currentStudentIndex === 0}
-                        className="h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2"
+                        className="h-10 px-3 rounded-xl border-border"
+                        title="Previous Student ([)"
                       >
-                        <ArrowLeft className="h-4 w-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Previous</span>
+                        <ArrowLeft className="h-4 w-4 sm:mr-1.5" />
+                        <span className="hidden sm:inline text-xs font-bold">Prev</span>
                       </Button>
 
-                      <div className="text-center min-w-[120px]">
-                        <div className="font-semibold text-foreground truncate max-w-[150px] sm:max-w-none">
-                          {currentStudent?.student?.name}
+                      {/* Interactive Student Pill Button */}
+                      <button
+                        onClick={() => setIsStudentSwitcherOpen(true)}
+                        className="flex items-center gap-3 px-4 py-2 rounded-xl bg-muted/50 hover:bg-muted border border-border/80 transition-all text-left group"
+                        title="Click to search and switch student (S)"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                          {currentStudent?.student?.name ? currentStudent.student.name.charAt(0).toUpperCase() : "S"}
                         </div>
-                        <div className="text-xs text-muted-foreground font-medium">
-                          Roll: {currentStudent?.student?.roll} • {currentStudentIndex + 1}/{exam?.submissions?.length}
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm text-foreground truncate max-w-[140px] sm:max-w-[200px] group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                            <span>{currentStudent?.student?.name || "Student"}</span>
+                            <Search className="h-3 w-3 text-muted-foreground opacity-60 group-hover:opacity-100" />
+                          </div>
+                          <div className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                            <span>Roll: {currentStudent?.student?.roll || "N/A"}</span>
+                            <span>•</span>
+                            <span className="text-foreground/80 font-bold">{currentStudentIndex + 1}/{exam?.submissions?.length || 0}</span>
+                            {currentStudent?.status === 'COMPLETED' ? (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Completed" />
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Pending" />
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </button>
 
                       <Button
                         variant="outline"
                         onClick={() => {
-                          const newIndex = Math.min(exam?.submissions?.length - 1, currentStudentIndex + 1);
+                          const newIndex = Math.min((exam?.submissions?.length || 1) - 1, currentStudentIndex + 1);
                           setCurrentStudentIndex(newIndex);
-                          setCurrentQuestionIndex(0); // Reset to first question when switching student
-                          // Refetch exam data with the new student's questions
+                          setCurrentQuestionIndex(0);
                           if (exam?.submissions?.[newIndex]) {
-                            fetchExamData(exam?.submissions?.[newIndex]?.student?.id);
+                            fetchExamData(exam.submissions[newIndex]?.student?.id);
                           }
                         }}
-                        disabled={currentStudentIndex === exam?.submissions?.length - 1}
-                        className="h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2"
+                        disabled={!exam?.submissions || currentStudentIndex === exam.submissions.length - 1}
+                        className="h-10 px-3 rounded-xl border-border"
+                        title="Next Student (])"
                       >
-                        <span className="hidden sm:inline">Next</span>
-                        <ArrowRight className="h-4 w-4 sm:ml-2" />
+                        <span className="hidden sm:inline text-xs font-bold">Next</span>
+                        <ArrowRight className="h-4 w-4 sm:ml-1.5" />
                       </Button>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 order-1 lg:order-2">
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <Button
-                          variant="outline"
-                          onClick={() => currentStudent && window.open(`/exams/evaluations/${id}/print/${currentStudent?.student?.id}`, '_blank')}
-                          disabled={!currentStudent}
-                          title="Print student script with marks"
-                          className="flex-1 sm:flex-none"
-                        >
-                          <Printer className="h-4 w-4 sm:mr-2" />
-                          <span className="hidden sm:inline">Print Script</span>
-                        </Button>
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center justify-end gap-2 order-1 lg:order-2">
+                      {/* Auto-Grade Objectives Action */}
+                      <Button
+                        variant="outline"
+                        onClick={handleAutoGradeAllObjective}
+                        disabled={!currentStudent || !canEditMarks()}
+                        title="Auto-grade all objective/MCQ/MTF/INT questions for this student"
+                        className="rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-xs font-bold shadow-sm"
+                      >
+                        <Sparkles className="h-4 w-4 mr-1.5 text-amber-500" />
+                        <span className="hidden sm:inline">Auto-Grade</span> Objectives
+                      </Button>
 
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            if (!currentStudent || !exam) return;
+                      <Button
+                        variant="outline"
+                        onClick={() => currentStudent && window.open(`/exams/evaluations/${id}/print/${currentStudent?.student?.id}`, '_blank')}
+                        disabled={!currentStudent}
+                        title="Print student script with marks"
+                        className="rounded-xl border-border text-xs font-bold"
+                      >
+                        <Printer className="h-4 w-4 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Print Script</span>
+                      </Button>
 
-                            const questions = exam?.questions || [];
-                            if (!questions.length) return toast.error("No questions found");
+                      <Button
+                        onClick={submitStudentEvaluation}
+                        disabled={saving || !canSubmitStudent()}
+                        className={cn(
+                          "rounded-xl text-xs font-bold shadow-md transition-all",
+                          canSubmitStudent()
+                            ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25"
+                            : "bg-muted text-muted-foreground cursor-not-allowed"
+                        )}
+                        title="Submit this student's evaluation"
+                      >
+                        <Save className="h-4 w-4 sm:mr-1.5" />
+                        <span>Submit {currentStudent?.status === 'COMPLETED' ? '✓' : 'Student'}</span>
+                      </Button>
 
-                            const sessionData = (questions || [])?.map((q) => {
-                              const ans = currentStudent?.answers ? currentStudent?.answers?.[q?.id] : null;
-                              let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                              let userIdx = null;
-
-                              if (ans !== undefined && ans !== null) {
-                                const correctOpt = q?.options?.find((o: any) => o?.isCorrect);
-                                const isCorrect = correctOpt && (
-                                  (typeof ans === 'number' && q?.options?.[ans]?.text === correctOpt?.text) ||
-                                  (ans === correctOpt?.text)
-                                );
-                                status = isCorrect ? 'correct' : 'wrong';
-
-                                if (q?.type?.toLowerCase() === 'mcq' && q?.options) {
-                                  userIdx = typeof ans === 'number' ? ans : q?.options?.findIndex((o: any) => o?.text === ans);
-                                }
-                              }
-
-                              // normalize questionText
-                              const questionText = (q as any).questionText || q.text || "Question text missing";
-
-                              return {
-                                ...q,
-                                questionText, // Ensure this exists for the session page
-                                status,
-                                userAnswer: userIdx,
-                                type: (q?.type || "").toUpperCase() === 'MCQ' ? 'MCQ' : q?.type
-                              };
-                            });
-
-                            // Store as object with Metadata
-                            const payload = {
-                              examName: exam?.name || "Exam Review",
-                              questions: sessionData
-                            };
-
-                            localStorage.setItem("review-session-data", JSON.stringify(payload));
-                            toast.success("Opening Review Session...");
-                            window.open(`/problem-solving/review?id=${id}`, '_blank'); // Targeted dedicated page
-                          }}
-                          disabled={!currentStudent}
-                          title="Open in interactive Problem Solving Session"
-                          className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 flex-1 sm:flex-none"
-                        >
-                          <MonitorPlay className="h-4 w-4 sm:mr-2" />
-                          <span className="hidden sm:inline">Review Session</span>
-                        </Button>
-                      </div>
-
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <Button
-                          onClick={submitStudentEvaluation}
-                          disabled={saving || !canSubmitStudent()}
-                          className={`flex-1 sm:flex-none ${canSubmitStudent()
-                            ? "bg-blue-600 hover:bg-blue-700 text-white"
-                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                            }`}
-                          title={
-                            !canSubmitStudent()
-                              ? "Student evaluation is already completed"
-                              : "Submit this student's evaluation"
-                          }
-                        >
-                          <Save className="h-4 w-4 sm:mr-2" />
-                          <span>Submit {currentStudent?.status === 'COMPLETED' ? '✓' : 'Student'}</span>
-                        </Button>
-
-                        <Button
-                          onClick={submitAllEvaluations}
-                          disabled={saving || !canSubmitAll()}
-                          className={`flex-1 sm:flex-none ${canSubmitAll()
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                            }`}
-                          title={
-                            !canSubmitAll()
-                              ? "All student evaluations are already completed"
-                              : "Submit all student evaluations"
-                          }
-                        >
-                          <CheckCircle className="h-4 w-4 sm:mr-2" />
-                          <span>Submit All {exam && exam?.submissions?.every(s => s?.status === 'COMPLETED') ? '✓' : ''}</span>
-                        </Button>
-                      </div>
+                      <Button
+                        onClick={submitAllEvaluations}
+                        disabled={saving || !canSubmitAll()}
+                        className={cn(
+                          "rounded-xl text-xs font-bold shadow-md transition-all",
+                          canSubmitAll()
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25"
+                            : "bg-muted text-muted-foreground cursor-not-allowed"
+                        )}
+                        title="Submit all student evaluations"
+                      >
+                        <CheckCircle className="h-4 w-4 sm:mr-1.5" />
+                        <span>Submit All {exam?.submissions?.every(s => s?.status === 'COMPLETED') ? '✓' : ''}</span>
+                      </Button>
                     </div>
                   </div>
                 </div>
 
-                {/* Question Type Filter */}
-                <div className="mb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
+                {/* Filter Controls (Status & Type) */}
+                <div className="space-y-3 mb-6">
+                  {/* Result Status Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-muted/40 rounded-2xl border border-border">
+                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground whitespace-nowrap">Filter by Result:</span>
                     <div className="flex flex-wrap gap-2">
-                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc'] as const).map((type) => (
+                      {[
+                        { id: 'ALL', label: 'All', count: statusCounts.ALL, icon: Layers, color: 'bg-indigo-600 shadow-indigo-500/25' },
+                        { id: 'CORRECT', label: 'Correct', count: statusCounts.CORRECT, icon: CheckCircle, color: 'bg-emerald-600 shadow-emerald-500/25' },
+                        { id: 'PARTIAL', label: 'Partial', count: statusCounts.PARTIAL, icon: Activity, color: 'bg-amber-600 shadow-amber-500/25' },
+                        { id: 'WRONG', label: 'Incorrect', count: statusCounts.WRONG, icon: XCircle, color: 'bg-rose-600 shadow-rose-500/25' },
+                        { id: 'UNANSWERED', label: 'Unanswered', count: statusCounts.UNANSWERED, icon: Minus, color: 'bg-slate-600 shadow-slate-500/25' }
+                      ].map(f => (
                         <Button
-                          key={type}
-                          variant={questionTypeFilter === type ? 'default' : 'outline'}
+                          key={f.id}
+                          variant={filterStatus === f.id ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => {
-                            setQuestionTypeFilter(type);
-                            setCurrentQuestionIndex(0); // Reset to first question when filtering
+                            setFilterStatus(f.id as any);
+                            setCurrentQuestionIndex(0);
                           }}
-                          className="capitalize px-4 flex-1 sm:flex-none"
+                          className={cn(
+                            "rounded-xl px-3 py-1 text-xs font-bold transition-all duration-300 flex items-center gap-1.5",
+                            filterStatus === f.id
+                              ? `${f.color} text-white shadow-md`
+                              : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          )}
                         >
-                          {type === 'all' ? 'All Questions' : type.toUpperCase()}
+                          <f.icon className="h-3.5 w-3.5" />
+                          <span>{f.label}</span>
+                          <span className={cn(
+                            "text-[10px] px-1.5 py-0.2 rounded-full",
+                            filterStatus === f.id ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                          )}>
+                            {f.count}
+                          </span>
                         </Button>
                       ))}
                     </div>
                   </div>
-                  <div className="text-sm text-muted-foreground mt-2 sm:mt-0">
-                    Showing {filteredQuestions.length} of {exam?.questions?.length} questions
+
+                  {/* Question Type Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground whitespace-nowrap">Filter by type:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive', 'cma', 'mpc'] as const).map((type) => {
+                        const typeCount = type === 'all'
+                          ? activeQuestions?.length || 0
+                          : activeQuestions?.filter(q => (q?.type || '').toLowerCase() === type)?.length || 0;
+
+                        if (type !== 'all' && typeCount === 0) return null;
+
+                        return (
+                          <Button
+                            key={type}
+                            variant={questionTypeFilter === type ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => {
+                              setQuestionTypeFilter(type);
+                              setCurrentQuestionIndex(0);
+                            }}
+                            className="capitalize px-3 py-1 text-xs rounded-xl flex items-center gap-1.5"
+                          >
+                            <span>{type === 'all' ? 'All Types' : type.toUpperCase()}</span>
+                            <span className="text-[10px] opacity-70">({typeCount})</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    Showing {filteredQuestions.length} of {activeQuestions?.length || 0} questions
                   </div>
                 </div>
 
@@ -3005,8 +3423,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   </div>
                 )}
 
-                {/* Question Navigation */}
-                <div className="mb-4">
+                {/* Question Navigation & Quick-Select Ribbon */}
+                <div className="space-y-3 mb-6">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                       <Button
@@ -3019,8 +3437,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                         Prev
                       </Button>
 
-                      <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                        Q {filteredQuestions.length > 0 ? currentQuestionIndex + 1 : 0} / {filteredQuestions.length}
+                      <div className="text-sm font-bold text-foreground whitespace-nowrap">
+                        Question {filteredQuestions.length > 0 ? currentQuestionIndex + 1 : 0} of {filteredQuestions.length}
                       </div>
 
                       <Button
@@ -3034,8 +3452,44 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       </Button>
                     </div>
 
-                    {/* Additional actions if any could go here */}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Correct</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> Partial</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" /> Incorrect</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400" /> Blank</span>
+                    </div>
                   </div>
+
+                  {/* Question Jumper Pills */}
+                  {filteredQuestions.length > 1 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto p-2 bg-muted/30 rounded-xl border border-border/50 scrollbar-thin">
+                      {filteredQuestions.map((q, idx) => {
+                        const qStatus = getQuestionEvaluationStatus(q, currentStudent?.answers);
+                        const isSelected = idx === currentQuestionIndex;
+                        let statusColor = "bg-slate-400 text-white";
+                        if (qStatus === 'CORRECT') statusColor = "bg-emerald-500 text-white";
+                        else if (qStatus === 'PARTIAL') statusColor = "bg-amber-500 text-white";
+                        else if (qStatus === 'WRONG') statusColor = "bg-rose-500 text-white";
+
+                        return (
+                          <button
+                            key={q.id || idx}
+                            onClick={() => setCurrentQuestionIndex(idx)}
+                            className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 border",
+                              isSelected
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-400/50"
+                                : "bg-card border-border hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <span className={cn("w-2 h-2 rounded-full shrink-0", isSelected ? "bg-white" : statusColor)} />
+                            <span>Q{idx + 1}</span>
+                            <span className="text-[10px] uppercase opacity-70">({q?.type})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
 
@@ -3283,49 +3737,126 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="space-y-4">
                                         {(currentAnswer || currentQuestion?.type?.toLowerCase() === 'smcq') ? (
-                                          <div className="space-y-3">
-                                            {/* Auto-Score Header */}
-                                            <div className="flex items-center gap-2 mb-2">
-                                              {getAutoScore(currentQuestion, currentStudent?.answers) > 0 ? (
-                                                <CheckCircle className="h-5 w-5 text-green-600" />
-                                              ) : getAutoScore(currentQuestion, currentStudent?.answers) === 0 ? (
-                                                <XCircle className="h-5 w-5 text-orange-500" />
-                                              ) : (
-                                                <XCircle className="h-5 w-5 text-red-600" />
-                                              )}
-                                              <span className={`font-semibold ${getAutoScore(currentQuestion, currentStudent?.answers) > 0 ? 'text-green-700' : getAutoScore(currentQuestion, currentStudent?.answers) < 0 ? 'text-red-700' : 'text-gray-700'}`}>
-                                                Auto-calculated Score: {getAutoScore(currentQuestion, currentStudent?.answers)} / {currentQuestion?.marks}
-                                                {getAutoScore(currentQuestion, currentStudent?.answers) < 0 && <span className="ml-2 text-xs font-normal text-red-500">(negative marking applied)</span>}
-                                              </span>
-                                            </div>
+                                          <div className="space-y-4">
+                                            {/* Auto-Score Header Badge */}
+                                            {(() => {
+                                              const autoScore = getAutoScore(currentQuestion, currentStudent?.answers);
+                                              const qMarks = Number(currentQuestion?.marks) || 1;
+                                              const isFull = autoScore >= qMarks && qMarks > 0;
+                                              const isPart = !isFull && (autoScore > 0 || (currentQuestion?.type?.toLowerCase() === 'mc' && evaluateMCDetails(currentQuestion, currentAnswer).isPartial) || (currentQuestion?.type?.toLowerCase() === 'mtf' && evaluateMTFDetails(currentQuestion, currentAnswer).correctCount > 0));
+                                              const isNeg = autoScore < 0;
 
-                                            {/* Type Specific Rendering */}
+                                              return (
+                                                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-card border border-border shadow-sm mb-2">
+                                                  <div className="flex items-center gap-2">
+                                                    {isFull ? (
+                                                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                        <CheckCircle className="h-4 w-4" /> Correct (+{autoScore}/{qMarks})
+                                                      </Badge>
+                                                    ) : isPart ? (
+                                                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                        <Activity className="h-4 w-4" /> Partial Credit (+{autoScore}/{qMarks})
+                                                      </Badge>
+                                                    ) : isNeg ? (
+                                                      <Badge className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                        <XCircle className="h-4 w-4" /> Wrong ({autoScore}/{qMarks})
+                                                      </Badge>
+                                                    ) : (
+                                                      <Badge variant="outline" className="text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1 text-xs py-1 px-2.5">
+                                                        <XCircle className="h-4 w-4 text-rose-500" /> Score: {autoScore} / {qMarks}
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                  <span className="text-xs font-semibold text-muted-foreground">
+                                                    Auto-calculated Score: <span className="font-bold text-foreground">{autoScore}</span> / {qMarks}
+                                                    {isNeg && <span className="ml-1.5 text-rose-500 text-xs font-medium">(negative marking applied)</span>}
+                                                  </span>
+                                                </div>
+                                              );
+                                            })()}
+
+                                            {/* MCQ Specific Rendering */}
                                             {currentQuestion?.type?.toLowerCase() === 'mcq' && (
-                                              <div className="text-base md:text-lg p-2 bg-card rounded border border-border italic">
+                                              <div className="text-base md:text-lg p-3 bg-card rounded-xl border border-border italic font-medium">
                                                 <UniversalMathJax inline dynamic>{cleanupMath(String(currentAnswer))}</UniversalMathJax>
                                               </div>
                                             )}
 
+                                            {/* MC Specific Rendering (Multiple Correct with Partial Marks) */}
                                             {currentQuestion?.type?.toLowerCase() === 'mc' && (
-                                              <div className="grid grid-cols-1 gap-2">
-                                                {(currentQuestion?.options || []).map((opt: any, idx: number) => {
-                                                  const isSelected = currentAnswer?.selectedOptions?.includes(idx);
-                                                  const isCorrect = opt?.isCorrect;
-                                                  if (!isSelected && !isCorrect) return null;
+                                              <div className="space-y-3">
+                                                {(() => {
+                                                  const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
                                                   return (
-                                                    <div key={idx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20') : 'bg-muted/30 border-border opacity-60'}`}>
-                                                      <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-gray-500 w-5">{MCQ_LABELS?.[idx]}.</span>
-                                                        <UniversalMathJax inline dynamic>{cleanupMath(opt?.text || String(opt))}</UniversalMathJax>
+                                                    <div className="space-y-2">
+                                                      <div className="text-xs font-bold text-muted-foreground flex items-center justify-between">
+                                                        <span>Selected ({mc.selectedIndices.length}) • Correct Keys ({mc.totalCorrect}):</span>
+                                                        {mc.isFullCorrect ? (
+                                                          <span className="text-emerald-600 font-bold">Full Marks Earned (+{mc.score})</span>
+                                                        ) : mc.isPartial ? (
+                                                          <span className="text-amber-600 font-bold">Partial Marks Earned (+{mc.score})</span>
+                                                        ) : (
+                                                          <span className="text-rose-600 font-bold">0 Marks</span>
+                                                        )}
                                                       </div>
-                                                      {isSelected && (isCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />)}
-                                                      {!isSelected && isCorrect && <span className="text-xs font-semibold text-green-600">(Missed)</span>}
+                                                      <div className="grid grid-cols-1 gap-2">
+                                                        {(currentQuestion?.options || []).map((opt: any, idx: number) => {
+                                                          const isSelected = mc.selectedIndices.includes(idx);
+                                                          const isCorrectOpt = opt?.isCorrect === true;
+                                                          const optText = typeof opt === 'object' ? opt?.text : opt;
+
+                                                          let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                          let labelStyle = "bg-muted text-muted-foreground";
+                                                          let badge = null;
+
+                                                          if (isSelected && isCorrectOpt) {
+                                                            style = "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 opacity-100";
+                                                            labelStyle = "bg-emerald-500 text-white";
+                                                            badge = (
+                                                              <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                                <CheckCircle className="h-3 w-3" /> Correct
+                                                              </Badge>
+                                                            );
+                                                          } else if (isSelected && !isCorrectOpt) {
+                                                            style = "bg-rose-500/10 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30 opacity-100";
+                                                            labelStyle = "bg-rose-500 text-white";
+                                                            badge = (
+                                                              <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                                <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                             </Badge>
+                                                            );
+                                                          } else if (!isSelected && isCorrectOpt) {
+                                                            style = "bg-emerald-500/5 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                            labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                            badge = (
+                                                              <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2">
+                                                                Missed Correct Option
+                                                              </Badge>
+                                                            );
+                                                          }
+
+                                                          return (
+                                                            <div key={idx} className={`p-3 rounded-xl border-2 flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                                  {MCQ_LABELS_BN?.[idx] || String.fromCharCode(65 + idx)}
+                                                                </span>
+                                                                <div className="text-sm font-medium leading-relaxed break-words overflow-x-auto max-w-full">
+                                                                  <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                                </div>
+                                                              </div>
+                                                              <div className="shrink-0">{badge}</div>
+                                                            </div>
+                                                          );
+                                                        })}
+                                                      </div>
                                                     </div>
                                                   );
-                                                })}
+                                                })()}
                                               </div>
                                             )}
 
+                                            {/* SMCQ Specific Rendering */}
                                             {currentQuestion?.type?.toLowerCase() === 'smcq' && (
                                               <div className="space-y-4">
                                                 {(currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).map((subQ: any, sIdx: number) => {
@@ -3355,9 +3886,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   }
 
                                                   return (
-                                                    <div key={sIdx} className="p-3 bg-card rounded border border-border">
+                                                    <div key={sIdx} className="p-3 bg-card rounded-xl border border-border">
                                                       <div className="flex items-center justify-between mb-3">
-                                                        <div className="text-sm font-semibold text-indigo-700 whitespace-pre-wrap">
+                                                        <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 whitespace-pre-wrap">
                                                           Part {toBengaliNumerals(sIdx + 1)}: <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                         </div>
                                                         {subAns ? (
@@ -3373,8 +3904,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                           const isCorrect = opt.isCorrect || (subQ.correctAnswer !== undefined && (normalize(subQ.correctAnswer) === normalize(optText) || Number(subQ.correctAnswer) === oIdx));
 
                                                           return (
-                                                            <div key={oIdx} className={`text-xs p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') :
-                                                              isCorrect ? 'bg-green-50 border-green-200 opacity-80' : 'bg-muted/30 border-border opacity-60'
+                                                            <div key={oIdx} className={`text-xs p-2 rounded-lg border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 dark:bg-green-950/30 border-green-300' : 'bg-red-100 dark:bg-red-950/30 border-red-300') :
+                                                              isCorrect ? 'bg-green-50 dark:bg-green-950/20 border-green-200 opacity-80' : 'bg-muted/30 border-border opacity-60'
                                                               }`}>
                                                               <div className="flex items-center gap-2 whitespace-pre-wrap">
                                                                 <span className="font-bold text-gray-500">{MCQ_LABELS?.[oIdx]}.</span>
@@ -3386,12 +3917,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                         })}
                                                       </div>
                                                       {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
-                                                        <div className="mt-3 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
+                                                        <div className="mt-3 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 p-2 rounded-lg border border-green-100 dark:border-green-900/30 whitespace-pre-wrap">
                                                           <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                         </div>
                                                       )}
                                                       {subQ.explanation && (
-                                                        <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
+                                                        <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/20 p-2 rounded-lg border border-blue-100 dark:border-blue-900/30 whitespace-pre-wrap">
                                                           <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                         </div>
                                                       )}
@@ -3401,20 +3932,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               </div>
                                             )}
 
+                                            {/* AR Specific Rendering */}
                                             {currentQuestion?.type?.toLowerCase() === 'ar' && (
-                                              <div className="p-3 bg-card rounded border border-border">
-                                                <div className="text-sm font-semibold text-indigo-600 mb-1">Selected Option {currentAnswer?.selectedOption || "N/A"}:</div>
-                                                <div className="text-sm text-gray-700 italic">
+                                              <div className="p-3 bg-card rounded-xl border border-border">
+                                                <div className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 mb-1">Selected Option {currentAnswer?.selectedOption || currentAnswer || "N/A"}:</div>
+                                                <div className="text-sm text-foreground italic">
                                                   {(() => {
-                                                    // Use stored options if available (supports shuffling)
                                                     if (currentQuestion?.options && (currentQuestion?.options?.length || 0) > 0) {
-                                                      const selectedIdx = Number(currentAnswer?.selectedOption || 0) - 1;
+                                                      const selectedIdx = Number(currentAnswer?.selectedOption || currentAnswer || 0) - 1;
                                                       if (selectedIdx >= 0 && selectedIdx < (currentQuestion?.options?.length || 0)) {
                                                         return <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion?.options?.[selectedIdx]?.text || "")}</UniversalMathJax>;
                                                       }
                                                     }
 
-                                                    // Fallback for legacy data
                                                     const labels = [
                                                       "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
                                                       "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
@@ -3422,47 +3952,179 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                       "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
                                                     ];
-                                                    return <UniversalMathJax inline dynamic>{labels?.[Number(currentAnswer?.selectedOption || 0) - 1] || "Unknown Option"}</UniversalMathJax>;
+                                                    return <UniversalMathJax inline dynamic>{labels?.[Number(currentAnswer?.selectedOption || currentAnswer || 0) - 1] || "Unknown Option"}</UniversalMathJax>;
                                                   })()}
                                                 </div>
                                               </div>
                                             )}
 
+                                            {/* MTF Specific Rendering (Rich 2-Column Grid + Match Analysis Table) */}
                                             {currentQuestion?.type?.toLowerCase() === 'mtf' && (
-                                              <div className="space-y-2">
-                                                <div className="text-sm font-semibold text-gray-600 mb-2">Student Matches:</div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                  {Object.entries(currentAnswer || {})?.map(([leftId, rightId]: [any, any]) => {
-                                                    const leftPart = (currentQuestion as any)?.leftColumn?.find((p: any) => p?.id === leftId);
-                                                    const rightPart = (currentQuestion as any)?.rightColumn?.find((p: any) => p?.id === rightId);
-                                                    const correctMatchId = (currentQuestion as any)?.correctMatches?.[leftId];
-                                                    const isMatchCorrect = rightId === correctMatchId;
-
-                                                    return (
-                                                      <div key={leftId} className={`p-2 rounded border flex flex-col gap-1 ${isMatchCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                                        <div className="flex items-center justify-between text-xs font-bold text-gray-500">
-                                                          <span>{leftPart?.text || leftId}</span>
-                                                          {isMatchCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : <XCircle className="h-3 w-3 text-red-600" />}
-                                                        </div>
-                                                        <div className="text-sm font-medium">
-                                                          Matched to: <span className={isMatchCorrect ? 'text-green-700' : 'text-red-700'}>{rightPart?.text || rightId}</span>
-                                                        </div>
-                                                        {!isMatchCorrect && (
-                                                          <div className="text-xs text-gray-500 border-t pt-1 mt-1">
-                                                            Correct: {(currentQuestion as any)?.rightColumn?.find((p: any) => p?.id === correctMatchId)?.text || correctMatchId}
+                                              <div className="space-y-4">
+                                                {(() => {
+                                                  const mtf = evaluateMTFDetails(currentQuestion, currentAnswer);
+                                                  return (
+                                                    <div className="space-y-4">
+                                                      {/* 2-Column Grid Layout */}
+                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="space-y-2">
+                                                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                                                            <span>Column A</span>
+                                                            <span className="text-[10px] text-muted-foreground/70">Left Items</span>
                                                           </div>
-                                                        )}
+                                                          {mtf.leftColumn.map((item, i) => (
+                                                            <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
+                                                              <span className="font-bold text-muted-foreground shrink-0">{i + 1}.</span>
+                                                              <div className="flex-1 font-medium">
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                              </div>
+                                                            </div>
+                                                          ))}
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                                                            <span>Column B</span>
+                                                            <span className="text-[10px] text-muted-foreground/70">Right Items</span>
+                                                          </div>
+                                                          {mtf.rightColumn.map((item, i) => (
+                                                            <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
+                                                              <span className="font-bold text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
+                                                              <div className="flex-1 font-medium">
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                              </div>
+                                                            </div>
+                                                          ))}
+                                                        </div>
                                                       </div>
-                                                    );
-                                                  })}
-                                                </div>
+
+                                                      {/* Match Analysis Table */}
+                                                      <div className="rounded-xl border border-indigo-500/20 overflow-hidden bg-indigo-500/5 shadow-sm">
+                                                        <div className="p-2.5 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
+                                                          <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <Activity className="h-3.5 w-3.5" /> Match Analysis & Breakdown
+                                                          </span>
+                                                          <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                                            {mtf.correctCount} / {mtf.totalPairs} Matched (+{mtf.score} marks)
+                                                          </span>
+                                                        </div>
+                                                        <div className="overflow-x-auto">
+                                                          <table className="w-full text-xs md:text-sm">
+                                                            <thead className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold uppercase">
+                                                              <tr>
+                                                                <th className="p-2.5 text-left w-1/3">Question (Left)</th>
+                                                                <th className="p-2.5 text-left w-1/3">Student Match</th>
+                                                                <th className="p-2.5 text-left w-1/3">Correct Match</th>
+                                                              </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-indigo-500/10 bg-card">
+                                                              {mtf.rows.map((row, lIdx) => {
+                                                                const rowClass = row.isMatchCorrect
+                                                                  ? "bg-emerald-500/5 dark:bg-emerald-500/10"
+                                                                  : !row.hasAnswered
+                                                                    ? "bg-muted/30 opacity-80"
+                                                                    : "bg-rose-500/5 dark:bg-rose-500/10";
+
+                                                                return (
+                                                                  <tr key={lIdx} className={rowClass}>
+                                                                    <td className="p-2.5 border-r border-indigo-500/10 font-medium">
+                                                                      <div className="flex items-center gap-1.5">
+                                                                        <span className="font-bold text-muted-foreground shrink-0">{row.vlLeft}.</span>
+                                                                        <div className="flex-1">
+                                                                          <UniversalMathJax inline dynamic>{cleanupMath(row.leftText)}</UniversalMathJax>
+                                                                        </div>
+                                                                      </div>
+                                                                    </td>
+                                                                    <td className={`p-2.5 border-r border-indigo-500/10 ${row.isMatchCorrect ? 'text-emerald-700 dark:text-emerald-300 font-bold' : !row.hasAnswered ? 'text-muted-foreground italic' : 'text-rose-700 dark:text-rose-300 font-bold'}`}>
+                                                                      {!row.hasAnswered ? (
+                                                                        <span className="text-muted-foreground italic">No selection</span>
+                                                                      ) : (
+                                                                        <div className="flex items-center justify-between gap-1.5">
+                                                                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                            {row.vStudentRight && <span className="font-bold shrink-0">{row.vStudentRight}.</span>}
+                                                                            <div className="flex-1">
+                                                                              <UniversalMathJax inline dynamic>{cleanupMath(row.studentRightText)}</UniversalMathJax>
+                                                                            </div>
+                                                                          </div>
+                                                                          {row.isMatchCorrect ? (
+                                                                            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                                                                          ) : (
+                                                                            <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                                                          )}
+                                                                        </div>
+                                                                      )}
+                                                                    </td>
+                                                                    <td className="p-2.5 text-emerald-700 dark:text-emerald-300 font-medium">
+                                                                      <div className="flex items-center gap-1.5">
+                                                                        {row.vCorrectRight && <span className="font-bold shrink-0">{row.vCorrectRight}.</span>}
+                                                                        <div className="flex-1">
+                                                                          <UniversalMathJax inline dynamic>{cleanupMath(row.correctRightText)}</UniversalMathJax>
+                                                                        </div>
+                                                                      </div>
+                                                                    </td>
+                                                                  </tr>
+                                                                );
+                                                              })}
+                                                            </tbody>
+                                                          </table>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })()}
                                               </div>
                                             )}
 
+                                            {/* INT / NUMERIC Specific Rendering (Comparison Box) */}
                                             {(currentQuestion?.type?.toLowerCase() === 'int' || currentQuestion?.type?.toLowerCase() === 'numeric') && (
-                                              <div className="text-lg font-bold p-3 bg-card rounded border border-border flex items-center gap-2">
-                                                <span>Answer:</span>
-                                                <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded">{currentAnswer?.answer}</span>
+                                              <div>
+                                                {(() => {
+                                                  const intDetails = evaluateINTDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
+                                                  const isCorrect = intDetails.isCorrect;
+                                                  const hasAttempted = intDetails.hasAttempted;
+
+                                                  return (
+                                                    <div className="p-4 bg-card border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+                                                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                                        <div className="pr-0 sm:pr-4">
+                                                          <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
+                                                            Student&apos;s Answer
+                                                          </div>
+                                                          <div className={`text-2xl font-black ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : hasAttempted ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground italic text-lg font-medium'}`}>
+                                                            {hasAttempted ? (
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.studentVal))}</UniversalMathJax>
+                                                            ) : (
+                                                              "Unanswered"
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                        <div className="pt-3 sm:pt-0 pl-0 sm:pl-4">
+                                                          <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
+                                                            Correct Key / Value
+                                                          </div>
+                                                          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.correctVal || "N/A"))}</UniversalMathJax>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                      <div className="shrink-0 flex items-center justify-end">
+                                                        {isCorrect ? (
+                                                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                            <CheckCircle className="h-4 w-4" /> Correct Key
+                                                          </Badge>
+                                                        ) : hasAttempted ? (
+                                                          <Badge className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                            <XCircle className="h-4 w-4" /> Incorrect Key
+                                                          </Badge>
+                                                        ) : (
+                                                          <Badge variant="outline" className="text-muted-foreground font-bold px-3 py-1.5 rounded-xl">
+                                                            Unanswered
+                                                          </Badge>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })()}
                                               </div>
                                             )}
 
@@ -3499,25 +4161,47 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   const displayUrl = getImageUrl(imgUrl, currentQuestion?.id, imgIdx);
                                                   const hasAnnotation = displayUrl !== imgUrl;
                                                   return (
-                                                    <div key={imgIdx} className="relative inline-block group">
+                                                    <div key={imgIdx} className="relative inline-block group rounded-xl overflow-hidden border border-border bg-muted/30 shadow-sm">
                                                       <img
                                                         src={displayUrl}
                                                         alt={`Answer Attachment ${imgIdx + 1}`}
                                                         crossOrigin="anonymous"
-                                                        className="h-32 w-32 rounded border border-border bg-muted/50 object-cover cursor-pointer transition-transform hover:scale-105"
+                                                        className="h-32 w-32 object-cover cursor-pointer transition-transform group-hover:scale-105"
                                                         onClick={() => openAnnotation(imgUrl, currentQuestion?.id, imgIdx, currentStudent?.student?.id, allImages)}
                                                       />
-                                                      <button
-                                                        onClick={() => openAnnotation(imgUrl, currentQuestion?.id, imgIdx, currentStudent?.student?.id, allImages)}
-                                                        className="absolute top-2 right-2 bg-background/90 p-1.5 rounded-full shadow-sm hover:bg-muted text-primary"
-                                                      >
-                                                        <PenTool className="w-4 h-4" />
-                                                      </button>
-                                                      <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                                                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setLightboxData({
+                                                              isOpen: true,
+                                                              url: displayUrl,
+                                                              zoom: 1,
+                                                              rotation: 0,
+                                                              title: `Script Image ${imgIdx + 1} of ${allImages.length}`
+                                                            });
+                                                          }}
+                                                          className="bg-background/90 p-1.5 rounded-full shadow-sm hover:bg-muted text-foreground"
+                                                          title="View Fullscreen"
+                                                        >
+                                                          <Maximize2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openAnnotation(imgUrl, currentQuestion?.id, imgIdx, currentStudent?.student?.id, allImages);
+                                                          }}
+                                                          className="bg-indigo-600 text-white p-1.5 rounded-full shadow-sm hover:bg-indigo-700"
+                                                          title="Annotate & Draw"
+                                                        >
+                                                          <PenTool className="w-3.5 h-3.5" />
+                                                        </button>
+                                                      </div>
+                                                      <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                                                         {imgIdx + 1}/{(allImages?.length || 0)}
                                                       </div>
                                                       {hasAnnotation && (
-                                                        <div className="absolute top-1 left-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shadow-sm z-10 pointer-events-none">
+                                                        <div className="absolute top-1 left-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold shadow-sm z-10 pointer-events-none">
                                                           ✓
                                                         </div>
                                                       )}
@@ -3983,32 +4667,51 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   )}
 
-                                  {/* New Question Types Specialized View */}
+                                  {/* MC Reference View */}
                                   {(currentQuestion?.type || "").toLowerCase() === 'mc' && (
                                     <div className="mb-4 space-y-3">
-                                      <h5 className="font-semibold text-gray-700 flex items-center gap-2">
-                                        <CheckSquare className="h-4 w-4 text-indigo-600" />
-                                        Multiple Correct (MC) Review:
+                                      <h5 className="font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-2">
+                                        <CheckSquare className="h-4 w-4" />
+                                        Multiple Correct (MC) Answer Key:
                                       </h5>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {currentQuestion?.options?.map((opt: any, oidx: number) => {
-                                          const sel = currentAnswer?.selectedOptions || [];
-                                          const isSelected = sel?.includes?.(oidx);
-                                          const isCorrect = opt?.isCorrect;
-                                          return (
-                                            <div key={oidx} className={`p-3 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400') : (isCorrect ? 'bg-green-100/50 border-dashed border-green-300 opacity-60' : 'bg-gray-50 border-gray-100')}`}>
-                                              <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold w-5 h-5 rounded-full bg-card flex items-center justify-center border border-border">{MCQ_LABELS?.[oidx]}</span>
-                                                <span className="text-sm"><UniversalMathJax dynamic>{cleanupMath(opt?.text)}</UniversalMathJax></span>
-                                              </div>
-                                              <div className="flex gap-1">
-                                                {isSelected && (isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />)}
-                                                {!isSelected && isCorrect && <CheckCircle className="w-4 h-4 text-green-400/50" />}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
+                                      {(() => {
+                                        const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
+                                        return (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            {currentQuestion?.options?.map((opt: any, oidx: number) => {
+                                              const isSelected = mc.selectedIndices.includes(oidx);
+                                              const isCorrect = opt?.isCorrect === true;
+                                              const optText = typeof opt === 'object' ? opt?.text : opt;
+
+                                              return (
+                                                <div key={oidx} className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isSelected ? (isCorrect ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30') : (isCorrect ? 'bg-emerald-500/5 border-dashed border-emerald-500/30 opacity-80' : 'bg-muted/30 border-border opacity-60')}`}>
+                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <span className="text-xs font-bold w-6 h-6 rounded-full bg-card flex items-center justify-center border border-border shrink-0">{MCQ_LABELS_BN?.[oidx] || String.fromCharCode(65 + oidx)}</span>
+                                                    <div className="text-sm font-medium"><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></div>
+                                                  </div>
+                                                  <div className="shrink-0 flex items-center gap-1.5">
+                                                    {isSelected && isCorrect && (
+                                                      <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                        <CheckCircle className="h-3 w-3" /> Correct
+                                                      </Badge>
+                                                    )}
+                                                    {isSelected && !isCorrect && (
+                                                      <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                        <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                      </Badge>
+                                                    )}
+                                                    {!isSelected && isCorrect && (
+                                                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 text-[10px] py-0.5 px-2">
+                                                        Correct Key
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   )}
 
@@ -4044,8 +4747,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
                                         ].map((optText, i) => {
                                           const optionId = i + 1;
-                                          const isSelected = Number(currentAnswer?.selectedOption || 0) === optionId;
-                                          const isCorrect = Number(currentQuestion?.correct || (currentQuestion as any)?.correctOption || 0) === optionId;
+                                          const isSelected = Number(currentAnswer?.selectedOption || currentAnswer || 0) === optionId;
+                                          const isCorrect = Number(currentQuestion?.correct || (currentQuestion as any)?.correctOption || (currentQuestion as any)?.correctAnswer || 0) === optionId;
 
                                           let bgClass = "bg-card border-border hover:bg-accent";
                                           if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300 dark:bg-green-900/20 dark:border-green-800 dark:ring-green-900/40";
@@ -4057,7 +4760,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${isSelected || isCorrect ? 'bg-card border-border' : 'bg-muted text-muted-foreground'}`}>
                                                 {optionId}
                                               </div>
-                                              <span className={`text-sm flex-1 ${isCorrect ? 'font-medium text-green-900' : isSelected ? 'text-red-900' : 'text-gray-700'}`}>
+                                              <span className={`text-sm flex-1 ${isCorrect ? 'font-medium text-green-900 dark:text-green-200' : isSelected ? 'text-red-900 dark:text-red-200' : 'text-foreground'}`}>
                                                 {optText}
                                               </span>
                                               {isCorrect && <CheckCircle className="h-5 w-5 text-green-600" />}
@@ -4069,157 +4772,139 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   )}
 
+                                  {/* MTF Reference View */}
                                   {(currentQuestion?.type || "").toLowerCase() === 'mtf' && (
-                                    <div className="mb-4 space-y-6">
-                                      <h5 className="font-semibold text-orange-700 flex items-center gap-2 border-b pb-2">
-                                        <Activity className="h-4 w-4" /> Match the Following Grid:
+                                    <div className="mb-4 space-y-4">
+                                      <h5 className="font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-2 border-b pb-2">
+                                        <Activity className="h-4 w-4" /> Match the Following Key & Breakdown:
                                       </h5>
 
-                                      {/* 2-Column Grid Layout (Question View) */}
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column A</div>
-                                          {((currentQuestion as any)?.leftColumn || (currentQuestion as any)?.pairs?.map((p: any, i: number) => ({ id: p?.left, text: p?.left })))?.map((item: any, i: number) => (
-                                            <div key={i} className="p-3 bg-card border border-border rounded shadow-sm text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2 text-gray-500">{i + 1}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item?.text || item?.id || "")}</UniversalMathJax>
+                                      {(() => {
+                                        const mtf = evaluateMTFDetails(currentQuestion, currentAnswer);
+                                        return (
+                                          <div className="space-y-4">
+                                            {/* 2-Column Grid Layout */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                              <div className="space-y-2">
+                                                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Column A (Left)</div>
+                                                {mtf.leftColumn.map((item, i) => (
+                                                  <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
+                                                    <span className="font-bold text-muted-foreground shrink-0">{i + 1}.</span>
+                                                    <div className="flex-1 font-medium"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                              <div className="space-y-2">
+                                                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Column B (Right)</div>
+                                                {mtf.rightColumn.map((item, i) => (
+                                                  <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
+                                                    <span className="font-bold text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
+                                                    <div className="flex-1 font-medium"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
+                                                  </div>
+                                                ))}
+                                              </div>
                                             </div>
-                                          ))}
-                                        </div>
-                                        <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column B</div>
-                                          {((currentQuestion as any)?.rightColumn || (currentQuestion as any)?.pairs?.map((p: any, i: number) => ({ id: p?.right, text: p?.right })))?.map((item: any, i: number) => (
-                                            <div key={i} className="p-3 bg-card border border-border rounded shadow-sm text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2 text-gray-500">{String.fromCharCode(65 + i)}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item?.text || item?.id || "")}</UniversalMathJax>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
 
-                                      {/* Match Analysis Table */}
-                                      <div className="overflow-hidden rounded-lg border border-border">
-                                        <table className="w-full text-sm">
-                                          <thead className="bg-muted text-xs text-muted-foreground font-bold uppercase text-left">
-                                            <tr>
-                                              <th className="px-3 py-2">Item</th>
-                                              <th className="px-3 py-2">Your Match</th>
-                                              <th className="px-3 py-2 text-center">Status</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-border">
-                                            {((currentQuestion as any)?.leftColumn || (currentQuestion as any)?.pairs?.map((p: any, i: number) => ({ id: i, text: p?.left })))?.map((leftItem: any, lIdx: number) => {
-                                              // Determine Student's Match
-                                              let studentRightText = "Unmatched";
-                                              let isCorrect = false;
-                                              let studentRightIdx = -1;
-
-                                              // Determine Correct Match for display if wrong
-                                              let correctRightText = "";
-                                              let correctRightIdx = -1;
-
-                                              if ((currentQuestion as any)?.leftColumn) {
-                                                // New Schema
-                                                const studentMatches = (currentAnswer as any)?.matches || (currentAnswer as any) || {};
-                                                let studentRightId = null;
-                                                if (Array.isArray(studentMatches)) {
-                                                  const match = studentMatches?.find((m: any) => m?.leftId === leftItem?.id);
-                                                  if (match) studentRightId = match?.studentRightId || match?.rightId;
-                                                } else {
-                                                  studentRightId = studentMatches?.[leftItem?.id];
-                                                }
-
-                                                const rightItem = (currentQuestion as any)?.rightColumn?.find((r: any) => r?.id === studentRightId);
-                                                studentRightIdx = (currentQuestion as any)?.rightColumn?.findIndex((r: any) => r?.id === studentRightId);
-                                                studentRightText = rightItem?.text || (studentRightId ? "Invalid ID" : "Unmatched");
-
-                                                const correctRightId = (currentQuestion as any)?.correctMatches?.[leftItem?.id];
-                                                isCorrect = studentRightId === correctRightId;
-
-                                                const correctItem = (currentQuestion as any)?.rightColumn?.find((r: any) => r?.id === correctRightId);
-                                                correctRightIdx = (currentQuestion as any)?.rightColumn?.findIndex((r: any) => r?.id === correctRightId);
-                                                correctRightText = correctItem?.text || "";
-
-                                              } else {
-                                                // Legacy Schema (Pairs)
-                                                // Try to find match in array
-                                                const pair = (currentQuestion as any)?.pairs?.[lIdx];
-                                                studentRightIdx = currentAnswer?.matches?.find((m: any) => m?.leftIndex === lIdx)?.rightIndex;
-
-                                                const rightPair = (currentQuestion as any)?.pairs?.[studentRightIdx];
-                                                studentRightText = rightPair?.right || "Unmatched";
-
-                                                isCorrect = pair?.right === rightPair?.right;
-                                                correctRightText = pair?.right || "";
-                                                // For legacy pairs, correctRightIdx would be lIdx if they were perfectly aligned initially
-                                                correctRightIdx = lIdx;
-                                              }
-
-                                              // Visual labels
-                                              const vlLeft = toBengaliNumerals(lIdx + 1);
-                                              const vStudentRight = studentRightIdx !== -1 && studentRightIdx !== undefined ? String.fromCharCode(65 + studentRightIdx) : null;
-                                              const vCorrectRight = correctRightIdx !== -1 && correctRightIdx !== undefined ? String.fromCharCode(65 + correctRightIdx) : null;
-
-                                              return (
-                                                <tr key={lIdx} className={isCorrect ? "bg-green-50/30" : "bg-red-50/30"}>
-                                                  <td className="px-3 py-2 font-medium">
-                                                    <div className="flex items-center gap-1">
-                                                      <span className="font-bold text-gray-400 shrink-0">{vlLeft}.</span>
-                                                      <UniversalMathJax inline>{cleanupMath(leftItem?.text || String(leftItem || ""))}</UniversalMathJax>
-                                                    </div>
-                                                  </td>
-                                                  <td className="px-3 py-2">
-                                                    <div className="flex flex-col">
-                                                      <span className={isCorrect ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>
-                                                        <div className="flex items-center gap-1">
-                                                          {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
-                                                          <UniversalMathJax inline>{cleanupMath(studentRightText || "")}</UniversalMathJax>
+                                            {/* Match Breakdown Table */}
+                                            <div className="rounded-xl border border-indigo-500/20 overflow-hidden bg-indigo-500/5 shadow-sm">
+                                              <div className="p-2.5 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
+                                                <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                                                  Match Key Breakdown
+                                                </span>
+                                                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                                  Score: {mtf.score} / {currentQuestion?.marks || 1} marks
+                                                </span>
+                                              </div>
+                                              <table className="w-full text-xs md:text-sm">
+                                                <thead className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold uppercase text-left">
+                                                  <tr>
+                                                    <th className="p-2.5 w-1/3">Column A (Left)</th>
+                                                    <th className="p-2.5 w-1/3">Student Choice</th>
+                                                    <th className="p-2.5 w-1/3">Correct Match</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-indigo-500/10 bg-card">
+                                                  {mtf.rows.map((row, lIdx) => (
+                                                    <tr key={lIdx} className={row.isMatchCorrect ? "bg-emerald-500/5" : !row.hasAnswered ? "bg-muted/30 opacity-80" : "bg-rose-500/5"}>
+                                                      <td className="p-2.5 border-r border-indigo-500/10 font-medium">
+                                                        <div className="flex items-center gap-1.5">
+                                                          <span className="font-bold text-muted-foreground shrink-0">{row.vlLeft}.</span>
+                                                          <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.leftText)}</UniversalMathJax></div>
                                                         </div>
-                                                      </span>
-                                                      {!isCorrect && (
-                                                        <span className="text-xs text-gray-500 mt-0.5">
-                                                          Correct: <span className="text-green-600 font-medium flex items-center gap-1">
-                                                            {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
-                                                            <UniversalMathJax inline>{cleanupMath(correctRightText || "")}</UniversalMathJax>
-                                                          </span>
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                  </td>
-                                                  <td className="px-3 py-2 text-center">
-                                                    {isCorrect ? <CheckCircle className="h-5 w-5 text-green-500 mx-auto" /> : <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
-                                                  </td>
-                                                </tr>
-                                              );
-                                            })}
-                                          </tbody>
-                                        </table>
-                                      </div>
+                                                      </td>
+                                                      <td className="p-2.5 border-r border-indigo-500/10">
+                                                        {!row.hasAnswered ? (
+                                                          <span className="text-muted-foreground italic">No selection</span>
+                                                        ) : (
+                                                          <div className="flex items-center justify-between gap-1.5">
+                                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                              {row.vStudentRight && <span className="font-bold shrink-0">{row.vStudentRight}.</span>}
+                                                              <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.studentRightText)}</UniversalMathJax></div>
+                                                            </div>
+                                                            {row.isMatchCorrect ? (
+                                                              <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                                                            ) : (
+                                                              <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </td>
+                                                      <td className="p-2.5 text-emerald-700 dark:text-emerald-300 font-medium">
+                                                        <div className="flex items-center gap-1.5">
+                                                          {row.vCorrectRight && <span className="font-bold shrink-0">{row.vCorrectRight}.</span>}
+                                                          <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.correctRightText)}</UniversalMathJax></div>
+                                                        </div>
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   )}
 
+                                  {/* INT / Numeric Reference View */}
                                   {(['int', 'numeric'].includes((currentQuestion?.type || "").toLowerCase())) && (
                                     <div className="mb-4">
-                                      <div className="flex flex-col sm:flex-row gap-4">
-                                        {/* Comparison Box */}
-                                        <div className="flex-1 bg-card border border-border rounded-xl overflow-hidden shadow-sm flex">
-                                          <div className={`w-2 ${Number(currentAnswer?.answer || 0) === Number(currentQuestion?.correct || (currentQuestion as any)?.answer || 0) ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                          <div className="flex-1 p-4 grid grid-cols-2 gap-4 divide-x">
-                                            <div className="pr-4">
-                                              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Your Answer</div>
-                                              <div className="text-2xl font-black text-gray-800">
-                                                {currentAnswer?.answer ?? <span className="text-gray-300 text-lg italic">Empty</span>}
+                                      {(() => {
+                                        const intDetails = evaluateINTDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
+                                        return (
+                                          <div className="p-4 bg-card border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+                                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                              <div className="pr-0 sm:pr-4">
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Student Answer</div>
+                                                <div className={`text-2xl font-black ${intDetails.isCorrect ? 'text-emerald-600' : intDetails.hasAttempted ? 'text-rose-600' : 'text-muted-foreground italic text-lg font-medium'}`}>
+                                                  {intDetails.hasAttempted ? <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.studentVal))}</UniversalMathJax> : "Empty / Unanswered"}
+                                                </div>
+                                              </div>
+                                              <div className="pt-3 sm:pt-0 pl-0 sm:pl-4">
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Correct Key</div>
+                                                <div className="text-2xl font-black text-emerald-600">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.correctVal || "N/A"))}</UniversalMathJax>
+                                                </div>
                                               </div>
                                             </div>
-                                            <div className="pl-4">
-                                              <div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Correct Key</div>
-                                              <div className="text-2xl font-black text-green-600">
-                                                {currentQuestion?.correct || (currentQuestion as any)?.answer || "N/A"}
-                                              </div>
+                                            <div className="shrink-0 flex items-center justify-end">
+                                              {intDetails.isCorrect ? (
+                                                <Badge className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                  <CheckCircle className="h-4 w-4" /> Correct Key
+                                                </Badge>
+                                              ) : intDetails.hasAttempted ? (
+                                                <Badge className="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                  <XCircle className="h-4 w-4" /> Incorrect Key
+                                                </Badge>
+                                              ) : (
+                                                <Badge variant="outline" className="text-muted-foreground font-bold px-3 py-1.5 rounded-xl">
+                                                  Unanswered
+                                                </Badge>
+                                              )}
                                             </div>
                                           </div>
-                                        </div>
-                                      </div>
+                                        );
+                                      })()}
                                     </div>
                                   )}
 
@@ -5040,6 +5725,256 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             </Tabs>
           </div>
 
+          {/* Student Switcher Modal */}
+          <Dialog open={isStudentSwitcherOpen} onOpenChange={setIsStudentSwitcherOpen}>
+            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6 rounded-3xl">
+              <DialogHeader className="pb-2 border-b border-border">
+                <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  Select & Jump to Student
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4 pt-2 flex-1 overflow-hidden flex flex-col">
+                {/* Search & Tabs */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by student name or roll..."
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      className="pl-9 rounded-xl text-xs"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl">
+                    {[
+                      { id: 'ALL', label: 'All' },
+                      { id: 'COMPLETED', label: 'Completed' },
+                      { id: 'PENDING', label: 'Pending' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setStudentFilterTab(tab.id as any)}
+                        className={cn(
+                          "px-3 py-1 text-xs font-bold rounded-lg transition-all",
+                          studentFilterTab === tab.id
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Student Grid */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                  {(() => {
+                    const filtered = (exam?.submissions || []).filter(sub => {
+                      const name = sub?.student?.name || '';
+                      const roll = sub?.student?.roll || '';
+                      const query = studentSearchQuery.toLowerCase();
+                      const matchesQuery = name.toLowerCase().includes(query) || roll.toLowerCase().includes(query);
+
+                      if (!matchesQuery) return false;
+                      if (studentFilterTab === 'COMPLETED') return sub?.status === 'COMPLETED';
+                      if (studentFilterTab === 'PENDING') return sub?.status !== 'COMPLETED';
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-muted-foreground text-sm">
+                          No students matching your search criteria.
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((sub) => {
+                      const realIndex = (exam?.submissions || []).findIndex(s => s?.student?.id === sub?.student?.id);
+                      const isCurrent = realIndex === currentStudentIndex;
+                      const isCompleted = sub?.status === 'COMPLETED';
+
+                      return (
+                        <div
+                          key={sub?.student?.id || realIndex}
+                          onClick={() => {
+                            setCurrentStudentIndex(realIndex);
+                            setCurrentQuestionIndex(0);
+                            setIsStudentSwitcherOpen(false);
+                            if (sub?.student?.id) {
+                              fetchExamData(sub.student.id);
+                            }
+                            triggerHaptic(ImpactStyle.Medium);
+                          }}
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer group",
+                            isCurrent
+                              ? "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-500/50 shadow-sm ring-1 ring-indigo-500/30"
+                              : "bg-card hover:bg-muted/50 border-border"
+                          )}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={cn(
+                              "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-transform group-hover:scale-105",
+                              isCurrent
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                                : "bg-muted text-muted-foreground"
+                            )}>
+                              {sub?.student?.name ? sub.student.name.charAt(0).toUpperCase() : (realIndex + 1)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm text-foreground truncate flex items-center gap-2">
+                                <span>{sub?.student?.name}</span>
+                                {isCurrent && (
+                                  <Badge className="bg-indigo-600 text-white text-[9px] py-0 px-1.5 font-bold">
+                                    Current
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Roll: <span className="font-semibold text-foreground/80">{sub?.student?.roll || 'N/A'}</span> • #{realIndex + 1}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <div className="text-xs font-bold text-foreground">
+                                Score: {sub?.result?.totalMarks ?? sub?.totalScore ?? '—'}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                / {totalMarks} marks
+                              </div>
+                            </div>
+
+                            {isCompleted ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] py-0.5 px-2 font-bold flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" /> Graded
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] py-0.5 px-2 font-bold flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" /> Pending
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Keyboard Shortcuts Cheat-sheet Modal */}
+          <Dialog open={isShortcutsOpen} onOpenChange={setIsShortcutsOpen}>
+            <DialogContent className="max-w-md p-6 rounded-3xl">
+              <DialogHeader className="pb-2 border-b border-border">
+                <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  Productivity Keyboard Shortcuts
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3 pt-2 text-xs">
+                <div className="space-y-2">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Navigation</div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border">
+                      <span className="font-medium text-foreground">Next / Previous Question</span>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">←</kbd>
+                        <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">→</kbd>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border">
+                      <span className="font-medium text-foreground">Next / Previous Student</span>
+                      <div className="flex items-center gap-1">
+                        <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">[</kbd>
+                        <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">]</kbd>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Actions & Views</div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border">
+                      <span className="font-medium text-foreground">Open Fast Student Switcher</span>
+                      <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">S</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border">
+                      <span className="font-medium text-foreground">Toggle Reference / Model Key</span>
+                      <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">R</kbd>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/40 border border-border">
+                      <span className="font-medium text-foreground">Toggle Shortcuts Cheat-Sheet</span>
+                      <kbd className="px-2 py-0.5 rounded bg-card border border-border font-mono font-bold text-[11px] shadow-sm">?</kbd>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* High-Resolution Image Lightbox Modal */}
+          {lightboxData?.isOpen && (
+            <Dialog open={lightboxData.isOpen} onOpenChange={(open) => !open && setLightboxData(null)}>
+              <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col p-4 rounded-3xl bg-background/95 backdrop-blur-xl border border-border shadow-2xl">
+                <DialogHeader className="flex flex-row items-center justify-between pb-2 border-b border-border">
+                  <DialogTitle className="text-sm font-bold truncate max-w-[300px]">
+                    {lightboxData.title || "Student Script Image"}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLightboxData(prev => prev ? { ...prev, zoom: Math.min(3, prev.zoom + 0.25) } : null)}
+                      className="rounded-lg h-8 px-2"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLightboxData(prev => prev ? { ...prev, zoom: Math.max(0.5, prev.zoom - 0.25) } : null)}
+                      className="rounded-lg h-8 px-2"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLightboxData(prev => prev ? { ...prev, rotation: (prev.rotation + 90) % 360 } : null)}
+                      className="rounded-lg h-8 px-2"
+                      title="Rotate 90°"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-muted/20 rounded-2xl min-h-[400px]">
+                  <img
+                    src={lightboxData.url}
+                    alt={lightboxData.title}
+                    className="max-w-full max-h-[70vh] object-contain transition-transform duration-200 rounded-lg shadow-lg"
+                    style={{
+                      transform: `scale(${lightboxData.zoom}) rotate(${lightboxData.rotation}deg)`
+                    }}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Drawing Canvas Annotation Modal */}
           <Dialog open={isAnnotationOpen} onOpenChange={setIsAnnotationOpen}>
             <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 border-none bg-transparent shadow-none">
               {activeAnnotationOriginal && (
