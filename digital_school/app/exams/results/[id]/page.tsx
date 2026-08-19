@@ -3101,19 +3101,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     ) : type === 'CMA' ? (
                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
                                         {(() => {
-                                          const parsedVal = typeof question.studentAnswer === 'string'
-                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
+                                          let parsedVal = typeof question.studentAnswer === 'string'
+                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
                                             : (question.studentAnswer || {});
+                                          parsedVal = parsedVal || {};
+
+                                          let rawParts = (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || (question as any).sub_questions || [];
+                                          if (typeof rawParts === 'string') {
+                                            try { rawParts = JSON.parse(rawParts); } catch { rawParts = []; }
+                                          }
+                                          const parts = Array.isArray(rawParts) ? rawParts : [];
+
                                           const cmaQ = {
                                             id: question.id,
                                             text: question.questionText || (question as any).text,
                                             marks: question.marks || 1,
-                                            parts: (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []
+                                            parts: parts
                                           };
                                           return (
                                             <CMARenderer
                                               question={cmaQ}
                                               value={parsedVal}
+                                              disabled={true}
                                               showFeedback={true}
                                               evalResult={evaluateCMAQuestion(cmaQ as any, parsedVal)}
                                             />
@@ -3123,19 +3132,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     ) : type === 'MPC' ? (
                                       <div className="p-4 bg-card rounded-xl border border-border space-y-3">
                                         {(() => {
-                                          const parsedVal = typeof question.studentAnswer === 'string'
-                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return {}; } })()
+                                          let parsedVal = typeof question.studentAnswer === 'string'
+                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
                                             : (question.studentAnswer || {});
+                                          parsedVal = parsedVal || {};
+
+                                          let rawStages = (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || (question as any).sub_questions || [];
+                                          if (typeof rawStages === 'string') {
+                                            try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
+                                          }
+                                          const stages = Array.isArray(rawStages) ? rawStages : [];
+
                                           const mpcQ = {
                                             id: question.id,
                                             text: question.questionText || (question as any).text,
                                             scenario: (question as any).scenario,
-                                            stages: (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []
+                                            stages: stages
                                           };
                                           return (
                                             <MPCRenderer
                                               question={mpcQ}
                                               value={parsedVal}
+                                              disabled={true}
                                               showFeedback={true}
                                               evalResult={evaluateMPCQuestion(mpcQ as any, parsedVal)}
                                             />
@@ -3160,32 +3178,59 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           {type === 'CMA' && (
                                             <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-1.5 text-slate-800 dark:text-slate-200">
                                               <span className="font-bold text-amber-700 dark:text-amber-400">CMA Model Answers:</span>
-                                              {((question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []).map((p: any, pIdx: number) => (
-                                                <div key={pIdx} className="flex items-center justify-between pl-2 border-l-2 border-amber-500/30">
-                                                  <span>Part {p.label || pIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(p.prompt || p.text || 'Answer')}</UniversalMathJax>):</span>
-                                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(String(p.expectedAnswer || p.modelAnswer || 'N/A'))}</UniversalMathJax> {p.unit || ''}
-                                                  </span>
-                                                </div>
-                                              ))}
+                                              {(() => {
+                                                let rawParts = (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || (question as any).sub_questions || [];
+                                                if (typeof rawParts === 'string') {
+                                                  try { rawParts = JSON.parse(rawParts); } catch { rawParts = []; }
+                                                }
+                                                const partsList = Array.isArray(rawParts) ? rawParts : [];
+                                                return partsList.map((p: any, pIdx: number) => {
+                                                  const pAns = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? p.correct ?? 'N/A';
+                                                  const pLabel = p.label || p.prompt || p.text || p.question || `Part ${pIdx + 1}`;
+                                                  return (
+                                                    <div key={pIdx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pl-2.5 border-l-2 border-amber-500/40">
+                                                      <span>Part {p.label || pIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(pLabel)}</UniversalMathJax>):</span>
+                                                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(String(pAns))}</UniversalMathJax> {p.unit || ''}
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                });
+                                              })()}
                                             </div>
                                           )}
 
                                           {/* MPC Model Answer Breakdown */}
                                           {type === 'MPC' && (
-                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-1.5 text-slate-800 dark:text-slate-200">
+                                            <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-2 text-slate-800 dark:text-slate-200">
                                               <span className="font-bold text-amber-700 dark:text-amber-400">MPC Stage Model Solutions:</span>
-                                              {((question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []).map((s: any, sIdx: number) => (
-                                                <div key={sIdx} className="flex flex-col gap-0.5 pl-2 border-l-2 border-amber-500/30">
-                                                  <div className="flex items-center justify-between">
-                                                    <span>Stage {sIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(s.stageTitle || s.prompt || 'Step')}</UniversalMathJax>):</span>
-                                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                                      <UniversalMathJax inline dynamic>{cleanupMath(String(s.expectedAnswer || s.modelAnswer || 'N/A'))}</UniversalMathJax>
-                                                    </span>
-                                                  </div>
-                                                  {s.formula && <span className="text-[10px] text-slate-500 font-mono">Formula: {s.formula}</span>}
-                                                </div>
-                                              ))}
+                                              {(() => {
+                                                let rawStages = (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || (question as any).sub_questions || [];
+                                                if (typeof rawStages === 'string') {
+                                                  try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
+                                                }
+                                                const stagesList = Array.isArray(rawStages) ? rawStages : [];
+                                                return stagesList.map((s: any, sIdx: number) => {
+                                                  const sAns = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? s.correct ?? 'N/A';
+                                                  const sTitle = s.stageTitle || s.prompt || s.text || s.question || `Stage ${sIdx + 1}`;
+                                                  return (
+                                                    <div key={sIdx} className="flex flex-col gap-1 pl-2.5 border-l-2 border-amber-500/40">
+                                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                                        <span>Stage {sIdx + 1} (<UniversalMathJax inline dynamic>{cleanupMath(sTitle)}</UniversalMathJax>):</span>
+                                                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(String(sAns))}</UniversalMathJax>
+                                                        </span>
+                                                      </div>
+                                                      {s.formula && (
+                                                        <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">
+                                                          <span className="font-bold mr-1">Formula:</span>
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(s.formula)}</UniversalMathJax>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                });
+                                              })()}
                                             </div>
                                           )}
 
