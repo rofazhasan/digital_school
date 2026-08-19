@@ -204,7 +204,19 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['আর্কিমিডিসের নীতি', 'archimedes principle'],
   ['ডপলার প্রভাব', 'ডপলার ক্রিয়া', 'doppler effect'],
   ['পূর্ণ অভ্যন্তরীণ প্রতিফলন', 'total internal reflection', 'tir'],
-  ['সংকট কোণ', 'ক্রান্তি কোণ', 'critical angle']
+  ['সংকট কোণ', 'ক্রান্তি কোণ', 'critical angle'],
+  ['প্লবতা', 'উর্ধ্বমুখী বল', 'buoyancy', 'buoyant force', 'upthrust'],
+  ['সান্দ্রতা', 'সান্দ্রতা গুণাঙ্ক', 'viscosity', 'viscous force'],
+  ['অর্ধায়ু', 'অর্ধ-জীবন', 'half life', 'half-life', 't_1/2', 't_{1/2}'],
+  ['তেজস্ক্রিয়তা', 'radioactivity'],
+  ['তড়িৎ প্রবাহ', 'তড়িৎ প্রবাহ', 'বিদ্যুৎ প্রবাহ', 'electric current', 'current', 'I'],
+  ['বিভব পার্থক্য', 'ভোল্টেজ', 'potential difference', 'voltage', 'V'],
+  ['তড়িৎচালক শক্তি', 'তড়িৎচালক বল', 'ইএমএফ', 'emf', 'electromotive force', 'E'],
+  ['রোধ', 'তড়িৎ রোধ', 'বৈদ্যুতিক রোধ', 'resistance', 'R'],
+  ['প্রতিসরাঙ্ক', 'প্রতিসরণাঙ্ক', 'refractive index', 'mu', 'n'],
+  ['ফোকাস দূরত্ব', 'focal length', 'f'],
+  ['ভরত্রুটি', 'ভর ত্রুটি', 'mass defect', 'delta m', 'Δm'],
+  ['বন্ধন শক্তি', 'binding energy', 'BE']
 ];
 
 export const BENGALI_SYNONYM_GROUPS = COMPREHENSIVE_SCIENCE_SYNONYMS;
@@ -364,6 +376,9 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   s = s.replace(/\\+(cdot|times)/g, '*');
   s = s.replace(/\\+(div)/g, '/');
 
+  // Convert LaTeX mixed fractions: 2\frac{1}{2} -> ((2)+(1)/(2))
+  s = s.replace(/(\d+)\s*\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)+($3)/($4))');
+
   // Convert fractions \frac{a}{b}, \dfrac{a}{b}, \tfrac{a}{b} -> (a)/(b)
   while (/\\+(frac|dfrac|tfrac)/.test(s)) {
     const nextS = s.replace(/\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '($2)/($3)');
@@ -408,6 +423,31 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   // Convert sqrt
   s = s.replace(/\\+sqrt\{([^{}]+)\}/g, 'sqrt($1)');
   s = s.replace(/\\+sqrt\[([^{}]+)\]\{([^{}]+)\}/g, '(($2)^(1/($1)))');
+
+  // Convert mixed fractions: 2\frac{1}{2} or 2 1/2 -> ((2)+(1)/(2))
+  s = s.replace(/(\d+)\s*\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)+($3)/($4))');
+  s = s.replace(/\b(\d+)\s+(\d+)\/(\d+)\b/g, '(($1)+($2)/($3))');
+
+  // Convert absolute values: \left| x \right| or |x| -> abs(x)
+  s = s.replace(/\\left\|([^{|]+)\\right\|/g, 'abs($1)');
+  s = s.replace(/(?<!\|)\|([^|\n]+)\|(?!\|)/g, 'abs($1)');
+
+  // Convert trigonometric powers: \sin^2(x) or sin^2(x) -> ((sin(x))^2)
+  s = s.replace(/\\+(sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|asin|acos|atan)\^\{?(\d+)\}?\s*(\([^\(\)]+\)|[a-zA-Z0-9_]+)/g, '(($1($3))^$2)');
+  s = s.replace(/\b(sin|cos|tan|cot|sec|csc)\^\{?(\d+)\}?\s*(\([^\(\)]+\)|[a-zA-Z0-9_]+)/g, '(($1($3))^$2)');
+
+  // Convert logarithms: \log_{2}(8) -> (log(8)/log(2)), \ln(x) -> ln(x)
+  s = s.replace(/\\+log_\{?([0-9a-zA-Z]+)\}?\s*\(([^()]+)\)/g, '(log($2)/log($1))');
+  s = s.replace(/\\+(sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|asin|acos|atan|exp|ln|log|abs)\b/g, '$1');
+
+  // Convert plus-minus & minus-plus: \pm, ± -> +-, \mp, ∓ -> -+
+  s = s.replace(/\\+(pm|plusmn)\b|±/g, '+-');
+  s = s.replace(/\\+mp\b|∓/g, '-+');
+
+  // Convert LaTeX inequalities: \le, \leq -> <=, \ge, \geq -> >=, \ne, \neq -> !=
+  s = s.replace(/\\+(le|leq)\b/g, '<=');
+  s = s.replace(/\\+(ge|geq)\b/g, '>=');
+  s = s.replace(/\\+(ne|neq)\b/g, '!=');
 
   // Convert Unicode superscripts & subscripts
   const unicodeMap: Record<string, string> = {
@@ -509,9 +549,16 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   // Convert scientific notation: 1.5x10^8 or 1.5*10^8 or 1.5*10^(8) or 1.5 \times 10^{8} -> 1.5e8
   expr = expr.replace(/(\d+(?:\.\d+)?)\s*(?:\*|x|X)\s*10\^\(?([-+]?\d+)\)?/g, '$1e$2');
 
+  // Convert degree angles: 30 deg, 30°, 30^\circ -> (30 * pi / 180)
+  expr = expr.replace(/(\d+(?:\.\d+)?)\s*(?:deg|degree|\^\\circ|\\circ|°)\b/gi, '($1*pi/180)');
+
+  // Standardize complex engineering imaginary unit 'j' into 'i': e.g. 4j -> 4*i
+  expr = expr.replace(/(\d+)\s*j\b/g, '$1*i');
+  expr = expr.replace(/\bj\b/g, 'i');
+
   // Multi-letter functions and named constants (pi, theta, sin, etc.)
-  const funcKeywords = ['sqrt', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'abs', 'prev', 'binom', 'perm'];
-  const constKeywords = ['pi', 'theta', 'lambda', 'omega', 'delta', 'alpha', 'beta', 'gamma', 'rho', 'sigma', 'phi'];
+  const funcKeywords = ['sqrt', 'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'exp', 'log', 'ln', 'abs', 'prev', 'binom', 'perm'];
+  const constKeywords = ['pi', 'theta', 'lambda', 'omega', 'delta', 'alpha', 'beta', 'gamma', 'rho', 'sigma', 'phi', 'mu'];
   const knownKeywords = [...funcKeywords, ...constKeywords];
 
   // Tokenize string to preserve multi-letter functions and add explicit multiplication between variables/tokens
@@ -693,7 +740,16 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
       text = text.replace(regex, valStr);
     }
 
+    // Substitute pi constant
     text = text.replace(/(?<![a-zA-Z0-9_])pi(?![a-zA-Z0-9_])/gi, `(${Math.PI})`);
+
+    // Degree angle conversion: 30 deg or 30° -> (30 * Math.PI / 180)
+    text = text.replace(/(\d+(?:\.\d+)?)\s*(?:deg|degree|\^\\circ|\\circ|°)\b/gi, '($1 * Math.PI / 180)');
+
+    // Euler's constant e (when not explicitly provided as a sample variable)
+    if (!vars['e'] && !vars['E']) {
+      text = text.replace(/(?<![a-zA-Z0-9_])e(?![a-zA-Z0-9_])/g, `(${Math.E})`);
+    }
 
     // Convert binom(n, r) and perm(n, r)
     let norm = text.replace(/\bbinom\s*\(([^,]+),\s*([^)]+)\)/g, '_calcBinom($1, $2)');
@@ -705,11 +761,27 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
     // Convert powers: ^(...) or ^\d+ -> **(...) or **\d+
     norm = norm.replace(/\^/g, '**');
 
-    // Convert sqrt
-    norm = norm.replace(/sqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
+    // Convert sqrt and standard math functions
+    norm = norm.replace(/\bsqrt\(([^()]+)\)/g, 'Math.sqrt($1)');
+    norm = norm.replace(/\bsin\(/g, 'Math.sin(');
+    norm = norm.replace(/\bcos\(/g, 'Math.cos(');
+    norm = norm.replace(/\btan\(/g, 'Math.tan(');
+    norm = norm.replace(/\bcot\(([^()]+)\)/g, '(1/Math.tan($1))');
+    norm = norm.replace(/\bsec\(([^()]+)\)/g, '(1/Math.cos($1))');
+    norm = norm.replace(/\bcsc\(([^()]+)\)/g, '(1/Math.sin($1))');
+    norm = norm.replace(/\basin\(/g, 'Math.asin(');
+    norm = norm.replace(/\bacos\(/g, 'Math.acos(');
+    norm = norm.replace(/\batan\(/g, 'Math.atan(');
+    norm = norm.replace(/\bsinh\(/g, 'Math.sinh(');
+    norm = norm.replace(/\bcosh\(/g, 'Math.cosh(');
+    norm = norm.replace(/\btanh\(/g, 'Math.tanh(');
+    norm = norm.replace(/\bexp\(/g, 'Math.exp(');
+    norm = norm.replace(/\bln\(/g, 'Math.log(');
+    norm = norm.replace(/\blog\(/g, 'Math.log10(');
+    norm = norm.replace(/\babs\(/g, 'Math.abs(');
 
-    // Sanitize string to allow only numbers, operators, Math.sqrt, _calcBinom, _calcPerm, _calcFactorial, scientific notation
-    if (/[^0-9\.\+\*\/\(\)\,\sMath\.powsqrt\-eE_calcBinomPermFactorial]/.test(norm)) {
+    // Sanitize string to allow only numbers, operators, Math functions, _calcBinom, _calcPerm, _calcFactorial, scientific notation
+    if (/[^0-9\.\+\*\/\(\)\,\sMath\.powsqrt\-eE_calcBinomPermFactorialsincostansecclgexpabsh]/.test(norm)) {
       return null;
     }
 
@@ -811,28 +883,80 @@ export function areExpressionsEquivalent(
     return items;
   };
 
-  const sTuple = splitTupleOrList(cleanStu);
-  const eTuple = splitTupleOrList(cleanExp);
+  // Simultaneous variable assignments: e.g. x = 2, y = 3 vs y = 3, x = 2
+  const parseAssignments = (str: string): Record<string, string> | null => {
+    const items = splitTupleOrList(str);
+    const map: Record<string, string> = {};
+    for (const item of items) {
+      const eqParts = item.split('=').map(p => p.trim());
+      if (eqParts.length === 2 && /^[a-zA-Z_\u0980-\u09FF][a-zA-Z0-9_\u0980-\u09FF]*$/.test(eqParts[0])) {
+        map[eqParts[0]] = eqParts[1];
+      } else {
+        return null;
+      }
+    }
+    return Object.keys(map).length > 1 ? map : null;
+  };
+
+  const sAssign = parseAssignments(cleanStu);
+  const eAssign = parseAssignments(cleanExp);
+  if (sAssign && eAssign && Object.keys(sAssign).length === Object.keys(eAssign).length) {
+    const keys = Object.keys(sAssign);
+    const allKeysMatch = keys.every(k => eAssign[k] !== undefined && areExpressionsEquivalent(sAssign[k], eAssign[k], tolerance));
+    if (allKeysMatch) return true;
+  }
+
+  // Plus-Minus (\pm / ±) expansion: e.g. \pm 3 == {3, -3} == 3, -3
+  const expandPlusMinus = (str: string): string[] => {
+    const s = str.trim();
+    if (s.includes('+-')) {
+      return [s.replace(/\+\-/g, '+').replace(/^\+/, '').replace(/\s+/g, ''), s.replace(/\+\-/g, '-').replace(/\s+/g, '')];
+    }
+    if (s.includes('-+')) {
+      return [s.replace(/\-\+/g, '-').replace(/\s+/g, ''), s.replace(/\-\+/g, '+').replace(/^\+/, '').replace(/\s+/g, '')];
+    }
+    return [s];
+  };
+
+  const sPM = expandPlusMinus(cleanStu);
+  const ePM = expandPlusMinus(cleanExp);
+  const sTuple = sPM.length > 1 ? sPM : splitTupleOrList(cleanStu);
+  const eTuple = ePM.length > 1 ? ePM : splitTupleOrList(cleanExp);
+
   if (sTuple.length > 1 && sTuple.length === eTuple.length) {
     const allMatch = sTuple.every((sEl, idx) => areExpressionsEquivalent(sEl, eTuple[idx], tolerance));
     if (allMatch) return true;
 
-    // For set notation {a, b} or bracketed lists, allow permutation matching
-    if ((cleanStu.startsWith('{') && cleanExp.startsWith('{')) || (cleanStu.startsWith('[') && cleanExp.startsWith('['))) {
-      const unmatched = [...eTuple];
-      let setMatches = 0;
-      for (const sEl of sTuple) {
-        const foundIdx = unmatched.findIndex(eEl => areExpressionsEquivalent(sEl, eEl, tolerance));
-        if (foundIdx !== -1) {
-          setMatches++;
-          unmatched.splice(foundIdx, 1);
-        }
+    // For set notation {a, b}, plus-minus sets, or unordered root lists, allow permutation matching
+    const unmatched = [...eTuple];
+    let setMatches = 0;
+    for (const sEl of sTuple) {
+      const foundIdx = unmatched.findIndex(eEl => areExpressionsEquivalent(sEl, eEl, tolerance));
+      if (foundIdx !== -1) {
+        setMatches++;
+        unmatched.splice(foundIdx, 1);
       }
-      if (setMatches === sTuple.length) return true;
+    }
+    if (setMatches === sTuple.length) return true;
+  }
+
+  // 8. Inequality Symmetry & Direction Check (e.g. x > 5 vs 5 < x, x <= 10 vs 10 >= x)
+  const ineqRegex = /^(.*?)\s*(<=|>=|<|>|!=)\s*(.*?)$/;
+  const mStu = cleanStu.match(ineqRegex);
+  const mExp = cleanExp.match(ineqRegex);
+  if (mStu && mExp) {
+    const [, sL, sOp, sR] = mStu;
+    const [, eL, eOp, eR] = mExp;
+    const flipOp: Record<string, string> = { '<': '>', '>': '<', '<=': '>=', '>=': '<=', '!=': '!=' };
+    if (sOp === eOp && areExpressionsEquivalent(sL, eL, tolerance) && areExpressionsEquivalent(sR, eR, tolerance)) {
+      return true;
+    }
+    if (flipOp[sOp] === eOp && areExpressionsEquivalent(sL, eR, tolerance) && areExpressionsEquivalent(sR, eL, tolerance)) {
+      return true;
     }
   }
 
-  // 8. Equation Symmetry & Transposition Check (e.g. F = ma vs ma = F, a^3+b^3+c=0 vs c+a^3+b^3=0 vs a^3+b^3=-c)
+  // 9. Equation Symmetry & Transposition Check (e.g. F = ma vs ma = F, a^3+b^3+c=0 vs c+a^3+b^3=0 vs a^3+b^3=-c)
   if (cleanStu.includes('=') && cleanExp.includes('=')) {
     const sParts = cleanStu.split('=').map(s => s.trim());
     const eParts = cleanExp.split('=').map(s => s.trim());

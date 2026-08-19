@@ -107,6 +107,49 @@ assert(areExpressionsEquivalent("2.605", "2.6", 0.01), "Tolerance within limit: 
 assert(!areExpressionsEquivalent("2.65", "2.6", 0.01), "Tolerance exceeded: 2.65 != 2.6 (tol 0.01)");
 assert(areExpressionsEquivalent("2.605, 0", "2.6, 0", 0.01), "Tuple tolerance within limit: 2.605,0 ~ 2.6,0 (tol 0.01)");
 assert(!areExpressionsEquivalent("2.65, 0", "2.6, 0", 0.01), "Tuple tolerance exceeded: 2.65,0 != 2.6,0 (tol 0.01)");
+
+// 2.5 Mixed Fractions
+console.log('\n--- 2.5 Mixed Fractions ---');
+assert(areExpressionsEquivalent("2 1/2", "5/2"), "Mixed fraction: 2 1/2 == 5/2");
+assert(areExpressionsEquivalent("2 1/2", "2.5"), "Mixed fraction to decimal: 2 1/2 == 2.5");
+assert(areExpressionsEquivalent("2\\frac{1}{2}", "2.5"), "LaTeX mixed fraction: 2\\frac{1}{2} == 2.5");
+assert(areExpressionsEquivalent("২ ১/২", "2.5"), "Bengali mixed fraction: ২ ১/২ == 2.5");
+
+// 2.6 Trigonometric Powers, Degrees & Identities
+console.log('\n--- 2.6 Trigonometry & Angles ---');
+assert(areExpressionsEquivalent("\\sin^2(x)", "(sin(x))^2"), "Trig power notation: \\sin^2(x) == (sin(x))^2");
+assert(areExpressionsEquivalent("\\sin^2(x) + \\cos^2(x)", "1"), "Pythagorean trig identity: sin^2(x) + cos^2(x) == 1");
+assert(areExpressionsEquivalent("\\sin(30^\\circ)", "0.5"), "Trig with degree symbol: \\sin(30^\\circ) == 0.5");
+assert(areExpressionsEquivalent("sin(30 deg)", "1/2"), "Trig with deg keyword: sin(30 deg) == 1/2");
+assert(areExpressionsEquivalent("\\cos(60 deg)", "0.5"), "Trig cos 60 deg: \\cos(60 deg) == 0.5");
+
+// 2.7 Plus-Minus & Multi-Root Sets
+console.log('\n--- 2.7 Plus-Minus & Multi-Root Sets ---');
+assert(areExpressionsEquivalent("\\pm 3", "3, -3"), "Plus-minus expansion: \\pm 3 == 3, -3");
+assert(areExpressionsEquivalent("±3", "{-3, 3}"), "Unicode plus-minus set: ±3 == {-3, 3}");
+assert(areExpressionsEquivalent("x = \\pm 5", "x = 5, -5"), "Variable plus-minus: x = \\pm 5 == x = 5, -5");
+
+// 2.8 Absolute Values & Logarithms
+console.log('\n--- 2.8 Absolute Values & Logarithms ---');
+assert(areExpressionsEquivalent("|2x - 3|", "abs(2x - 3)"), "Absolute value bars: |2x-3| == abs(2x-3)");
+assert(areExpressionsEquivalent("\\left| 2x - 3 \\right|", "abs(2x - 3)"), "LaTeX absolute value: \\left|2x-3\\right| == abs(2x-3)");
+assert(areExpressionsEquivalent("\\ln(x)", "ln(x)"), "Natural logarithm: \\ln(x) == ln(x)");
+assert(areExpressionsEquivalent("\\log_{2}(8)", "3"), "Logarithm with base: \\log_{2}(8) == 3");
+
+// 2.9 Simultaneous Variable Assignments & Inequalities
+console.log('\n--- 2.9 Simultaneous Assignments & Inequalities ---');
+assert(areExpressionsEquivalent("x = 2, y = 3", "y = 3, x = 2"), "Simultaneous assignment order: x=2, y=3 == y=3, x=2");
+assert(areExpressionsEquivalent("x > 5", "5 < x"), "Inequality directional symmetry: x > 5 == 5 < x");
+assert(areExpressionsEquivalent("x \\le 10", "10 >= x"), "Inequality with LaTeX: x \\le 10 == 10 >= x");
+
+// 2.10 Complex Numbers & Expanded Bengali STEM Terms
+console.log('\n--- 2.10 Complex Numbers & STEM Ontology ---');
+assert(areExpressionsEquivalent("3 + 4i", "4i + 3"), "Complex number commutativity: 3 + 4i == 4i + 3");
+assert(areExpressionsEquivalent("3 + 4j", "3 + 4i"), "Complex engineering j: 3 + 4j == 3 + 4i");
+assert(areExpressionsEquivalent("প্লবতা", "buoyancy"), "STEM Synonym: প্লবতা == buoyancy");
+assert(areExpressionsEquivalent("অর্ধায়ু", "half life"), "STEM Synonym: অর্ধায়ু == half life");
+assert(areExpressionsEquivalent("বিভব পার্থক্য", "voltage"), "STEM Synonym: বিভব পার্থক্য == voltage");
+assert(areExpressionsEquivalent("রোধ", "resistance"), "STEM Synonym: রোধ == resistance");
 console.log('\n--- 3. Auto LaTeX Preview Formatting ---');
 const fmtD2 = formatExpressionToLatex("D^2+");
 assert(fmtD2 === "$D^{2+}$", `Auto-wrapped preview for D^2+: got ${fmtD2}`);
