@@ -3958,51 +3958,35 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               </div>
                                             )}
 
-                                            {/* MTF Specific Rendering (Rich 2-Column Grid + Match Analysis Table) */}
+                                            {/* MTF Specific Rendering (Clean Match Analysis Table) */}
                                             {currentQuestion?.type?.toLowerCase() === 'mtf' && (
-                                              <div className="space-y-4">
+                                              <div className="space-y-3">
                                                 {(() => {
                                                   const mtf = evaluateMTFDetails(currentQuestion, currentAnswer);
                                                   return (
-                                                    <div className="space-y-4">
-                                                      {/* 2-Column Grid Layout */}
-                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <div className="space-y-2">
-                                                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                                                            <span>Column A</span>
-                                                            <span className="text-[10px] text-muted-foreground/70">Left Items</span>
+                                                    <div className="space-y-3">
+                                                      {/* Compact Column B Reference Pills (if any distractors) */}
+                                                      {mtf.rightColumn.length > 0 && (
+                                                        <div className="p-2.5 bg-muted/40 rounded-xl border border-border">
+                                                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+                                                            Column B Items:
                                                           </div>
-                                                          {mtf.leftColumn.map((item, i) => (
-                                                            <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
-                                                              <span className="font-bold text-muted-foreground shrink-0">{i + 1}.</span>
-                                                              <div className="flex-1 font-medium">
+                                                          <div className="flex flex-wrap gap-2">
+                                                            {mtf.rightColumn.map((item, i) => (
+                                                              <div key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card border border-border text-xs font-medium shadow-xs">
+                                                                <span className="font-bold text-indigo-600 dark:text-indigo-400">{String.fromCharCode(65 + i)}.</span>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                                               </div>
-                                                            </div>
-                                                          ))}
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                                                            <span>Column B</span>
-                                                            <span className="text-[10px] text-muted-foreground/70">Right Items</span>
+                                                            ))}
                                                           </div>
-                                                          {mtf.rightColumn.map((item, i) => (
-                                                            <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
-                                                              <span className="font-bold text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
-                                                              <div className="flex-1 font-medium">
-                                                                <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
-                                                              </div>
-                                                            </div>
-                                                          ))}
                                                         </div>
-                                                      </div>
+                                                      )}
 
                                                       {/* Match Analysis Table */}
                                                       <div className="rounded-xl border border-indigo-500/20 overflow-hidden bg-indigo-500/5 shadow-sm">
                                                         <div className="p-2.5 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
                                                           <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <Activity className="h-3.5 w-3.5" /> Match Analysis & Breakdown
+                                                            <Activity className="h-3.5 w-3.5" /> Match Breakdown & Evaluation
                                                           </span>
                                                           <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                                                             {mtf.correctCount} / {mtf.totalPairs} Matched (+{mtf.score} marks)
@@ -4012,8 +3996,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                           <table className="w-full text-xs md:text-sm">
                                                             <thead className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold uppercase">
                                                               <tr>
-                                                                <th className="p-2.5 text-left w-1/3">Question (Left)</th>
-                                                                <th className="p-2.5 text-left w-1/3">Student Match</th>
+                                                                <th className="p-2.5 text-left w-1/3">Column A (Question)</th>
+                                                                <th className="p-2.5 text-left w-1/3">Student Choice</th>
                                                                 <th className="p-2.5 text-left w-1/3">Correct Match</th>
                                                               </tr>
                                                             </thead>
@@ -4621,340 +4605,29 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   </div>
                                 </div>
 
-                                {/* Explanation & Correct Answer */}
-                                <div className="mt-4 pt-4 border-t border-gray-200">
-                                  {/* MCQ Options Display */}
-                                  {currentQuestion?.type?.toLowerCase() === 'mcq' && currentQuestion?.options && (
-                                    <div className="mb-4">
-                                      <h5 className="font-semibold text-gray-700 mb-2">Options:</h5>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {currentQuestion?.options?.map((opt: any, idx: number) => {
-                                          const normalize = (s: string) => String(s || "").trim().toLowerCase();
-                                          const optText = opt?.text || String(opt || "");
-                                          const isSelected = currentAnswer && normalize(currentAnswer) === normalize(optText);
-                                          const isCorrect = opt?.isCorrect;
-
-                                          let bgClass = "bg-card border-border";
-                                          if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
-                                          if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
-                                          if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
-
-                                          return (
-                                            <div key={idx} className={`p-3 rounded border ${bgClass} flex flex-col gap-2`}>
-                                              <div className="flex items-center justify-between w-full">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="font-bold text-gray-500 w-6">{MCQ_LABELS?.[idx]}.</span>
-                                                  <div className="flex-1">
-                                                    <span className={`text-sm md:text-base ${isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}`}>
-                                                      <UniversalMathJax dynamic>{cleanupMath(optText)}</UniversalMathJax>
-                                                    </span>
-                                                    {opt.image && (
-                                                      <div className="mt-1">
-                                                        <img src={opt.image} alt="Option" className="max-h-24 rounded border border-border bg-muted/50 object-contain" />
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                                {isCorrect && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
-                                                {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
-                                              </div>
-
-                                              {/* Option Specific Explanation Removed as Redundant */}
-                                            </div>
-                                          );
-                                        })}
+                                {/* Explanation & Model Answer */}
+                                <div className="mt-4 pt-4 border-t border-border">
+                                  {/* Model Answer (For Subjective, CQ, SQ, or questions with custom modelAnswer) */}
+                                  {['cq', 'sq', 'descriptive'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
+                                    <div className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl">
+                                      <h5 className="font-bold text-emerald-800 dark:text-emerald-300 text-xs mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
+                                        <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        Model Answer / Grading Reference:
+                                      </h5>
+                                      <div className="text-foreground text-sm md:text-base leading-relaxed">
+                                        <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct))}</UniversalMathJax>
                                       </div>
                                     </div>
                                   )}
 
-                                  {/* MC Reference View */}
-                                  {(currentQuestion?.type || "").toLowerCase() === 'mc' && (
-                                    <div className="mb-4 space-y-3">
-                                      <h5 className="font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-2">
-                                        <CheckSquare className="h-4 w-4" />
-                                        Multiple Correct (MC) Answer Key:
-                                      </h5>
-                                      {(() => {
-                                        const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
-                                        return (
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                            {currentQuestion?.options?.map((opt: any, oidx: number) => {
-                                              const isSelected = mc.selectedIndices.includes(oidx);
-                                              const isCorrect = opt?.isCorrect === true;
-                                              const optText = typeof opt === 'object' ? opt?.text : opt;
-
-                                              return (
-                                                <div key={oidx} className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isSelected ? (isCorrect ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30') : (isCorrect ? 'bg-emerald-500/5 border-dashed border-emerald-500/30 opacity-80' : 'bg-muted/30 border-border opacity-60')}`}>
-                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <span className="text-xs font-bold w-6 h-6 rounded-full bg-card flex items-center justify-center border border-border shrink-0">{MCQ_LABELS_BN?.[oidx] || String.fromCharCode(65 + oidx)}</span>
-                                                    <div className="text-sm font-medium"><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></div>
-                                                  </div>
-                                                  <div className="shrink-0 flex items-center gap-1.5">
-                                                    {isSelected && isCorrect && (
-                                                      <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
-                                                        <CheckCircle className="h-3 w-3" /> Correct
-                                                      </Badge>
-                                                    )}
-                                                    {isSelected && !isCorrect && (
-                                                      <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
-                                                        <XCircle className="h-3 w-3" /> Incorrect Choice
-                                                      </Badge>
-                                                    )}
-                                                    {!isSelected && isCorrect && (
-                                                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 text-[10px] py-0.5 px-2">
-                                                        Correct Key
-                                                      </Badge>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-
-                                  {(currentQuestion?.type || "").toLowerCase() === 'ar' && (
-                                    <div className="mb-4 space-y-4">
-                                      <h5 className="font-semibold text-purple-700 flex items-center gap-2 border-b pb-2">
-                                        <Star className="h-4 w-4" /> Assertion-Reason Analysis:
-                                      </h5>
-
-                                      {/* AR Statement Boxes */}
-                                      <div className="grid grid-cols-1 gap-3 mb-4">
-                                        <div className="p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded-r shadow-sm">
-                                          <div className="text-[10px] font-bold text-indigo-600 mb-1 leading-none uppercase tracking-wider">Assertion (A)</div>
-                                          <div className="text-gray-900 font-medium">
-                                            <UniversalMathJax dynamic>{cleanupMath(currentQuestion?.assertion || currentQuestion?.questionText || "")}</UniversalMathJax>
-                                          </div>
-                                        </div>
-                                        <div className="p-3 bg-purple-50 border-l-4 border-purple-500 rounded-r shadow-sm">
-                                          <div className="text-[10px] font-bold text-purple-600 mb-1 leading-none uppercase tracking-wider">Reason (R)</div>
-                                          <div className="text-gray-900 font-medium">
-                                            <UniversalMathJax dynamic>{cleanupMath(currentQuestion?.reason || "")}</UniversalMathJax>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Full Options List for AR */}
-                                      <div className="space-y-2">
-                                        {[
-                                          "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
-                                          "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
-                                          "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                                          "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                                          "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                        ].map((optText, i) => {
-                                          const optionId = i + 1;
-                                          const isSelected = Number(currentAnswer?.selectedOption || currentAnswer || 0) === optionId;
-                                          const isCorrect = Number(currentQuestion?.correct || (currentQuestion as any)?.correctOption || (currentQuestion as any)?.correctAnswer || 0) === optionId;
-
-                                          let bgClass = "bg-card border-border hover:bg-accent";
-                                          if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300 dark:bg-green-900/20 dark:border-green-800 dark:ring-green-900/40";
-                                          if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300 dark:bg-red-900/20 dark:border-red-800 dark:ring-red-900/40";
-                                          if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500 dark:bg-green-900/40 dark:border-green-600 dark:ring-green-900/60";
-
-                                          return (
-                                            <div key={i} className={`p-3 rounded-lg border transition-all flex items-center gap-3 ${bgClass}`}>
-                                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${isSelected || isCorrect ? 'bg-card border-border' : 'bg-muted text-muted-foreground'}`}>
-                                                {optionId}
-                                              </div>
-                                              <span className={`text-sm flex-1 ${isCorrect ? 'font-medium text-green-900 dark:text-green-200' : isSelected ? 'text-red-900 dark:text-red-200' : 'text-foreground'}`}>
-                                                {optText}
-                                              </span>
-                                              {isCorrect && <CheckCircle className="h-5 w-5 text-green-600" />}
-                                              {isSelected && !isCorrect && <XCircle className="h-5 w-5 text-red-600" />}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* MTF Reference View */}
-                                  {(currentQuestion?.type || "").toLowerCase() === 'mtf' && (
-                                    <div className="mb-4 space-y-4">
-                                      <h5 className="font-semibold text-indigo-700 dark:text-indigo-400 flex items-center gap-2 border-b pb-2">
-                                        <Activity className="h-4 w-4" /> Match the Following Key & Breakdown:
-                                      </h5>
-
-                                      {(() => {
-                                        const mtf = evaluateMTFDetails(currentQuestion, currentAnswer);
-                                        return (
-                                          <div className="space-y-4">
-                                            {/* 2-Column Grid Layout */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                              <div className="space-y-2">
-                                                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Column A (Left)</div>
-                                                {mtf.leftColumn.map((item, i) => (
-                                                  <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
-                                                    <span className="font-bold text-muted-foreground shrink-0">{i + 1}.</span>
-                                                    <div className="flex-1 font-medium"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <div className="space-y-2">
-                                                <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Column B (Right)</div>
-                                                {mtf.rightColumn.map((item, i) => (
-                                                  <div key={i} className="p-2.5 bg-card border border-border rounded-lg text-sm min-h-[38px] flex items-center gap-2">
-                                                    <span className="font-bold text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
-                                                    <div className="flex-1 font-medium"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-
-                                            {/* Match Breakdown Table */}
-                                            <div className="rounded-xl border border-indigo-500/20 overflow-hidden bg-indigo-500/5 shadow-sm">
-                                              <div className="p-2.5 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
-                                                <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
-                                                  Match Key Breakdown
-                                                </span>
-                                                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-                                                  Score: {mtf.score} / {currentQuestion?.marks || 1} marks
-                                                </span>
-                                              </div>
-                                              <table className="w-full text-xs md:text-sm">
-                                                <thead className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold uppercase text-left">
-                                                  <tr>
-                                                    <th className="p-2.5 w-1/3">Column A (Left)</th>
-                                                    <th className="p-2.5 w-1/3">Student Choice</th>
-                                                    <th className="p-2.5 w-1/3">Correct Match</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-indigo-500/10 bg-card">
-                                                  {mtf.rows.map((row, lIdx) => (
-                                                    <tr key={lIdx} className={row.isMatchCorrect ? "bg-emerald-500/5" : !row.hasAnswered ? "bg-muted/30 opacity-80" : "bg-rose-500/5"}>
-                                                      <td className="p-2.5 border-r border-indigo-500/10 font-medium">
-                                                        <div className="flex items-center gap-1.5">
-                                                          <span className="font-bold text-muted-foreground shrink-0">{row.vlLeft}.</span>
-                                                          <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.leftText)}</UniversalMathJax></div>
-                                                        </div>
-                                                      </td>
-                                                      <td className="p-2.5 border-r border-indigo-500/10">
-                                                        {!row.hasAnswered ? (
-                                                          <span className="text-muted-foreground italic">No selection</span>
-                                                        ) : (
-                                                          <div className="flex items-center justify-between gap-1.5">
-                                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                              {row.vStudentRight && <span className="font-bold shrink-0">{row.vStudentRight}.</span>}
-                                                              <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.studentRightText)}</UniversalMathJax></div>
-                                                            </div>
-                                                            {row.isMatchCorrect ? (
-                                                              <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
-                                                            ) : (
-                                                              <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </td>
-                                                      <td className="p-2.5 text-emerald-700 dark:text-emerald-300 font-medium">
-                                                        <div className="flex items-center gap-1.5">
-                                                          {row.vCorrectRight && <span className="font-bold shrink-0">{row.vCorrectRight}.</span>}
-                                                          <div className="flex-1"><UniversalMathJax inline dynamic>{cleanupMath(row.correctRightText)}</UniversalMathJax></div>
-                                                        </div>
-                                                      </td>
-                                                    </tr>
-                                                  ))}
-                                                </tbody>
-                                              </table>
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-
-                                  {/* INT / Numeric Reference View */}
-                                  {(['int', 'numeric'].includes((currentQuestion?.type || "").toLowerCase())) && (
-                                    <div className="mb-4">
-                                      {(() => {
-                                        const intDetails = evaluateINTDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
-                                        return (
-                                          <div className="p-4 bg-card border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
-                                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
-                                              <div className="pr-0 sm:pr-4">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Student Answer</div>
-                                                <div className={`text-2xl font-black ${intDetails.isCorrect ? 'text-emerald-600' : intDetails.hasAttempted ? 'text-rose-600' : 'text-muted-foreground italic text-lg font-medium'}`}>
-                                                  {intDetails.hasAttempted ? <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.studentVal))}</UniversalMathJax> : "Empty / Unanswered"}
-                                                </div>
-                                              </div>
-                                              <div className="pt-3 sm:pt-0 pl-0 sm:pl-4">
-                                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">Correct Key</div>
-                                                <div className="text-2xl font-black text-emerald-600">
-                                                  <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.correctVal || "N/A"))}</UniversalMathJax>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            <div className="shrink-0 flex items-center justify-end">
-                                              {intDetails.isCorrect ? (
-                                                <Badge className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
-                                                  <CheckCircle className="h-4 w-4" /> Correct Key
-                                                </Badge>
-                                              ) : intDetails.hasAttempted ? (
-                                                <Badge className="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
-                                                  <XCircle className="h-4 w-4" /> Incorrect Key
-                                                </Badge>
-                                              ) : (
-                                                <Badge variant="outline" className="text-muted-foreground font-bold px-3 py-1.5 rounded-xl">
-                                                  Unanswered
-                                                </Badge>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-
-                                  {(currentQuestion?.type || "").toLowerCase() === "cma" && (
-                                    <div className="mb-4">
-                                      <CMARenderer
-                                        question={currentQuestion}
-                                        value={currentAnswer || {}}
-                                        onChange={() => {}}
-                                        disabled={true}
-                                        showFeedback={true}
-                                        evalResult={evaluateCMAQuestion(currentQuestion as any, currentAnswer)}
-                                      />
-                                    </div>
-                                  )}
-
-                                  {(currentQuestion?.type || "").toLowerCase() === "mpc" && (
-                                    <div className="mb-4">
-                                      <MPCRenderer
-                                        question={currentQuestion}
-                                        value={currentAnswer || {}}
-                                        onChange={() => {}}
-                                        disabled={true}
-                                        showFeedback={true}
-                                        evalResult={evaluateMPCQuestion(currentQuestion as any, currentAnswer)}
-                                      />
-                                    </div>
-                                   )}
-
-                                   {/* Correct Answer (Non-MCQ or if options missing) */}
-                                   {!['mcq', 'cma', 'mpc'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
-                                     <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
-                                       <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
-                                         <CheckCircle className="h-4 w-4" />
-                                         Correct / Model Answer:
-                                       </h5>
-                                       <div className="text-green-900 text-sm md:text-base">
-                                         <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct))}</UniversalMathJax>
-                                       </div>
-                                     </div>
-                                   )}
-
-                                   {/* Explanation */}
+                                  {/* Dynamic Question Explanation */}
                                   {currentQuestion?.explanation && (
-                                    <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded">
-                                      <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
-                                        <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
+                                    <div className="p-3.5 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
+                                      <h5 className="font-bold text-blue-800 dark:text-blue-300 text-xs mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
+                                        <div className="bg-blue-200 dark:bg-blue-800 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800 dark:text-blue-200">i</div>
                                         Explanation:
                                       </h5>
-                                      <div className="text-blue-900 text-xs md:text-sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                      <div className="text-blue-900 dark:text-blue-100 text-sm md:text-base leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>
                                         <UniversalMathJax key={currentQuestion?.id} dynamic>
                                           {cleanupMath(renderDynamicExplanation(
                                             currentQuestion?.explanation?.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '') || "",
