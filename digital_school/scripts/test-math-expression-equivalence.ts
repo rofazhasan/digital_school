@@ -150,6 +150,48 @@ assert(areExpressionsEquivalent("প্লবতা", "buoyancy"), "STEM Synonym
 assert(areExpressionsEquivalent("অর্ধায়ু", "half life"), "STEM Synonym: অর্ধায়ু == half life");
 assert(areExpressionsEquivalent("বিভব পার্থক্য", "voltage"), "STEM Synonym: বিভব পার্থক্য == voltage");
 assert(areExpressionsEquivalent("রোধ", "resistance"), "STEM Synonym: রোধ == resistance");
+
+// 2.11 Physical Units Stripping & Dimensional Equivalence
+console.log('\n--- 2.11 Physics & STEM Units ---');
+assert(areExpressionsEquivalent("9.8 m/s^2", "9.8 ms^-2"), "Units equivalence: 9.8 m/s^2 == 9.8 ms^-2");
+assert(areExpressionsEquivalent("9.8 \\text{ m/s}^2", "9.8"), "LaTeX unit to raw number: 9.8 \\text{ m/s}^2 == 9.8");
+assert(areExpressionsEquivalent("100 N", "100"), "Force unit stripping: 100 N == 100");
+assert(areExpressionsEquivalent("50 J", "50 Joule"), "Energy unit equivalence: 50 J == 50 Joule");
+assert(areExpressionsEquivalent("9.8 মিটার/সেকেন্ড^২", "9.8"), "Bengali unit stripping: 9.8 মিটার/সেকেন্ড^২ == 9.8");
+
+// 2.12 Calculus Derivatives & Integrals
+console.log('\n--- 2.12 Calculus & Derivatives ---');
+assert(areExpressionsEquivalent("\\frac{dy}{dx}", "y'"), "First derivative: \\frac{dy}{dx} == y'");
+assert(areExpressionsEquivalent("\\frac{d^2y}{dx^2}", "y''"), "Second derivative: \\frac{d^2y}{dx^2} == y''");
+assert(areExpressionsEquivalent("\\int f(x) dx", "int f(x) dx"), "Indefinite integral: \\int f(x) dx == int f(x) dx");
+
+// 2.13 Recurring & Repeating Decimals (পৌনঃপুনিক)
+console.log('\n--- 2.13 Recurring Decimals ---');
+assert(areExpressionsEquivalent("0.\\dot{3}", "1/3"), "Recurring decimal: 0.\\dot{3} == 1/3");
+assert(areExpressionsEquivalent("0.3333333333333333", "1/3"), "Repeating decimal digits: 0.3333... == 1/3");
+assert(areExpressionsEquivalent("0.\\dot{6}", "2/3"), "Recurring decimal 0.\\dot{6} == 2/3");
+assert(areExpressionsEquivalent("০.৩̇", "1/3"), "Bengali recurring dot: ০.৩̇ == 1/3");
+
+// 2.14 Set Theory & Logic
+console.log('\n--- 2.14 Set Theory & Logic ---');
+assert(areExpressionsEquivalent("A \\cup B", "A U B"), "Set union: A \\cup B == A U B");
+assert(areExpressionsEquivalent("A \\cap B", "A cap B"), "Set intersection: A \\cap B == A cap B");
+assert(areExpressionsEquivalent("\\emptyset", "{}"), "Empty set: \\emptyset == {}");
+
+// 2.15 3D Vectors to Coordinate Tuple
+console.log('\n--- 2.15 3D Unit Vectors to Coordinates ---');
+assert(areExpressionsEquivalent("2\\hat{i} + 3\\hat{j} - \\hat{k}", "(2, 3, -1)"), "3D vector hat to tuple: 2\\hat{i}+3\\hat{j}-\\hat{k} == (2, 3, -1)");
+assert(areExpressionsEquivalent("2i + 3j - k", "(2, 3, -1)"), "3D vector ASCII to tuple: 2i + 3j - k == (2, 3, -1)");
+assert(areExpressionsEquivalent("3i - 2j", "(3, -2, 0)"), "2D vector in 3D: 3i - 2j == (3, -2, 0)");
+
+// 2.16 Advanced Scientific Laws & Molecular Biology
+console.log('\n--- 2.16 Advanced Scientific Laws ---');
+assert(areExpressionsEquivalent("কেপলারের সূত্র", "kepler's law"), "Law: কেপলারের সূত্র == kepler's law");
+assert(areExpressionsEquivalent("কার্শফের সূত্র", "kvl"), "Law: কার্শফের সূত্র == kvl");
+assert(areExpressionsEquivalent("বার্নোলির নীতি", "bernoulli's principle"), "Law: বার্নোলির নীতি == bernoulli's principle");
+assert(areExpressionsEquivalent("লে শাতেলীয়ার নীতি", "le chatelier's principle"), "Law: লে শাতেলীয়ার নীতি == le chatelier's principle");
+assert(areExpressionsEquivalent("মেন্ডেলের প্রথম সূত্র", "law of segregation"), "Biology: মেন্ডেলের প্রথম সূত্র == law of segregation");
+assert(areExpressionsEquivalent("ডিএনএ প্রতিলিপন", "dna replication"), "Biology: ডিএনএ প্রতিলিপন == dna replication");
 console.log('\n--- 3. Auto LaTeX Preview Formatting ---');
 const fmtD2 = formatExpressionToLatex("D^2+");
 assert(fmtD2 === "$D^{2+}$", `Auto-wrapped preview for D^2+: got ${fmtD2}`);

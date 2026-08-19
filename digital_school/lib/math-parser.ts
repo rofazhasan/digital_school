@@ -216,7 +216,23 @@ export const COMPREHENSIVE_SCIENCE_SYNONYMS: string[][] = [
   ['প্রতিসরাঙ্ক', 'প্রতিসরণাঙ্ক', 'refractive index', 'mu', 'n'],
   ['ফোকাস দূরত্ব', 'focal length', 'f'],
   ['ভরত্রুটি', 'ভর ত্রুটি', 'mass defect', 'delta m', 'Δm'],
-  ['বন্ধন শক্তি', 'binding energy', 'BE']
+  ['বন্ধন শক্তি', 'binding energy', 'BE'],
+  ['কেপলারের সূত্র', "kepler's law", 'kepler law'],
+  ['কার্শফের সূত্র', "kirchhoff's law", 'kirchhoff law', 'kcl', 'kvl'],
+  ['বায়ো-সাভার্ট সূত্র', 'বায়ো সাভার্ট সূত্র', "biot-savart law", "biot savart law"],
+  ['অ্যাম্পিয়ারের সূত্র', "ampere's law", 'ampere law', 'circuital law'],
+  ['হাইগেনসের নীতি', 'হাইগেনসের নীতি ও তরঙ্গমুখ', "huygens principle"],
+  ['ব্র্যাগ সূত্র', "bragg's law", 'bragg law'],
+  ['স্টোকসের সূত্র', "stokes' law", 'stokes law'],
+  ['বার্নোলির নীতি', 'বার্নোলির উপপাদ্য', "bernoulli's principle", 'bernoulli principle'],
+  ['হেনরির সূত্র', "henry's law", 'henry law'],
+  ['রাউল্টের সূত্র', "raoult's law", 'raoult law'],
+  ['লে শাতেলীয়ার নীতি', 'লা শাতেলিয়ের নীতি', "le chatelier's principle", 'le chatelier principle'],
+  ['মেন্ডেলের প্রথম সূত্র', "mendel's first law", 'পৃথকীকরণ সূত্র', 'law of segregation'],
+  ['মেন্ডেলের দ্বিতীয় সূত্র', "mendel's second law", 'স্বাধীনভাবে সঞ্চারণের সূত্র', 'law of independent assortment'],
+  ['ডিএনএ প্রতিলিপন', 'ডিএনএ রেপ্লিকেশন', 'dna replication'],
+  ['ট্রান্সক্রিপশন', 'transcription'],
+  ['ট্রান্সলেশন', 'translation']
 ];
 
 export const BENGALI_SYNONYM_GROUPS = COMPREHENSIVE_SCIENCE_SYNONYMS;
@@ -379,6 +395,16 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   // Convert LaTeX mixed fractions: 2\frac{1}{2} -> ((2)+(1)/(2))
   s = s.replace(/(\d+)\s*\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)+($3)/($4))');
 
+  // Convert calculus derivatives & differential notation before general fraction conversion:
+  s = s.replace(/\\+(?:frac|dfrac|tfrac)\{d\^?\{?2\}?y\}\{dx\^?\{?2\}?\}/g, "y''");
+  s = s.replace(/\\+(?:frac|dfrac|tfrac)\{dy\}\{dx\}/g, "y'");
+  s = s.replace(/\b(?:dy\/dx|\(dy\)\/\(dx\))\b/g, "y'");
+  s = s.replace(/\b(?:d\^2y\/dx\^2|\(d\^2y\)\/\(dx\^2\))\b/g, "y''");
+
+  // Convert empty set: \emptyset, \varnothing, {} -> empty_set
+  s = s.replace(/\\+(emptyset|varnothing)\b/g, 'empty_set');
+  s = s.replace(/^\{\s*\}$/g, 'empty_set');
+
   // Convert fractions \frac{a}{b}, \dfrac{a}{b}, \tfrac{a}{b} -> (a)/(b)
   while (/\\+(frac|dfrac|tfrac)/.test(s)) {
     const nextS = s.replace(/\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '($2)/($3)');
@@ -439,6 +465,26 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   // Convert logarithms: \log_{2}(8) -> (log(8)/log(2)), \ln(x) -> ln(x)
   s = s.replace(/\\+log_\{?([0-9a-zA-Z]+)\}?\s*\(([^()]+)\)/g, '(log($2)/log($1))');
   s = s.replace(/\\+(sin|cos|tan|cot|sec|csc|sinh|cosh|tanh|asin|acos|atan|exp|ln|log|abs)\b/g, '$1');
+
+  // Convert recurring / repeating decimals: 0.\dot{3}, 0.3̇, 0.333... -> ((3)/9) = 1/3, 0.\dot{6} -> ((6)/9) = 2/3
+  s = s.replace(/0\s*\.\s*\\dot\{?(\d)\}?/g, (m, d) => '((' + d + ')/9)');
+  s = s.replace(/0\s*\.\s*(\d)\u0307/g, (m, d) => '((' + d + ')/9)');
+  s = s.replace(/\b0\s*\.\s*(\d)\1{3,}(?:\.{3})?\b/g, (m, d) => '((' + d + ')/9)');
+
+  // Convert calculus derivatives & differential notation:
+  s = s.replace(/\\+(?:frac|dfrac|tfrac)\{d\^?\{?2\}?y\}\{dx\^?\{?2\}?\}/g, "y''");
+  s = s.replace(/\\+(?:frac|dfrac|tfrac)\{dy\}\{dx\}/g, "y'");
+  s = s.replace(/\\+(?:frac|dfrac|tfrac)\{\\partial\s*([^{}]+)\}\{\\partial\s*([^{}]+)\}/g, "del($1)/del($2)");
+  s = s.replace(/\\+int\b/g, 'int');
+  s = s.replace(/\\+lim_\{?([^{}]+)\}?/g, 'lim($1)');
+
+  // Convert set operations & logic:
+  s = s.replace(/\\+(cup|bigcup)\b/g, 'U');
+  s = s.replace(/\\+(cap|bigcap)\b/g, 'cap');
+  s = s.replace(/\\+(emptyset|varnothing)\b/g, 'empty_set');
+  s = s.replace(/\\+(in)\b/g, 'in');
+  s = s.replace(/\\+(notin)\b/g, 'notin');
+  s = s.replace(/\\+(subset|subseteq)\b/g, 'subset');
 
   // Convert plus-minus & minus-plus: \pm, ± -> +-, \mp, ∓ -> -+
   s = s.replace(/\\+(pm|plusmn)\b|±/g, '+-');
@@ -858,6 +904,48 @@ export function areExpressionsEquivalent(
   const cleanExp = stripLatexAndMathFormatting(bnExp);
   if (cleanStu.toLowerCase().replace(/\s+/g, '') === cleanExp.toLowerCase().replace(/\s+/g, '')) return true;
   if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
+
+  // 6.1 Physical Units Stripping & Dimensional Comparison (e.g. 9.8 m/s^2 == 9.8 ms^-2 == 9.8 \text{ m/s}^2 == 9.8)
+  const UNIT_REGEX = /\s*(?:\\text\{)?(?:\\mathrm\{)?(m\/s\^2|ms\^-2|ms\^\{-2\}|m\/s|ms\^-1|ms\^\{-1\}|km\/h|km\/hr|m\^3|m\^2|cm\^3|cm\^2|mm|cm|km|m|kg\/m\^3|g\/cm\^3|kg|gm|g|mg|N\/m\^2|N\/m|N\*m|Nm|Newton|N|Joule|J\/s|J|kW|MW|Watt|W|kPa|Pascal|Pa|atm|bar|mmHg|Kelvin|K|deg\s*C|deg\s*F|mA|Ampere|Amp|A|kV|mV|Volt|V|k\\Omega|M\\Omega|\\Omega|ohm|Ohm|\\mu\s*C|nC|Coulomb|C|\\mu\s*F|nF|pF|Farad|F|mH|Henry|H|Tesla|T|Weber|Wb|kHz|MHz|GHz|Hertz|Hz|mole|mol|rad\/s|rpm|radian|rad|keV|MeV|eV|মিটার\/সেকেন্ড(?:\^[২2])?|মিটার\/সেকেন্ড|মিটার|সেমি|কিমি|কিলোমিটার|কেজি|গ্রাম|নিউটন|জুল|ওয়াট|ভোল্ট|অ্যাম্পিয়ার|ওহম|প্যাসকেল|হার্টজ|কেলভিন|কুলম্ব|ফ্যারাড)(?:\})?$/i;
+
+  const stripUnit = (s: string) => {
+    const trimmed = s.trim();
+    const m = trimmed.match(UNIT_REGEX);
+    if (m && m.index !== undefined && m.index > 0) {
+      return { val: trimmed.slice(0, m.index).trim(), unit: m[1].toLowerCase() };
+    }
+    return { val: trimmed, unit: null };
+  };
+
+  const sUnit = stripUnit(cleanStu);
+  const eUnit = stripUnit(cleanExp);
+  if ((sUnit.unit || eUnit.unit) && (sUnit.val !== cleanStu || eUnit.val !== cleanExp)) {
+    if (areExpressionsEquivalent(sUnit.val, eUnit.val, tolerance)) return true;
+  }
+
+  // 6.2 3D Unit Vectors to Coordinate Tuple Equivalence (e.g. 2i + 3j - k == (2, 3, -1))
+  const vectorToTuple = (str: string): string | null => {
+    const s = str.replace(/\s+/g, '').replace(/\^/g, '');
+    const m = s.match(/^([+-]?\d*(?:\.\d+)?)[iî]\+?([+-]?\d*(?:\.\d+)?)[jĵ](?:\+?([+-]?\d*(?:\.\d+)?)[kḵ])?$/);
+    if (m) {
+      const parseCoeff = (c: string) => {
+        if (c === '' || c === '+') return '1';
+        if (c === '-') return '-1';
+        return c;
+      };
+      const iVal = parseCoeff(m[1]);
+      const jVal = parseCoeff(m[2]);
+      const kVal = m[3] ? parseCoeff(m[3]) : '0';
+      return `(${iVal}, ${jVal}, ${kVal})`;
+    }
+    return null;
+  };
+
+  const sVec = vectorToTuple(cleanStu);
+  const eVec = vectorToTuple(cleanExp);
+  if (sVec && areExpressionsEquivalent(sVec, cleanExp, tolerance)) return true;
+  if (eVec && areExpressionsEquivalent(cleanStu, eVec, tolerance)) return true;
+  if (sVec && eVec && areExpressionsEquivalent(sVec, eVec, tolerance)) return true;
 
   // 7. Coordinate, Tuple & Multi-Value List Comparison (e.g. (13/5, 0) == (2.6, 0), 13/5,0 == 2.6,0, (1/2, 3/4) == (0.5, 0.75))
   const splitTupleOrList = (str: string): string[] => {
