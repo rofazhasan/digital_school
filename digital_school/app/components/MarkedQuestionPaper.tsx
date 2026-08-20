@@ -180,7 +180,6 @@ interface MarkedQuestionPaperProps {
         descriptive?: CQ[];
         cma?: any[];
         mpc?: any[];
-        dr?: any[];
     };
     submission: StudentSubmission;
     rank?: number;
@@ -210,10 +209,9 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         const mtfs = questions.mtf || [];
         const cmas = questions.cma || [];
         const mpcs = questions.mpc || [];
-        const drs = questions.dr || [];
 
         const objectiveTotal = [
-            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs, ...cmas, ...mpcs, ...drs
+            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs, ...cmas, ...mpcs
         ].reduce((sum, q) => sum + (q.marks || 1), 0);
 
         const cqs = questions.cq || [];
@@ -890,40 +888,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         const getCMAMark = (q: any, userAnswer: any) => {
             if (!userAnswer) return 0;
             const evalRes = evaluateCMAQuestion(q, userAnswer);
-            if (negativeRate > 0) {
-                const parts = q.parts || q.cmaParts || [];
-                const maxM = evalRes.maxScore || q.marks || 1;
-                const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
-                let wrongPenalty = 0;
-                for (const part of parts) {
-                    const pRes = evalRes.partResults?.[part.id];
-                    if (pRes && !pRes.isCorrect) {
-                        const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
-                        wrongPenalty += partMax * negativeRate;
-                    }
-                }
-                return Math.round((evalRes.score - wrongPenalty) * 100) / 100;
-            }
             return evalRes.score;
         };
 
         const getMPCMark = (q: any, userAnswer: any) => {
             if (!userAnswer) return 0;
             const evalRes = evaluateMPCQuestion(q, userAnswer);
-            if (negativeRate > 0) {
-                const stages = q.stages || q.mpcStages || [];
-                const maxM = evalRes.maxScore || q.marks || 1;
-                const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
-                let wrongPenalty = 0;
-                for (const stage of stages) {
-                    const sRes = evalRes.stageResults?.[stage.id];
-                    if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
-                        const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
-                        wrongPenalty += stageMax * negativeRate;
-                    }
-                }
-                return Math.round((evalRes.score - wrongPenalty) * 100) / 100;
-            }
             return evalRes.score;
         };
 

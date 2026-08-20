@@ -14,8 +14,8 @@ async function runQuestionTypeAuditTests() {
 
   let passedCount = 0;
 
-  // 1. Audit Registry Coverage for All 9 Required Question Types
-  const requiredTypes = ['MCQ', 'MMCQ', 'MTF', 'INT', 'AR', 'SMCQ', 'CMA', 'MPC', 'SDR'];
+  // 1. Audit Registry Coverage for All 8 Required Question Types
+  const requiredTypes = ['MCQ', 'MMCQ', 'MTF', 'INT', 'AR', 'SMCQ', 'CMA', 'MPC'];
   let allTypesPresent = true;
 
   requiredTypes.forEach((t) => {
@@ -27,7 +27,7 @@ async function runQuestionTypeAuditTests() {
   });
 
   if (allTypesPresent) {
-    console.log(`✓ [PASS] Registry covers all 9 question types: ${requiredTypes.join(', ')}`);
+    console.log(`✓ [PASS] Registry covers all 8 question types: ${requiredTypes.join(', ')}`);
     passedCount++;
   }
 
@@ -40,7 +40,6 @@ async function runQuestionTypeAuditTests() {
   const mtfProfile = QuestionTypeOMRAuditor.getProfile('MTF');
   const cmaProfile = QuestionTypeOMRAuditor.getProfile('CMA');
   const mpcProfile = QuestionTypeOMRAuditor.getProfile('MPC');
-  const sdrProfile = QuestionTypeOMRAuditor.getProfile('SDR');
 
   if (
     mcqProfile.supportLevel === 'NATIVE' &&
@@ -50,10 +49,9 @@ async function runQuestionTypeAuditTests() {
     intProfile.supportLevel === 'DIGITAL_ONLY' &&
     mtfProfile.supportLevel === 'DIGITAL_ONLY' &&
     cmaProfile.supportLevel === 'DIGITAL_ONLY' &&
-    mpcProfile.supportLevel === 'DIGITAL_ONLY' &&
-    sdrProfile.supportLevel === 'DIGITAL_ONLY'
+    mpcProfile.supportLevel === 'DIGITAL_ONLY'
   ) {
-    console.log(`✓ [PASS] Support levels precisely audited (NATIVE: MCQ, SMCQ, AR | COMPOSITE: MMCQ | DIGITAL_ONLY: INT, MTF, CMA, MPC, SDR)`);
+    console.log(`✓ [PASS] Support levels precisely audited (NATIVE: MCQ, SMCQ, AR | COMPOSITE: MMCQ | DIGITAL_ONLY: INT, MTF, CMA, MPC)`);
     passedCount++;
   } else {
     console.error(`✗ [FAIL] Support level mismatch`);
@@ -64,8 +62,8 @@ async function runQuestionTypeAuditTests() {
     examSetId: 'set_mixed_types_01',
     setName: 'Set A',
     examId: 'exam_poly_01',
-    totalQuestions: 9,
-    totalObjectiveMarks: 90,
+    totalQuestions: 8,
+    totalObjectiveMarks: 80,
     questions: [
       { id: 'q_mcq_1', sequenceNumber: 1, type: 'MCQ', questionText: 'MCQ Test', options: [{ text: 'A' }, { text: 'B' }], marks: 10 },
       { id: 'q_smcq_2', sequenceNumber: 2, type: 'SMCQ', questionText: 'SMCQ Test', options: [{ text: 'A' }], marks: 10 },
@@ -74,8 +72,7 @@ async function runQuestionTypeAuditTests() {
       { id: 'q_int_5', sequenceNumber: 5, type: 'INT', questionText: 'INT Test', options: [], marks: 10 },
       { id: 'q_mtf_6', sequenceNumber: 6, type: 'MTF', questionText: 'MTF Test', options: [], marks: 10 },
       { id: 'q_cma_7', sequenceNumber: 7, type: 'CMA', questionText: 'CMA Test', options: [], marks: 10 },
-      { id: 'q_mpc_8', sequenceNumber: 8, type: 'MPC', questionText: 'MPC Test', options: [], marks: 10 },
-      { id: 'q_sdr_9', sequenceNumber: 9, type: 'SDR', questionText: 'SDR Test', options: [], marks: 10 }
+      { id: 'q_mpc_8', sequenceNumber: 8, type: 'MPC', questionText: 'MPC Test', options: [], marks: 10 }
     ]
   };
 
@@ -85,10 +82,10 @@ async function runQuestionTypeAuditTests() {
     !auditReport.isFullyPhysicalCompatible &&
     auditReport.nativeCount === 3 &&
     auditReport.compositeCount === 1 &&
-    auditReport.digitalOnlyCount === 5 &&
-    auditReport.digitalOnlyQuestionIds.length === 5
+    auditReport.digitalOnlyCount === 4 &&
+    auditReport.digitalOnlyQuestionIds.length === 4
   ) {
-    console.log(`✓ [PASS] Question set auditor successfully detected 5 DIGITAL_ONLY questions with actionable warnings`);
+    console.log(`✓ [PASS] Question set auditor successfully detected 4 DIGITAL_ONLY questions with actionable warnings`);
     passedCount++;
   } else {
     console.error(`✗ [FAIL] Audit report mismatch: ${JSON.stringify(auditReport)}`);

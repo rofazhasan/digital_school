@@ -136,16 +136,10 @@ export async function POST(
                 }
             } else if (type === 'CMA') {
                 const result = evaluateCMAQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
-                }
+                questionScore = Math.max(0, Number(result.score) || 0);
             } else if (type === 'MPC') {
                 const result = evaluateMPCQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
-                }
+                questionScore = Math.max(0, Number(result.score) || 0);
             }
 
             totalScore += questionScore;

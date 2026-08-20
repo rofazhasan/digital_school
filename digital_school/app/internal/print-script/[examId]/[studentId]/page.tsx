@@ -183,10 +183,6 @@ export default function InternalStudentScriptPrintPage({ params, searchParams }:
         mpc: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MPC').map((q: any) => ({
             ...q,
             questionText: q.text
-        })),
-        dr: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'DR').map((q: any) => ({
-            ...q,
-            questionText: q.text
         }))
     };
 

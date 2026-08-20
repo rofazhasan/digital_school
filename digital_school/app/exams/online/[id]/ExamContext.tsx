@@ -90,7 +90,7 @@ export function ExamContextProvider({
   // --- Section Detection Logic ---
   const { hasObjective, hasCqSq } = useMemo(() => {
     if (!exam.questions) return { hasObjective: false, hasCqSq: false };
-    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'dr'];
+    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc'];
     const questions = exam.questions || [];
 
     const obj = questions.some((q: any) => {

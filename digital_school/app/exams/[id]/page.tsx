@@ -1344,7 +1344,7 @@ export default function ExamBuilderPage() {
                                       })}
                                     </ul>
                                   )}
-                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC', 'DR'].includes(setQ.type || '') && setQ.negativeMarks && (
+                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(setQ.type || '') && setQ.negativeMarks && (
                                     <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                                       -{setQ.negativeMarks} marks
                                     </div>

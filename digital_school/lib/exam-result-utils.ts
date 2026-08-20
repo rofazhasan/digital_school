@@ -10,6 +10,7 @@
  * they WILL NOT interfere with online exam taking, the Question Bank (QB), or 
  * the core auto-evaluation engine.
  */
+import { areExpressionsEquivalent } from './math-parser';
 
 /**
  * Safely checks if a generic answer is considered "answered"
@@ -103,14 +104,11 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
         } else if (studentAnswer && typeof studentAnswer === 'object') {
             hasAtLeastOneCorrect = parts.some((p: any) => {
                 const pId = p.id || p.key || p.name || p.label;
-                const sVal = String(studentAnswer[pId] ?? studentAnswer[p.label] ?? '').trim().toLowerCase();
-                const eVal = String(p.expectedAnswer ?? p.modelAnswer ?? '').trim().toLowerCase();
+                const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
+                const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
                 if (!sVal || !eVal) return false;
-                if (p.type === 'decimal' || p.fieldType === 'decimal' || (p.tolerance !== undefined && !isNaN(Number(eVal)))) {
-                    const tol = Number(p.tolerance) || 0.01;
-                    return Math.abs(parseFloat(sVal) - parseFloat(eVal)) <= tol;
-                }
-                return sVal === eVal;
+                const tol = Number(p.tolerance) || 0.01;
+                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
         }
     } else if (type === 'MPC') {
@@ -120,10 +118,11 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
         } else if (studentAnswer && typeof studentAnswer === 'object') {
             hasAtLeastOneCorrect = stages.some((s: any) => {
                 const sId = s.id || s.key || s.name || s.stageTitle;
-                const sVal = parseFloat(String(studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? ''));
-                const eVal = parseFloat(String(s.expectedAnswer ?? s.modelAnswer ?? ''));
+                const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
+                const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
+                if (!sVal || !eVal) return false;
                 const tol = Number(s.tolerance) || 0.01;
-                return !isNaN(sVal) && !isNaN(eVal) && Math.abs(sVal - eVal) <= tol;
+                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
         }
     } else if (type === 'SMCQ') {

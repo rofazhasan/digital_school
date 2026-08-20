@@ -1,6 +1,5 @@
 import { evaluateCMAQuestion } from '../lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '../lib/evaluation/mpcEvaluation';
-import { evaluateDRQuestion } from '../lib/evaluation/drEvaluation';
 import { evaluateMCQuestion } from '../lib/evaluation/mcEvaluation';
 import { evaluateQuestionResultStatus } from '../lib/exam-result-utils';
 
@@ -180,21 +179,6 @@ export const SAMPLE_9_TYPE_EXAM = {
         type: "MPC"
       }
     ],
-    dr: [
-      {
-        id: "q-dr-1",
-        questionText: "What happens to the pressure inside a rigid sealed gas container when its temperature is increased?",
-        expectedAnswer: "Pressure Increases",
-        marks: 3,
-        reasonOptions: [
-          { id: "r1", text: "Gas molecules gain kinetic energy and collide more frequently and forcefully with container walls (Gay-Lussac's Law)", isCorrect: true },
-          { id: "r2", text: "The volume of the container expands significantly", isCorrect: false },
-          { id: "r3", text: "The number of gas molecules inside the container increases", isCorrect: false }
-        ],
-        confidenceTracking: true,
-        type: "DR"
-      }
-    ],
     cq: [],
     sq: [],
     descriptive: []
@@ -269,24 +253,7 @@ function auditCompleteLifecycle() {
     "MPC Audit: Error Propagation Handling (EPH) correctly awards 4 method credit marks for downstream stages"
   );
 
-  // 9. DR EVALUATION & COGNITIVE DIAGNOSTIC MATRIX AUDIT
-  const dr = SAMPLE_9_TYPE_EXAM.questions.dr[0];
-  const drMastery = evaluateDRQuestion(dr as any, { answer: 'pressure increases', reasonId: 'r1', confidence: 'Certain' });
-  testAssert(
-    drMastery.diagnosticTag === 'MASTERY' && drMastery.score === 3,
-    "DR Audit: Answer + Reason + Certain = MASTERY"
-  );
-
-  const drMisconception = evaluateDRQuestion(dr as any, { answer: "Pressure Increases", reasonId: "r2", confidence: "Certain" });
-  testAssert(drMisconception.diagnosticTag === "MISCONCEPTION" || drMisconception.diagnosticTag === "GUESS", "DR Audit: Answer + Wrong Reason = MISCONCEPTION / GUESS");
-
-  const drExecutionSlip = evaluateDRQuestion(dr as any, { answer: "Wrong Answer", reasonId: "r1", confidence: "Probably" });
-  testAssert(drExecutionSlip.diagnosticTag === "EXECUTION_SLIP", "DR Audit: Wrong Answer + Correct Reason = EXECUTION_SLIP");
-
-  const drKnowledgeGap = evaluateDRQuestion(dr as any, { answer: "Wrong Answer", reasonId: "r2", confidence: "Certain" });
-  testAssert(drKnowledgeGap.diagnosticTag === "KNOWLEDGE_GAP" || drKnowledgeGap.diagnosticTag === "STRONG_MISCONCEPTION", "DR Audit: Wrong Answer + Wrong Reason = KNOWLEDGE_GAP");
-
-  // 10. MC ALL WRONG NEGATIVE PENALTY AUDIT
+  // 9. MC ALL WRONG NEGATIVE PENALTY AUDIT
   const mcAllWrong = evaluateMCQuestion(
     { options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: true }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }], marks: 4 },
     { selectedOptions: [2, 3] }, // selected 2 wrong choices, 0 correct choices
@@ -361,27 +328,6 @@ function auditCompleteLifecycle() {
     stageResults: mpcEPH.stageResults
   });
   testAssert(mpcEPHStatus === "PARTIAL", `MPC Result Mapping: Error propagation method credit maps to PARTIAL on result page`);
-
-  // DR Result mapping:
-  const drMasteryStatus = evaluateQuestionResultStatus({
-    type: "DR",
-    marks: 3,
-    awardedMarks: 3,
-    studentAnswer: { answer: "Pressure Increases", reasonId: "r1", confidence: "Certain" },
-    reasonOptions: dr.reasonOptions,
-    expectedAnswer: dr.expectedAnswer
-  });
-  testAssert(drMasteryStatus === "CORRECT", `DR Result Mapping: Full Mastery maps to CORRECT on result page`);
-
-  const drSlipStatus = evaluateQuestionResultStatus({
-    type: "DR",
-    marks: 3,
-    awardedMarks: 1,
-    studentAnswer: { answer: "Wrong Answer", reasonId: "r1", confidence: "Certain" },
-    reasonOptions: dr.reasonOptions,
-    expectedAnswer: dr.expectedAnswer
-  });
-  testAssert(drSlipStatus === "PARTIAL", `DR Result Mapping: Execution Slip (correct reason only) maps to PARTIAL on result page`);
 
   console.log("--------------------------------------------------------------------------");
   console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT CHECKS PASSED CLEANLY!`);

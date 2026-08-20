@@ -2001,42 +2001,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     try {
       if (type === 'cma') {
         const cmaRes = evaluateCMAQuestion(question as any, answer as any);
-        let qMark = cmaRes.score;
-        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-          const parts = (question as any).parts || (question as any).cmaParts || [];
-          const maxM = cmaRes.maxScore || Number(question.marks) || 1;
-          const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
-          let wrongPenalty = 0;
-          for (const part of parts) {
-            const pRes = cmaRes.partResults?.[part.id];
-            if (pRes && !pRes.isCorrect) {
-              const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
-              wrongPenalty += (partMax * exam.mcqNegativeMarking) / 100;
-            }
-          }
-          qMark = Math.round((cmaRes.score - wrongPenalty) * 100) / 100;
-        }
-        return qMark;
+        return cmaRes.score;
       }
 
       if (type === 'mpc') {
         const mpcRes = evaluateMPCQuestion(question as any, answer as any);
-        let qMark = mpcRes.score;
-        if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-          const stages = (question as any).stages || (question as any).mpcStages || [];
-          const maxM = mpcRes.maxScore || Number(question.marks) || 1;
-          const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
-          let wrongPenalty = 0;
-          for (const stage of stages) {
-            const sRes = mpcRes.stageResults?.[stage.id];
-            if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
-              const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
-              wrongPenalty += (stageMax * exam.mcqNegativeMarking) / 100;
-            }
-          }
-          qMark = Math.round((mpcRes.score - wrongPenalty) * 100) / 100;
-        }
-        return qMark;
+        return mpcRes.score;
       }
 
       if (type === 'mcq') {
@@ -3309,14 +3279,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 {(() => {
                                   const dbMcqMarks = currentStudent?.result?.mcqMarks;
                                   const calculatedMcqMarks = exam?.questions
-                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(q?.type?.toLowerCase() || ''))
+                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'].includes(q?.type?.toLowerCase() || ''))
                                     ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers), 0) ?? 0;
 
                                   return dbMcqMarks != null ? dbMcqMarks : calculatedMcqMarks;
                                 })()}
                               </div>
                               <div className="text-xs text-blue-600">
-                                / {exam?.questions?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc', 'dr'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
+                                / {exam?.questions?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
                               </div>
                             </div>
                           </div>

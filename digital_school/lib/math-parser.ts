@@ -38,8 +38,8 @@ export function normalizeBengaliNumeralsAndText(str: string | number | undefined
   text = text.replace(/(\d)[\u0964\u0965](\d)/g, '$1.$2');
   text = text.replace(/[\u0964\u0965]/g, ' ');
 
-  // Degree symbols: 90° -> 90 deg, 90^\circ -> 90 deg, 90 ডিগ্রি -> 90 deg
-  text = text.replace(/(\d+(?:\.\d+)?)\s*(?:°|\^\\circ|\\circ|deg|degree|ডিগ্রি)\b/gi, '$1 deg');
+  // Degree symbols: 90° -> 90 deg, 90^\circ -> 90 deg, 90^{\circ} -> 90 deg, 90^circ -> 90 deg, 90 ডিগ্রি -> 90 deg, 90 degree(s) -> 90 deg
+  text = text.replace(/(\d+(?:\.\d+)?)\s*(?:°|\^?\{?\\+circ\}?|\^?circ|deg(?:ree)?s?|ডিগ্রি)\b/gi, '$1 deg');
   text = text.replace(/°/g, ' deg');
 
   // Unit vector notation: \hat{i} -> i, \hat{j} -> j, \hat{k} -> k
@@ -771,6 +771,14 @@ function _calcPerm(n: number, r: number): number {
  */
 export function evaluateExpressionAtSample(expr: string, vars: Record<string, number> = {}): number | null {
   try {
+    // If the expression is purely a standalone angle/number (e.g. "90 deg", "90°", "90 degree", "90 degrees", "90 ডিগ্রি", "-45 deg"),
+    // return its numeric angle directly instead of converting to radians.
+    const standaloneAngle = normalizeBengaliNumeralsAndText(expr).trim().match(/^([-+]?\d+(?:\.\d+)?)\s*(?:deg|degree|degrees|\^?\\circ|\\circ|°|ডিগ্রি)$/i);
+    if (standaloneAngle && Object.keys(vars).length === 0) {
+      const num = parseFloat(standaloneAngle[1]);
+      if (!isNaN(num)) return num;
+    }
+
     let text = normalizeExpression(expr);
     if (!text) return null;
 
@@ -789,8 +797,8 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
     // Substitute pi constant
     text = text.replace(/(?<![a-zA-Z0-9_])pi(?![a-zA-Z0-9_])/gi, `(${Math.PI})`);
 
-    // Degree angle conversion: 30 deg or 30° -> (30 * Math.PI / 180)
-    text = text.replace(/(\d+(?:\.\d+)?)\s*(?:deg|degree|\^\\circ|\\circ|°)\b/gi, '($1 * Math.PI / 180)');
+    // Degree angle conversion in trigonometric / algebraic formulas: e.g. sin(30 deg) -> sin(30 * Math.PI / 180)
+    text = text.replace(/(\d+(?:\.\d+)?)\s*(?:deg|degree|degrees|\^?\\circ|\\circ|°|ডিগ্রি)\b/gi, '($1 * Math.PI / 180)');
 
     // Euler's constant e (when not explicitly provided as a sample variable)
     if (!vars['e'] && !vars['E']) {
@@ -905,8 +913,8 @@ export function areExpressionsEquivalent(
   if (cleanStu.toLowerCase().replace(/\s+/g, '') === cleanExp.toLowerCase().replace(/\s+/g, '')) return true;
   if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
 
-  // 6.1 Physical Units Stripping & Dimensional Comparison (e.g. 9.8 m/s^2 == 9.8 ms^-2 == 9.8 \text{ m/s}^2 == 9.8)
-  const UNIT_REGEX = /\s*(?:\\text\{)?(?:\\mathrm\{)?(m\/s\^2|ms\^-2|ms\^\{-2\}|m\/s|ms\^-1|ms\^\{-1\}|km\/h|km\/hr|m\^3|m\^2|cm\^3|cm\^2|mm|cm|km|m|kg\/m\^3|g\/cm\^3|kg|gm|g|mg|N\/m\^2|N\/m|N\*m|Nm|Newton|N|Joule|J\/s|J|kW|MW|Watt|W|kPa|Pascal|Pa|atm|bar|mmHg|Kelvin|K|deg\s*C|deg\s*F|mA|Ampere|Amp|A|kV|mV|Volt|V|k\\Omega|M\\Omega|\\Omega|ohm|Ohm|\\mu\s*C|nC|Coulomb|C|\\mu\s*F|nF|pF|Farad|F|mH|Henry|H|Tesla|T|Weber|Wb|kHz|MHz|GHz|Hertz|Hz|mole|mol|rad\/s|rpm|radian|rad|keV|MeV|eV|মিটার\/সেকেন্ড(?:\^[২2])?|মিটার\/সেকেন্ড|মিটার|সেমি|কিমি|কিলোমিটার|কেজি|গ্রাম|নিউটন|জুল|ওয়াট|ভোল্ট|অ্যাম্পিয়ার|ওহম|প্যাসকেল|হার্টজ|কেলভিন|কুলম্ব|ফ্যারাড)(?:\})?$/i;
+  // 6.1 Physical Units Stripping & Dimensional Comparison (e.g. 9.8 m/s^2 == 9.8 ms^-2 == 9.8 \text{ m/s}^2 == 9.8, 90 deg == 90° == 90 degree == 90)
+  const UNIT_REGEX = /\s*(?:\\text\{)?(?:\\mathrm\{)?(m\/s\^2|ms\^-2|ms\^\{-2\}|m\/s|ms\^-1|ms\^\{-1\}|km\/h|km\/hr|m\^3|m\^2|cm\^3|cm\^2|mm|cm|km|m|kg\/m\^3|g\/cm\^3|kg|gm|g|mg|N\/m\^2|N\/m|N\*m|Nm|Newton|N|Joule|J\/s|J|kW|MW|Watt|W|kPa|Pascal|Pa|atm|bar|mmHg|Kelvin|K|deg\s*C|deg\s*F|deg(?:ree)?s?|\^?\\circ|°|ডিগ্রি|mA|Ampere|Amp|A|kV|mV|Volt|V|k\\Omega|M\\Omega|\\Omega|ohm|Ohm|\\mu\s*C|nC|Coulomb|C|\\mu\s*F|nF|pF|Farad|F|mH|Henry|H|Tesla|T|Weber|Wb|kHz|MHz|GHz|Hertz|Hz|mole|mol|rad\/s|rpm|radian|rad|keV|MeV|eV|মিটার\/সেকেন্ড(?:\^[২2])?|মিটার\/সেকেন্ড|মিটার|সেমি|কিমি|কিলোমিটার|কেজি|গ্রাম|নিউটন|জুল|ওয়াট|ভোল্ট|অ্যাম্পিয়ার|ওহম|প্যাসকেল|হার্টজ|কেলভিন|কুলম্ব|ফ্যারাড)(?:\})?$/i;
 
   const stripUnit = (s: string) => {
     const trimmed = s.trim();
@@ -1089,7 +1097,7 @@ export function areExpressionsEquivalent(
 
   // 9. Direct numeric comparison (with tolerance) for purely numeric values or evaluated formulas (e.g. 5C2 == 10, 5P2 == 20)
   const evalStuDirect = evaluateExpressionAtSample(stuStr);
-  const evalExpDirect = evaluateExpressionAtSample(expectedExpr);
+  const evalExpDirect = evaluateExpressionAtSample(expStr);
   if (evalStuDirect !== null && evalExpDirect !== null) {
     if (Math.abs(evalStuDirect - evalExpDirect) <= (tolerance || 0.01)) return true;
   }
@@ -1102,7 +1110,7 @@ export function areExpressionsEquivalent(
 
   // 10. Normalized algebraic string comparison
   const normStu = normalizeExpression(stuStr);
-  const normExp = normalizeExpression(expectedExpr);
+  const normExp = normalizeExpression(expStr);
   if (normStu && normExp && normStu.toLowerCase() === normExp.toLowerCase()) {
     return true;
   }
@@ -1138,7 +1146,7 @@ export function areExpressionsEquivalent(
 
     for (const samples of sampleSets) {
       const valStu = evaluateExpressionAtSample(stuStr, samples);
-      const valExp = evaluateExpressionAtSample(expectedExpr, samples);
+      const valExp = evaluateExpressionAtSample(expStr, samples);
 
       if (valStu !== null && valExp !== null && !isNaN(valStu) && !isNaN(valExp) && isFinite(valStu) && isFinite(valExp)) {
         validSampleCount++;
@@ -1164,7 +1172,7 @@ export function areExpressionsEquivalent(
     return normalizeExpression(expr).split('*').sort();
   };
   const factorsStu = extractFactors(stuStr);
-  const factorsExp = extractFactors(expectedExpr);
+  const factorsExp = extractFactors(expStr);
   if (factorsStu.length > 1 && factorsStu.join('*') === factorsExp.join('*')) {
     return true;
   }

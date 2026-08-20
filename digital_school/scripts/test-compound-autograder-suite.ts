@@ -50,7 +50,7 @@ const cmaQuestion = {
     },
     {
       id: 'p4',
-      type: 'DR',
+      type: 'TEXT',
       marks: 1,
       expectedAnswer: 'NEPHRON',
       acceptedAnswers: ['nephron', 'নেফ্রন']
@@ -70,7 +70,7 @@ assert(allCorrectRes.isCorrect === true, 'CMA: All parts correct status is true'
 assert(allCorrectRes.partResults['p1'].status === 'CORRECT', 'CMA: MCQ child part status is CORRECT');
 assert(allCorrectRes.partResults['p2'].status === 'CORRECT', 'CMA: INT child part status is CORRECT');
 assert(allCorrectRes.partResults['p3'].status === 'CORRECT', 'CMA: MC child part status is CORRECT');
-assert(allCorrectRes.partResults['p4'].status === 'CORRECT', 'CMA: DR child part status is CORRECT');
+assert(allCorrectRes.partResults['p4'].status === 'CORRECT', 'CMA: TEXT child part status is CORRECT');
 
 // Test 2: Partial credit & Unanswered child parts
 const partialCmaRes = evaluateCMAQuestion(cmaQuestion, {

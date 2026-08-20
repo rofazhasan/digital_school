@@ -1,3 +1,5 @@
+import { normalizeBengaliNumeralsAndText, areExpressionsEquivalent } from '../math-parser';
+
 // INT (Integer Type) Question Evaluation Logic
 // Evaluates integer answer questions with exact match
 
@@ -31,16 +33,19 @@ export function evaluateINTQuestion(
 ): INTEvaluationResult {
     // Try to find correct answer in various possible fields
     const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
-    const correctAnswer = parseInt(String(rawCorrect).trim()) || 0;
+    const normCorrect = normalizeBengaliNumeralsAndText(String(rawCorrect)).trim();
+    const cleanCorrect = normCorrect.replace(/[^0-9.-]/g, '');
+    const correctAnswer = parseInt(cleanCorrect) || (parseInt(normCorrect) || 0);
 
     const studentAnsRaw = studentAnswer?.answer ?? studentAnswer;
-    const studentAns = typeof studentAnsRaw === 'object' ? 0 : (parseInt(String(studentAnsRaw).trim()) || 0);
+    const normStudent = normalizeBengaliNumeralsAndText(typeof studentAnsRaw === 'object' ? '0' : String(studentAnsRaw ?? '')).trim();
+    const cleanStudent = normStudent.replace(/[^0-9.-]/g, '');
+    const studentAns = parseInt(cleanStudent) || (parseInt(normStudent) || 0);
 
     const marks = Number(question.marks) || 0;
 
-
-    // Check if answer is correct (exact match)
-    const isCorrect = studentAns === correctAnswer;
+    // Check if answer is correct (exact numeric integer match or algebraic expression equivalence)
+    const isCorrect = studentAns === correctAnswer || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.001);
     const score = isCorrect ? marks : 0;
 
     const feedback = isCorrect
@@ -76,12 +81,16 @@ export function getINTFeedback(
     score: number
 ) {
     const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
-    const correctAnswer = parseInt(String(rawCorrect).trim()) || 0;
+    const normCorrect = normalizeBengaliNumeralsAndText(String(rawCorrect)).trim();
+    const cleanCorrect = normCorrect.replace(/[^0-9.-]/g, '');
+    const correctAnswer = parseInt(cleanCorrect) || (parseInt(normCorrect) || 0);
 
     const studentAnsRaw = studentAnswer?.answer ?? studentAnswer;
-    const studentAns = typeof studentAnsRaw === 'object' ? 0 : (parseInt(String(studentAnsRaw).trim()) || 0);
+    const normStudent = normalizeBengaliNumeralsAndText(typeof studentAnsRaw === 'object' ? '0' : String(studentAnsRaw ?? '')).trim();
+    const cleanStudent = normStudent.replace(/[^0-9.-]/g, '');
+    const studentAns = parseInt(cleanStudent) || (parseInt(normStudent) || 0);
 
-    const isCorrect = studentAns === correctAnswer;
+    const isCorrect = studentAns === correctAnswer || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.001);
 
     return {
         isCorrect,

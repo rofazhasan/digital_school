@@ -16,6 +16,8 @@ export interface CMAPart {
     modelAnswer?: number | string;
     tolerance?: number; // E.g. ±0.05
     unit?: string;
+    acceptedAnswers?: string[] | string;
+    aliases?: string[] | string;
     options?: any[];
     matches?: Record<string, string>;
 }
@@ -136,7 +138,7 @@ export function evaluateCMAChildPart(
     let isEquiv = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
     // Unit-resilient fallback: try stripping units if direct check fails
-    if (!isEquiv && (part.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF]/))) {
+    if (!isEquiv && (part.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF°]/) || expectedStr.match(/[a-zA-Z\u0980-\u09FF°]/))) {
         const stripUnits = (s: string, u?: string) => {
             let res = String(s).trim();
             if (u) {
@@ -147,7 +149,8 @@ export function evaluateCMAChildPart(
                 'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
                 'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
                 'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
-                'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad'
+                'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad',
+                'ডিগ্রি', 'degree', 'degrees', 'deg', '°', '^\\circ', '\\circ'
             ];
             for (const unitStr of commonUnits) {
                 res = res.split(unitStr).join('');

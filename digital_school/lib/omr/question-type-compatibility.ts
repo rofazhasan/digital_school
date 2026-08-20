@@ -98,15 +98,6 @@ export const QUESTION_TYPE_COMPATIBILITY_REGISTRY: Record<string, QuestionTypeOM
     requiredTemplateSupport: 'Requires separate physical sub-question numbering per stage',
     isNativelyReadableOnCurrentSheet: false,
     notes: 'Marked DIGITAL_ONLY for dynamic multi-stage branching.'
-  },
-  SDR: {
-    type: 'SDR',
-    name: 'Short Descriptive Response / Subjective Written Answer',
-    supportLevel: 'DIGITAL_ONLY',
-    currentOMRRepresentation: 'Handwritten written lines / calculations cannot be read by optical bubble thresholding',
-    requiredTemplateSupport: 'Ruled written box requiring OCR handwriting evaluation or manual teacher grading',
-    isNativelyReadableOnCurrentSheet: false,
-    notes: 'Marked DIGITAL_ONLY for optical bubble scanning. Evaluated via /exams/evaluations drawing & marking tools.'
   }
 };
 

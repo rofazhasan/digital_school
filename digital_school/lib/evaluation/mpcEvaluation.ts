@@ -1,4 +1,4 @@
-import { areExpressionsEquivalent, evaluateExpressionAtSample } from '../math-parser';
+import { areExpressionsEquivalent, evaluateExpressionAtSample, normalizeBengaliNumeralsAndText } from '../math-parser';
 
 // MPC (Multi-Step Problem Chain) Question Evaluation Logic
 // Evaluates sequential problem stages with dependency-aware scoring, Directed Acyclic Graph (DAG) validation,
@@ -13,6 +13,7 @@ export interface MPCStage {
     marks: number;
     expectedAnswer: number | string;
     tolerance?: number;
+    unit?: string;
     dependsOnStageId?: string; // ID of preceding stage required for evaluation
     dependsOn?: string[] | string;
     gradingMode?: 'FOLLOW_THROUGH' | 'EXACT' | string;
@@ -132,7 +133,8 @@ function computeDynamicTarget(
 
     for (const depId of depIds) {
         const rawVal = studentAnswer ? studentAnswer[depId] : undefined;
-        const numVal = parseFloat(String(rawVal ?? ''));
+        const normVal = normalizeBengaliNumeralsAndText(String(rawVal ?? '')).replace(/[^0-9.-]/g, '');
+        const numVal = parseFloat(normVal);
         if (!isNaN(numVal)) {
             sampleVars[depId] = numVal;
             sampleVars[`stage_${depId}`] = numVal;
@@ -241,7 +243,7 @@ export function evaluateMPCQuestion(
             isCorrectDirectly = areExpressionsEquivalent(studentStr, expectedStr, tol);
 
             // Unit-resilient fallback
-            if (!isCorrectDirectly && (stage.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF]/))) {
+            if (!isCorrectDirectly && (stage.unit || studentStr.match(/[a-zA-Z\u0980-\u09FF°]/) || expectedStr.match(/[a-zA-Z\u0980-\u09FF°]/))) {
                 const stripUnits = (s: string, u?: string) => {
                     let res = String(s).trim();
                     if (u) {
@@ -252,7 +254,8 @@ export function evaluateMPCQuestion(
                         'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
                         'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
                         'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
-                        'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad'
+                        'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad',
+                        'ডিগ্রি', 'degree', 'degrees', 'deg', '°', '^\\circ', '\\circ'
                     ];
                     for (const unitStr of commonUnits) {
                         res = res.split(unitStr).join('');

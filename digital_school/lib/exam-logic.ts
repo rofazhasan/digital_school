@@ -455,42 +455,12 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             } else if (type === 'CMA') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const cmaRes = evaluateCMAQuestion(question as any, studentAnswer as any);
-                let qMark = cmaRes.score;
-                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    const parts = (question as any).parts || (question as any).cmaParts || [];
-                    const maxM = cmaRes.maxScore || Number(question.marks) || 1;
-                    const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
-                    let wrongPenalty = 0;
-                    for (const part of parts) {
-                        const pRes = cmaRes.partResults?.[part.id];
-                        if (pRes && !pRes.isCorrect) {
-                            const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
-                            wrongPenalty += (partMax * exam.mcqNegativeMarking) / 100;
-                        }
-                    }
-                    qMark = Math.round((cmaRes.score - wrongPenalty) * 100) / 100;
-                }
-                questionScore = qMark;
+                questionScore = cmaRes.score;
                 res = { score: questionScore, type, isCorrect: cmaRes.isCorrect, partResults: cmaRes.partResults };
             } else if (type === 'MPC') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
-                let qMark = mpcRes.score;
-                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    const stages = (question as any).stages || (question as any).mpcStages || [];
-                    const maxM = mpcRes.maxScore || Number(question.marks) || 1;
-                    const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
-                    let wrongPenalty = 0;
-                    for (const stage of stages) {
-                        const sRes = mpcRes.stageResults?.[stage.id];
-                        if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
-                            const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
-                            wrongPenalty += (stageMax * exam.mcqNegativeMarking) / 100;
-                        }
-                    }
-                    qMark = Math.round((mpcRes.score - wrongPenalty) * 100) / 100;
-                }
-                questionScore = qMark;
+                questionScore = mpcRes.score;
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
             }
 

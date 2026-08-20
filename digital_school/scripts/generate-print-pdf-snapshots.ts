@@ -29,11 +29,9 @@ async function generateSnapshots() {
     mtf: SAMPLE_9_TYPE_EXAM.questions.mtf as any,
     cq: [],
     sq: [],
-    descriptive: [],
     smcq: SAMPLE_9_TYPE_EXAM.questions.smcq,
     cma: SAMPLE_9_TYPE_EXAM.questions.cma,
     mpc: SAMPLE_9_TYPE_EXAM.questions.mpc,
-    dr: SAMPLE_9_TYPE_EXAM.questions.dr,
   };
 
   // 1. Render Question Paper
