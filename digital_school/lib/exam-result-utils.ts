@@ -37,9 +37,13 @@ export const hasStudentAnswered = (
     const type = (questionType || '').toUpperCase();
 
     if (type === 'SMCQ') {
-        // For SMCQ, we check if ANY of the sub-questions have a valid answer
+        // For SMCQ, we check if ANY of the sub-questions or the top-level studentAnswer has a valid answer
         const sqs = subQuestions || [];
-        return sqs.some((sq: any) => isAnswerValueValid(sq.studentAnswer));
+        if (sqs.some((sq: any) => isAnswerValueValid(sq.studentAnswer))) return true;
+        if (studentAnswer && typeof studentAnswer === 'object' && !Array.isArray(studentAnswer)) {
+            return Object.values(studentAnswer).some(v => isAnswerValueValid(v));
+        }
+        return isAnswerValueValid(studentAnswer);
     }
 
     if (studentAnswer && typeof studentAnswer === 'object' && !Array.isArray(studentAnswer)) {

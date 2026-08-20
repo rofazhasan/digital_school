@@ -42,8 +42,10 @@ export function evaluateMTFQuestion(
     question: MTFQuestion,
     studentMatches: MTFAnswer
 ): MTFResult {
+    const leftCol = question.leftColumn || (question as any).leftItems || [];
+    const rightCol = question.rightColumn || (question as any).rightItems || [];
     const correctMatches = (question.matches || {}) as Record<string, string>;
-    const totalLeftItems = question.leftColumn?.length || 0;
+    const totalLeftItems = leftCol.length;
     const marksPerMatch = totalLeftItems > 0 ? (Number(question.marks) || 1) / totalLeftItems : 0;
 
     let correctCount = 0;
@@ -59,8 +61,8 @@ export function evaluateMTFQuestion(
             if (m && typeof m === 'object' && m.leftId !== undefined && m.rightId !== undefined) {
                 normalizedStudentMatches[m.leftId] = m.rightId;
             } else if (m && typeof m === 'object' && m.leftIndex !== undefined && m.rightIndex !== undefined) {
-                const leftItem = question.leftColumn?.[m.leftIndex];
-                const rightItem = question.rightColumn?.[m.rightIndex];
+                const leftItem = leftCol[m.leftIndex];
+                const rightItem = rightCol[m.rightIndex];
                 if (leftItem && rightItem) {
                     normalizedStudentMatches[leftItem.id] = rightItem.id;
                 }
@@ -71,14 +73,14 @@ export function evaluateMTFQuestion(
         normalizedStudentMatches = rawMatches as Record<string, string>;
     }
 
-    const matchesDetails = (question.leftColumn || []).map((item: MTFMatchNode, idx: number) => {
+    const matchesDetails = leftCol.map((item: MTFMatchNode, idx: number) => {
         let correctRightId = correctMatches[item.id];
         if (!correctRightId) {
             const leftOrigIdx = (item as any).originalIndex !== undefined ? (item as any).originalIndex : idx;
-            if (question.rightColumn) {
-                const rMatch = question.rightColumn.find((r: any) => r.originalIndex === leftOrigIdx);
+            if (rightCol.length > 0) {
+                const rMatch = rightCol.find((r: any) => r.originalIndex === leftOrigIdx);
                 if (rMatch) correctRightId = rMatch.id;
-                else if (question.rightColumn[idx]) correctRightId = question.rightColumn[idx].id;
+                else if (rightCol[idx]) correctRightId = rightCol[idx].id;
             }
         }
 

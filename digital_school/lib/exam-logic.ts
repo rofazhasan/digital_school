@@ -370,7 +370,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
                 questionScore = evaluateMCQuestion(question as unknown as MCQuestion, studentAnswer as MCAnswer, {
-                    negativeMarking: exam.mcNegativeMarking || 0,
+                    negativeMarking: (exam as any).mcNegativeMarking ?? exam.mcqNegativeMarking ?? 0,
                     partialMarking: true,
                     hasAttempted: true
                 });

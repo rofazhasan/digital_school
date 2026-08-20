@@ -32,7 +32,7 @@ export function evaluateINTQuestion(
     studentAnswer: INTAnswer
 ): INTEvaluationResult {
     // Try to find correct answer in various possible fields
-    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
+    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? (question as any).expectedAnswer ?? question.correct ?? question.answer ?? '0';
     const normCorrect = normalizeBengaliNumeralsAndText(String(rawCorrect)).trim();
     const cleanCorrect = normCorrect.replace(/[^0-9.-]/g, '');
     const correctAnswer = parseInt(cleanCorrect) || (parseInt(normCorrect) || 0);
@@ -80,7 +80,7 @@ export function getINTFeedback(
     studentAnswer: INTAnswer,
     score: number
 ) {
-    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
+    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? (question as any).expectedAnswer ?? question.correct ?? question.answer ?? '0';
     const normCorrect = normalizeBengaliNumeralsAndText(String(rawCorrect)).trim();
     const cleanCorrect = normCorrect.replace(/[^0-9.-]/g, '');
     const correctAnswer = parseInt(cleanCorrect) || (parseInt(normCorrect) || 0);
