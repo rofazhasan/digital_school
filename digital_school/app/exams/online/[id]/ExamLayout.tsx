@@ -5,9 +5,10 @@ import { useExamContext } from "./ExamContext";
 import QuestionCard from "./QuestionCard";
 import Timer from "./Timer";
 import Navigator from "./Navigator";
+import OMRExamSheet from "./OMRExamSheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check, BookOpen, FileSpreadsheet, Play, CheckSquare, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
@@ -213,8 +214,16 @@ export default function ExamLayout() {
   const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
   const isActuallyResuming = hasStartedAny && !exam.hasSubmitted;
 
-  // Illusion Mode State
   const [illusionMode, setIllusionMode] = useState(false);
+
+  // View Mode: 'omr' (physical-style OMR sheet with no question text) vs 'full' (full question cards)
+  const [examViewMode, setExamViewMode] = useState<'omr' | 'full'>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'omr') return 'omr';
+    }
+    return 'full';
+  });
 
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
@@ -352,9 +361,10 @@ export default function ExamLayout() {
   }, [exam.objectiveStartedAt, exam.cqSqStartedAt, showInstructions, activeSection, exam.objectiveStatus, exam.cqSqStatus]);
 
 
-  const handleStartExam = async (sectionToStart: 'objective' | 'cqsq') => {
+  const handleStartExam = async (sectionToStart: 'objective' | 'cqsq', mode: 'omr' | 'full' = 'full') => {
     try {
       setIsStarting(true);
+      setExamViewMode(mode);
       setGracePeriod(true); // Enable grace period
 
       // 1. Enter Fullscreen FIRST (Objective ONLY)
@@ -619,19 +629,72 @@ export default function ExamLayout() {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-6 space-y-3">
             {hasObjective && (exam.objectiveStatus === 'PENDING' || exam.objectiveStatus === 'IN_PROGRESS') ? (
-              <Button
-                onClick={() => handleStartExam('objective')}
-                disabled={isStarting}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-blue-500/25 border-0 transition-all active:scale-[0.98] group mb-4"
-              >
-                {isStarting ? "প্রস্তুত করা হচ্ছে..." : isActuallyResuming ? "পরীক্ষা পুনরায় শুরু করো (Resume Exam)" : "পরীক্ষা শুরু করো (Start Exam)"}
-                <ChevronRight className="ml-2 h-6 w-6" />
-              </Button>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* OPTION 1: ONLY OMR MODE */}
+                  <button
+                    type="button"
+                    onClick={() => handleStartExam('objective', 'omr')}
+                    disabled={isStarting}
+                    className="group relative overflow-hidden text-left p-5 md:p-6 rounded-3xl border-2 border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl shadow-indigo-950/40 hover:border-indigo-400 hover:shadow-indigo-500/25 hover:scale-[1.01] active:scale-[0.98] transition-all duration-300 flex flex-col justify-between"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center font-black shadow-inner">
+                        <FileSpreadsheet className="w-6 h-6" />
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-400" /> Physical OMR Mode
+                      </span>
+                    </div>
+                    <div>
+                      <div className="font-black text-xl text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
+                        <span>শুধুমাত্র ওএমআর (Only OMR)</span>
+                        <ChevronRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                      <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                        শিক্ষকের দেওয়া প্রিন্ট করা প্রশ্নপত্র দেখে সরাসরি ডিজিটাল ওএমআর শিটে বৃত্ত ভরাট করুন (No question text on screen).
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* OPTION 2: FULL EXAM MODE */}
+                  <button
+                    type="button"
+                    onClick={() => handleStartExam('objective', 'full')}
+                    disabled={isStarting}
+                    className="group relative overflow-hidden text-left p-5 md:p-6 rounded-3xl border-2 border-indigo-500 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 text-white shadow-xl shadow-indigo-600/30 hover:border-indigo-300 hover:shadow-indigo-500/30 hover:scale-[1.01] active:scale-[0.98] transition-all duration-300 flex flex-col justify-between"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-white/20 text-white flex items-center justify-center font-black shadow-inner">
+                        <BookOpen className="w-6 h-6" />
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white">
+                        Full Digital Mode
+                      </span>
+                    </div>
+                    <div>
+                      <div className="font-black text-xl text-white flex items-center gap-2 group-hover:text-indigo-100 transition-colors">
+                        <span>সম্পূর্ণ পরীক্ষা (Full Exam)</span>
+                        <ChevronRight className="w-5 h-5 text-indigo-200 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                      <p className="text-xs text-indigo-100 mt-2 leading-relaxed">
+                        স্ক্রিনে এক এক করে সম্পূর্ণ প্রশ্ন ও অপশন দেখে উত্তর দিন (Interactive digital question card).
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {isStarting && (
+                  <div className="text-center py-2 text-xs font-bold text-primary animate-pulse">
+                    পরীক্ষার পরিবেশ প্রস্তুত করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...
+                  </div>
+                )}
+              </div>
             ) : hasCqSq && (exam.cqSqStatus === 'PENDING' || exam.cqSqStatus === 'IN_PROGRESS') ? (
               <Button
-                onClick={() => handleStartExam('cqsq')}
+                onClick={() => handleStartExam('cqsq', 'full')}
                 disabled={isStarting}
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
               >
@@ -759,6 +822,29 @@ export default function ExamLayout() {
                 </Button>
               </div>
 
+              {/* OMR / Full Mode Toggle (Objective section only) */}
+              {activeSection === 'objective' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExamViewMode(prev => prev === 'omr' ? 'full' : 'omr')}
+                  className="hidden sm:flex items-center gap-1.5 h-8 px-3 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 text-xs font-bold transition-all"
+                  title="ওএমআর শিট এবং প্রশ্ন ভিউ এর মধ্যে পরিবর্তন করুন"
+                >
+                  {examViewMode === 'omr' ? (
+                    <>
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>প্রশ্ন দেখুন (Full View)</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>ওএমআর শিট (Only OMR)</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Illusion Mode Toggle (Desktop Header) */}
               <Button variant="ghost" size="icon" onClick={toggleIllusionMode} title="Enter Focus Mode" className="hidden sm:flex text-muted-foreground hover:text-primary">
                 <Eye className="w-5 h-5" />
@@ -774,18 +860,29 @@ export default function ExamLayout() {
           </div>
         </header>
 
-        {/* --- PROGRESS BAR (Hidden in Illusion) --- */}
-        {!illusionMode && (
+        {/* --- PROGRESS BAR (Hidden in Illusion & OMR) --- */}
+        {!illusionMode && examViewMode !== 'omr' && (
           <div className="w-full h-1 bg-muted fixed top-16 z-40">
             <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
           </div>
         )}
 
-        {/* --- MAIN CONTENT --- */}
-        <main className={cn(
-          "flex-grow mx-auto w-full transition-all duration-500 pb-24 md:pb-10", // Added pb-24 for mobile sticky footer
-          illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
-        )}>
+        {/* --- MAIN CONTENT (OMR Mode OR Standard Question View) --- */}
+        {examViewMode === 'omr' && activeSection === 'objective' ? (
+          <div className="flex-1 w-full animate-in fade-in duration-300">
+            <OMRExamSheet
+              instituteName={instituteName}
+              instituteLogo={instituteLogo}
+              onSubmit={handleSubmit}
+              onToggleViewMode={() => setExamViewMode('full')}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+        ) : (
+          <main className={cn(
+            "flex-grow mx-auto w-full transition-all duration-500 pb-24 md:pb-10", // Added pb-24 for mobile sticky footer
+            illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
+          )}>
 
           {/* --- LEFT SIDEBAR (Desktop Navigator) --- */}
           {!illusionMode && (
@@ -926,6 +1023,7 @@ export default function ExamLayout() {
             )}
           </div>
         </main>
+      )}
 
         {/* --- OVERLAYS --- */}
         {showSubmitConfirm && (

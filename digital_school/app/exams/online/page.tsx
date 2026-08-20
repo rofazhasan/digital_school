@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Sparkles,
   ArrowUpDown,
+  FileSpreadsheet,
 } from "lucide-react";
 import DarkModeToggle from "@/components/ui/DarkModeToggle";
 
@@ -1187,12 +1188,19 @@ function ExamCard({
               )}
             </div>
           ) : (status === "active" || inProgress) && status !== "finished" ? (
-            <a href={`/exams/online/${exam.id}`} className="block">
-              <Button className="w-full rounded-xl h-10 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/25 gap-2 transition-transform active:scale-[0.98]">
-                <Play className="w-4 h-4 fill-current" />
-                {inProgress ? "Resume Exam" : "Start Exam"}
-              </Button>
-            </a>
+            <div className="flex gap-2">
+              <a href={`/exams/online/${exam.id}`} className="flex-1">
+                <Button className="w-full rounded-xl h-10 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/25 gap-2 transition-transform active:scale-[0.98]">
+                  <Play className="w-4 h-4 fill-current" />
+                  {inProgress ? "Resume Exam" : "Start Exam"}
+                </Button>
+              </a>
+              <a href={`/exams/online/${exam.id}?mode=omr`} title="শুধুমাত্র ওএমআর শিট মোড (Only OMR Mode)">
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40" title="Only OMR Mode">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
           ) : status === "upcoming" ? (
             <Button disabled className="w-full rounded-xl h-10 text-sm font-medium opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
               <Timer className="w-4 h-4 mr-2" /> Not Started Yet
