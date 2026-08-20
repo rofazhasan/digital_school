@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { use } from 'react';
+import React, { useState, useEffect, useMemo, useRef, use } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +62,6 @@ import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
 import { hasStudentAnswered, isAnswerCorrect, evaluateQuestionResultStatus } from "@/lib/exam-result-utils";
-import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
