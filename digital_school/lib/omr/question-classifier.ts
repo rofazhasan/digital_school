@@ -79,8 +79,8 @@ export class QuestionClassifier {
         };
       });
 
-      if (top.result.netInkScore >= 0.28 && top.result.fillRatio >= 0.35) {
-        if (second && second.result.netInkScore >= 0.26 && second.result.fillRatio >= 0.32) {
+      if (top.result.netInkScore >= 0.34 && top.result.fillRatio >= 0.38) {
+        if (second && second.result.netInkScore >= 0.30 && second.result.fillRatio >= 0.34) {
           // Multiple options filled
           qStatus = 'MULTIPLE_SELECTED';
           selectedOption = null;
@@ -88,7 +88,7 @@ export class QuestionClassifier {
           multipleCount++;
         } else {
           const margin = second ? top.result.netInkScore - second.result.netInkScore : top.result.netInkScore;
-          if (margin >= 0.10) {
+          if (margin >= 0.12) {
             qStatus = 'ONE_SELECTED';
             selectedOption = top.option;
             qConfidence = Math.min(1.0, 0.75 + margin * 1.2);

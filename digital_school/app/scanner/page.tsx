@@ -128,6 +128,8 @@ export default function RofazAcademyZeroManualOMRScanner() {
 
   const autoCaptureManagerRef = useRef(new AutoCaptureManager());
   const isProcessingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Audio chime feedback
   const playChime = useCallback((type: 'success' | 'warning' | 'error') => {
@@ -506,6 +508,48 @@ export default function RofazAcademyZeroManualOMRScanner() {
     });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    setProgressionState('PROCESSING');
+    setProgressionMessage('Processing uploaded OMR sheet...');
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.src = url;
+        await new Promise((resolve, reject) => {
+          img.onload = () => resolve(true);
+          img.onerror = reject;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          await processZeroManualFrame(imgData.data, canvas.width, canvas.height);
+        }
+        URL.revokeObjectURL(url);
+      }
+    } catch (err: any) {
+      console.error('Failed to process uploaded OMR file:', err);
+      setProgressionState('EXCEPTION');
+      setProgressionMessage(`Upload error: ${err.message || 'Processing failed'}`);
+      playChime('warning');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
@@ -518,6 +562,15 @@ export default function RofazAcademyZeroManualOMRScanner() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans">
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        multiple
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       {/* Top Header & Navigation Tabs */}
       <div className="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-5">
         <div className="flex items-center gap-3">
@@ -539,7 +592,7 @@ export default function RofazAcademyZeroManualOMRScanner() {
           </div>
         </div>
 
-        {/* View Switcher Pills */}
+        {/* View Switcher Pills & File Upload */}
         <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
           <button
             onClick={() => { setActiveTab('HOME'); stopCamera(); }}
@@ -557,6 +610,14 @@ export default function RofazAcademyZeroManualOMRScanner() {
           >
             <Camera className="w-3.5 h-3.5" />
             Batch Camera
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30"
+          >
+            <Upload className={`w-3.5 h-3.5 ${isUploading ? 'animate-spin' : ''}`} />
+            {isUploading ? 'Scanning File...' : 'Upload Image'}
           </button>
           <button
             onClick={() => { setActiveTab('EXCEPTIONS'); stopCamera(); }}

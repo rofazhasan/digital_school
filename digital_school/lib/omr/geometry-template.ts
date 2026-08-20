@@ -219,10 +219,10 @@ export function generateTemplateGeometry(
   const qsPerCol = 25;
   const colWidth = 510;
   const ansStartX = 240;
-  const ansStartY = 1620;
+  const ansStartY = 1690;
   const optStartXInCol = 145;
   const optStepX = 76;
-  const ansRowStepY = 63;
+  const ansRowStepY = 61.5;
 
   for (let col = 0; col < ansColumns; col++) {
     for (let row = 0; row < qsPerCol; row++) {

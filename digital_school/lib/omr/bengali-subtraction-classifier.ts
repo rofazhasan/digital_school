@@ -38,24 +38,24 @@ export function classifyBubbleROI(
   canonicalHeight: number,
   cell: CellROI
 ): BubbleAnalysisResult {
-  const cx = Math.round(cell.center.x);
-  const cy = Math.round(cell.center.y);
+  const origCx = Math.round(cell.center.x);
+  const origCy = Math.round(cell.center.y);
   const radius = cell.radius;
 
   const innerRadius = radius * 0.75;
   const outerRadius = radius * 1.35;
   const coreRadius = radius * 0.40;
 
-  // 1. Measure local background paper brightness (outer ring)
+  // 1. Measure local background paper brightness (outer reference ring)
   const bgIntensities: number[] = [];
-  const minX = Math.max(0, cx - Math.ceil(outerRadius));
-  const maxX = Math.min(canonicalWidth - 1, cx + Math.ceil(outerRadius));
-  const minY = Math.max(0, cy - Math.ceil(outerRadius));
-  const maxY = Math.min(canonicalHeight - 1, cy + Math.ceil(outerRadius));
+  const minX = Math.max(0, origCx - Math.ceil(outerRadius));
+  const maxX = Math.min(canonicalWidth - 1, origCx + Math.ceil(outerRadius));
+  const minY = Math.max(0, origCy - Math.ceil(outerRadius));
+  const maxY = Math.min(canonicalHeight - 1, origCy + Math.ceil(outerRadius));
 
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const distSq = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      const distSq = (x - origCx) * (x - origCx) + (y - origCy) * (y - origCy);
       if (distSq > radius * radius && distSq <= outerRadius * outerRadius) {
         const idx = (y * canonicalWidth + x) * 4;
         const gray = (canonicalData[idx] * 299 + canonicalData[idx + 1] * 587 + canonicalData[idx + 2] * 114) / 1000;
@@ -64,66 +64,101 @@ export function classifyBubbleROI(
     }
   }
 
-  // Local background median paper brightness (255 = pure white)
+  // Local background median paper brightness
   bgIntensities.sort((a, b) => a - b);
   const paperBrightness = bgIntensities.length > 0 ? bgIntensities[Math.floor(bgIntensities.length / 2)] : 240;
+  const darkThreshold = Math.max(40, paperBrightness * 0.52);
 
-  // 2. Measure inner bubble pixel darkness relative to paper brightness
-  let innerPixelCount = 0;
-  let innerDarknessSum = 0;
-  let filledPixelCount = 0;
+  // 2. Sub-pixel local centroid refinement (search window ±4px) to align with actual printed/filled ink center
+  let bestCx = origCx;
+  let bestCy = origCy;
+  let bestDarkness = -1;
+  let bestInnerPixelCount = 0;
+  let bestInnerDarknessSum = 0;
+  let bestFilledPixelCount = 0;
+  let bestCorePixelCount = 0;
+  let bestCoreFilledCount = 0;
 
-  let corePixelCount = 0;
-  let coreFilledCount = 0;
+  const searchOffsets = [
+    { dx: 0, dy: 0 },
+    { dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
+    { dx: 4, dy: 0 }, { dx: -4, dy: 0 }, { dx: 0, dy: 4 }, { dx: 0, dy: -4 },
+    { dx: 3, dy: -3 }, { dx: 3, dy: 3 }, { dx: -3, dy: -3 }, { dx: -3, dy: 3 },
+    { dx: 5, dy: -3 }, { dx: 5, dy: 3 }, { dx: -5, dy: -3 }, { dx: -5, dy: 3 }
+  ];
 
-  const darkThreshold = Math.max(40, paperBrightness * 0.45); // Pen ink is significantly darker than paper
+  for (const { dx, dy } of searchOffsets) {
+    const cx = origCx + dx;
+    const cy = origCy + dy;
 
-  for (let y = minY; y <= maxY; y++) {
-    for (let x = minX; x <= maxX; x++) {
-      const distSq = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+    let innerPixelCount = 0;
+    let innerDarknessSum = 0;
+    let filledPixelCount = 0;
+    let corePixelCount = 0;
+    let coreFilledCount = 0;
 
-      if (distSq <= innerRadius * innerRadius) {
-        const idx = (y * canonicalWidth + x) * 4;
-        const gray = (canonicalData[idx] * 299 + canonicalData[idx + 1] * 587 + canonicalData[idx + 2] * 114) / 1000;
-        
-        // Normalized darkness: 0.0 (white paper) to 1.0 (black ink)
-        const normDarkness = Math.max(0, (paperBrightness - gray) / paperBrightness);
+    const bMinX = Math.max(0, cx - Math.ceil(innerRadius));
+    const bMaxX = Math.min(canonicalWidth - 1, cx + Math.ceil(innerRadius));
+    const bMinY = Math.max(0, cy - Math.ceil(innerRadius));
+    const bMaxY = Math.min(canonicalHeight - 1, cy + Math.ceil(innerRadius));
 
-        innerDarknessSum += normDarkness;
-        innerPixelCount++;
+    for (let y = bMinY; y <= bMaxY; y++) {
+      for (let x = bMinX; x <= bMaxX; x++) {
+        const distSq = (x - cx) * (x - cx) + (y - cy) * (y - cy);
 
-        if (gray < darkThreshold) {
-          filledPixelCount++;
-        }
+        if (distSq <= innerRadius * innerRadius) {
+          const idx = (y * canonicalWidth + x) * 4;
+          const gray = (canonicalData[idx] * 299 + canonicalData[idx + 1] * 587 + canonicalData[idx + 2] * 114) / 1000;
+          const normDarkness = Math.max(0, (paperBrightness - gray) / paperBrightness);
 
-        if (distSq <= coreRadius * coreRadius) {
-          corePixelCount++;
+          innerDarknessSum += normDarkness;
+          innerPixelCount++;
+
           if (gray < darkThreshold) {
-            coreFilledCount++;
+            filledPixelCount++;
+          }
+
+          if (distSq <= coreRadius * coreRadius) {
+            corePixelCount++;
+            if (gray < darkThreshold) {
+              coreFilledCount++;
+            }
           }
         }
       }
     }
+
+    const avgDarkness = innerPixelCount > 0 ? innerDarknessSum / innerPixelCount : 0;
+    if (avgDarkness > bestDarkness) {
+      bestDarkness = avgDarkness;
+      bestCx = cx;
+      bestCy = cy;
+      bestInnerPixelCount = innerPixelCount;
+      bestInnerDarknessSum = innerDarknessSum;
+      bestFilledPixelCount = filledPixelCount;
+      bestCorePixelCount = corePixelCount;
+      bestCoreFilledCount = coreFilledCount;
+    }
   }
 
-  const rawDarkness = innerPixelCount > 0 ? innerDarknessSum / innerPixelCount : 0;
-  const fillRatio = innerPixelCount > 0 ? filledPixelCount / innerPixelCount : 0;
-  const centerFillRatio = corePixelCount > 0 ? coreFilledCount / corePixelCount : 0;
+  const rawDarkness = bestInnerPixelCount > 0 ? bestInnerDarknessSum / bestInnerPixelCount : 0;
+  const fillRatio = bestInnerPixelCount > 0 ? bestFilledPixelCount / bestInnerPixelCount : 0;
+  const centerFillRatio = bestCorePixelCount > 0 ? bestCoreFilledCount / bestCorePixelCount : 0;
 
   // 3. Perform static Bengali printed ink subtraction
   const baselineInk = PRINTED_CHAR_BASELINES[cell.printedChar] || 0.13;
   const netInkScore = Math.max(0, (rawDarkness - baselineInk) / (1.0 - baselineInk));
 
-  // 4. Initial tri-state classification
+  // 4. Multi-Feature Tri-State Classification
   let status: BubbleStatus = 'EMPTY';
   let confidence = 1.0;
 
-  if (netInkScore >= 0.32 && fillRatio >= 0.40 && centerFillRatio >= 0.35) {
+  if (netInkScore >= 0.34 && fillRatio >= 0.38 && centerFillRatio >= 0.35) {
     status = 'FILLED';
-    confidence = Math.min(1.0, 0.70 + netInkScore * 0.30);
-  } else if (netInkScore <= 0.12 && fillRatio <= 0.18) {
+    confidence = Math.min(1.0, 0.75 + netInkScore * 0.25);
+  } else if (netInkScore <= 0.15 && fillRatio <= 0.20) {
     status = 'EMPTY';
-    confidence = Math.min(1.0, 0.80 + (0.12 - netInkScore) * 1.5);
+    confidence = Math.min(1.0, 0.85 + (0.15 - netInkScore) * 1.5);
   } else {
     status = 'AMBIGUOUS';
     confidence = 0.50;

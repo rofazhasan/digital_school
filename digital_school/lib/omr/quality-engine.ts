@@ -74,35 +74,37 @@ export function evaluateImageQuality(
     userInstructions.push('Keep all four corner markers visible');
   }
 
-  if (blurScore < 80) {
+  if (blurScore < 60) {
     userInstructions.push('Hold camera steady');
   }
 
-  if (brightnessScore < 75) {
+  if (brightnessScore < 50) {
     userInstructions.push('Improve lighting');
-  } else if (brightnessScore > 230) {
+  } else if (brightnessScore > 248 && contrastScore < 20) {
     userInstructions.push('Reduce lighting');
   }
 
-  if (glareRatio > 0.10) {
+  // Only flag glare if high brightness has caused low contrast (washed out)
+  const isActualGlare = glareRatio > 0.40 && contrastScore < 25;
+  if (isActualGlare) {
     userInstructions.push('Reduce glare / tilt camera slightly');
   }
 
-  if (contrastScore < 25) {
+  if (contrastScore < 18) {
     userInstructions.push('Improve contrast / adjust distance');
   }
 
-  if (perspectiveSkew > 0.15) {
+  if (perspectiveSkew > 0.20) {
     userInstructions.push('Hold camera perpendicular to paper');
   }
 
   const isQualityPassed =
     markerConfidence >= 0.70 &&
-    blurScore >= 80 &&
-    brightnessScore >= 70 &&
-    brightnessScore <= 235 &&
-    glareRatio <= 0.12 &&
-    contrastScore >= 22;
+    blurScore >= 60 &&
+    brightnessScore >= 50 &&
+    brightnessScore <= 250 &&
+    (!isActualGlare) &&
+    contrastScore >= 18;
 
   return {
     blurScore,
