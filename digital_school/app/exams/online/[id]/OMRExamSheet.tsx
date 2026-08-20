@@ -175,6 +175,14 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
         map[q.id] = !!(ans?.selectedOptions && ans.selectedOptions.length > 0);
       } else if (type === "mtf") {
         map[q.id] = !!(ans && Object.keys(ans).length > 0);
+      } else if (type === "cma" || type === "mpc" || type === "constructed_multi_answer" || type === "multi_step_problem_chain") {
+        const obj = typeof ans === "string" ? (() => { try { return JSON.parse(ans); } catch { return {}; } })() : ans;
+        if (obj && typeof obj === "object") {
+          const nonBlank = Object.values(obj).filter((v: any) => v !== undefined && v !== null && String(v).trim() !== "");
+          map[q.id] = nonBlank.length > 0;
+        } else {
+          map[q.id] = Boolean(ans);
+        }
       } else {
         map[q.id] = ans !== undefined && ans !== null && ans !== "" && ans !== "No answer provided";
       }
@@ -264,6 +272,58 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
       return { ...prev, [qId]: { answer: val } };
     });
   }, [isSubmitting, setAnswers]);
+
+  // Handle CMA Part Input / Option Select
+  const handleCMAPartChange = useCallback((qId: string, partId: string, val: string) => {
+    if (isSubmitting) return;
+    vibrateOnTouch();
+    setAnswers((prev: any) => {
+      const current = typeof prev[qId] === 'string'
+        ? (() => { try { return JSON.parse(prev[qId]); } catch { return {}; } })()
+        : (prev[qId] || {});
+
+      const updated = { ...current };
+      if (!val || String(val).trim() === '') {
+        delete updated[partId];
+      } else {
+        updated[partId] = val;
+      }
+
+      if (Object.keys(updated).length === 0) {
+        const next = { ...prev };
+        delete next[qId];
+        return next;
+      }
+
+      return { ...prev, [qId]: updated };
+    });
+  }, [isSubmitting, setAnswers, vibrateOnTouch]);
+
+  // Handle MPC Stage Input / Option Select
+  const handleMPCStageChange = useCallback((qId: string, stageId: string, val: string) => {
+    if (isSubmitting) return;
+    vibrateOnTouch();
+    setAnswers((prev: any) => {
+      const current = typeof prev[qId] === 'string'
+        ? (() => { try { return JSON.parse(prev[qId]); } catch { return {}; } })()
+        : (prev[qId] || {});
+
+      const updated = { ...current };
+      if (!val || String(val).trim() === '') {
+        delete updated[stageId];
+      } else {
+        updated[stageId] = val;
+      }
+
+      if (Object.keys(updated).length === 0) {
+        const next = { ...prev };
+        delete next[qId];
+        return next;
+      }
+
+      return { ...prev, [qId]: updated };
+    });
+  }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
   // Handle Assertion-Reason select
   const handleARSelect = useCallback((qId: string, optionNumber: number) => {
@@ -796,6 +856,8 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                   onSMCQSelect={handleSMCQSelect}
                                   onMTFPair={handleMTFPair}
                                   onNumericInput={handleNumericInput}
+                                  onCMAPartChange={handleCMAPartChange}
+                                  onMPCStageChange={handleMPCStageChange}
                                   onARSelect={handleARSelect}
                                   onClearAnswer={handleClearAnswer}
                                   disabled={isSubmitting}
@@ -1004,6 +1066,8 @@ interface OMRQuestionRowProps {
   onSMCQSelect: (qId: string, subIdx: number, label: string) => void;
   onMTFPair: (qId: string, leftKey: string, rightVal: string) => void;
   onNumericInput: (qId: string, val: string) => void;
+  onCMAPartChange: (qId: string, partId: string, val: string) => void;
+  onMPCStageChange: (qId: string, stageId: string, val: string) => void;
   onARSelect: (qId: string, optNum: number) => void;
   onClearAnswer: (q: any) => void;
   disabled: boolean;
@@ -1021,6 +1085,8 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
   onSMCQSelect,
   onMTFPair,
   onNumericInput,
+  onCMAPartChange,
+  onMPCStageChange,
   onARSelect,
   onClearAnswer,
   disabled
@@ -1344,49 +1410,193 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     );
   }
 
-  // 7. CMA / MPC (Constructed / Multi-part)
-  if (type === "cma" || type === "mpc") {
+  // 7. CMA (Constructed Multi-Answer with sub-questions / parts)
+  if (type === "cma") {
     const currentVal = typeof userAnswer === "string" ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {});
+    let rawParts = question.parts || question.cmaParts || question.subQuestions || question.sub_questions || [];
+    if (typeof rawParts === "string") {
+      try { rawParts = JSON.parse(rawParts); } catch { rawParts = []; }
+    }
+    const parts: any[] = Array.isArray(rawParts) && rawParts.length > 0
+      ? rawParts
+      : [{ id: "part_0", label: "Part 1" }, { id: "part_1", label: "Part 2" }];
+
     return (
-      <div className="py-2 px-1.5 sm:px-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl my-1 border border-slate-200 dark:border-slate-700 space-y-1.5">
+      <div className="py-2.5 px-2 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl my-1.5 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="font-black text-[11px] sm:text-xs text-slate-800 dark:text-slate-200">
-            প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় কাঠামো ({type.toUpperCase()})
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-black text-xs sm:text-sm text-indigo-950 dark:text-indigo-200">
+              প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় উত্তর (CMA Parts)
+            </span>
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+              {toBengaliNumerals(parts.length)} টি অংশ
+            </Badge>
+          </div>
           <button
             type="button"
             onClick={() => onClearAnswer(question)}
-            disabled={disabled}
-            className="text-[10px] text-rose-500 hover:underline"
+            disabled={disabled || Object.keys(currentVal).length === 0}
+            className={cn("text-[10px] text-rose-500 hover:underline", Object.keys(currentVal).length === 0 && "opacity-0")}
           >
-            Clear
+            Clear All
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          {["A", "B", "C", "D"].map((part) => {
-            const isSelected = currentVal[part] || currentVal[part.toLowerCase()];
+        <div className="space-y-1.5">
+          {parts.map((part: any, pIdx: number) => {
+            const partId = part.id || part.key || part.name || `part_${pIdx}`;
+            const partLabel = part.label || part.prompt || part.text || `অংশ ${toBengaliAlphabets(pIdx)} (${pIdx + 1})`;
+            const partVal = currentVal[partId] ?? currentVal[part.label] ?? currentVal[`part_${pIdx}`] ?? currentVal[pIdx] ?? "";
+            const hasOptions = Array.isArray(part.options) && part.options.length > 0;
+
             return (
-              <button
-                key={part}
-                type="button"
-                onClick={() => {
-                  if (disabled) return;
-                  const nextVal = { ...currentVal, [part]: !isSelected };
-                  onNumericInput(qId, JSON.stringify(nextVal));
-                }}
-                className={cn(
-                  "p-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-between transition-all touch-manipulation",
-                  isSelected
-                    ? "bg-slate-950 text-white border-slate-950 dark:bg-white dark:text-slate-950"
-                    : "bg-white text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600"
+              <div key={partId} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-[10px] font-bold">
+                      {pIdx + 1}
+                    </span>
+                    <span>{partLabel}</span>
+                  </span>
+                  {partVal && (
+                    <button
+                      type="button"
+                      onClick={() => onCMAPartChange(qId, partId, "")}
+                      disabled={disabled}
+                      className="text-[9px] text-rose-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {hasOptions ? (
+                  <div className="flex justify-around items-center px-1 pt-1">
+                    {part.options.slice(0, 4).map((opt: any, optIdx: number) => {
+                      const optLabel = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
+                      const isSelected = String(partVal).trim() === optLabel.trim() || String(partVal).trim() === String(optIdx);
+
+                      return (
+                        <OMRBubble
+                          key={optIdx}
+                          label={OMR_BENGALI_OPTIONS[optIdx]}
+                          subLabel={OMR_ENGLISH_OPTIONS[optIdx]}
+                          isSelected={isSelected}
+                          onClick={() => onCMAPartChange(qId, partId, optLabel)}
+                          disabled={disabled}
+                          isLarge={bubbleSizeScale === "large"}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={partVal}
+                    onChange={(e) => onCMAPartChange(qId, partId, e.target.value)}
+                    disabled={disabled}
+                    placeholder={`অংশ ${pIdx + 1} এর উত্তর লিখুন...`}
+                    className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white"
+                  />
                 )}
-              >
-                <span>অংশ {part}</span>
-                <span className={cn("w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px]", isSelected ? "bg-white text-black dark:bg-black dark:text-white" : "")}>
-                  {isSelected ? "✓" : ""}
-                </span>
-              </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // 8. MPC (Multi-step Problem Chain with stages / sub-questions)
+  if (type === "mpc") {
+    const currentVal = typeof userAnswer === "string" ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {});
+    let rawStages = question.stages || question.mpcStages || question.subQuestions || question.sub_questions || [];
+    if (typeof rawStages === "string") {
+      try { rawStages = JSON.parse(rawStages); } catch { rawStages = []; }
+    }
+    const stages: any[] = Array.isArray(rawStages) && rawStages.length > 0
+      ? rawStages
+      : [{ id: "stage_0", stageTitle: "Stage 1" }, { id: "stage_1", stageTitle: "Stage 2" }];
+
+    return (
+      <div className="py-2.5 px-2 bg-purple-50/40 dark:bg-purple-950/20 rounded-xl my-1.5 border border-purple-100 dark:border-purple-900/30 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="font-black text-xs sm:text-sm text-purple-950 dark:text-purple-200">
+              প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় সমস্যা (MPC Stages)
+            </span>
+            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200">
+              {toBengaliNumerals(stages.length)} টি ধাপ
+            </Badge>
+          </div>
+          <button
+            type="button"
+            onClick={() => onClearAnswer(question)}
+            disabled={disabled || Object.keys(currentVal).length === 0}
+            className={cn("text-[10px] text-rose-500 hover:underline", Object.keys(currentVal).length === 0 && "opacity-0")}
+          >
+            Clear All
+          </button>
+        </div>
+
+        <div className="space-y-1.5">
+          {stages.map((stage: any, sIdx: number) => {
+            const stageId = stage.id || stage.key || stage.name || `stage_${sIdx}`;
+            const stageTitle = stage.stageTitle || stage.prompt || stage.text || `ধাপ ${toBengaliNumerals(sIdx + 1)}`;
+            const stageVal = currentVal[stageId] ?? currentVal[stage.stageTitle] ?? currentVal[`stage_${sIdx}`] ?? currentVal[sIdx] ?? "";
+            const hasOptions = Array.isArray(stage.options) && stage.options.length > 0;
+
+            return (
+              <div key={stageId} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center text-[10px] font-bold">
+                      {sIdx + 1}
+                    </span>
+                    <span>{stageTitle}</span>
+                  </span>
+                  {stageVal && (
+                    <button
+                      type="button"
+                      onClick={() => onMPCStageChange(qId, stageId, "")}
+                      disabled={disabled}
+                      className="text-[9px] text-rose-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {hasOptions ? (
+                  <div className="flex justify-around items-center px-1 pt-1">
+                    {stage.options.slice(0, 4).map((opt: any, optIdx: number) => {
+                      const optLabel = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
+                      const isSelected = String(stageVal).trim() === optLabel.trim() || String(stageVal).trim() === String(optIdx);
+
+                      return (
+                        <OMRBubble
+                          key={optIdx}
+                          label={OMR_BENGALI_OPTIONS[optIdx]}
+                          subLabel={OMR_ENGLISH_OPTIONS[optIdx]}
+                          isSelected={isSelected}
+                          onClick={() => onMPCStageChange(qId, stageId, optLabel)}
+                          disabled={disabled}
+                          isLarge={bubbleSizeScale === "large"}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={stageVal}
+                    onChange={(e) => onMPCStageChange(qId, stageId, e.target.value)}
+                    disabled={disabled}
+                    placeholder={`ধাপ ${sIdx + 1} এর মান বা উত্তর লিখুন...`}
+                    className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-slate-900 dark:text-white"
+                  />
+                )}
+              </div>
             );
           })}
         </div>
