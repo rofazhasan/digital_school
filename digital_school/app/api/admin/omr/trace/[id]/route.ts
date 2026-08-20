@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { ExamSetResolver } from '@/lib/omr/exam-set-resolver';
 
 export async function GET(
@@ -10,10 +9,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
+    const currentUser = await getCurrentUser();
 
     // Ensure teacher / admin / superUser access
-    const userRole = session?.user?.role;
+    const userRole = currentUser?.role;
     const isAuthorized = userRole === 'SUPER_USER' || userRole === 'ADMIN' || userRole === 'TEACHER' || userRole === 'SHARED';
 
     if (!isAuthorized) {

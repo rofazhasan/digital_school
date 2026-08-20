@@ -107,6 +107,20 @@ export default function ProductionOMRScannerPage() {
     setQuality(qualityEval);
 
     if (!markerResult.isValid || !markerResult.quad) {
+      console.warn('Marker detection failed:', markerResult.error);
+      const scanUuid = uuidv4();
+      const failItem: BatchScanItem = {
+        id: scanUuid,
+        scanUuid,
+        timestamp: new Date().toLocaleTimeString(),
+        rollNumber: 'Invalid Markers',
+        registrationNo: 'N/A',
+        score: 0,
+        maxScore: 100,
+        status: 'FAILED',
+        qualityPassed: qualityEval.isQualityPassed
+      };
+      setBatchList(prev => [failItem, ...prev]);
       return;
     }
 

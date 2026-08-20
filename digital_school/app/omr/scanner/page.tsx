@@ -382,7 +382,7 @@ export default function MobileOMRScannerViewfinder() {
         registration: candidateReg,
         detectedSet: qrPayload.setId || 'C',
         answers: answersMap,
-        confidence: classifiedQuestions.bubbleAccuracy > 0.9 ? 0.99 : 0.92,
+        confidence: classifiedQuestions.overallConfidence > 0.9 ? 0.99 : 0.92,
         status: 'PENDING',
         localCreatedAt: new Date().toISOString()
       };

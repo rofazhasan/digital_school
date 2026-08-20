@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { evaluateSubmission } from '@/lib/exam-logic';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    const userRole = session?.user?.role;
+    const currentUser = await getCurrentUser();
+    const userRole = currentUser?.role;
     const isAuthorized = userRole === 'SUPER_USER' || userRole === 'ADMIN' || userRole === 'TEACHER' || userRole === 'SHARED';
 
     if (!isAuthorized) {

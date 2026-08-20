@@ -1087,14 +1087,51 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   }, [isAnnotationOpen, activeAnnotationMeta, activeAnnotationImages, annotations, drawingDataStore]);
 
   const handleScan = async (questionId: string, pIdx?: number) => {
-    if (!Capacitor.isNativePlatform()) {
-      toast.error("Document scanner is only available on native Android.");
-      return;
-    }
-
     const currentStudent = exam?.submissions[currentStudentIndex];
     if (!currentStudent?.student?.id) {
       toast.error("Cannot scan: No student selected or student ID missing.");
+      return;
+    }
+
+    if (!Capacitor.isNativePlatform()) {
+      // Desktop / Web Browser Fallback: Open file picker
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        try {
+          toast.info("Uploading scanned document...");
+          const formData = new FormData();
+          formData.append('file', file);
+          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+          if (!uploadRes.ok) throw new Error("Upload failed");
+          const { url } = await uploadRes.json();
+
+          const saveRes = await fetch(`/api/exams/evaluations/${id}/drawing`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studentId: currentStudent?.student?.id,
+              questionId,
+              imageIndex: pIdx ?? 0,
+              originalImagePath: url,
+              imageData: url
+            })
+          });
+
+          if (saveRes.ok) {
+            toast.success("Scanned script uploaded and linked!");
+            fetchAnnotations(currentStudent?.student?.id || '');
+          } else {
+            throw new Error("Failed to save scanned script record.");
+          }
+        } catch (err: any) {
+          toast.error(`Upload error: ${err.message || String(err)}`);
+        }
+      };
+      input.click();
       return;
     }
 
