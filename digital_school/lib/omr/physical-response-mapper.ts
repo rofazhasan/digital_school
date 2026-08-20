@@ -111,8 +111,8 @@ export class PhysicalResponseMapper {
     const unmappedQuestionIds: string[] = [];
 
     // Process every question in canonical order
-    examSet.questions.forEach((q: CanonicalQuestion) => {
-      const qNo = q.sequenceNumber;
+    examSet.questions.forEach((q: CanonicalQuestion, idx: number) => {
+      const qNo = q.sequenceNumber ?? (q as any).questionNo ?? (idx + 1);
       const physicalEntry = physicalMap.get(qNo);
 
       if (!physicalEntry) {

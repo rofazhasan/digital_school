@@ -153,6 +153,40 @@ export class StudentIdentityResolver {
       }
 
       const student = matchingStudents[0];
+
+      // Strict Exam <-> Student Class Cross-Validation
+      if (examId && mockDb.exams) {
+        const examObj = mockDb.exams.find(e => e.id === examId);
+        if (examObj) {
+          if (examObj.classId && classId && examObj.classId !== classId) {
+            return {
+              success: false,
+              validationStatus: "CLASS_MISMATCH",
+              rollNumber: input.roll || undefined,
+              registrationNo: registration || undefined,
+              examId,
+              examSetId,
+              classId,
+              confidence: 0,
+              error: `QR class '${classId}' does not match target Exam class '${examObj.classId}'.`
+            };
+          }
+          if (examObj.classId && student.classId && examObj.classId !== student.classId) {
+            return {
+              success: false,
+              validationStatus: "CLASS_MISMATCH",
+              rollNumber: input.roll || undefined,
+              registrationNo: registration || undefined,
+              examId,
+              examSetId,
+              classId: student.classId,
+              confidence: 0,
+              error: `Student '${student.name || student.user?.name || student.id}' is in class '${student.classId}', not exam class '${examObj.classId}'.`
+            };
+          }
+        }
+      }
+
       return {
         success: true,
         validationStatus: "VALID",
@@ -240,6 +274,28 @@ export class StudentIdentityResolver {
       }
 
       const student = candidates[0];
+
+      // Strict DB Exam <-> Student Class Cross-Validation
+      if (examId) {
+        const examRecord = await prisma.exam.findUnique({
+          where: { id: examId },
+          select: { id: true, classId: true }
+        });
+        if (examRecord && examRecord.classId && student.classId && examRecord.classId !== student.classId) {
+          return {
+            success: false,
+            validationStatus: "CLASS_MISMATCH",
+            rollNumber: input.roll || undefined,
+            registrationNo: registration || undefined,
+            examId,
+            examSetId,
+            classId: student.classId,
+            confidence: 0,
+            error: `Student '${student.user?.name || student.id}' is enrolled in class '${student.classId}', not exam target class '${examRecord.classId}'.`
+          };
+        }
+      }
+
       return {
         success: true,
         validationStatus: "VALID",

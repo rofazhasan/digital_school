@@ -156,7 +156,8 @@ export async function POST(req: NextRequest) {
     });
 
     // 6. Invoke Authoritative Server-Side Evaluation
-    await evaluateSubmission(submission, exam as any, exam.examSets as any, true);
+    const evalResult = await evaluateSubmission(submission, exam as any, exam.examSets as any, true);
+    const finalScore = typeof evalResult?.totalScore === 'number' ? evalResult.totalScore : (submission.score || 0);
 
     // 7. Persist Traceable OMRScan record linked to submission
     const scanStatus = adaptResult.status === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'APPROVED';
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
         rollNumber: identity.rollNumber || null,
         registrationNo: identity.registrationNo || null,
         detectedSet: canonicalSubmission.metadata.detectedSet || null,
-        totalScore: submission.score || 0,
+        totalScore: finalScore,
         maxScore: exam.totalMarks || 100,
         confidenceScore,
         qualityScore,
@@ -210,8 +211,10 @@ export async function POST(req: NextRequest) {
       reviewRequired: scanStatus === 'REVIEW_REQUIRED',
       warnings: adaptResult.warnings,
       score: {
-        totalScore: submission.score || 0,
-        maxScore: exam.totalMarks || 100
+        totalScore: finalScore,
+        maxScore: exam.totalMarks || 100,
+        grade: evalResult?.grade,
+        percentage: evalResult?.percentage
       }
     });
 
