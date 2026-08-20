@@ -483,9 +483,20 @@ export async function GET(
 
 
     const isSuspended = submission.exceededQuestionLimit || (result as any)?.status === 'SUSPENDED';
+    const source = (result as any)?.omrScanId ? 'OMR' : 'ONLINE';
+    const setName = examSet?.name || 'A';
 
     return NextResponse.json({
-      exam: { ...exam, class: exam.class.name },
+      exam: {
+        ...exam,
+        class: exam.class.name,
+        source,
+        set: setName,
+        setName
+      },
+      source,
+      setName,
+      omrScanId: (result as any)?.omrScanId || null,
       student: {
         id: studentProfile.id,
         name: user.name,
@@ -499,6 +510,8 @@ export async function GET(
       },
       result: (result && (result.isPublished || isTeacher)) ? {
         ...result,
+        source,
+        setName,
         grade: calculateGrade(result.percentage || 0, Number(exam.passMarks) || 33),
         gpa: calculateGPA(result.percentage || 0, Number(exam.passMarks) || 33),
         rank: rankCount + 1,

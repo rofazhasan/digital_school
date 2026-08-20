@@ -152,10 +152,16 @@ export function warpPerspectiveImage(
   srcQuad: CornerQuad,
   dstW: number,
   dstH: number,
-  dstQuad: CornerQuad
+  dstQuad?: CornerQuad
 ): { data: Uint8ClampedArray; width: number; height: number } {
+  const actualDstQuad: CornerQuad = dstQuad || {
+    tl: { x: 0, y: 0 },
+    tr: { x: dstW, y: 0 },
+    br: { x: dstW, y: dstH },
+    bl: { x: 0, y: dstH }
+  };
   // Homography mapping from destination (canonical) coordinates back to source coordinates
-  const H_dstToSrc = solveHomography(dstQuad, srcQuad);
+  const H_dstToSrc = solveHomography(actualDstQuad, srcQuad);
   const dstData = new Uint8ClampedArray(dstW * dstH * 4);
 
   for (let yDst = 0; yDst < dstH; yDst++) {

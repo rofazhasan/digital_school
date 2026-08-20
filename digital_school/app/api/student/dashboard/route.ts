@@ -293,13 +293,17 @@ export async function GET(req: NextRequest) {
       const totalMarks = r.exam?.totalMarks || 100;
       const score = Number(r.total) || 0;
       const pct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : (Number(r.percentage) || 0);
+      const isOmr = Boolean(r.omrScanId);
+      const setName = r.examSubmission?.examSet?.name || r.exam?.examSets?.[0]?.name || "A";
 
       resultMap.set(r.examId, {
         id: r.id,
         examId: r.examId,
         examTitle: r.exam?.name || "Academic Exam",
         subject,
-        type: r.exam?.type || "OFFLINE",
+        type: isOmr ? "OMR" : (r.exam?.type || "ONLINE"),
+        source: isOmr ? "OMR" : "ONLINE",
+        setName,
         totalMarks,
         score,
         total: score,
@@ -331,6 +335,7 @@ export async function GET(req: NextRequest) {
         const totalMarks = sub.exam?.totalMarks || 100;
         const score = Number(sub.score) || 0;
         const pct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
+        const setName = sub.examSet?.name || sub.exam?.examSets?.[0]?.name || "A";
 
         resultMap.set(sub.examId, {
           id: sub.id,
@@ -338,6 +343,8 @@ export async function GET(req: NextRequest) {
           examTitle: sub.exam?.name || "Online Exam",
           subject,
           type: sub.exam?.type || "ONLINE",
+          source: "ONLINE",
+          setName,
           totalMarks,
           score,
           total: score,

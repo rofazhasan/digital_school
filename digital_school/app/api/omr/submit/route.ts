@@ -1,36 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { writeOMRResult } from '@/lib/omr/result-writer';
+import db from '@/lib/db';
+import { OMRSubmissionAdapter, OMRScanResult } from '@/lib/omr/omr-submission-adapter';
+import { evaluateSubmission } from '@/lib/exam-logic';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       scanUuid,
-      templateId = 'C_11_12',
-      templateVersion = 1,
+      qrPayload,
       examId,
       examSetId,
       studentId,
       rollNumber,
       registrationNo,
       detectedSet,
+      physicalAnswers = [],
       rawAnswers = {},
       confidenceScore = 1.0,
       qualityScore = 1.0,
       scanSessionId
     } = body;
 
-    if (!scanUuid || !examId) {
+    const scanId = scanUuid || body.scanId;
+
+    if (!scanId) {
       return NextResponse.json(
-        { success: false, error: 'scanUuid and examId are required' },
+        { success: false, error: 'scanUuid is required' },
         { status: 400 }
       );
     }
 
     // 1. Idempotency Check: Prevent duplicate submissions
-    const existingScan = await prisma.oMRScan.findUnique({
-      where: { scanUuid },
+    const existingScan = await db.oMRScan.findUnique({
+      where: { scanUuid: scanId },
       include: { answers: true, quality: true }
     });
 
@@ -48,214 +51,175 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Fetch Exam & Questions / Answer Key from Database
-    const exam = await prisma.exam.findUnique({
-      where: { id: examId },
-      include: {
-        examSets: true
-      }
+    // 2. Prepare normalized physical answers array
+    let normalizedPhysicalAnswers = physicalAnswers;
+    if ((!normalizedPhysicalAnswers || normalizedPhysicalAnswers.length === 0) && rawAnswers) {
+      normalizedPhysicalAnswers = Object.entries(rawAnswers).map(([k, v]) => ({
+        questionNo: parseInt(k, 10),
+        selectedOption: typeof v === 'string' ? v : (v as any)?.selectedOption || null,
+        confidence: typeof v === 'object' ? (v as any)?.confidence : 1.0,
+        status: typeof v === 'object' ? (v as any)?.status : (v ? 'ONE_SELECTED' : 'BLANK')
+      }));
+    }
+
+    const scanResultInput: OMRScanResult = {
+      scanId,
+      qrPayload: qrPayload || { examId, examSetId, setId: examSetId, classId: body.classId },
+      roll: rollNumber || body.roll,
+      registration: registrationNo || body.registration,
+      detectedSet,
+      physicalAnswers: normalizedPhysicalAnswers,
+      confidence: confidenceScore,
+      scannerVersion: body.scannerVersion || '2.0.0',
+      templateVersion: body.templateVersion || 1,
+      scannedAt: body.scannedAt || new Date()
+    };
+
+    // 3. Run OMRSubmissionAdapter Bridge
+    const adaptResult = await OMRSubmissionAdapter.adapt(scanResultInput);
+
+    if (!adaptResult.success || !adaptResult.canonicalSubmission) {
+      // Record failed scan for teacher audit
+      const failedScan = await db.oMRScan.create({
+        data: {
+          scanUuid: scanId,
+          templateId: body.templateId || 'C_11_12',
+          examId: examId || 'unknown',
+          examSetId: examSetId || null,
+          studentId: studentId || null,
+          rollNumber: rollNumber || null,
+          registrationNo: registrationNo || null,
+          detectedSet: detectedSet || null,
+          confidenceScore,
+          qualityScore,
+          status: 'FAILED',
+          rawAnswers: rawAnswers as any
+        }
+      });
+
+      return NextResponse.json({
+        success: false,
+        scanId: failedScan.id,
+        status: 'FAILED',
+        error: adaptResult.error || 'Failed to adapt physical scan.'
+      }, { status: 422 });
+    }
+
+    const { canonicalSubmission, identity, mappingResult } = adaptResult;
+
+    // 4. Load full Exam record
+    const exam = await db.exam.findUnique({
+      where: { id: canonicalSubmission.examId },
+      include: { examSets: true }
     });
 
     if (!exam) {
       return NextResponse.json(
-        { success: false, error: 'Exam not found' },
-        { status: 444 }
+        { success: false, error: `Exam '${canonicalSubmission.examId}' not found.` },
+        { status: 404 }
       );
     }
 
-    // Resolve Student Profile if not provided directly
-    let resolvedStudentId = studentId;
-    if (!resolvedStudentId && (rollNumber || registrationNo)) {
-      const student = await prisma.studentProfile.findFirst({
-        where: {
-          OR: [
-            rollNumber ? { roll: rollNumber } : {},
-            registrationNo ? { registrationNo } : {}
-          ]
+    // 5. Upsert Canonical ExamSubmission (The same table used by online exams)
+    const existingSub = await db.examSubmission.findUnique({
+      where: {
+        studentId_examId: {
+          studentId: canonicalSubmission.studentId,
+          examId: canonicalSubmission.examId
         }
-      });
-      if (student) {
-        resolvedStudentId = student.id;
       }
-    }
+    });
 
-    // 3. Authoritative Scoring Calculation
-    let targetSet: any = null;
-    if (examSetId) {
-      targetSet = exam.examSets.find(s => s.id === examSetId);
-    } else if (detectedSet) {
-      targetSet = exam.examSets.find((s: any) => s.setName === detectedSet || s.name === detectedSet || s.setLabel === detectedSet);
-    }
-    if (!targetSet && exam.examSets.length > 0) {
-      targetSet = exam.examSets[0];
-    }
-
-    const questionKeyMap: Record<number, string> = {}; // qNo -> correctOption
-    let maxMarks = 0;
-    const negativeMark = exam.mcqNegativeMarking || exam.mcNegativeMarking || 0;
-
-    if (targetSet && targetSet.questionsKey) {
-      const keyObj = targetSet.questionsKey as Record<string, string>;
-      Object.entries(keyObj).forEach(([qStr, correctOpt]) => {
-        const qNo = parseInt(qStr, 10);
-        if (!isNaN(qNo)) {
-          questionKeyMap[qNo] = correctOpt;
-          maxMarks += 1.0;
+    const submission = await db.examSubmission.upsert({
+      where: {
+        studentId_examId: {
+          studentId: canonicalSubmission.studentId,
+          examId: canonicalSubmission.examId
         }
-      });
-    } else if (exam.generatedSet) {
-      const genSet = exam.generatedSet as any;
-      if (Array.isArray(genSet.mcq)) {
-        genSet.mcq.forEach((q: any, idx: number) => {
-          questionKeyMap[idx + 1] = q.answer || q.correctOption || 'A';
-          maxMarks += 1.0;
-        });
+      },
+      update: {
+        answers: canonicalSubmission.answers as any,
+        examSetId: canonicalSubmission.examSetId,
+        status: 'SUBMITTED',
+        objectiveStatus: 'SUBMITTED',
+        objectiveSubmittedAt: existingSub?.objectiveSubmittedAt || new Date()
+      },
+      create: {
+        studentId: canonicalSubmission.studentId,
+        examId: canonicalSubmission.examId,
+        examSetId: canonicalSubmission.examSetId,
+        answers: canonicalSubmission.answers as any,
+        status: 'SUBMITTED',
+        objectiveStatus: 'SUBMITTED',
+        objectiveSubmittedAt: new Date()
       }
-    }
+    });
 
-    if (maxMarks === 0) maxMarks = 100; // Default to 100 questions
+    // 6. Invoke Authoritative Server-Side Evaluation
+    await evaluateSubmission(submission, exam as any, exam.examSets as any, true);
 
-    let totalScore = 0;
-    const evaluatedAnswers: Record<number, { selected: string | null; correct: string | null; isCorrect: boolean; mark: number }> = {};
-    const answerRecords: any[] = [];
-    let hasAmbiguousOrError = false;
+    // 7. Persist Traceable OMRScan record linked to submission
+    const scanStatus = adaptResult.status === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'APPROVED';
 
-    for (let qNo = 1; qNo <= 100; qNo++) {
-      const selected = rawAnswers[qNo] || null;
-      const correct = questionKeyMap[qNo] || null;
-
-      let isCorrect = false;
-      let mark = 0;
-
-      if (selected && correct) {
-        if (selected.toUpperCase() === correct.toUpperCase()) {
-          isCorrect = true;
-          mark = 1.0;
-        } else {
-          isCorrect = false;
-          mark = -Math.abs(negativeMark);
-        }
-      } else if (selected && !correct) {
-        mark = 0;
-      } else {
-        mark = 0; // Blank
-      }
-
-      totalScore += mark;
-
-      evaluatedAnswers[qNo] = {
-        selected,
-        correct,
-        isCorrect,
-        mark
-      };
-
-      answerRecords.push({
-        questionNo: qNo,
-        selectedOption: selected,
-        correctOption: correct,
-        isCorrect,
-        marksObtained: mark,
-        confidence: selected ? 0.90 : 1.0,
-        status: selected ? 'ONE_SELECTED' : 'BLANK'
-      });
-    }
-
-    const reviewRequired = confidenceScore < 0.75 || qualityScore < 0.70 || hasAmbiguousOrError;
-    const status = reviewRequired ? 'REVIEW_REQUIRED' : 'APPROVED';
-
-    // 4. Save to Database
-    const newScan = await prisma.oMRScan.create({
+    const scanRecord = await db.oMRScan.create({
       data: {
-        scanUuid,
-        templateId,
-        templateVersion,
-        examId,
-        examSetId: targetSet?.id || null,
-        studentId: resolvedStudentId || null,
-        rollNumber: rollNumber || null,
-        registrationNo: registrationNo || null,
-        detectedSet: targetSet?.setName || detectedSet || null,
-        totalScore,
-        maxScore: maxMarks,
-        rawAnswers,
-        evaluatedAnswers,
+        scanUuid: scanId,
+        templateId: body.templateId || 'C_11_12',
+        examId: canonicalSubmission.examId,
+        examSetId: canonicalSubmission.examSetId,
+        studentId: canonicalSubmission.studentId,
+        rollNumber: identity.rollNumber || null,
+        registrationNo: identity.registrationNo || null,
+        detectedSet: canonicalSubmission.metadata.detectedSet || null,
+        totalScore: submission.score || 0,
+        maxScore: exam.totalMarks || 100,
         confidenceScore,
         qualityScore,
-        status,
+        status: scanStatus,
         isAuthoritative: true,
         scanSessionId: scanSessionId || null,
-        quality: {
-          create: {
-            blurScore: 100,
-            brightnessScore: 180,
-            contrastScore: 50,
-            glareRatio: 0,
-            perspectiveDistortion: 0,
-            markerConfidence: 1.0,
-            qrConfidence: 1.0
-          }
-        },
+        rawAnswers: rawAnswers as any,
+        evaluatedAnswers: canonicalSubmission.answers as any,
         answers: {
-          create: answerRecords
+          create: mappingResult.details.map(d => ({
+            questionNo: d.questionNo,
+            selectedOption: d.physicalInput,
+            marksObtained: d.expectedMarks,
+            confidence: d.confidence,
+            status: d.status
+          }))
         }
       }
     });
 
-    // Record Sync Event
-    await prisma.oMRSyncEvent.create({
+    // Link Result to omrScanId for paper traceability
+    await db.result.updateMany({
+      where: {
+        studentId: canonicalSubmission.studentId,
+        examId: canonicalSubmission.examId
+      },
       data: {
-        idempotencyKey: scanUuid,
-        scanUuid,
-        status: 'SYNCED',
-        syncedAt: new Date()
+        omrScanId: scanRecord.id
       }
     });
-
-    // 5. Phase 3-A: Write authoritative Result to the production results table
-    let resultInfo: { resultId: string; grade: string; percentage: number; total: number; isNew: boolean } | null = null;
-    if (resolvedStudentId && !reviewRequired) {
-      try {
-        const writerOutput = await writeOMRResult(
-          {
-            scanId: newScan.id,
-            studentId: resolvedStudentId,
-            examId,
-            totalScore,
-            maxScore: maxMarks,
-          },
-          prisma
-        );
-        resultInfo = {
-          resultId: writerOutput.resultId,
-          grade: writerOutput.grade,
-          percentage: writerOutput.percentage,
-          total: writerOutput.total,
-          isNew: writerOutput.isNew,
-        };
-      } catch (resultErr: any) {
-        // Non-fatal: log but don't fail the scan submission
-        console.error('[OMR Submit] Result write error:', resultErr?.message);
-      }
-    }
 
     return NextResponse.json({
       success: true,
-      scanId: newScan.id,
-      scanUuid,
-      reviewRequired,
-      result: resultInfo,
+      scanId: scanRecord.id,
+      submissionId: submission.id,
+      reviewRequired: scanStatus === 'REVIEW_REQUIRED',
+      warnings: adaptResult.warnings,
       score: {
-        totalScore,
-        maxScore: maxMarks,
-        evaluatedAnswers
+        totalScore: submission.score || 0,
+        maxScore: exam.totalMarks || 100
       }
     });
+
   } catch (error: any) {
+    console.error('[OMRSubmitAPI] Error processing OMR submission:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to record OMR submission' },
+      { success: false, error: error.message || 'Internal Server Error' },
       { status: 500 }
     );
   }
 }
-

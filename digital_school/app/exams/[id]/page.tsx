@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1084,7 +1084,22 @@ export default function ExamBuilderPage() {
                   >
                     <FileSpreadsheet className="mr-2 h-4 w-4" /> Bulk Add Questions
                   </Button>
-                  <Button variant="outline" onClick={() => router.push(`/exams/${examId}/print`)}><Printer className="mr-2 h-4 w-4" />Print Sets ({exam.examSets.length})</Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-600/20"
+                    onClick={() => router.push(`/exams/${examId}/print`)}
+                  >
+                    <Printer className="mr-2 h-4 w-4" /> Print OMR & Sets ({exam.examSets.length})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-indigo-500/40 text-indigo-400 hover:bg-indigo-950/40 font-bold"
+                    onClick={() => router.push('/scanner')}
+                  >
+                    <Camera className="mr-2 h-4 w-4" /> Open OMR Scanner
+                  </Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
                     <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Exam Preview: {newSetName || "Untitled Set"}</DialogTitle></DialogHeader><ScrollArea className="h-[70vh] p-4">{selectedQuestions.length > 0 ? selectedQuestions.map((q, index) => (<div key={q.id} className="mb-4"><h3 className="font-bold mb-2">Question {index + 1}</h3><QuestionCard question={q} isAdded={true} isSelectable={false} /></div>)) : <p className="text-center text-muted-foreground">No questions selected.</p>}</ScrollArea></DialogContent>

@@ -135,7 +135,10 @@ interface Result {
   examId: string;
   examTitle: string;
   subject: string;
-  type?: 'ONLINE' | 'OFFLINE' | 'MIXED';
+  type?: 'ONLINE' | 'OFFLINE' | 'MIXED' | 'OMR';
+  source?: 'ONLINE' | 'OMR';
+  setName?: string;
+  omrScanId?: string;
   score: number;
   totalMarks: number;
   percentage: number;
@@ -533,7 +536,12 @@ export default function StudentDashboardPage() {
   // Filtered Completed Exam Results
   const filteredExamResults = useMemo(() => {
     return results.filter(result => {
-      if (examTypeFilter !== 'all' && result.type && result.type !== examTypeFilter) return false;
+      if (examTypeFilter !== 'all') {
+        const isMatch = (examTypeFilter === 'OMR' && (result.type === 'OMR' || result.source === 'OMR')) ||
+                        (examTypeFilter === 'ONLINE' && (result.type === 'ONLINE' || result.source === 'ONLINE')) ||
+                        (result.type?.toUpperCase() === examTypeFilter.toUpperCase());
+        if (!isMatch) return false;
+      }
       if (examSearchQuery.trim()) {
         const q = examSearchQuery.toLowerCase();
         const mTitle = result.examTitle?.toLowerCase().includes(q);
@@ -1252,6 +1260,7 @@ export default function StudentDashboardPage() {
                     >
                       <option value="all">All Types</option>
                       <option value="ONLINE">Online Exams</option>
+                      <option value="OMR">Physical OMR</option>
                       <option value="OFFLINE">Offline Exams</option>
                       <option value="MIXED">Mixed Exams</option>
                     </select>
@@ -1440,9 +1449,15 @@ export default function StudentDashboardPage() {
                         <Card className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col h-full">
                           <div className="p-5 sm:p-6 flex flex-col h-full space-y-4">
                             <div className="flex items-center justify-between gap-2">
-                              <Badge variant="outline" className="text-[10px] font-bold uppercase">
-                                {result.type || 'EXAM'}
-                              </Badge>
+                              {result.type === 'OMR' || result.source === 'OMR' ? (
+                                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-[10px] uppercase border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                                  Physical OMR {result.setName ? `• Set ${result.setName}` : ''}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">
+                                  {result.type || 'ONLINE'}
+                                </Badge>
+                              )}
                               {result.rank && (
                                 <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold text-[10px]">
                                   Rank #{result.rank}

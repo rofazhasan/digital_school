@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 import { calculateGrade, calculateGPA } from "@/lib/utils";
+import { ExamSetResolver } from "@/lib/omr/exam-set-resolver";
 
 const analyticsCache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL_MS = 15000; // 15 seconds
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ message: "Student profile not found" }, { status: 404 });
         }
 
-        const cacheKey = `analytics:${studentId}:${classId}`;
+        const cacheKey = `analytics_v3:${studentId}:${classId}`;
         const cached = analyticsCache.get(cacheKey);
         if (cached && Date.now() < cached.expiresAt) {
             return NextResponse.json(cached.data, {
@@ -48,11 +49,16 @@ export async function GET(req: NextRequest) {
                         select: {
                             id: true,
                             name: true,
+                            subject: true,
                             totalMarks: true,
                             date: true,
+                            mcqNegativeMarking: true,
                             examSets: {
-                                take: 1,
-                                select: { questions: { take: 3, select: { subject: true } } }
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    questionsJson: true
+                                }
                             }
                         }
                     }
@@ -66,11 +72,15 @@ export async function GET(req: NextRequest) {
                         select: {
                             id: true,
                             name: true,
+                            subject: true,
                             totalMarks: true,
                             date: true,
                             examSets: {
-                                take: 1,
-                                select: { questions: { take: 3, select: { subject: true } } }
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    questionsJson: true
+                                }
                             }
                         }
                     }
@@ -91,18 +101,15 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ message: "Student profile not found" }, { status: 404 });
         }
 
-        // Merge Results & Submissions
+        // 1. Unify Results & Submissions into Continuous Timeline
         const unifiedMap = new Map<string, any>();
+
         dbResults.forEach((r: any) => {
-            let subject = "General";
-            if (r.exam?.examSets?.[0]?.questions?.[0]?.subject) {
-                subject = r.exam.examSets[0].questions[0].subject;
-            } else if (r.exam?.name) {
-                subject = r.exam.name.split(" ")[0] || "General";
-            }
+            const subject = r.exam?.subject || (r.exam?.name ? r.exam.name.split(" ")[0] : "General");
             const totalMarks = r.exam?.totalMarks || 100;
             const score = Number(r.total) || 0;
             const pct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : (Number(r.percentage) || 0);
+            const isOMR = Boolean(r.omrScanId);
 
             unifiedMap.set(r.examId, {
                 examId: r.examId,
@@ -112,18 +119,16 @@ export async function GET(req: NextRequest) {
                 score,
                 pct,
                 rank: r.rank,
-                date: r.createdAt || r.exam?.date
+                source: isOMR ? 'PHYSICAL_OMR' : 'ONLINE_EXAM',
+                omrScanId: r.omrScanId || null,
+                date: r.createdAt || r.exam?.date,
+                examSets: r.exam?.examSets || []
             });
         });
 
         dbSubmissions.forEach((sub: any) => {
             if (!unifiedMap.has(sub.examId)) {
-                let subject = "General";
-                if (sub.exam?.examSets?.[0]?.questions?.[0]?.subject) {
-                    subject = sub.exam.examSets[0].questions[0].subject;
-                } else if (sub.exam?.name) {
-                    subject = sub.exam.name.split(" ")[0] || "General";
-                }
+                const subject = sub.exam?.subject || (sub.exam?.name ? sub.exam.name.split(" ")[0] : "General");
                 const totalMarks = sub.exam?.totalMarks || 100;
                 const score = Number(sub.score) || 0;
                 const pct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
@@ -136,14 +141,151 @@ export async function GET(req: NextRequest) {
                     score,
                     pct,
                     rank: undefined,
-                    date: sub.evaluatedAt || sub.createdAt || sub.exam?.date
+                    source: 'ONLINE_EXAM',
+                    omrScanId: null,
+                    date: sub.evaluatedAt || sub.createdAt || sub.exam?.date,
+                    answers: sub.answers,
+                    examSets: sub.exam?.examSets || []
                 });
+            } else {
+                // Attach answers dict to existing result if available
+                const existing = unifiedMap.get(sub.examId);
+                if (existing && !existing.answers && sub.answers) {
+                    existing.answers = sub.answers;
+                }
             }
         });
 
         const unifiedList = Array.from(unifiedMap.values());
+        const sortedList = [...unifiedList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        // 1. Calculate Average Score/Grade
+        // 2. Timeline Progression
+        const timeline = sortedList.map((r, idx) => ({
+            sequence: idx + 1,
+            examId: r.examId,
+            examTitle: r.examTitle,
+            subject: r.subject,
+            source: r.source,
+            score: r.score,
+            totalMarks: r.totalMarks,
+            pct: r.pct,
+            date: r.date
+        }));
+
+        // 3. Question-Level Deep Analytics across All Exams (Mistakes, Types, Topics)
+        const topicStats: Record<string, { subject: string; correct: number; total: number; examOccurrences: Set<string>; wrongExams: Set<string> }> = {};
+        const typeStats: Record<string, { correct: number; total: number }> = {};
+        const mistakeHistory: any[] = [];
+
+        unifiedList.forEach((examItem) => {
+            const studentAnswers = examItem.answers || {};
+            const examSets = examItem.examSets || [];
+
+            examSets.forEach((set: any) => {
+                const canonicalSet = ExamSetResolver.parseRawQuestionsJson(set.questionsJson, set.id, set.name, examItem.examId);
+                canonicalSet.questions.forEach((q) => {
+                    const studentAns = studentAnswers[q.id];
+                    const marksAwarded = studentAnswers[`${q.id}_marks`];
+
+                    const isAnswered = studentAns !== undefined && studentAns !== null && studentAns !== '';
+                    let isCorrect = false;
+
+                    if (marksAwarded !== undefined) {
+                        isCorrect = Number(marksAwarded) > 0;
+                    } else if (q.correctAnswer && isAnswered) {
+                        isCorrect = String(studentAns).trim().toUpperCase() === String(q.correctAnswer).trim().toUpperCase();
+                    } else if (q.correctOption !== undefined && isAnswered) {
+                        isCorrect = String(studentAns).trim().toUpperCase() === String.fromCharCode(65 + q.correctOption);
+                    }
+
+                    // Track Question Type Performance
+                    const qType = q.type || 'MCQ';
+                    if (!typeStats[qType]) typeStats[qType] = { correct: 0, total: 0 };
+                    typeStats[qType].total += 1;
+                    if (isCorrect) typeStats[qType].correct += 1;
+
+                    // Track Topic / Chapter
+                    const topicName = q.topic || q.chapter || (q.metadata as any)?.topic || 'General Concepts';
+                    const subjectName = q.subject || examItem.subject;
+
+                    if (!topicStats[topicName]) {
+                        topicStats[topicName] = {
+                            subject: subjectName,
+                            correct: 0,
+                            total: 0,
+                            examOccurrences: new Set(),
+                            wrongExams: new Set()
+                        };
+                    }
+                    topicStats[topicName].total += 1;
+                    topicStats[topicName].examOccurrences.add(examItem.examId);
+
+                    if (isCorrect) {
+                        topicStats[topicName].correct += 1;
+                    } else if (isAnswered) {
+                        topicStats[topicName].wrongExams.add(examItem.examId);
+                        mistakeHistory.push({
+                            examId: examItem.examId,
+                            examTitle: examItem.examTitle,
+                            source: examItem.source,
+                            date: examItem.date,
+                            questionId: q.id,
+                            sequenceNumber: q.sequenceNumber,
+                            questionText: q.questionText,
+                            questionType: qType,
+                            subject: subjectName,
+                            topic: topicName,
+                            studentAnswer: studentAns,
+                            correctAnswer: q.correctAnswer || (q.correctOption !== undefined ? String.fromCharCode(65 + q.correctOption) : 'Official Key'),
+                            explanation: q.explanation
+                        });
+                    }
+                });
+            });
+        });
+
+        // 4. Repeated Mistakes & Topic Mastery Categorization
+        const repeatedWeaknesses: any[] = [];
+        const verifiedStrengths: any[] = [];
+
+        Object.entries(topicStats).forEach(([topic, stats]) => {
+            const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+
+            // Repeated Weakness: Failed in >= 2 distinct exams or accuracy < 60% with >= 3 questions
+            if (stats.wrongExams.size >= 2 || (accuracy < 60 && stats.total >= 3)) {
+                repeatedWeaknesses.push({
+                    topic,
+                    subject: stats.subject,
+                    accuracy,
+                    totalAttempts: stats.total,
+                    wrongAttempts: stats.total - stats.correct,
+                    examCount: stats.wrongExams.size,
+                    status: 'Repeated Weakness'
+                });
+            }
+
+            // Strength: >= 75% accuracy with >= 3 questions
+            if (accuracy >= 75 && stats.total >= 3) {
+                verifiedStrengths.push({
+                    topic,
+                    subject: stats.subject,
+                    accuracy,
+                    totalAttempts: stats.total,
+                    correctAttempts: stats.correct,
+                    status: 'Mastered'
+                });
+            }
+        });
+
+        // 5. Question Type Breakdown
+        const questionTypePerformance = Object.entries(typeStats).map(([type, stats]) => ({
+            type,
+            accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
+            correct: stats.correct,
+            total: stats.total
+        })).sort((a, b) => b.total - a.total);
+
+        // 6. Overall Performance & Improvement Signals
         let totalScore = 0;
         let totalPossible = 0;
         unifiedList.forEach((r: any) => {
@@ -154,7 +296,40 @@ export async function GET(req: NextRequest) {
         const averagePercentage = totalPossible > 0 ? (totalScore / totalPossible) * 100 : (unifiedList.length > 0 ? 80 : 0);
         const gpa = calculateGPA(averagePercentage).toFixed(2);
 
-        // 2. Attendance
+        // Calculate Real Improvement Signal across Last 5 Exams
+        let improvementSignal = null;
+        if (sortedList.length >= 2) {
+            const recentSubset = sortedList.slice(-5);
+            const firstScore = recentSubset[0].pct;
+            const lastScore = recentSubset[recentSubset.length - 1].pct;
+            const delta = lastScore - firstScore;
+            const dominantSubject = recentSubset[recentSubset.length - 1].subject;
+
+            if (delta > 0) {
+                improvementSignal = {
+                    type: 'GROWTH',
+                    delta,
+                    text: `Your accuracy in ${dominantSubject} has improved from ${firstScore}% to ${lastScore}% across your last ${recentSubset.length} exams.`,
+                    icon: '🚀'
+                };
+            } else if (delta < -5) {
+                improvementSignal = {
+                    type: 'DIP',
+                    delta,
+                    text: `Recent scores in ${dominantSubject} show a slight dip from ${firstScore}% to ${lastScore}%. Focus on reviewing the fundamentals.`,
+                    icon: '⚠️'
+                };
+            } else {
+                improvementSignal = {
+                    type: 'STABLE',
+                    delta: 0,
+                    text: `Your overall performance remains steady at ${lastScore}% across your last ${recentSubset.length} exams.`,
+                    icon: '📈'
+                };
+            }
+        }
+
+        // Attendance & Rank
         let presentCount = 0;
         let absentCount = 0;
         let lateCount = 0;
@@ -170,51 +345,10 @@ export async function GET(req: NextRequest) {
         });
 
         const attendancePercentage = totalDays > 0 ? Number(((presentCount / totalDays) * 100).toFixed(1)) : 95;
-
-        // 3. Rank
         const ranked = unifiedList.filter((r) => r.rank && r.rank > 0);
         const currentRank = ranked.length > 0 ? Math.min(...ranked.map((r) => r.rank)) : 3;
 
-        // 4. Badges
-        const badges = (studentProfile.badges || []).map((b: any) => ({
-            ...b,
-            icon: b.type === 'EXCELLENCE' ? '🏆' : b.type === 'ACHIEVEMENT' ? '🏅' : b.type === 'MILESTONE' ? '🎯' : '⭐',
-            earnedAt: b.issuedDate
-        }));
-
-        // 5. Trends
-        const sortedList = [...unifiedList].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        const trends = sortedList.map(r => ({
-            label: r.examTitle,
-            score: r.pct,
-            classAverage: 70,
-            date: r.date,
-            subject: r.subject
-        }));
-
-        // 6. Subject Strengths
-        const subjectGroups: { [key: string]: { total: number, possible: number, count: number, history: number[] } } = {};
-        unifiedList.forEach(r => {
-            const subject = r.subject || 'General';
-            if (!subjectGroups[subject]) subjectGroups[subject] = { total: 0, possible: 0, count: 0, history: [] };
-            subjectGroups[subject].total += r.score;
-            subjectGroups[subject].possible += r.totalMarks;
-            subjectGroups[subject].count += 1;
-            subjectGroups[subject].history.push(r.pct);
-        });
-
-        const subjectPerformance = Object.entries(subjectGroups).map(([subject, data]) => ({
-            subject,
-            score: data.possible > 0 ? Math.round((data.total / data.possible) * 100) : 75,
-            trend: data.history.length > 1 ? (data.history[data.history.length - 1] - data.history[data.history.length - 2]) : 0
-        }));
-
-        // 7. AI Analysis & Insights
-        const aiInsights = generateInsights(averagePercentage, trends, subjectPerformance, attendancePercentage);
-
-        // 8. Predictive Analytics (Score Projection)
-        const projection = calculateProjection(trends);
-
+        // Construct Unified Long-Term Learning Analytics Payload
         const responsePayload = {
             analytics: {
                 attendance: {
@@ -231,12 +365,17 @@ export async function GET(req: NextRequest) {
                 },
                 rank: currentRank.toString(),
                 totalStudents: Math.max(classCount, 30),
-                trends,
-                subjectPerformance,
-                insights: aiInsights,
-                projection
+                timeline,
+                repeatedWeaknesses: repeatedWeaknesses.sort((a, b) => a.accuracy - b.accuracy),
+                verifiedStrengths: verifiedStrengths.sort((a, b) => b.accuracy - a.accuracy),
+                questionTypePerformance,
+                mistakeHistory: mistakeHistory.slice(0, 50),
+                improvementSignal,
+                totalExamsEvaluated: unifiedList.length,
+                omrExamsCount: unifiedList.filter(u => u.source === 'PHYSICAL_OMR').length,
+                onlineExamsCount: unifiedList.filter(u => u.source === 'ONLINE_EXAM').length
             },
-            badges
+            badges: studentProfile.badges || []
         };
 
         analyticsCache.set(cacheKey, {
@@ -255,49 +394,4 @@ export async function GET(req: NextRequest) {
         console.error("Error fetching student analytics:", error);
         return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
     }
-}
-
-function generateInsights(avg: number, trends: any[], subjects: any[], attendance: number) {
-    const insights = [];
-
-    if (avg >= 80) insights.push({ text: "You're demonstrating mastery across subjects. Keep leading the way!", type: "good", icon: "🚀" });
-    else if (avg >= 60) insights.push({ text: "Steady progress. Aim for consistency in your core subjects.", type: "neutral", icon: "📈" });
-    else insights.push({ text: "Let's focus on building stronger fundamentals in weak areas.", type: "bad", icon: "💡" });
-
-    const topSubject = [...subjects].sort((a, b) => b.score - a.score)[0];
-    if (topSubject && topSubject.score >= 85) {
-        insights.push({ text: `Natural aptitude in ${topSubject.subject}! Consider advanced practice here.`, type: "good", icon: "🌟" });
-    }
-
-    const weakSubject = [...subjects].sort((a, b) => a.score - b.score)[0];
-    if (weakSubject && weakSubject.score < 50) {
-        insights.push({ text: `Prioritize ${weakSubject.subject} in your next study session to bridge the gap.`, type: "bad", icon: "🎯" });
-    }
-
-    if (trends.length >= 2) {
-        const last = trends[trends.length - 1].score;
-        const prev = trends[trends.length - 2].score;
-        if (last > prev + 5) insights.push({ text: "Incredible growth in your recent exams! The effort is paying off.", type: "good", icon: "🔥" });
-        else if (last < prev - 10) insights.push({ text: "Recent scores show a slight dip. Take a breath and review the basics.", type: "bad", icon: "⚠️" });
-    }
-
-    if (attendance < 75) insights.push({ text: "Attending more classes could significantly boost your understanding.", type: "bad", icon: "📅" });
-
-    return insights;
-}
-
-function calculateProjection(trends: any[]) {
-    if (trends.length < 2) return null;
-
-    const recent = trends.slice(-3);
-    const sum = recent.reduce((acc: number, r: any) => acc + r.score, 0);
-    const avg = sum / recent.length;
-
-    const growth = recent.length > 1 ? (recent[recent.length - 1].score - recent[0].score) / (recent.length - 1) : 0;
-
-    return {
-        nextPredictedScore: Math.min(100, Math.max(0, Math.round(avg + growth))),
-        growthRate: growth.toFixed(1),
-        confidence: recent.length > 2 ? 'High' : 'Medium'
-    };
 }

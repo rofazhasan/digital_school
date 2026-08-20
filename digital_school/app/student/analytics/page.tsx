@@ -2,18 +2,35 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  TrendingUp, Target, Award, Trophy, ArrowLeft,
-  Sparkles, Calendar, BookOpen, Users, Brain,
-  ChevronRight, RefreshCw, BarChart3
+  TrendingUp,
+  Target,
+  Award,
+  Trophy,
+  ArrowLeft,
+  Sparkles,
+  Calendar,
+  BookOpen,
+  Users,
+  Brain,
+  ChevronRight,
+  RefreshCw,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle2,
+  Bookmark,
+  Layers,
+  HelpCircle,
+  ExternalLink,
+  Zap,
+  Activity
 } from "lucide-react";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
-import { AIAnalysisCard } from "@/components/dashboard/student/AIAnalysisCard";
-import { PerformancePredictor } from "@/components/dashboard/student/PerformancePredictor";
 
 // Chart Components
 import {
@@ -30,7 +47,7 @@ import {
   RadialLinearScale,
   ArcElement
 } from 'chart.js';
-import { Line, Radar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
@@ -46,9 +63,9 @@ ChartJS.register(
   Filler
 );
 
-const ANALYTICS_CACHE_KEY = "student_analytics_page_cache_v2";
+const ANALYTICS_CACHE_KEY = "student_analytics_page_cache_v3";
 
-export default function StudentAnalyticsPage() {
+export default function UnifiedStudentLearningAnalyticsPage() {
   const router = useRouter();
 
   // Instant SWR Hydration
@@ -63,39 +80,34 @@ export default function StudentAnalyticsPage() {
   });
 
   const [analytics, setAnalytics] = useState<any>(cached?.analytics || null);
-  const [results, setResults] = useState<any[]>(cached?.results || []);
   const [loading, setLoading] = useState(!cached?.analytics);
-  const [trendRange, setTrendRange] = useState<'5' | '10' | 'all'>('10');
-  const [trendSubjectFilter, setTrendSubjectFilter] = useState<string>('all');
+  const [activeHistoryFilter, setActiveHistoryFilter] = useState<'ALL' | 'OMR' | 'ONLINE'>('ALL');
+  const [savedNotebookMistakes, setSavedNotebookMistakes] = useState<string[]>([]);
+
+  // Load Saved Mistake Notebook IDs from LocalStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ro_mistake_notebook');
+        if (raw) setSavedNotebookMistakes(JSON.parse(raw));
+      } catch {}
+    }
+  }, []);
 
   const fetchAnalytics = useCallback(async (isSilent = false) => {
     if (!isSilent && !analytics) setLoading(true);
     try {
-      const [anRes, resRes] = await Promise.allSettled([
-        fetch('/api/student/analytics', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
-        fetch('/api/student/results', { credentials: 'include' }).then(r => r.ok ? r.json() : [])
-      ]);
-
-      let anData = null;
-      if (anRes.status === 'fulfilled' && anRes.value) {
-        anData = anRes.value.analytics || anRes.value;
-        setAnalytics(anData);
+      const res = await fetch('/api/student/analytics', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data.analytics || data);
+        try {
+          sessionStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify({
+            analytics: data.analytics || data,
+            cachedAt: Date.now()
+          }));
+        } catch {}
       }
-
-      let resData = [];
-      if (resRes.status === 'fulfilled') {
-        const raw = resRes.value;
-        resData = Array.isArray(raw) ? raw : (raw.results || raw.data || []);
-        setResults(resData);
-      }
-
-      try {
-        sessionStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify({
-          analytics: anData,
-          results: resData,
-          cachedAt: Date.now()
-        }));
-      } catch {}
     } finally {
       setLoading(false);
     }
@@ -105,318 +117,386 @@ export default function StudentAnalyticsPage() {
     fetchAnalytics(true);
   }, [fetchAnalytics]);
 
-  // Unique Subjects
-  const availableSubjects = useMemo(() => {
-    const set = new Set<string>();
-    results.forEach(r => { if (r.subject) set.add(r.subject); });
-    if (analytics?.subjectPerformance) {
-      analytics.subjectPerformance.forEach((s: any) => { if (s.subject) set.add(s.subject); });
+  // Filter Timeline by Source (Online / Physical OMR / All)
+  const filteredTimeline = useMemo(() => {
+    const rawList = analytics?.timeline || [];
+    if (activeHistoryFilter === 'OMR') {
+      return rawList.filter((item: any) => item.source === 'PHYSICAL_OMR');
     }
-    return Array.from(set);
-  }, [results, analytics]);
-
-  // Trend Chart Calculation
-  const trendData = useMemo(() => {
-    let rawList: Array<{ label: string; score: number; classAvg: number; subject: string }> = [];
-
-    if (results.length > 0) {
-      const sorted = [...results].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      rawList = sorted.map(r => ({
-        label: r.examTitle || r.subject,
-        score: Number(r.percentage) || (r.totalMarks > 0 ? Math.round((r.score / r.totalMarks) * 100) : 0),
-        classAvg: 70,
-        subject: r.subject || 'General'
-      }));
-    } else if (analytics?.trends && Array.isArray(analytics.trends)) {
-      rawList = analytics.trends.map((t: any) => ({
-        label: t.label || t.examTitle || 'Exam',
-        score: Number(t.score) || 0,
-        classAvg: Number(t.classAverage) || 70,
-        subject: t.subject || 'General'
-      }));
+    if (activeHistoryFilter === 'ONLINE') {
+      return rawList.filter((item: any) => item.source === 'ONLINE_EXAM');
     }
+    return rawList;
+  }, [analytics?.timeline, activeHistoryFilter]);
 
-    if (trendSubjectFilter !== 'all') {
-      rawList = rawList.filter(item => item.subject.toLowerCase() === trendSubjectFilter.toLowerCase());
-    }
-
-    if (trendRange === '5') rawList = rawList.slice(-5);
-    else if (trendRange === '10') rawList = rawList.slice(-10);
-
-    const scores = rawList.map(r => r.score);
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
-    const firstScore = scores[0] || 0;
-    const lastScore = scores[scores.length - 1] || 0;
-    const delta = lastScore - firstScore;
+  // Chart Setup for Continuous Timeline
+  const chartData = useMemo(() => {
+    const labels = filteredTimeline.map((item: any) => item.examTitle || `Exam ${item.sequence}`);
+    const scores = filteredTimeline.map((item: any) => item.pct);
 
     return {
-      items: rawList,
-      avgScore,
-      maxScore,
-      delta,
-      chart: {
-        labels: rawList.map(r => r.label.length > 14 ? r.label.substring(0, 12) + '...' : r.label),
-        datasets: [
-          {
-            label: 'Your Score (%)',
-            data: rawList.map(r => r.score),
-            borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.15)',
-            fill: true,
-            tension: 0.35,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            pointBackgroundColor: '#6366f1',
-            pointBorderColor: '#fff',
-            borderWidth: 3,
-          },
-          {
-            label: 'Class Avg (%)',
-            data: rawList.map(r => r.classAvg),
-            borderColor: 'rgba(148, 163, 184, 0.6)',
-            borderDash: [5, 5],
-            fill: false,
-            tension: 0.35,
-            pointRadius: 0,
-            borderWidth: 2,
-          }
-        ]
-      }
+      labels,
+      datasets: [
+        {
+          label: 'Your Score %',
+          data: scores,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: '#4f46e5',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7
+        },
+        {
+          label: 'Benchmark (75%)',
+          data: labels.map(() => 75),
+          borderColor: 'rgba(148, 163, 184, 0.4)',
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false
+        }
+      ]
     };
-  }, [results, analytics, trendRange, trendSubjectFilter]);
+  }, [filteredTimeline]);
 
-  // Subject Mastery Matrix
-  const subjectList = useMemo(() => {
-    const map: Record<string, { total: number; count: number }> = {};
-    results.forEach(r => {
-      const sub = r.subject || 'General';
-      const pct = Number(r.percentage) || (r.totalMarks > 0 ? Math.round((r.score / r.totalMarks) * 100) : 0);
-      if (!map[sub]) map[sub] = { total: 0, count: 0 };
-      map[sub].total += pct;
-      map[sub].count += 1;
-    });
-
-    if (analytics?.subjectPerformance) {
-      analytics.subjectPerformance.forEach((s: any) => {
-        if (!map[s.subject]) map[s.subject] = { total: Number(s.score) || 75, count: 1 };
-      });
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: { color: '#94a3b8', font: { size: 11, weight: 'bold' as const } }
+      },
+      tooltip: {
+        backgroundColor: '#0f172a',
+        titleColor: '#ffffff',
+        bodyColor: '#cbd5e1',
+        borderColor: '#334155',
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          label: (context: any) => `Score: ${context.parsed.y}%`
+        }
+      }
+    },
+    scales: {
+      y: {
+        min: 0,
+        max: 100,
+        grid: { color: 'rgba(51, 65, 85, 0.25)' },
+        ticks: { color: '#64748b', font: { size: 10 } }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: '#64748b', font: { size: 10 } }
+      }
     }
-
-    const list = Object.entries(map).map(([subject, stat]) => {
-      const avg = Math.round(stat.total / stat.count);
-      let status = 'Proficient';
-      if (avg >= 85) status = 'Mastered';
-      else if (avg < 65) status = 'Needs Focus';
-      return { subject, avg, count: stat.count, status };
-    });
-    list.sort((a, b) => b.avg - a.avg);
-    return list;
-  }, [results, analytics]);
-
-  const classRank = analytics?.rank || '3';
-  const totalStudents = analytics?.totalStudents || '42';
-  const performance = analytics?.performance || { averagePercentage: 86, gpa: 4.85, grade: 'A+' };
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors">
-      <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Navigation Bar with Back Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
+      {/* Top Header */}
+      <div className="max-w-7xl mx-auto mb-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
+          <div className="flex items-center gap-3">
+            <Link href="/student/dashboard" className="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-400 rounded-2xl border border-slate-800 transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+                  Long-Term Learning Analytics
+                </h1>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
+                  Physical + Online Unified
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Deterministic performance trends, topic mastery diagnostics, and mistake patterns.
+              </p>
+            </div>
+          </div>
+
           <Button
+            onClick={() => fetchAnalytics(false)}
             variant="outline"
             size="sm"
-            onClick={() => { triggerHaptic(ImpactStyle.Light); router.push('/student/dashboard'); }}
-            className="self-start rounded-full font-bold text-xs bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-500 hover:text-indigo-600 transition-all gap-1.5 px-4 h-9"
+            className="rounded-xl border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Student Dashboard
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Analytics
           </Button>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/student/prac-perfect')}
-              className="rounded-full text-xs font-bold gap-1.5 border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 h-9"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Practice Weak Areas
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => fetchAnalytics(false)}
-              className="rounded-full text-xs font-bold gap-1.5 text-muted-foreground h-9"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Refresh
-            </Button>
-          </div>
         </div>
 
-        {/* Hero Banner */}
-        <div className="rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 text-white shadow-xl relative overflow-hidden border border-indigo-500/20">
-          <div className="relative z-10 space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-200 backdrop-blur-md">
-              <Brain className="h-3.5 w-3.5" />
-              AI Cognitive Analytics Engine
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-              Deep Academic Analytics 📊
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
-              Real-time cognitive growth indicators, subject strength distribution, and predictive scoring trends.
-            </p>
-          </div>
-        </div>
-
-        {/* Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Cumulative Average</span>
-            <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
-              {performance.averagePercentage}%
-            </div>
-            <span className="text-[11px] text-muted-foreground font-medium">Overall accuracy</span>
-          </Card>
-
-          <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Predicted Grade</span>
-            <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-              {performance.grade} (GPA {performance.gpa})
-            </div>
-            <span className="text-[11px] text-muted-foreground font-medium">Class standing target</span>
-          </Card>
-
-          <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Class Ranking</span>
-            <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
-              #{classRank}
-            </div>
-            <span className="text-[11px] text-muted-foreground font-medium">Out of {totalStudents} students</span>
-          </Card>
-
-          <Card className="rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 sm:p-5 shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Evaluated Tests</span>
-            <div className="text-xl sm:text-2xl font-black text-foreground mt-1">
-              {results.length}
-            </div>
-            <span className="text-[11px] text-muted-foreground font-medium">Total submissions graded</span>
-          </Card>
-        </div>
-
-        {/* Performance Trends & Subject Strengths */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <Card className="lg:col-span-7 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Real Improvement Signal Banner */}
+        {analytics?.improvementSignal && (
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-emerald-950/40 border border-indigo-500/30 shadow-xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="text-2xl">{analytics.improvementSignal.icon}</div>
               <div>
-                <h3 className="font-extrabold text-base sm:text-lg text-foreground flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-indigo-500" />
-                  Score Trajectory
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Historical progress comparison</p>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  {(['5', '10', 'all'] as const).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => { triggerHaptic(ImpactStyle.Light); setTrendRange(r); }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                        trendRange === r
-                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {r === 'all' ? 'All' : `Last ${r}`}
-                    </button>
-                  ))}
-                </div>
-
-                {availableSubjects.length > 0 && (
-                  <select
-                    value={trendSubjectFilter}
-                    onChange={(e) => setTrendSubjectFilter(e.target.value)}
-                    className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-2.5 py-1.5 text-foreground"
-                  >
-                    <option value="all">All Subjects</option>
-                    {availableSubjects.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                )}
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
+                  Performance Trajectory Signal
+                </span>
+                <p className="text-sm font-bold text-white mt-0.5">
+                  {analytics.improvementSignal.text}
+                </p>
               </div>
             </div>
+            <span className="text-xs font-mono font-bold text-emerald-400 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+              {analytics.improvementSignal.delta > 0 ? `+${analytics.improvementSignal.delta}% Growth` : 'Steady'}
+            </span>
+          </div>
+        )}
 
-            <div className="h-[280px] w-full">
-              {trendData.items.length > 0 ? (
-                <Line
-                  data={trendData.chart}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6, font: { size: 11, weight: 600 } } },
-                      tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 10, cornerRadius: 12 }
-                    },
-                    scales: {
-                      y: { min: 0, max: 100, grid: { color: 'rgba(156, 163, 175, 0.1)' } },
-                      x: { grid: { display: false } }
-                    }
-                  }}
-                />
+        {/* 4 Core Summary Metrics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Average Mastery</span>
+            <p className="text-2xl sm:text-3xl font-black text-white">{analytics?.performance?.averagePercentage || 0}%</p>
+            <span className="text-[11px] font-bold text-indigo-400">Grade {analytics?.performance?.grade || 'A'} • GPA {analytics?.performance?.gpa || '4.00'}</span>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Unified Exam History</span>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-400">{analytics?.totalExamsEvaluated || 0}</p>
+            <span className="text-[11px] text-slate-400 font-medium">{analytics?.omrExamsCount || 0} Physical OMR + {analytics?.onlineExamsCount || 0} Online</span>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Repeated Weaknesses</span>
+            <p className="text-2xl sm:text-3xl font-black text-rose-400">{analytics?.repeatedWeaknesses?.length || 0}</p>
+            <span className="text-[11px] text-rose-400/80 font-medium">Topic mistake clusters</span>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Verified Strengths</span>
+            <p className="text-2xl sm:text-3xl font-black text-yellow-400">{analytics?.verifiedStrengths?.length || 0}</p>
+            <span className="text-[11px] text-yellow-400/80 font-medium">≥75% mastery topics</span>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* 1. CONTINUOUS PERFORMANCE TIMELINE */}
+        {/* ========================================================================= */}
+        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-slate-900/60 border border-slate-800/80 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-indigo-400" />
+                Score Progression Timeline
+              </h2>
+              <p className="text-xs text-slate-400">
+                Continuous performance curve across physical OMR and digital examination milestones
+              </p>
+            </div>
+
+            {/* Source Filter Switcher */}
+            <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+              <button
+                onClick={() => setActiveHistoryFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeHistoryFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All Exams ({analytics?.timeline?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveHistoryFilter('OMR')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeHistoryFilter === 'OMR' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Physical OMR ({analytics?.omrExamsCount || 0})
+              </button>
+              <button
+                onClick={() => setActiveHistoryFilter('ONLINE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeHistoryFilter === 'ONLINE' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Online ({analytics?.onlineExamsCount || 0})
+              </button>
+            </div>
+          </div>
+
+          <div className="h-64 sm:h-72 w-full">
+            <Line data={chartData} options={chartOptions} />
+          </div>
+        </div>
+
+        {/* 2-Column Diagnostics Grid: Repeated Weaknesses & Verified Strengths */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Repeated Weaknesses */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black uppercase text-white flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                Repeated Weakness Clusters
+              </h3>
+              <span className="text-xs font-bold text-rose-400">{analytics?.repeatedWeaknesses?.length || 0} Detected</span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Topics where mistakes occurred across 2 or more distinct exams. Target these concepts for focused revision.
+            </p>
+
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {analytics?.repeatedWeaknesses?.length > 0 ? (
+                analytics.repeatedWeaknesses.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-rose-950/20 border border-rose-900/40 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <span className="font-bold text-white block">{item.topic}</span>
+                      <span className="text-[10px] text-slate-400">{item.subject} • Failed in {item.examCount} exams</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-black text-rose-400">{item.accuracy}% Accuracy</span>
+                      <span className="text-[10px] text-slate-500 block">{item.wrongAttempts} wrong of {item.totalAttempts}</span>
+                    </div>
+                  </div>
+                ))
               ) : (
-                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-                  No examination records available for the selected range.
+                <div className="py-8 text-center text-slate-500 text-xs">
+                  <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-400/50 mb-1" />
+                  No repeated weakness clusters detected.
                 </div>
               )}
             </div>
-          </Card>
+          </div>
 
-          {/* Subject Mastery List */}
-          <Card className="lg:col-span-5 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-6 space-y-4">
-            <h3 className="font-extrabold text-base sm:text-lg text-foreground flex items-center gap-2">
-              <Target className="h-4 w-4 text-rose-500" />
-              Subject Strengths Breakdown
-            </h3>
+          {/* Verified Strengths */}
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black uppercase text-white flex items-center gap-2">
+                <Award className="w-4 h-4 text-yellow-400" />
+                Verified Topic Strengths
+              </h3>
+              <span className="text-xs font-bold text-yellow-400">{analytics?.verifiedStrengths?.length || 0} Mastered</span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Topics where your accuracy consistently exceeds 75% across repeated examinations.
+            </p>
 
-            <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-              {subjectList.map((s, idx) => (
-                <div key={idx} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span>{s.subject}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-[10px] ${
-                        s.status === 'Mastered' ? 'text-emerald-600 border-emerald-300' : s.status === 'Proficient' ? 'text-blue-600 border-blue-300' : 'text-amber-600 border-amber-300'
-                      }`}>
-                        {s.status}
-                      </Badge>
-                      <span className="font-black">{s.avg}%</span>
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+              {analytics?.verifiedStrengths?.length > 0 ? (
+                analytics.verifiedStrengths.map((item: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-900/40 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <span className="font-bold text-white block">{item.topic}</span>
+                      <span className="text-[10px] text-slate-400">{item.subject} • Consistent High Accuracy</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-black text-emerald-400">{item.accuracy}% Mastery</span>
+                      <span className="text-[10px] text-slate-500 block">{item.correctAttempts} of {item.totalAttempts} correct</span>
                     </div>
                   </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                ))
+              ) : (
+                <div className="py-8 text-center text-slate-500 text-xs">
+                  Complete more exams to verify topic strengths.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Question Type Performance Breakdown */}
+        {analytics?.questionTypePerformance?.length > 0 && (
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black uppercase text-white flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                Question Type Mastery Breakdown
+              </h3>
+              <span className="text-xs text-slate-400">Evaluated across all objective question formats</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+              {analytics.questionTypePerformance.map((t: any) => (
+                <div key={t.type} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono font-black text-indigo-400">{t.type}</span>
+                    <span className="font-bold text-white">{t.accuracy}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
-                        s.avg >= 85 ? 'bg-emerald-500' : s.avg >= 65 ? 'bg-indigo-500' : 'bg-amber-500'
+                        t.accuracy >= 75 ? 'bg-emerald-500' : t.accuracy >= 60 ? 'bg-indigo-500' : 'bg-rose-500'
                       }`}
-                      style={{ width: `${s.avg}%` }}
+                      style={{ width: `${t.accuracy}%` }}
                     />
                   </div>
+                  <span className="text-[10px] text-slate-500 block">{t.correct} / {t.total} questions answered correctly</span>
                 </div>
               ))}
             </div>
-          </Card>
-        </div>
-
-        {/* AI Analysis & Predictor */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <AIAnalysisCard insights={analytics?.insights || []} />
           </div>
-          <div>
-            <PerformancePredictor projection={analytics?.projection || null} />
+        )}
+
+        {/* Mistake History & Notebook Review */}
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-black uppercase text-white flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-amber-400" />
+                Mistake Notebook & Question Review
+              </h3>
+              <p className="text-xs text-slate-400">
+                Review past incorrect answers across physical and online exams to reinforce comprehension.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            {analytics?.mistakeHistory?.length > 0 ? (
+              analytics.mistakeHistory.slice(0, 6).map((m: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 font-black text-[10px] border border-rose-500/20">
+                        {m.source === 'PHYSICAL_OMR' ? 'OMR Exam' : 'Online Exam'}
+                      </span>
+                      <span className="font-bold text-white">{m.examTitle}</span>
+                      <span className="text-slate-500">• {m.topic}</span>
+                    </div>
+                    <Link
+                      href={`/exams/results/${m.examId}`}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"
+                    >
+                      View in Report <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+
+                  <p className="text-xs text-slate-200 font-medium">{m.questionText}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-900/40">
+                      <span className="text-[10px] text-rose-400 font-bold uppercase block">Your Answer:</span>
+                      <span className="font-mono text-white font-bold">{String(m.studentAnswer)}</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40">
+                      <span className="text-[10px] text-emerald-400 font-bold uppercase block">Official Correct Answer:</span>
+                      <span className="font-mono text-white font-bold">{String(m.correctAnswer)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-slate-500 text-xs">
+                No mistakes recorded in recent exam history. Keep up the high score!
+              </div>
+            )}
           </div>
         </div>
       </div>

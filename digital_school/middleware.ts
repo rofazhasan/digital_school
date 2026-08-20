@@ -43,7 +43,8 @@ const ROUTE_PERMISSIONS = {
     '/exams/*',
     '/exams/results',
     '/exams/results/*',
-    '/omr_scanner'
+    '/omr_scanner',
+    '/scanner'
   ],
 
   // Admin routes
@@ -61,7 +62,8 @@ const ROUTE_PERMISSIONS = {
     '/exams/*',
     '/exams/results',
     '/exams/results/*',
-    '/omr_scanner'
+    '/omr_scanner',
+    '/scanner'
   ],
 
   // Teacher routes
@@ -79,7 +81,8 @@ const ROUTE_PERMISSIONS = {
     '/exams/evaluations/*',
     '/exams/results',
     '/exams/results/*',
-    '/omr_scanner'
+    '/omr_scanner',
+    '/scanner'
   ],
 
   // Student routes
@@ -115,6 +118,7 @@ const ROUTE_PERMISSIONS = {
     '/create-question',
     '/ai-question-generator',
     '/omr_scanner',
+    '/scanner',
     '/api/user',
     '/api/profile',
     '/api/settings',

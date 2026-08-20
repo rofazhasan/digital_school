@@ -48,7 +48,10 @@ import {
   Info,
   AlignLeft,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Bookmark,
+  Compass,
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -253,7 +256,32 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotification, setShowNotification] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNANSWERED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNANSWERED' | 'SAVED'>('ALL');
+  const [savedMistakes, setSavedMistakes] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('ro_mistake_notebook');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleSaveMistake = (qId: string) => {
+    setSavedMistakes(prev => {
+      const exists = prev.includes(qId);
+      const next = exists ? prev.filter(x => x !== qId) : [...prev, qId];
+      try {
+        localStorage.setItem('ro_mistake_notebook', JSON.stringify(next));
+      } catch {}
+      if (!exists) {
+        toast.success('Question saved to Mistake Notebook! 📓');
+      } else {
+        toast.info('Removed from Mistake Notebook');
+      }
+      return next;
+    });
+  };
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [zoomedImageTitle, setZoomedImageTitle] = useState('');
@@ -268,8 +296,44 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [downloading, setDownloading] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
-  const [isApplyingDrawing, setIsApplyingDrawing] = useState(false);
+  const topicAnalytics = useMemo(() => {
+    if (!result || !result.questions) {
+      return { topics: [], strong: [], weak: [], totalWrong: 0, totalCorrect: 0, totalSkipped: 0, accuracy: 0 };
+    }
+
+    const map = new Map<string, { name: string; total: number; correct: number; wrong: number; skipped: number }>();
+    let totalWrong = 0;
+    let totalCorrect = 0;
+    let totalSkipped = 0;
+
+    result.questions.forEach((q: any) => {
+      const status = evaluateQuestionResultStatus(q);
+      if (status === 'CORRECT') totalCorrect++;
+      else if (status === 'WRONG') totalWrong++;
+      else if (status === 'UNANSWERED') totalSkipped++;
+
+      const topicName = q.chapter || q.topic || q.subject || (result.exam.subject || 'Core Concepts');
+      if (!map.has(topicName)) {
+        map.set(topicName, { name: topicName, total: 0, correct: 0, wrong: 0, skipped: 0 });
+      }
+      const t = map.get(topicName)!;
+      t.total++;
+      if (status === 'CORRECT') t.correct++;
+      else if (status === 'WRONG') t.wrong++;
+      else if (status === 'UNANSWERED') t.skipped++;
+    });
+
+    const topics = Array.from(map.values()).map(t => ({
+      ...t,
+      percentage: t.total > 0 ? Math.round((t.correct / t.total) * 100) : 0
+    }));
+
+    const strong = topics.filter(t => t.percentage >= 75);
+    const weak = topics.filter(t => t.percentage < 75);
+    const accuracy = (totalCorrect + totalWrong) > 0 ? Math.round((totalCorrect / (totalCorrect + totalWrong)) * 100) : 0;
+
+    return { topics, strong, weak, totalWrong, totalCorrect, totalSkipped, accuracy };
+  }, [result]);
 
   const handleShare = async () => {
     if (!result) return;
@@ -2064,9 +2128,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-blue-500/20"
+                  className="inline-flex flex-wrap items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-blue-500/20"
                 >
-                  <Sparkles className="h-3 w-3" /> Official Assessment Report
+                  <span className="flex items-center gap-1.5"><Sparkles className="h-3 w-3" /> Official Assessment Report</span>
+                  {((result as any)?.source === 'OMR' || (result.exam as any)?.source === 'OMR') && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/80 font-black text-[9px] lowercase tracking-normal">
+                      source: Physical OMR {((result as any)?.setName || (result.exam as any)?.set) ? `• Set ${(result as any)?.setName || (result.exam as any)?.set}` : ''}
+                    </span>
+                  )}
                 </motion.div>
 
                 <h1 className="text-4xl md:text-6xl lg:text-8xl font-black leading-[0.85] tracking-tighter break-words">
@@ -2130,6 +2199,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white shadow-inner dark:border-slate-700/30 overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Student Name</label>
                       <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white break-words">{result.student.name}</div>
+                      <div className="text-xs text-slate-500 font-medium">Reg: {result.student.registrationNo || '--'}</div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 md:gap-4">
                       <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-indigo-50/80 dark:bg-indigo-950/30 border border-white dark:border-indigo-900/30 text-center shadow-inner overflow-hidden">
@@ -2139,6 +2209,26 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-purple-50/80 dark:bg-purple-950/30 border border-white dark:border-purple-900/30 text-center shadow-inner overflow-hidden">
                         <label className="text-[10px] uppercase tracking-widest font-black text-purple-400 dark:text-purple-600">Class</label>
                         <div className="text-lg sm:text-2xl font-black text-purple-900 dark:text-purple-400 break-words">{result.student.class}</div>
+                      </div>
+                    </div>
+                    <div className="col-span-full grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-100/70 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40">
+                      <div className="flex items-center justify-between px-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Exam Set</span>
+                        <Badge className="bg-indigo-600 text-white font-black text-xs px-2.5 py-0.5 rounded-lg">
+                          Set {(result.exam as any).set || (result.exam as any).setName || 'A'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between px-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Source</span>
+                        {((result as any).source === 'OMR' || (result.exam as any).source === 'OMR') ? (
+                          <Badge className="bg-indigo-950 text-indigo-300 border border-indigo-700/80 font-black text-[10px] px-2 py-0.5 rounded-lg">
+                            Physical OMR
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-blue-600 dark:text-blue-400 font-black text-[10px] px-2 py-0.5 rounded-lg">
+                            Online Exam
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2633,6 +2723,138 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             )
           }
 
+          {/* Topic Mastery, Strengths & Needs Improvement Diagnostics Card */}
+          {result.result?.isPublished && result.questions && result.questions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 }}
+              className="mb-8"
+            >
+              <Card className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/30 shadow-2xl rounded-[3rem] overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 p-1">
+                  <div className="bg-white/10 backdrop-blur-md px-8 py-5 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-white/20 border border-white/30 rotate-2 shadow-lg">
+                        <Compass className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                          Topic Mastery & Mistake Diagnostics
+                        </h3>
+                        <p className="text-white/80 text-xs font-medium">
+                          Real performance analysis based on exam question metadata
+                        </p>
+                      </div>
+                    </div>
+
+                    {((result as any).source === 'OMR' || (result.exam as any).source === 'OMR') && (
+                      <Badge className="bg-white/20 text-white border border-white/30 font-bold text-xs px-3.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm">
+                        <FileText className="w-3.5 h-3.5" />
+                        Scanned from physical answer sheet (Set {(result.exam as any).set || (result.exam as any).setName || 'A'})
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <CardContent className="p-6 md:p-8 space-y-6">
+                  {/* Strengths & Needs Improvement Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Strong Areas */}
+                    <div className="p-6 rounded-[2rem] bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-black text-xs uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                          Strong Areas (Mastery ≥ 75%)
+                        </h4>
+                      </div>
+
+                      <div className="space-y-3">
+                        {topicAnalytics.strong.length > 0 ? (
+                          topicAnalytics.strong.map((t, idx) => (
+                            <div key={idx} className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-emerald-200/50 dark:border-emerald-900/20 flex items-center justify-between gap-3">
+                              <div className="space-y-0.5 min-w-0">
+                                <p className="font-bold text-xs text-foreground truncate">{t.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{t.correct} of {t.total} questions correct</p>
+                              </div>
+                              <Badge className="bg-emerald-500 text-white font-black text-xs px-2.5 py-0.5 rounded-lg">
+                                {t.percentage}%
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">Keep practicing to achieve strong mastery across all topics!</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Needs Improvement Areas */}
+                    <div className="p-6 rounded-[2rem] bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                        <h4 className="font-black text-xs uppercase tracking-wider text-rose-800 dark:text-rose-300">
+                          Needs Improvement (Mastery &lt; 75%)
+                        </h4>
+                      </div>
+
+                      <div className="space-y-3">
+                        {topicAnalytics.weak.length > 0 ? (
+                          topicAnalytics.weak.map((t, idx) => (
+                            <div key={idx} className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-rose-200/50 dark:border-rose-900/20 flex items-center justify-between gap-3">
+                              <div className="space-y-0.5 min-w-0">
+                                <p className="font-bold text-xs text-foreground truncate">{t.name}</p>
+                                <p className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">You got {t.wrong} of {t.total} questions wrong</p>
+                              </div>
+                              <Badge className="bg-rose-500 text-white font-black text-xs px-2.5 py-0.5 rounded-lg">
+                                {t.percentage}%
+                              </Badge>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Outstanding performance! Zero weak topics identified.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Navigation */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Ready to turn mistakes into learning? Review and bookmark your errors below.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setFilterStatus('WRONG');
+                          setObjectivePage(1);
+                          document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/20"
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1.5" />
+                        Review Your Mistakes ({topicAnalytics.totalWrong})
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push(`/exams/practice/${result.exam.id}`)}
+                        className="rounded-xl font-bold text-xs border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                        Practice This Exam
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
           {/* Question Review Section - STRICTLY hidden until published */}
           {
             result.result?.isPublished && result.questions && result.questions.length > 0 && (
@@ -2659,10 +2881,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mr-2">Filter Objective:</span>
                       {[
                         { id: 'ALL', label: 'All', icon: Layers, color: 'bg-indigo-600 shadow-indigo-500/25' },
+                        { id: 'WRONG', label: 'Your Mistakes', icon: XCircle, color: 'bg-rose-600 shadow-rose-500/25' },
                         { id: 'CORRECT', label: 'Correct', icon: CheckCircle, color: 'bg-emerald-600 shadow-emerald-500/25' },
-                        { id: 'WRONG', label: 'Wrong', icon: XCircle, color: 'bg-rose-600 shadow-rose-500/25' },
-                        { id: 'PARTIAL', label: 'Partial', icon: Activity, color: 'bg-amber-600 shadow-amber-500/25' },
-                        { id: 'UNANSWERED', label: 'Blank', icon: Minus, color: 'bg-slate-600 shadow-slate-500/25' }
+                        { id: 'UNANSWERED', label: 'Skipped', icon: Minus, color: 'bg-slate-600 shadow-slate-500/25' },
+                        { id: 'SAVED', label: `Saved Notebook (${savedMistakes.length})`, icon: Bookmark, color: 'bg-amber-600 shadow-amber-500/25' }
                       ].map(f => (
                         <Button
                           key={f.id}
@@ -2686,6 +2908,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
+
+                          if (filterStatus === 'SAVED') {
+                            return savedMistakes.includes(q.id);
+                          }
 
                           const status = evaluateQuestionResultStatus(q);
                           if (filterStatus === 'ALL') return true;
@@ -3185,6 +3411,61 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         })()}
                                       </div>
                                     ) : null}
+
+                                    {/* Mistake Diagnosis Box & Save to Mistake Notebook */}
+                                    {!isCorrect && hasAns && (
+                                      <div className="mt-6 p-5 rounded-3xl bg-rose-500/[0.04] dark:bg-rose-500/[0.08] border border-rose-500/20 shadow-sm space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <div className="p-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                                              <XCircle className="w-4 h-4" />
+                                            </div>
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                                              Your Mistake Breakdown
+                                            </span>
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => toggleSaveMistake(question.id)}
+                                            className={cn(
+                                              "h-8 px-3 text-xs font-bold rounded-xl border transition-all",
+                                              savedMistakes.includes(question.id)
+                                                ? "text-amber-700 bg-amber-100/80 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                                                : "text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-amber-600 hover:bg-amber-50"
+                                            )}
+                                          >
+                                            <Bookmark className={cn("w-3.5 h-3.5 mr-1.5", savedMistakes.includes(question.id) ? "fill-amber-500 text-amber-500" : "")} />
+                                            {savedMistakes.includes(question.id) ? "Saved in Mistake Notebook" : "Save to Mistake Notebook"}
+                                          </Button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/40 space-y-1">
+                                            <span className="text-[10px] uppercase font-black tracking-wider text-rose-500 block">❌ Your Selected Answer</span>
+                                            <span className="font-mono font-black text-sm text-rose-900 dark:text-rose-200">
+                                              {typeof question.studentAnswer === 'object' ? JSON.stringify(question.studentAnswer) : (String(question.studentAnswer || 'N/A'))}
+                                            </span>
+                                          </div>
+                                          <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900/40 space-y-1">
+                                            <span className="text-[10px] uppercase font-black tracking-wider text-emerald-600 dark:text-emerald-400 block">✅ Correct Official Answer</span>
+                                            <span className="font-mono font-black text-sm text-emerald-900 dark:text-emerald-200">
+                                              {(() => {
+                                                if (question.correctAnswer !== undefined) return String(question.correctAnswer);
+                                                if (question.correctOption !== undefined && question.options && question.options[question.correctOption]) {
+                                                  return String.fromCharCode(65 + question.correctOption) + ` (${question.options[question.correctOption].text})`;
+                                                }
+                                                if (question.options) {
+                                                  const cIdx = question.options.findIndex(o => o.isCorrect);
+                                                  if (cIdx >= 0) return String.fromCharCode(65 + cIdx) + ` (${question.options[cIdx].text})`;
+                                                }
+                                                return question.modelAnswer || 'Official Key';
+                                              })()}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
 
                                     {/* Objective Explanation & Model Answer Breakdown Section */}
                                     {(question.explanation || (question as any).explanationImage || type === 'CMA' || type === 'MPC') && (
