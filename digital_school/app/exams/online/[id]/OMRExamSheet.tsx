@@ -362,14 +362,28 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                 </Button>
               )}
 
-              {/* Desktop Submit Button */}
+              {/* Desktop Submit / Proceed to CQ/SQ Button */}
               <Button
                 onClick={() => onSubmit(false)}
                 disabled={isSubmitting}
-                className="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl px-4 h-9 shadow-md shadow-emerald-600/20 text-xs gap-1.5 active:scale-95 transition-all"
+                className={cn(
+                  "hidden sm:flex text-white font-bold rounded-xl px-4 h-9 shadow-md text-xs gap-1.5 active:scale-95 transition-all",
+                  hasCqSq && activeSection === 'objective'
+                    ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-600/20"
+                    : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20"
+                )}
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>জমা দিন</span>
+                {hasCqSq && activeSection === 'objective' ? (
+                  <>
+                    <span>পরবর্তী অংশ (CQ/SQ)</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>জমা দিন</span>
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -742,6 +756,45 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
             )}
           </div>
 
+          {/* --- BOTTOM CALLOUT & SUBMIT BUTTON --- */}
+          <div className="mt-8 pt-4 text-center">
+            {hasCqSq && activeSection === 'objective' ? (
+              <div className="p-5 sm:p-6 bg-gradient-to-br from-indigo-50 via-purple-50 to-indigo-50 dark:bg-slate-800/80 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 text-center space-y-3 shadow-md">
+                <div className="inline-flex items-center gap-1.5 bg-indigo-600 text-white text-[11px] font-black uppercase px-3 py-1 rounded-full shadow-sm">
+                  <Layers className="w-3.5 h-3.5" /> পরবর্তী ধাপ: সৃজনশীল / সংক্ষিপ্ত অংশ (CQ/SQ Section)
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                  নৈর্ব্যক্তিক ওএমআর অংশ সম্পন্ন করে লিখিত/সৃজনশীল অংশে প্রবেশ করুন
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                  ওএমআর উত্তরপত্র জমা দিলে আপনার নৈর্ব্যক্তিক উত্তর সংরক্ষিত হবে এবং সৃজনশীল/সংক্ষিপ্ত প্রশ্ন ও উত্তর লেখার অংশে নিয়ে যাওয়া হবে।
+                </p>
+                <div className="pt-2">
+                  <Button
+                    onClick={() => onSubmit(false)}
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto min-w-[280px] bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 text-white font-black py-6 text-base rounded-2xl shadow-xl shadow-indigo-500/25 border-0 transition-all active:scale-[0.98] gap-2"
+                  >
+                    <span>নৈর্ব্যক্তিক ওএমআর জমা দিয়ে CQ/SQ শুরু করুন</span>
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={() => onSubmit(false)}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto min-w-[280px] bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white font-black py-7 text-lg rounded-2xl shadow-xl shadow-emerald-500/25 border-0 transition-all active:scale-[0.98] gap-3"
+              >
+                <Send className="w-5 h-5" />
+                <span>পরীক্ষা ও উত্তরপত্র জমা দিন (Submit Exam)</span>
+              </Button>
+            )}
+            <p className="text-[11px] text-slate-400 mt-2">
+              উত্তরপত্র জমা দিলে আপনার ফলাফল ও অগ্রগতি সংরক্ষিত হবে।
+            </p>
+          </div>
+
           {/* --- FOOTER & SIGNATURE SECTION --- */}
           <div className="mt-8 sm:mt-12 pt-4 sm:pt-6 border-t-2 border-dashed border-slate-300 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-2">
@@ -784,10 +837,24 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
         <Button
           onClick={() => onSubmit(false)}
           disabled={isSubmitting}
-          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-10 rounded-xl shadow-lg shadow-emerald-600/20 text-xs gap-1.5 active:scale-95 transition-all"
+          className={cn(
+            "flex-1 font-bold h-10 rounded-xl shadow-lg text-xs gap-1.5 active:scale-95 transition-all text-white",
+            hasCqSq && activeSection === 'objective'
+              ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-600/20"
+              : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20"
+          )}
         >
-          <Send className="w-3.5 h-3.5" />
-          <span>জমা দিন ({toBengaliNumerals(answeredCount)})</span>
+          {hasCqSq && activeSection === 'objective' ? (
+            <>
+              <span>পরবর্তী অংশ: CQ/SQ</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </>
+          ) : (
+            <>
+              <Send className="w-3.5 h-3.5" />
+              <span>জমা দিন ({toBengaliNumerals(answeredCount)})</span>
+            </>
+          )}
         </Button>
       </div>
 
