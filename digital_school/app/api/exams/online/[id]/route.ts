@@ -29,6 +29,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
+    // Fetch real student profile and user details
+    const user = await prisma.user.findUnique({
+      where: { id: tokenData.user.id },
+      include: {
+        studentProfile: {
+          include: {
+            class: true
+          }
+        }
+      }
+    });
+
+    const studentProfile = user?.studentProfile || (studentId ? await prisma.studentProfile.findUnique({ where: { id: studentId }, include: { class: true } }) : null);
+    const studentName = user?.name || user?.username || tokenData.user.name || "পরীক্ষার্থী";
+    const studentRoll = studentProfile?.roll || tokenData.user.studentProfile?.roll || tokenData.user.roll || "01";
+    const studentReg = studentProfile?.registrationNo || tokenData.user.studentProfile?.registrationNo || "";
+
     let questions: any[] = [];
     let assignedExamSetId = null;
 
@@ -131,20 +148,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Now assignedExamSetId should be resolved either from new creation or existing submission
     // We need to fetch the questions for this set
 
+    let assignedExamSet = null;
     if (assignedExamSetId) {
-      const examSet = await prisma.examSet.findUnique({ where: { id: assignedExamSetId } });
-      if (examSet && examSet.questionsJson) {
+      assignedExamSet = await prisma.examSet.findUnique({ where: { id: assignedExamSetId } });
+      if (assignedExamSet && assignedExamSet.questionsJson) {
         try {
-          questions = Array.isArray(examSet.questionsJson)
-            ? examSet.questionsJson
-            : typeof examSet.questionsJson === "string"
-              ? JSON.parse(examSet.questionsJson)
+          questions = Array.isArray(assignedExamSet.questionsJson)
+            ? assignedExamSet.questionsJson
+            : typeof assignedExamSet.questionsJson === "string"
+              ? JSON.parse(assignedExamSet.questionsJson)
               : [];
         } catch {
           questions = [];
         }
       }
+    } else if (exam.examSets && exam.examSets.length > 0) {
+      assignedExamSet = exam.examSets[0];
+      assignedExamSetId = assignedExamSet.id;
     }
+
+    const setName = assignedExamSet?.name || (exam.examSets && exam.examSets.length > 0 ? exam.examSets[0].name : "A");
 
     // Fallback if no specific set assigned (legacy compatible)
     if (questions.length === 0 && exam.examSets.length > 0 && !assignedExamSetId) {
@@ -158,13 +181,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               ? JSON.parse(firstSet.questionsJson)
               : [];
 
-          // We don't return the questions (security), but we return the stats
-          // Actually, for simplicity and since user wants to see them or at least the count,
-          // we can attach a 'stats' object to the response.
-
-          // Let's populate questions array for now to ensure layout works as expected
-          // If security is a major concern, we would only return stats, but ExamLayout needs updating.
-          // Given the user request "why these seen 0", they expect data.
           questions = previewQuestions;
         } catch { }
       }
@@ -188,13 +204,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({
       id: exam.id,
       name: exam.name,
+      title: exam.name,
       type: exam.type,
       duration: exam.duration,
       totalMarks: exam.totalMarks,
       allowRetake: exam.allowRetake,
-      className: exam.class?.name || '',
-      questions,
+      className: exam.class?.name || studentProfile?.class?.name || '',
+      studentName,
+      studentRoll,
+      studentReg,
+      setName,
       assignedExamSetId,
+      assignedSet: assignedExamSet ? { id: assignedExamSet.id, name: assignedExamSet.name } : null,
+      examSets: exam.examSets?.map(s => ({ id: s.id, name: s.name })),
+      subject: (questions[0] as any)?.subject || exam.class?.name || '',
+      questions,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
       // Derive startedAt from either objective or cqSq start time

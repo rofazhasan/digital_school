@@ -75,10 +75,46 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   const questions = sortedQuestions || [];
   const totalQuestions = questions.length;
 
-  // Selected Set Code on OMR sheet
-  const [selectedSet, setSelectedSet] = useState<string>(() => {
-    return exam.setName || exam.examSet?.name || "A";
-  });
+  // Session user fallback state
+  const [sessionUser, setSessionUser] = useState<any>(null);
+
+  useEffect(() => {
+    // If student info is missing from exam, fetch session info
+    if (!exam.studentName || !exam.studentRoll) {
+      fetch("/api/auth/session")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.authenticated && data?.user) {
+            setSessionUser(data.user);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [exam.studentName, exam.studentRoll]);
+
+  // Real student details from exam or session
+  const realStudentName = exam.studentName || sessionUser?.name || sessionUser?.username || "নিয়মিত পরীক্ষার্থী";
+  const realStudentRoll = exam.studentRoll || sessionUser?.studentProfile?.roll || sessionUser?.roll || "01";
+  const realStudentReg = exam.studentReg || sessionUser?.studentProfile?.registrationNo || "";
+
+  // Selected Set Code on OMR sheet (Normalized to A, B, C, D / ক, খ, গ, ঘ)
+  const normalizedExamSet = useMemo(() => {
+    const raw = String(exam.setName || exam.examSetName || exam.assignedSet?.name || exam.examSet?.name || "A").trim();
+    const clean = raw.replace(/^(set|সেট)\s*[-:]?\s*/i, "").trim().toUpperCase();
+    if (clean === "1" || clean === "A" || clean === "ক") return "A";
+    if (clean === "2" || clean === "B" || clean === "খ") return "B";
+    if (clean === "3" || clean === "C" || clean === "গ") return "C";
+    if (clean === "4" || clean === "D" || clean === "ঘ") return "D";
+    return clean || "A";
+  }, [exam.setName, exam.examSetName, exam.assignedSet, exam.examSet]);
+
+  const [selectedSet, setSelectedSet] = useState<string>(normalizedExamSet);
+
+  useEffect(() => {
+    if (normalizedExamSet) {
+      setSelectedSet(normalizedExamSet);
+    }
+  }, [normalizedExamSet]);
 
   // UI state for small screen optimizations
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
@@ -88,11 +124,21 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   const [bubbleSizeScale, setBubbleSizeScale] = useState<"normal" | "large">("normal");
   const [highlightedQId, setHighlightedQId] = useState<string | null>(null);
 
-  // Student Roll bubbling state (6 digits)
-  const rollStr = String(exam.studentRoll || "001234").padStart(6, "0").slice(-6);
+  // Student Roll bubbling state (6 digits based on real roll)
+  const rollDigitsStr = useMemo(() => {
+    const digitsOnly = String(realStudentRoll).replace(/\D/g, "");
+    return (digitsOnly || "01").padStart(6, "0").slice(-6);
+  }, [realStudentRoll]);
+
   const [bubbledRoll, setBubbledRoll] = useState<number[]>(() => {
-    return rollStr.split("").map((d) => parseInt(d) || 0);
+    return rollDigitsStr.split("").map((d) => parseInt(d, 10) || 0);
   });
+
+  useEffect(() => {
+    if (rollDigitsStr) {
+      setBubbledRoll(rollDigitsStr.split("").map((d) => parseInt(d, 10) || 0));
+    }
+  }, [rollDigitsStr]);
 
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -534,10 +580,14 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
               </div>
 
               <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                {exam.studentName || "নিয়মিত পরীক্ষার্থী (Student)"}
+                {realStudentName}
               </div>
               <div className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400">
-                রোল নং: <span className="font-mono font-bold text-slate-900 dark:text-white">{exam.studentRoll || rollStr}</span>
+                রোল নং: <span className="font-mono font-bold text-slate-900 dark:text-white">{toBengaliNumerals(realStudentRoll)}</span>
+                <span className="text-[10px] text-slate-400 ml-1 font-mono">({realStudentRoll})</span>
+                {realStudentReg && (
+                  <span className="text-[10px] text-slate-500 block truncate">রেজি: {realStudentReg}</span>
+                )}
               </div>
             </div>
 
