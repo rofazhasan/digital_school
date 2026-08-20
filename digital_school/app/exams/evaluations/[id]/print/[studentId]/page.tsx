@@ -165,6 +165,11 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     // ... (questions mapping)
 
     const questions = {
+        rawList: examData.questions.map((q: any) => ({
+            ...q,
+            q: q.text || q.questionText,
+            questionText: q.questionText || q.text
+        })),
         mcq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => ({
             ...q,
             q: q.text // Component expects 'q' for text

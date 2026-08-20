@@ -168,6 +168,7 @@ interface MarkedQuestionPaperProps {
         cqSubsections?: any[];
     };
     questions: {
+        rawList?: any[];
         mcq: MCQ[];
         mc: MCQ[];
         ar: AR[];
@@ -1039,15 +1040,20 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 <main>
                     {/* Objective Questions Section */}
                     {(() => {
-                        const allObjective = [
-                            ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
-                            ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
-                            ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
-                            ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
-                            ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
-                            ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
-                            ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' }))
-                        ];
+                        const allObjective = questions.rawList && questions.rawList.length > 0
+                            ? questions.rawList.filter((q: any) => {
+                                const t = (q.type || '').toUpperCase();
+                                return ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'CMA', 'MPC', 'SMCQ'].includes(t) && !['CQ', 'SQ', 'DESCRIPTIVE'].includes(t);
+                            })
+                            : [
+                                ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
+                                ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
+                                ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
+                                ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
+                                ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
+                                ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
+                                ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' }))
+                            ];
 
                         if (allObjective.length === 0) return null;
 

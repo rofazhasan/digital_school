@@ -144,6 +144,11 @@ export default function InternalStudentScriptPrintPage({ params, searchParams }:
     }
 
     const questions = {
+        rawList: examData.questions.map((q: any) => ({
+            ...q,
+            q: q.text || q.questionText,
+            questionText: q.questionText || q.text
+        })),
         mcq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => ({
             ...q,
             q: q.text

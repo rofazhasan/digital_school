@@ -1262,6 +1262,25 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     if (!result) return null;
 
     const questions = {
+      rawList: (result.questions || []).map(q => ({
+        ...q,
+        id: q.id,
+        q: q.questionText,
+        questionText: q.questionText,
+        options: q.options || [],
+        marks: q.marks,
+        correct: q.options?.find((o: any) => o.isCorrect)?.text || (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct,
+        assertion: (q as any).assertion || q.questionText,
+        reason: (q as any).reason || "",
+        correctOption: Number((q as any).correctOption || (q as any).correct || 0),
+        leftColumn: (q as any).leftColumn || [],
+        rightColumn: (q as any).rightColumn || [],
+        matches: (q as any).matches || {},
+        answer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || (q as any).explanation || 0,
+        subQuestions: q.subQuestions || [],
+        parts: (q as any).parts || (q as any).cmaParts || q.subQuestions || [],
+        stages: (q as any).stages || (q as any).mpcStages || q.subQuestions || []
+      })),
       mcq: result.questions.filter(q => q.type?.toUpperCase() === 'MCQ').map(q => ({
         id: q.id,
         q: q.questionText,
@@ -1899,7 +1918,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const mpcQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MPC') || [];
   const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'DESCRIPTIVE') || [];
   const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
-  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions, ...cmaQuestions, ...mpcQuestions];
+  // Preserve exact set-generated sequence for objective questions (do not artificially regroup by type)
+  const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'constructed_multi_answer', 'multi_step_problem_chain'];
+  const objectiveQuestions = (result.questions || []).filter((q: Question) => {
+    const t = (q.type || '').toLowerCase();
+    return objectiveTypes.includes(t) && !['cq', 'sq', 'descriptive'].includes(t);
+  });
 
   // Re-calculate awarded marks on the fly to avoid "zero-score" errors for descriptive/creative parts
   const recalculatedCqMarks = cqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
