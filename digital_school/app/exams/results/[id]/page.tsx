@@ -192,6 +192,8 @@ interface Question {
   leftColumn?: string[];
   rightColumn?: string[];
   matches?: Record<string, number>;
+  correctAnswer?: any;
+  correct?: any;
 }
 
 interface Statistics {
@@ -291,9 +293,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [activeZoomTexts, setActiveZoomTexts] = useState<any[]>([]);
   const [annotatedImageFailed, setAnnotatedImageFailed] = useState(false);
   const [originalImageFallback, setOriginalImageFallback] = useState<string>('');
+  const [isApplyingDrawing, setIsApplyingDrawing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  const showComparison = useMemo(() => {
+    return Boolean(
+      (activeZoomStrokes && activeZoomStrokes.length > 0) ||
+      (activeZoomTexts && activeZoomTexts.length > 0) ||
+      (originalImageFallback && zoomedImage && originalImageFallback !== zoomedImage)
+    );
+  }, [activeZoomStrokes, activeZoomTexts, originalImageFallback, zoomedImage]);
   const topicAnalytics = useMemo(() => {
     if (!result || !result.questions) {
       return { topics: [], strong: [], weak: [], totalWrong: 0, totalCorrect: 0, totalSkipped: 0, accuracy: 0 };
@@ -3144,14 +3155,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                             // --- PRECISE isCorrectOpt DETECTION ---
                                             const isOptionMarkedCorrect = typeof option === 'object' && option.isCorrect === true;
+                                            const qAny = question as any;
                                             const isOptionMatchingCorrectAnswer =
-                                              (question.correctAnswer !== undefined && question.correctAnswer !== null &&
-                                                String(question.correctAnswer).trim() === String(optText).trim()) ||
-                                              (question.correct !== undefined && question.correct !== null &&
-                                                String(question.correct).trim() === String(optText).trim()) ||
-                                              (typeof question.correctAnswer === 'number' && question.correctAnswer === optIndex) ||
-                                              (typeof question.correct === 'number' && question.correct === optIndex) ||
-                                              ((question as any).correctOption !== undefined && (question as any).correctOption === optIndex);
+                                              (qAny.correctAnswer !== undefined && qAny.correctAnswer !== null &&
+                                                String(qAny.correctAnswer).trim() === String(optText).trim()) ||
+                                              (qAny.correct !== undefined && qAny.correct !== null &&
+                                                String(qAny.correct).trim() === String(optText).trim()) ||
+                                              (typeof qAny.correctAnswer === 'number' && qAny.correctAnswer === optIndex) ||
+                                              (typeof qAny.correct === 'number' && qAny.correct === optIndex) ||
+                                              (qAny.correctOption !== undefined && qAny.correctOption === optIndex);
 
                                             const isCorrectOpt = isOptionMarkedCorrect || isOptionMatchingCorrectAnswer;
 
@@ -4035,8 +4047,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       onPrev={handlePrevZoomImage}
                       currentIndex={activeZoomIndex}
                       totalImages={activeZoomImages?.length || 1}
-                      initialStrokes={activeZoomStrokes}
-                      initialTexts={activeZoomTexts}
+                      initialStrokes={annotatedImageFailed ? [] : activeZoomStrokes}
+                      initialTexts={annotatedImageFailed ? [] : activeZoomTexts}
                     />
                   )}
                 </div>
