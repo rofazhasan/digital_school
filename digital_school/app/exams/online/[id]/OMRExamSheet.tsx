@@ -36,6 +36,7 @@ import { toBengaliNumerals, toBengaliAlphabets } from "@/utils/numeralConverter"
 import { cn } from "@/lib/utils";
 import Timer from "./Timer";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+import { toast } from "sonner";
 
 const OMR_BENGALI_OPTIONS = ["ক", "খ", "গ", "ঘ", "ঙ", "চ"];
 const OMR_ENGLISH_OPTIONS = ["A", "B", "C", "D", "E", "F"];
@@ -196,51 +197,49 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
 
   const unansweredCount = totalQuestions - answeredCount;
 
-  // Handle single MCQ Bubble Select
+  // Handle single MCQ Bubble Select (One-Time Fill Rule in OMR Mode)
   const handleMCQSelect = useCallback((qId: string, optionLabel: string, optionIndex: number) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     setAnswers((prev: any) => {
       const current = prev[qId];
       const currentStr = typeof current === "object" ? current?.selectedOption || current?.text : String(current || "");
-      if (currentStr.trim() === optionLabel.trim()) {
-        const updated = { ...prev };
-        delete updated[qId];
-        return updated;
+      // In Only OMR mode: once a bubble is filled with pen, it cannot be changed or unselected
+      if (currentStr && currentStr.trim() !== "") {
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন বা বাতিল করা যাবে না।", { id: `omr-lock-${qId}` });
+        return prev;
       }
+      vibrateOnTouch();
       return { ...prev, [qId]: optionLabel };
     });
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
-  // Handle Multiple Correct (MC) Toggle
+  // Handle Multiple Correct (MC) Toggle (One-Time Fill per Bubble in OMR Mode)
   const handleMCToggle = useCallback((qId: string, optIndex: number) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     setAnswers((prev: any) => {
       const currentObj = prev[qId] || {};
       const currentList: number[] = currentObj.selectedOptions || [];
-      let nextList: number[];
       if (currentList.includes(optIndex)) {
-        nextList = currentList.filter(i => i !== optIndex);
-      } else {
-        nextList = [...currentList, optIndex];
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর বাতিল করা যাবে না।", { id: `omr-lock-${qId}-${optIndex}` });
+        return prev;
       }
+      vibrateOnTouch();
+      const nextList = [...currentList, optIndex];
       return { ...prev, [qId]: { ...currentObj, selectedOptions: nextList } };
     });
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
-  // Handle SMCQ Sub-Question select
+  // Handle SMCQ Sub-Question select (One-Time Fill Rule in OMR Mode)
   const handleSMCQSelect = useCallback((qId: string, subIdx: number, optionLabel: string) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     const key = `${qId}_sub_${subIdx}`;
     setAnswers((prev: any) => {
       const current = prev[key];
-      if (String(current || "").trim() === optionLabel.trim()) {
-        const updated = { ...prev };
-        delete updated[key];
-        return updated;
+      if (current && String(current).trim() !== "") {
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন বা বাতিল করা যাবে না।", { id: `omr-lock-${key}` });
+        return prev;
       }
+      vibrateOnTouch();
       return { ...prev, [key]: optionLabel };
     });
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
@@ -274,14 +273,19 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   }, [isSubmitting, setAnswers]);
 
   // Handle CMA Part Input / Option Select
-  const handleCMAPartChange = useCallback((qId: string, partId: string, val: string) => {
+  const handleCMAPartChange = useCallback((qId: string, partId: string, val: string, isOptionSelect = false) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     setAnswers((prev: any) => {
       const current = typeof prev[qId] === 'string'
         ? (() => { try { return JSON.parse(prev[qId]); } catch { return {}; } })()
         : (prev[qId] || {});
 
+      if (isOptionSelect && current[partId] && String(current[partId]).trim() !== "") {
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন করা যাবে না।", { id: `omr-lock-${qId}-${partId}` });
+        return prev;
+      }
+
+      vibrateOnTouch();
       const updated = { ...current };
       if (!val || String(val).trim() === '') {
         delete updated[partId];
@@ -300,14 +304,19 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
   // Handle MPC Stage Input / Option Select
-  const handleMPCStageChange = useCallback((qId: string, stageId: string, val: string) => {
+  const handleMPCStageChange = useCallback((qId: string, stageId: string, val: string, isOptionSelect = false) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     setAnswers((prev: any) => {
       const current = typeof prev[qId] === 'string'
         ? (() => { try { return JSON.parse(prev[qId]); } catch { return {}; } })()
         : (prev[qId] || {});
 
+      if (isOptionSelect && current[stageId] && String(current[stageId]).trim() !== "") {
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন করা যাবে না।", { id: `omr-lock-${qId}-${stageId}` });
+        return prev;
+      }
+
+      vibrateOnTouch();
       const updated = { ...current };
       if (!val || String(val).trim() === '') {
         delete updated[stageId];
@@ -325,24 +334,28 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     });
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
-  // Handle Assertion-Reason select
+  // Handle Assertion-Reason select (One-Time Fill Rule in OMR Mode)
   const handleARSelect = useCallback((qId: string, optionNumber: number) => {
     if (isSubmitting) return;
-    vibrateOnTouch();
     setAnswers((prev: any) => {
       const current = prev[qId];
       const curNum = typeof current === "object" ? current?.selectedOption : Number(current);
-      if (curNum === optionNumber) {
-        const next = { ...prev };
-        delete next[qId];
-        return next;
+      if (curNum !== undefined && curNum !== null && !isNaN(curNum) && curNum > 0) {
+        toast.info("OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন বা বাতিল করা যাবে না।", { id: `omr-lock-${qId}` });
+        return prev;
       }
+      vibrateOnTouch();
       return { ...prev, [qId]: { selectedOption: optionNumber } };
     });
   }, [isSubmitting, setAnswers, vibrateOnTouch]);
 
-  // Clear a specific question's answer
+  // Clear a specific question's answer (Only for subjective or matrix if needed)
   const handleClearAnswer = useCallback((q: any) => {
+    const type = (q?.type || q?.questionType || '').toLowerCase();
+    if (['mcq', 'mc', 'ar', 'smcq'].includes(type)) {
+      toast.info("OMR নিয়ম: বৃত্ত ভরাটকৃত উত্তর মোছা যাবে না।", { id: `omr-no-clear-${q?.id}` });
+      return;
+    }
     if (isSubmitting) return;
     vibrateOnTouch();
     setAnswers((prev: any) => {
@@ -698,11 +711,16 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
               </div>
             </div>
 
-            {/* Instruction Graphic */}
-            <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400 md:pl-3 flex flex-col justify-center">
-              <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                নির্দেশাবলি (INSTRUCTIONS)
-              </span>
+            {/* Instruction Graphic & Permanent Fill Rule */}
+            <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 md:pl-3 flex flex-col justify-center">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+                  নির্দেশাবলি (INSTRUCTIONS)
+                </span>
+                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
+                  ১ বার পূরণযোগ্য
+                </span>
+              </div>
               <div className="flex items-center gap-2.5 text-[10px] sm:text-[11px] pt-0.5">
                 <div className="flex items-center gap-1">
                   <div className="w-3.5 h-3.5 rounded-full bg-slate-950 dark:bg-white flex items-center justify-center">
@@ -723,8 +741,9 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                   <span className="text-slate-400">ভুল</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                প্রশ্নপত্র দেখে সঠিক বৃত্তটি স্পর্শ করে সম্পূর্ণ ভরাট করুন।
+              <p className="text-[10px] text-amber-800 dark:text-amber-300 font-semibold leading-tight flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                ফিজিক্যাল OMR নিয়ম: একবার বৃত্ত ভরাট করলে তা আর পরিবর্তন করা যাবে না।
               </p>
             </div>
           </div>
@@ -1066,8 +1085,8 @@ interface OMRQuestionRowProps {
   onSMCQSelect: (qId: string, subIdx: number, label: string) => void;
   onMTFPair: (qId: string, leftKey: string, rightVal: string) => void;
   onNumericInput: (qId: string, val: string) => void;
-  onCMAPartChange: (qId: string, partId: string, val: string) => void;
-  onMPCStageChange: (qId: string, stageId: string, val: string) => void;
+  onCMAPartChange: (qId: string, partId: string, val: string, isOptionSelect?: boolean) => void;
+  onMPCStageChange: (qId: string, stageId: string, val: string, isOptionSelect?: boolean) => void;
   onARSelect: (qId: string, optNum: number) => void;
   onClearAnswer: (q: any) => void;
   disabled: boolean;
@@ -1099,8 +1118,9 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
   // Options count (default 4)
   const optionsCount = question.options?.length || 4;
 
-  // 1. STANDARD MCQ
+  // 1. STANDARD MCQ (One-Time Permanent Fill - No Erase/Clear on OMR)
   if (type === "mcq" || !type || type === "single") {
+    const isChosen = isAnswered;
     return (
       <div className={cn(
         "flex items-center justify-between py-1.5 sm:py-2 px-1.5 sm:px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group rounded-xl",
@@ -1141,24 +1161,19 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
           })}
         </div>
 
-        {/* Clear Button */}
-        <button
-          type="button"
-          onClick={() => onClearAnswer(question)}
-          disabled={disabled || !userAnswer}
-          className={cn(
-            "w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all shrink-0",
-            !userAnswer && "opacity-0 pointer-events-none"
+        {/* Status Lock Icon in place of Clear button */}
+        <div className="w-6 h-6 flex items-center justify-center shrink-0">
+          {isChosen ? (
+            <span className="text-[10px] text-emerald-600 font-bold">✓</span>
+          ) : (
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
           )}
-          title="উত্তর মুছুন"
-        >
-          <RotateCcw className="w-3 h-3" />
-        </button>
+        </div>
       </div>
     );
   }
 
-  // 2. MULTIPLE CORRECT (MC)
+  // 2. MULTIPLE CORRECT (MC) (One-Time Fill per Bubble)
   if (type === "mc") {
     const selectedList: number[] = userAnswer?.selectedOptions || [];
     return (
@@ -1172,14 +1187,11 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
               বহুপদী (Multi)
             </Badge>
           </div>
-          <button
-            type="button"
-            onClick={() => onClearAnswer(question)}
-            disabled={disabled || selectedList.length === 0}
-            className={cn("text-[10px] text-rose-500 hover:underline", selectedList.length === 0 && "opacity-0")}
-          >
-            Clear
-          </button>
+          {selectedList.length > 0 && (
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+              ✓ {toBengaliNumerals(selectedList.length)}টি পূরণকৃত
+            </span>
+          )}
         </div>
 
         <div className="flex justify-around items-center px-1">
@@ -1203,7 +1215,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     );
   }
 
-  // 3. SUB-MCQ (SMCQ)
+  // 3. SUB-MCQ (SMCQ) (One-Time Fill per Sub-Question)
   if (type === "smcq") {
     const subQs = question.subQuestions || [];
     return (
@@ -1212,14 +1224,9 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
           <span className="font-black text-[11px] sm:text-xs text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
             <Layers className="w-3 h-3" /> প্রশ্ন {toBengaliNumerals(index + 1)} (উদ্দীপকভিত্তিক SMCQ)
           </span>
-          <button
-            type="button"
-            onClick={() => onClearAnswer(question)}
-            disabled={disabled}
-            className="text-[10px] text-rose-500 hover:underline"
-          >
-            Clear All
-          </button>
+          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+            {toBengaliNumerals(subQs.length)} টি প্রশ্ন
+          </Badge>
         </div>
 
         {subQs.map((subQ: any, subIdx: number) => {
@@ -1366,7 +1373,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     );
   }
 
-  // 6. ASSERTION-REASON (AR)
+  // 6. ASSERTION-REASON (AR) (One-Time Fill - No Erase/Clear on OMR)
   if (type === "ar") {
     const selectedOpt = typeof userAnswer === "object" ? userAnswer?.selectedOption : Number(userAnswer);
     return (
@@ -1380,14 +1387,11 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
               Assertion-Reason
             </Badge>
           </div>
-          <button
-            type="button"
-            onClick={() => onClearAnswer(question)}
-            disabled={disabled || !selectedOpt}
-            className={cn("text-[10px] text-rose-500 hover:underline", !selectedOpt && "opacity-0")}
-          >
-            Clear
-          </button>
+          {selectedOpt && (
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+              ✓ পূরণকৃত
+            </span>
+          )}
         </div>
 
         <div className="flex justify-around items-center px-1">
@@ -1432,14 +1436,6 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
               {toBengaliNumerals(parts.length)} টি অংশ
             </Badge>
           </div>
-          <button
-            type="button"
-            onClick={() => onClearAnswer(question)}
-            disabled={disabled || Object.keys(currentVal).length === 0}
-            className={cn("text-[10px] text-rose-500 hover:underline", Object.keys(currentVal).length === 0 && "opacity-0")}
-          >
-            Clear All
-          </button>
         </div>
 
         <div className="space-y-1.5">
@@ -1458,7 +1454,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
                     </span>
                     <span>{partLabel}</span>
                   </span>
-                  {partVal && (
+                  {!hasOptions && partVal && (
                     <button
                       type="button"
                       onClick={() => onCMAPartChange(qId, partId, "")}
@@ -1482,7 +1478,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
                           label={OMR_BENGALI_OPTIONS[optIdx]}
                           subLabel={OMR_ENGLISH_OPTIONS[optIdx]}
                           isSelected={isSelected}
-                          onClick={() => onCMAPartChange(qId, partId, optLabel)}
+                          onClick={() => onCMAPartChange(qId, partId, optLabel, true)}
                           disabled={disabled}
                           isLarge={bubbleSizeScale === "large"}
                         />
@@ -1529,14 +1525,6 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
               {toBengaliNumerals(stages.length)} টি ধাপ
             </Badge>
           </div>
-          <button
-            type="button"
-            onClick={() => onClearAnswer(question)}
-            disabled={disabled || Object.keys(currentVal).length === 0}
-            className={cn("text-[10px] text-rose-500 hover:underline", Object.keys(currentVal).length === 0 && "opacity-0")}
-          >
-            Clear All
-          </button>
         </div>
 
         <div className="space-y-1.5">
@@ -1555,7 +1543,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
                     </span>
                     <span>{stageTitle}</span>
                   </span>
-                  {stageVal && (
+                  {!hasOptions && stageVal && (
                     <button
                       type="button"
                       onClick={() => onMPCStageChange(qId, stageId, "")}
@@ -1579,7 +1567,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
                           label={OMR_BENGALI_OPTIONS[optIdx]}
                           subLabel={OMR_ENGLISH_OPTIONS[optIdx]}
                           isSelected={isSelected}
-                          onClick={() => onMPCStageChange(qId, stageId, optLabel)}
+                          onClick={() => onMPCStageChange(qId, stageId, optLabel, true)}
                           disabled={disabled}
                           isLarge={bubbleSizeScale === "large"}
                         />
