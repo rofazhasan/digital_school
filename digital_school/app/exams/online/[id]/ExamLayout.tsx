@@ -216,14 +216,36 @@ export default function ExamLayout() {
 
   const [illusionMode, setIllusionMode] = useState(false);
 
+  // Storage key to strictly persist and enforce the started exam mode (OMR vs Full) across resumes and refreshes
+  const submissionId = exam.submissionId || 'active';
+  const examModeStorageKey = `exam-mode-${exam.id}-${submissionId}`;
+
   // View Mode: 'omr' (physical-style OMR sheet with no question text) vs 'full' (full question cards)
-  const [examViewMode, setExamViewMode] = useState<'omr' | 'full'>(() => {
+  const [examViewMode, setExamViewModeState] = useState<'omr' | 'full'>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('mode') === 'omr') return 'omr';
+      const urlMode = urlParams.get('mode');
+      if (urlMode === 'omr' || urlMode === 'full') return urlMode;
+      const savedMode = localStorage.getItem(examModeStorageKey);
+      if (savedMode === 'omr' || savedMode === 'full') return savedMode as 'omr' | 'full';
     }
     return 'full';
   });
+
+  const setExamViewMode = useCallback((mode: 'omr' | 'full' | ((prev: 'omr' | 'full') => 'omr' | 'full')) => {
+    setExamViewModeState((prev) => {
+      const nextMode = typeof mode === 'function' ? mode(prev) : mode;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(examModeStorageKey, nextMode);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('mode', nextMode);
+          window.history.replaceState(null, '', url.toString());
+        } catch {}
+      }
+      return nextMode;
+    });
+  }, [examModeStorageKey]);
 
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;

@@ -68,11 +68,14 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     answers,
     setAnswers,
     sortedQuestions,
+    setOrderedQuestions,
+    switchExamSet,
     activeSection,
     hasCqSq,
   } = useExamContext();
 
-  const questions = sortedQuestions || [];
+  // In Only OMR mode: strictly adhere to the physical generated set's exact question order (1, 2, 3, 4...)
+  const questions = setOrderedQuestions || sortedQuestions || [];
   const totalQuestions = questions.length;
 
   // Session user fallback state
@@ -612,6 +615,9 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                       onClick={() => {
                         vibrateOnTouch();
                         setSelectedSet(s.code);
+                        if (switchExamSet) {
+                          switchExamSet(s.code);
+                        }
                       }}
                       className="flex flex-col items-center gap-0.5 group focus:outline-none touch-manipulation"
                     >

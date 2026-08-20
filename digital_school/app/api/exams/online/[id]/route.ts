@@ -201,6 +201,37 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const hasSubmitted = isFinished && !exam.allowRetake;
 
+    // Fetch all sets for this exam so students can switch sets seamlessly on OMR sheet
+    const fullExamSets = await prisma.examSet.findMany({
+      where: { examId },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        questionsJson: true,
+      }
+    });
+
+    const allSets = fullExamSets.map(s => {
+      let setQuestions: any[] = [];
+      try {
+        setQuestions = Array.isArray(s.questionsJson)
+          ? s.questionsJson
+          : typeof s.questionsJson === "string"
+            ? JSON.parse(s.questionsJson)
+            : [];
+      } catch {
+        setQuestions = [];
+      }
+      return {
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        questions: setQuestions
+      };
+    });
+
     return NextResponse.json({
       id: exam.id,
       name: exam.name,
@@ -217,6 +248,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       assignedSet: assignedExamSet ? { id: assignedExamSet.id, name: assignedExamSet.name } : null,
       examSets: exam.examSets?.map(s => ({ id: s.id, name: s.name })),
+      allSets,
       subject: (questions[0] as any)?.subject || exam.class?.name || '',
       questions,
       hasSubmitted,

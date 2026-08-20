@@ -234,6 +234,48 @@ export function ExamContextProvider({
     }
   }, [fullSortedQuestions, activeSection]);
 
+  // Exact generated set sequence (preserving original question order of the physical/generated set)
+  const setOrderedQuestions = useMemo(() => {
+    const raw = exam.questions || [];
+    if (activeSection === 'objective') {
+      return raw.filter((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        return !['cq', 'sq', 'descriptive'].includes(type);
+      });
+    } else {
+      return raw.filter((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        return ['cq', 'sq', 'descriptive'].includes(type);
+      });
+    }
+  }, [exam.questions, activeSection]);
+
+  // Switch active exam set (e.g. from OMR Set selector)
+  const switchExamSet = useCallback((setNameOrCode: string) => {
+    if (!exam.allSets || exam.allSets.length === 0) return;
+    const cleanTarget = String(setNameOrCode).replace(/^(set|সেট)\s*[-:]?\s*/i, "").trim().toUpperCase();
+    
+    const matchedSet = exam.allSets.find((s: any) => {
+      const cleanName = String(s.name).replace(/^(set|সেট)\s*[-:]?\s*/i, "").trim().toUpperCase();
+      if (cleanName === cleanTarget) return true;
+      if (s.id === setNameOrCode) return true;
+      if ((cleanTarget === 'A' || cleanTarget === 'ক' || cleanTarget === '1') && (cleanName === 'A' || cleanName === 'ক' || cleanName === '1')) return true;
+      if ((cleanTarget === 'B' || cleanTarget === 'খ' || cleanTarget === '2') && (cleanName === 'B' || cleanName === 'খ' || cleanName === '2')) return true;
+      if ((cleanTarget === 'C' || cleanTarget === 'গ' || cleanTarget === '3') && (cleanName === 'C' || cleanName === 'গ' || cleanName === '3')) return true;
+      if ((cleanTarget === 'D' || cleanTarget === 'ঘ' || cleanTarget === '4') && (cleanName === 'D' || cleanName === 'ঘ' || cleanName === '4')) return true;
+      return false;
+    });
+
+    if (matchedSet && matchedSet.questions && matchedSet.questions.length > 0) {
+      patchExam({
+        setName: matchedSet.name,
+        assignedExamSetId: matchedSet.id,
+        questions: matchedSet.questions,
+        assignedSet: { id: matchedSet.id, name: matchedSet.name }
+      });
+    }
+  }, [exam.allSets, patchExam]);
+
   // Server perspective: only sync periodically
   const saveAnswers = useCallback(async (answersToSave: any) => {
     if (Object.keys(answersToSave).length === 0) return;
@@ -350,6 +392,8 @@ export function ExamContextProvider({
     hasObjective,
     hasCqSq,
     sortedQuestions,
+    setOrderedQuestions,
+    switchExamSet,
     fullSortedQuestions,
     groupedQuestions
   }), [
@@ -379,6 +423,8 @@ export function ExamContextProvider({
     hasObjective,
     hasCqSq,
     sortedQuestions,
+    setOrderedQuestions,
+    switchExamSet,
     fullSortedQuestions,
     groupedQuestions
   ]);
