@@ -4479,11 +4479,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                           </div>
                                         ) : (
-                                          <span className="text-gray-500 italic">No answer provided by the student</span>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-6">
+                                          <div className="space-y-6">
                                         {/* Main Answer (SQ) or Intro (CQ) */}
                                         {currentAnswer && typeof currentAnswer === 'string' && (
                                           <div>
