@@ -4973,7 +4973,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 {/* Explanation & Model Answer */}
                                 <div className="mt-4 pt-4 border-t border-border">
                                   {/* Model Answer (For Subjective, CQ, SQ, or questions with custom modelAnswer) */}
-                                  {['cq', 'sq', 'descriptive'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct) && (
+                                  {Boolean(['cq', 'sq', 'descriptive'].includes((currentQuestion?.type || "").toLowerCase()) && (currentQuestion?.modelAnswer || currentQuestion?.correct)) && (
                                     <div className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/25 rounded-2xl">
                                       <h5 className="font-bold text-emerald-800 dark:text-emerald-300 text-xs mb-1.5 flex items-center gap-1.5 uppercase tracking-wider">
                                         <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
