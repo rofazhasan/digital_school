@@ -237,6 +237,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 "Assertion (A) is false but Reason (R) is true"
             ];
             return arOptions[opt - 1] || `Option ${opt}`;
+        };
+
         const getMCQMark = (q: MCQ, userAnswer: any) => {
             if (userAnswer === undefined || userAnswer === null || userAnswer === '' || userAnswer === 'No answer provided') return 0;
             const correctText = q.correct || q.options?.find(opt => opt.isCorrect)?.text;

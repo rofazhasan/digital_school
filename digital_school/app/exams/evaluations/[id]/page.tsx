@@ -4183,6 +4183,84 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               <XCircle className="h-3.5 w-3.5" /> Wrong ({exam?.mcqNegativeMarking ? `-${((subMarks * exam.mcqNegativeMarking) / 100).toFixed(2)}` : '0'})
                                                             </Badge>
                                                           )
+                                                        ) : (
+                                                          <Badge variant="outline" className="text-muted-foreground text-xs py-0.5 px-2.5">
+                                                            Unanswered (0)
+                                                          </Badge>
+                                                        )}
+                                                      </div>
+                                                    </div>
+
+                                                    {/* Options Grid for Sub-Question */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                                                      {options.map((opt: any, optIdx: number) => {
+                                                        const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
+                                                        const optNorm = normalize(optText);
+                                                        const isSelected = hasSubAns && userAns === optNorm;
+                                                        const isCorrect = (typeof opt === 'object' && opt.isCorrect) ||
+                                                          (subQ.correctAnswer !== undefined && (normalize(subQ.correctAnswer) === optNorm || Number(subQ.correctAnswer) === optIdx)) ||
+                                                          (subQ.correct !== undefined && (normalize(subQ.correct) === optNorm || Number(subQ.correct) === optIdx));
+
+                                                        let optionBorder = "border-border bg-background/50 hover:bg-accent/30 text-foreground";
+                                                        if (isSelected && isCorrect) {
+                                                          optionBorder = "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold ring-2 ring-emerald-500/30";
+                                                        } else if (isSelected && !isCorrect) {
+                                                          optionBorder = "border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-bold ring-2 ring-rose-500/30";
+                                                        } else if (!isSelected && isCorrect) {
+                                                          optionBorder = "border-emerald-500/60 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 font-medium";
+                                                        }
+
+                                                        return (
+                                                          <div
+                                                            key={optIdx}
+                                                            className={cn(
+                                                              "flex items-start gap-2.5 p-2.5 rounded-xl border text-xs transition-all",
+                                                              optionBorder
+                                                            )}
+                                                          >
+                                                            <div className={cn(
+                                                              "h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0",
+                                                              isSelected && isCorrect
+                                                                ? "bg-emerald-600 text-white"
+                                                                : isSelected && !isCorrect
+                                                                  ? "bg-rose-600 text-white"
+                                                                  : isCorrect
+                                                                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                                                    : "bg-muted text-muted-foreground"
+                                                            )}>
+                                                              {MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}
+                                                            </div>
+                                                            <div className="flex-1 pt-0.5">
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                            </div>
+                                                            {isSelected && (
+                                                              <div className="shrink-0">
+                                                                {isCorrect ? (
+                                                                  <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                                ) : (
+                                                                  <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                                                                )}
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+
+                                                    {subQ.explanation && (
+                                                      <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                                                        <span className="font-bold shrink-0">ব্যাখ্যা:</span>
+                                                        <div className="inline">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation)}</UniversalMathJax>
+                                                        </div>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              });
+                                            })()}
+                                          </div>
+                                        )}
 
                                             {/* CMA Specific Rendering */}
                                             {(currentQuestion?.type || "").toLowerCase() === 'cma' && (
