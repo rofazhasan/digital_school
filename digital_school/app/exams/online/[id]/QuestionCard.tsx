@@ -236,26 +236,45 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
             {type === "ar" && (
               <div className="grid grid-cols-1 gap-3">
-                {[
-                  "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
-                  "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
-                  "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                  "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                  "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                ].map((lbl, i) => {
-                  const val = i + 1;
-                  const isCorrect = Number(question.correctOption || question.correct) === val;
-                  // Fix: Robust selection check for AR questions
-                  const isSelected = (userAnswer?.selectedOption === val || userAnswer === val || (typeof userAnswer === 'object' && userAnswer?.selectedOption === val));
-                  return (
-                    <MCQOption
-                      key={i} index={i} option={lbl} isSelected={isSelected} isCorrect={isCorrect}
-                      showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
-                      submitted={!!submitted} onSelect={() => onAnswerChange({ selectedOption: val })}
-                      fontSize={fontSize}
-                    />
-                  );
-                })}
+                {(() => {
+                  const defaultArOptions = [
+                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                  ];
+                  const arOptions = (Array.isArray(question.options) && question.options.length >= 4)
+                    ? question.options.map((opt: any) => typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt))
+                    : defaultArOptions;
+
+                  let selNum = 0;
+                  if (userAnswer !== undefined && userAnswer !== null && userAnswer !== "") {
+                    if (typeof userAnswer === 'number') selNum = userAnswer;
+                    else if (typeof userAnswer === 'string' && !isNaN(Number(userAnswer.trim()))) selNum = Number(userAnswer.trim());
+                    else if (typeof userAnswer === 'object') {
+                      const v = userAnswer.selectedOption ?? userAnswer.answer ?? userAnswer.option ?? userAnswer.value;
+                      if (v !== undefined && v !== null && !isNaN(Number(v))) selNum = Number(v);
+                    }
+                  }
+
+                  const rawCorrect = question.correctOption ?? question.correct ?? question.correctAnswer;
+                  const correctVal = typeof rawCorrect === 'number' ? rawCorrect : Number(rawCorrect || 0);
+
+                  return arOptions.map((lbl: string, i: number) => {
+                    const val = i + 1;
+                    const isCorrect = correctVal === val;
+                    const isSelected = selNum === val;
+                    return (
+                      <MCQOption
+                        key={i} index={i} option={lbl} isSelected={isSelected} isCorrect={isCorrect}
+                        showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
+                        submitted={!!submitted} onSelect={() => onAnswerChange({ selectedOption: val })}
+                        fontSize={fontSize}
+                      />
+                    );
+                  });
+                })()}
               </div>
             )}
 

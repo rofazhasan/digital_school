@@ -1375,38 +1375,103 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
 
   // 6. ASSERTION-REASON (AR) (One-Time Fill - No Erase/Clear on OMR)
   if (type === "ar") {
-    const selectedOpt = typeof userAnswer === "object" ? userAnswer?.selectedOption : Number(userAnswer);
+    let selectedOpt = 0;
+    if (userAnswer !== undefined && userAnswer !== null && userAnswer !== "") {
+      if (typeof userAnswer === "number") {
+        selectedOpt = userAnswer;
+      } else if (typeof userAnswer === "string" && !isNaN(Number(userAnswer.trim()))) {
+        selectedOpt = Number(userAnswer.trim());
+      } else if (typeof userAnswer === "object") {
+        const v = userAnswer.selectedOption ?? userAnswer.answer ?? userAnswer.option ?? userAnswer.value;
+        if (v !== undefined && v !== null && !isNaN(Number(v))) selectedOpt = Number(v);
+      }
+    }
+
+    const defaultArOptions = [
+      "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+      "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+      "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+      "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+      "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+    ];
+
+    const arOptions = (Array.isArray(question.options) && question.options.length >= 4)
+      ? question.options.map((opt: any) => typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt))
+      : defaultArOptions;
+
     return (
-      <div className="py-2 px-1.5 sm:px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors rounded-xl">
-        <div className="flex items-center justify-between mb-1">
+      <div className="py-3 px-2 sm:px-3 bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-900/40 rounded-2xl my-2 space-y-2.5">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200">
               {toBengaliNumerals(index + 1)}. ({index + 1})
             </span>
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-300">
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border-purple-300">
               Assertion-Reason
             </Badge>
           </div>
-          {selectedOpt && (
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-              ✓ পূরণকৃত
+          {selectedOpt > 0 ? (
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+              ✓ অপশন {toBengaliNumerals(selectedOpt)} পূরণকৃত
             </span>
+          ) : (
+            <span className="text-[10px] text-slate-400 italic">উত্তর নির্বাচন করুন</span>
           )}
         </div>
 
-        <div className="flex justify-around items-center px-1">
-          {[1, 2, 3, 4, 5].map((optNum) => {
+        {/* Assertion & Reason Statement Boxes */}
+        {(question.assertion || question.reason || question.questionText || question.text) && (
+          <div className="space-y-1.5 text-xs">
+            {(question.assertion || question.questionText || question.text) && (
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-purple-200/60 dark:border-purple-900/40 shadow-xs">
+                <span className="text-[9px] font-black uppercase text-purple-700 dark:text-purple-400 block mb-0.5">Assertion (A):</span>
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || question.questionText || question.text || "")}</UniversalMathJax>
+                </div>
+              </div>
+            )}
+            {question.reason && (
+              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-purple-200/60 dark:border-purple-900/40 shadow-xs">
+                <span className="text-[9px] font-black uppercase text-purple-700 dark:text-purple-400 block mb-0.5">Reason (R):</span>
+                <div className="font-medium text-slate-900 dark:text-slate-100">
+                  <UniversalMathJax inline dynamic>{cleanupMath(question.reason)}</UniversalMathJax>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Detailed 5 Options List with Interactive Clickable Selection */}
+        <div className="space-y-1.5 pt-1">
+          {arOptions.map((optText: string, optIdx: number) => {
+            const optNum = optIdx + 1;
             const isSelected = selectedOpt === optNum;
+
             return (
-              <OMRBubble
+              <div
                 key={optNum}
-                label={toBengaliNumerals(optNum)}
-                subLabel={String(optNum)}
-                isSelected={isSelected}
-                onClick={() => onARSelect(qId, optNum)}
-                disabled={disabled}
-                isLarge={bubbleSizeScale === "large"}
-              />
+                onClick={() => !disabled && onARSelect(qId, optNum)}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all select-none",
+                  isSelected
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm font-semibold ring-1 ring-purple-600/30"
+                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-purple-300 hover:bg-purple-50/60"
+                )}
+              >
+                <div className="shrink-0 pt-0.5">
+                  <div className={cn(
+                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border transition-colors",
+                    isSelected
+                      ? "bg-white text-purple-700 border-white"
+                      : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                  )}>
+                    {toBengaliNumerals(optNum)}
+                  </div>
+                </div>
+                <div className="flex-1 leading-snug">
+                  <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                </div>
+              </div>
             );
           })}
         </div>
