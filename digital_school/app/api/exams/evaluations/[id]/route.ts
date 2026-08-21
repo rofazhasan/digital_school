@@ -389,6 +389,78 @@ export async function GET(
 
 
 
+    // Helper to format and normalize question objects consistently
+    const formatQuestion = (q: any) => {
+      if (!q) return q;
+
+      // Parse subQuestions if it's a JSON string
+      let parsedSubQuestions = null;
+      const rawSub = q.subQuestions || q.sub_questions || q.parts;
+      if (rawSub) {
+        try {
+          parsedSubQuestions = typeof rawSub === 'string'
+            ? JSON.parse(rawSub)
+            : rawSub;
+        } catch (e) {
+          console.error('Error parsing subQuestions:', e);
+          parsedSubQuestions = null;
+        }
+      }
+
+      // Parse options if JSON string
+      let parsedOptions = q.options;
+      if (typeof parsedOptions === 'string') {
+        try {
+          parsedOptions = JSON.parse(parsedOptions);
+        } catch {
+          parsedOptions = q.options;
+        }
+      }
+
+      // Extract explanation: DB > Question Level > Option Level
+      let explanation = questionDetailsMap.get(q.id) || q.explanation;
+      if (!explanation && Array.isArray(parsedOptions)) {
+        const correctOpt = parsedOptions.find((opt: any) => opt && opt.isCorrect);
+        if (correctOpt && correctOpt.explanation) {
+          explanation = correctOpt.explanation;
+        }
+      }
+
+      return {
+        id: q.id,
+        type: (q.type || '').toLowerCase(),
+        text: q.questionText || q.text || q.question || '',
+        questionText: q.questionText || q.text || q.question || '',
+        marks: q.marks,
+        correct: q.correct,
+        options: parsedOptions,
+        subQuestions: parsedSubQuestions,
+        sub_questions: parsedSubQuestions,
+        modelAnswer: q.modelAnswer || q.answer || q.q_ans || q.ans || null,
+        explanation: explanation || null,
+        assertion: q.assertion || null,
+        reason: q.reason || null,
+        correctOption: q.correctOption ?? q.correct ?? q.correctAnswer ?? null,
+        pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
+        leftColumn: q.leftColumn,
+        rightColumn: q.rightColumn,
+        matches: q.matches,
+        correctAnswer: q.correctAnswer || q.correct || q.answer,
+        sourceText: q.sourceText || q.source_text || null,
+        passage: q.passage || null,
+        label: q.label || null,
+        instructions: q.instructions || null,
+        chartConfig: q.chartConfig || q.chart_config || null,
+        image: q.image || q.imageUrl || q.image_url || null
+      };
+    };
+
+    // Format questionsBySet for frontend mapping
+    const formattedQuestionsBySet: Record<string, any[]> = {};
+    for (const [key, val] of studentQuestionsMap.entries()) {
+      formattedQuestionsBySet[key] = (val || []).map((q: any) => formatQuestion(q));
+    }
+
     const examData = {
       id: exam.id,
       name: exam.name,
@@ -402,61 +474,9 @@ export async function GET(
       mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
       cqRequiredQuestions: (exam as any).cqRequiredQuestions,
       sqRequiredQuestions: (exam as any).sqRequiredQuestions,
-      questions: baseQuestions.map((q: any) => {
-        // Parse subQuestions if it's a JSON string
-        let parsedSubQuestions = null;
-        if (q.subQuestions) {
-          try {
-            parsedSubQuestions = typeof q.subQuestions === 'string'
-              ? JSON.parse(q.subQuestions)
-              : q.subQuestions;
-          } catch (e) {
-            console.error('Error parsing subQuestions:', e);
-            parsedSubQuestions = null;
-          }
-        }
-
-        // Extract explanation: DB > Question Level > Option Level
-        let explanation = questionDetailsMap.get(q.id) || q.explanation;
-
-        if (!explanation && Array.isArray(q.options)) {
-          const correctOpt = q.options.find((opt: any) => opt.isCorrect);
-          if (correctOpt && correctOpt.explanation) {
-            explanation = correctOpt.explanation;
-          }
-        }
-
-        return {
-          id: q.id,
-          type: q.type.toLowerCase(),
-          text: q.questionText || q.text || '',
-          marks: q.marks,
-          correct: q.correct,
-          options: q.options,
-          subQuestions: parsedSubQuestions,
-          modelAnswer: q.modelAnswer || q.answer || q.q_ans || q.ans || null,
-          explanation: explanation || null,
-          assertion: q.assertion || null,
-          reason: q.reason || null,
-          correctOption: q.correctOption || q.correct || null,
-          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
-          // New fields for MTF
-          leftColumn: q.leftColumn,
-          rightColumn: q.rightColumn,
-          matches: q.matches,
-          // New INT field
-          correctAnswer: q.correctAnswer || q.answer,
-          // Final Check Robustness for Descriptive
-          sourceText: q.sourceText || q.source_text || null,
-          passage: q.passage || null,
-          label: q.label || null,
-          instructions: q.instructions || null,
-          chartConfig: q.chartConfig || q.chart_config || null,
-          image: q.image || q.imageUrl || q.image_url || null
-        };
-      }),
+      questions: baseQuestions.map((q: any) => formatQuestion(q)),
       submissions: processedSubmissions,
-      questionsBySet: questionsBySet
+      questionsBySet: formattedQuestionsBySet
     };
 
     return NextResponse.json(examData);

@@ -237,12 +237,17 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 "Assertion (A) is false but Reason (R) is true"
             ];
             return arOptions[opt - 1] || `Option ${opt}`;
-        };
-
         const getMCQMark = (q: MCQ, userAnswer: any) => {
-            if (!userAnswer) return 0;
+            if (userAnswer === undefined || userAnswer === null || userAnswer === '' || userAnswer === 'No answer provided') return 0;
             const correctText = q.correct || q.options?.find(opt => opt.isCorrect)?.text;
-            const isCorrect = String(userAnswer) === String(correctText);
+            let isCorrect = false;
+            if (q.options && Array.isArray(q.options)) {
+                const optIdx = typeof userAnswer === 'number' ? userAnswer : q.options.findIndex((o: any) => (o.text || o) === userAnswer);
+                if (optIdx !== -1 && q.options[optIdx]?.isCorrect) isCorrect = true;
+            }
+            if (!isCorrect && correctText !== undefined) {
+                isCorrect = String(userAnswer).trim().toLowerCase() === String(correctText).trim().toLowerCase();
+            }
             if (isCorrect) return q.marks || 1;
             return -((q.marks || 1) * negativeRate);
         };
@@ -338,19 +343,30 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
 
         const getSMCQMark = (q: any, studentAnswer: any) => {
-            if (!q.subQuestions || q.subQuestions.length === 0) return 0;
+            const rawSubQs = q.subQuestions || q.sub_questions || [];
+            const subQs = Array.isArray(rawSubQs) ? rawSubQs : [];
+            if (subQs.length === 0) return 0;
             let totalObtained = 0;
-            q.subQuestions.forEach((sub: any, idx: number) => {
-                const subAns = studentAnswer?.[idx] || (typeof studentAnswer === 'object' ? studentAnswer[sub.id] : null);
-                if (!subAns) return;
-                const correctText = sub.correct || sub.options?.find((opt: any) => opt.isCorrect)?.text;
-                if (String(subAns).trim() === String(correctText).trim()) {
-                    totalObtained += (sub.marks || 1);
+            subQs.forEach((sub: any, idx: number) => {
+                const subAns = submission.answers?.[`${q.id}_sub_${idx}`] ?? submission.answers?.[`${q.id}_${idx}`] ?? studentAnswer?.[idx] ?? (typeof studentAnswer === 'object' ? studentAnswer?.[sub.id] : null);
+                if (!subAns || subAns === 'No answer provided') return;
+                const correctText = sub.correct || sub.correctAnswer || sub.options?.find((opt: any) => opt.isCorrect)?.text;
+                const subMarks = sub.marks || 1;
+                let isCorrect = false;
+                if (sub.options && Array.isArray(sub.options)) {
+                    const optIdx = typeof subAns === 'number' ? subAns : sub.options.findIndex((o: any) => (o.text || o) === subAns);
+                    if (optIdx !== -1 && sub.options[optIdx]?.isCorrect) isCorrect = true;
+                }
+                if (!isCorrect && correctText !== undefined) {
+                    isCorrect = String(subAns).trim().toLowerCase() === String(correctText).trim().toLowerCase();
+                }
+                if (isCorrect) {
+                    totalObtained += subMarks;
                 } else {
-                    totalObtained -= ((sub.marks || 1) * negativeRate);
+                    totalObtained -= (subMarks * negativeRate);
                 }
             });
-            return totalObtained;
+            return Number(totalObtained.toFixed(2));
         };
 
         const formatMark = (m: number) => {
@@ -1013,7 +1029,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         const allObjective = questions.rawList && questions.rawList.length > 0
                             ? questions.rawList.filter((q: any) => {
                                 const t = (q.type || '').toUpperCase();
-                                return ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'CMA', 'MPC', 'SMCQ'].includes(t) && !['CQ', 'SQ', 'DESCRIPTIVE'].includes(t);
+                                return ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'CMA', 'MPC'].includes(t) && !['CQ', 'SQ', 'DESCRIPTIVE', 'SMCQ'].includes(t);
                             })
                             : [
                                 ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
@@ -1039,42 +1055,48 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                                     {allObjective.map((q: any, idx) => {
                                         const qNum = idx + 1;
-                                        const ans = submission.answers[q.id || ''];
+                                        const ans = submission.answers?.[q.id || ''];
 
                                         // MCQ / MC Rendering
                                         if (q.type === 'MCQ' || q.type === 'MC') {
-                                            const selectedIndices = q.type === 'MC' ? (ans?.selectedOptions || []) : [];
-                                            const singleSelected = q.type === 'MCQ' ? ans : null;
+                                            const isMC = q.type === 'MC';
+                                            const selectedIndices = isMC ? (ans?.selectedOptions || (Array.isArray(ans) ? ans : [])) : [];
+                                            const selectedAny = isMC ? (selectedIndices.length > 0) : (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided');
+                                            const m = isMC ? getMCMark(q, ans) : getMCQMark(q, ans);
 
-                                            const correctIndices = (q.options || []).map((o: any, i: number) => o.isCorrect ? i : -1).filter((i: number) => i !== -1);
-                                            const correctText = q.correct || q.options?.find((o: any) => o.isCorrect)?.text;
-
-                                            let isCorrect = false;
-                                            if (q.type === 'MCQ') {
-                                                isCorrect = String(ans) === String(correctText);
-                                            } else {
-                                                isCorrect = selectedIndices.length === correctIndices.length && selectedIndices.every((v: number) => correctIndices.includes(v));
-                                            }
-
-                                            const selectedAny = q.type === 'MC' ? (ans?.selectedOptions?.length > 0) : (ans !== undefined && ans !== null && ans !== '');
-                                            const m = q.type === 'MC' ? getMCMark(q, ans) : getMCQMark(q, ans);
-
-                                            // Explanation Rendering (Shared Logic for MCQ)
                                             return (
                                                 <div key={q.id || idx}>
                                                     <div className={`p-3 rounded border ${selectedAny ? (m > 0 ? (m === q.marks ? 'bg-green-50' : 'bg-yellow-50') : 'bg-red-50') : 'bg-gray-50'} break-inside-avoid shadow-sm relative`}>
                                                         <MarkDisplay earned={m} total={q.marks || 1} />
                                                         <div className="flex items-start mb-2">
                                                             <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                            <div className="flex-1 font-bold text-sm"><Text>{q.q}</Text></div>
+                                                            <div className="flex-1 font-bold text-sm"><Text>{q.q || q.questionText || ''}</Text></div>
                                                         </div>
 
                                                         {/* Options Grid */}
                                                         <div className="ml-2 md:ml-6 mt-1">
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                                                                 {(q.options || []).map((opt: any, oidx: number) => {
-                                                                    const isCorrectOpt = opt.isCorrect || (q.correct && q.correct.includes(oidx));
-                                                                    const isSelected = ans?.selectedOptions?.includes(oidx);
+                                                                    const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
+                                                                    const isCorrectOpt = (typeof opt === 'object' && opt.isCorrect) ||
+                                                                        (q.correct !== undefined && q.correct !== null && (
+                                                                            String(q.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                                            (typeof q.correct === 'number' && q.correct === oidx) ||
+                                                                            (typeof q.correct === 'string' && q.correct.trim() === String(oidx)) ||
+                                                                            (typeof q.correct === 'string' && MCQ_LABELS[oidx] && q.correct.trim() === MCQ_LABELS[oidx]) ||
+                                                                            (Array.isArray(q.correct) && q.correct.includes(oidx))
+                                                                        )) ||
+                                                                        (q.correctOption !== undefined && (Number(q.correctOption) === oidx || String(q.correctOption) === String(oidx))) ||
+                                                                        (q.correctAnswer !== undefined && String(q.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase());
+
+                                                                    const isSelected = isMC
+                                                                        ? selectedIndices.includes(oidx)
+                                                                        : (selectedAny && (
+                                                                            String(ans).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                                            (typeof ans === 'number' && ans === oidx) ||
+                                                                            (typeof ans === 'string' && ans.trim() === String(oidx)) ||
+                                                                            (typeof ans === 'string' && MCQ_LABELS[oidx] && ans.trim() === MCQ_LABELS[oidx])
+                                                                        ));
 
                                                                     let optClass = "text-gray-600";
                                                                     if (isSelected && isCorrectOpt) {
@@ -1088,7 +1110,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                     return (
                                                                         <div key={oidx} className={`flex items-center gap-1 px-1 rounded ${optClass}`}>
                                                                             <span className="font-bold">{MCQ_LABELS[oidx]}.</span>
-                                                                            <Text>{opt.text}</Text>
+                                                                            <Text>{optText}</Text>
                                                                             {isSelected && (isCorrectOpt ? <CheckCircle className="w-3 h-3 ml-1 inline text-green-600" /> : <XCircle className="w-3 h-3 ml-1 inline text-red-600" />)}
                                                                         </div>
                                                                     );
@@ -1352,10 +1374,11 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             );
                                         }
 
-                                        // INT Rendering
-                                        if (q.type === 'INT') {
-                                            const studentVal = ans?.answer !== undefined ? ans.answer : ans;
-                                            const isCorrect = String(studentVal) === String(q.answer);
+                                        // INT / NUMERIC Rendering
+                                        if (q.type === 'INT' || q.type === 'NUMERIC') {
+                                            const studentVal = ans?.answer !== undefined ? ans.answer : (ans?.studentVal !== undefined ? ans.studentVal : ans);
+                                            const correctVal = q.correctAnswer || q.answer || q.modelAnswer || q.correct;
+                                            const isCorrect = studentVal !== undefined && studentVal !== null && studentVal !== '' && String(studentVal).trim().toLowerCase() === String(correctVal).trim().toLowerCase();
                                             const qMark = getINTMark(q, ans);
 
                                             return (
@@ -1363,7 +1386,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                     <div className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : (studentVal ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')} shadow-sm relative`}>
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                         <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                        <div className="font-bold text-sm mb-3 inline-block"><Text>{q.q}</Text></div>
+                                                        <div className="font-bold text-sm mb-3 inline-block"><Text>{q.q || q.questionText || ''}</Text></div>
 
                                                         {/* Comparison Box */}
                                                         <div className="flex bg-white rounded border border-gray-200 overflow-hidden">
@@ -1378,7 +1401,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <div className="p-2">
                                                                     <div className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-1">Correct Key</div>
                                                                     <div className="text-xl font-black text-green-700">
-                                                                        {q.correctAnswer || q.answer}
+                                                                        {correctVal ?? 'N/A'}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1547,44 +1570,54 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
                                 <h3>দৃশ্যপট ভিত্তিক প্রশ্ন (SMCQ)</h3>
                                 <div className="text-right">
-                                    <span>Marks: {smcqs.reduce((sum, q) => sum + getSMCQMark(q, submission.answers[q.id]), 0)} / {smcqs.reduce((sum, q) => sum + (q.marks || 0), 0)}</span>
+                                    <span>Marks: {smcqs.reduce((sum, q) => sum + getSMCQMark(q, submission.answers?.[q.id]), 0)} / {smcqs.reduce((sum, q) => sum + (q.marks || 0), 0)}</span>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6">
                                 {smcqs.map((q, idx) => {
-                                    const studentAnswer = submission.answers[q.id];
+                                    const studentAnswer = submission.answers?.[q.id];
                                     const obtainedMark = getSMCQMark(q, studentAnswer);
+                                    const subQs = q.subQuestions || q.sub_questions || [];
 
                                     return (
                                         <div key={idx} className="mb-6 border-b border-gray-200 pb-4 break-inside-avoid">
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="font-bold text-lg flex gap-2">
                                                     <span>{idx + 1}.</span>
-                                                    <div className="inline-block whitespace-pre-wrap"><Text>{q.questionText}</Text></div>
+                                                    <div className="inline-block whitespace-pre-wrap"><Text>{q.questionText || q.text}</Text></div>
                                                 </div>
                                                 <div className="bg-gray-100 px-3 py-1 rounded text-sm font-bold whitespace-nowrap">
-                                                    {obtainedMark} / {q.marks}
+                                                    {obtainedMark} / {q.marks || subQs.reduce((s: number, sq: any) => s + (sq.marks || 1), 0)}
                                                 </div>
                                             </div>
 
                                             <div className="ml-6 space-y-4">
-                                                {q.subQuestions?.map((sub: any, sidx: number) => {
-                                                    const subAns = studentAnswer?.[sidx] || (typeof studentAnswer === 'object' ? studentAnswer[sub.id] : null);
-                                                    const correctText = sub.correct || sub.options?.find((opt: any) => opt.isCorrect)?.text;
-                                                    const isCorrect = String(subAns).trim() === String(correctText).trim();
+                                                {subQs.map((sub: any, sidx: number) => {
+                                                    const subAns = submission.answers?.[`${q.id}_sub_${sidx}`] ?? submission.answers?.[`${q.id}_${sidx}`] ?? studentAnswer?.[sidx] ?? (typeof studentAnswer === 'object' ? studentAnswer?.[sub.id] : null);
+                                                    const hasSubAns = subAns !== undefined && subAns !== null && subAns !== '' && subAns !== 'No answer provided';
+                                                    const correctText = sub.correct || sub.correctAnswer || sub.options?.find((opt: any) => opt.isCorrect)?.text;
+                                                    const subOpts = sub.options || [];
 
                                                     return (
                                                         <div key={sidx} className="p-3 border rounded-lg bg-gray-50">
                                                             <div className="font-bold mb-2 flex gap-2">
                                                                 <span className="text-gray-500">{BENGALI_SUB_LABELS[sidx]}.</span>
-                                                                <div className="inline-block"><Text>{sub.questionText}</Text></div>
+                                                                <div className="inline-block"><Text>{sub.questionText || sub.text}</Text></div>
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-2 ml-6">
-                                                                {sub.options?.map((opt: any, oidx: number) => {
-                                                                    const isSelected = String(subAns).trim() === String(opt.text).trim();
-                                                                    const isOptCorrect = opt.isCorrect || String(opt.text).trim() === String(correctText).trim();
-                                                                    
+                                                                {subOpts.map((opt: any, oidx: number) => {
+                                                                    const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
+                                                                    const isSelected = hasSubAns && (
+                                                                        String(subAns).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                                        (typeof subAns === 'number' && subAns === oidx) ||
+                                                                        (typeof subAns === 'string' && subAns.trim() === String(oidx)) ||
+                                                                        (typeof subAns === 'string' && MCQ_LABELS[oidx] && subAns.trim() === MCQ_LABELS[oidx])
+                                                                    );
+                                                                    const isOptCorrect = (typeof opt === 'object' && opt.isCorrect) ||
+                                                                        (correctText !== undefined && String(optText).trim().toLowerCase() === String(correctText).trim().toLowerCase()) ||
+                                                                        (sub.correctOption !== undefined && (Number(sub.correctOption) === oidx || String(sub.correctOption) === String(oidx)));
+
                                                                     let statusClass = "border-gray-200 bg-white";
                                                                     if (isSelected && isOptCorrect) statusClass = "border-green-500 bg-green-50 text-green-700 shadow-sm ring-1 ring-green-500";
                                                                     else if (isSelected && !isOptCorrect) statusClass = "border-red-500 bg-red-50 text-red-700";
@@ -1594,7 +1627,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                         <div key={oidx} className={`p-2 border rounded text-xs flex items-center gap-2 ${statusClass}`}>
                                                                             <span className="font-bold opacity-50">{MCQ_LABELS[oidx]}.</span>
                                                                             <div className="flex-1">
-                                                                                <Text>{opt.text}</Text>
+                                                                                <Text>{optText}</Text>
                                                                             </div>
                                                                             {isSelected && (isOptCorrect ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />)}
                                                                         </div>

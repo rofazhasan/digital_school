@@ -162,50 +162,56 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     }
 
 
-    // ... (questions mapping)
+    // Extract active set questions or default questions list
+    const activeSet = examSetName || submission?.examSet || "A";
+    const rawQuestions = (examData.questionsBySet && examData.questionsBySet[activeSet] && examData.questionsBySet[activeSet].length > 0)
+        ? examData.questionsBySet[activeSet]
+        : (examData.questions || []);
+
+    const normalizeQuestion = (q: any) => {
+        let subQs = q.subQuestions || q.sub_questions || q.parts || [];
+        if (typeof subQs === 'string') {
+            try { subQs = JSON.parse(subQs); } catch { subQs = []; }
+        }
+        let opts = q.options;
+        if (typeof opts === 'string') {
+            try { opts = JSON.parse(opts); } catch { opts = []; }
+        }
+        return {
+            ...q,
+            id: q.id,
+            type: (q.type || '').toUpperCase(),
+            q: q.text || q.questionText || q.question || '',
+            questionText: q.questionText || q.text || q.question || '',
+            options: opts,
+            subQuestions: subQs,
+            sub_questions: subQs,
+            parts: subQs,
+            assertion: q.assertion || null,
+            reason: q.reason || null,
+            correct: q.correct ?? q.correctAnswer ?? q.correctOption ?? null,
+            correctOption: q.correctOption ?? q.correct ?? null,
+            correctAnswer: q.correctAnswer ?? q.correct ?? q.modelAnswer ?? null,
+            modelAnswer: q.modelAnswer ?? q.answer ?? q.correctAnswer ?? null,
+            explanation: q.explanation ?? null
+        };
+    };
+
+    const formattedRawList = rawQuestions.map(normalizeQuestion);
 
     const questions = {
-        rawList: examData.questions.map((q: any) => ({
-            ...q,
-            q: q.text || q.questionText,
-            questionText: q.questionText || q.text
-        })),
-        mcq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => ({
-            ...q,
-            q: q.text // Component expects 'q' for text
-        })),
-        mc: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MC').map((q: any) => ({
-            ...q,
-            q: q.text
-        })),
-        int: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'INT').map((q: any) => ({
-            ...q,
-            q: q.text
-        })),
-        ar: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'AR').map((q: any) => ({
-            ...q,
-            // AR fields (assertion, reason) should be in ...q
-        })),
-        mtf: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MTF').map((q: any) => ({
-            ...q,
-            q: q.text
-        })),
-        cq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'CQ').map((q: any) => ({
-            ...q,
-            questionText: q.text // Component expects 'questionText'
-        })),
-        sq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'SQ').map((q: any) => ({
-            ...q,
-            questionText: q.text
-        })),
-        cma: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'CMA').map((q: any) => ({
-            ...q,
-            questionText: q.text
-        })),
-        mpc: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MPC').map((q: any) => ({
-            ...q,
-            questionText: q.text
-        }))
+        rawList: formattedRawList,
+        mcq: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ'),
+        mc: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'MC'),
+        int: formattedRawList.filter((q: any) => ['INT', 'NUMERIC'].includes((q.type || "").toUpperCase())),
+        ar: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'AR'),
+        mtf: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'MTF'),
+        smcq: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'SMCQ'),
+        cq: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'CQ'),
+        sq: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'SQ'),
+        descriptive: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'DESCRIPTIVE'),
+        cma: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'CMA'),
+        mpc: formattedRawList.filter((q: any) => (q.type || "").toUpperCase() === 'MPC')
     };
 
     const highestMark = examData.submissions.reduce((max: number, s: any) => Math.max(max, s.result?.total || 0), 0);

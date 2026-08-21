@@ -1706,25 +1706,31 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               )}
 
                               {/* Show options if MCQ */}
-                              {q?.type === 'mcq' && q?.options && <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {['mcq', 'mc'].includes((q?.type || '').toLowerCase()) && q?.options && <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {(q?.options || [])?.map((opt: any, i: number) => {
-                                  const isSelected = hasAnswer && String(ans) === (opt?.text || String(opt));
-                                  const isCorrect = opt?.isCorrect;
+                                  const optText = typeof opt === 'object' ? (opt?.text ?? String(opt)) : String(opt);
+                                  const isSelected = hasAnswer && (
+                                    String(ans).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                    (typeof ans === 'number' && ans === i) ||
+                                    (typeof ans === 'string' && ans.trim() === String(i))
+                                  );
+                                  const isCorrect = (typeof opt === 'object' && opt?.isCorrect) || (q?.correct !== undefined && (String(q.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() || Number(q.correct) === i));
                                   return (
-                                    <div key={i} className={`text-xs p-2 rounded border ${isSelected ? 'bg-blue-100 border-blue-300' :
-                                      isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-muted/50'
+                                    <div key={i} className={`text-xs p-2 rounded border ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300 text-green-900' : 'bg-red-100 border-red-300 text-red-900') :
+                                      isCorrect ? 'bg-green-500/10 border-green-500/30 text-green-800' : 'bg-muted/50 text-muted-foreground'
                                       }`}>
                                       <div className="flex items-start">
                                         <span className="font-bold mr-2">{MCQ_LABELS?.[i]}.</span>
                                         <div className="flex-1">
-                                          <UniversalMathJax inline dynamic key={`opt-${i}`}>{cleanupMath(opt?.text || String(opt))}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic key={`opt-${i}`}>{cleanupMath(optText)}</UniversalMathJax>
                                           {opt?.image && (
                                             <div className="mt-1">
                                               <img src={opt?.image} alt="Option" className="max-h-20 rounded border bg-white object-contain" />
                                             </div>
                                           )}
                                         </div>
-                                        {isCorrect && <CheckCircle className="inline w-3 h-3 ml-2 text-green-600 flex-shrink-0" />}
+                                        {isSelected && (isCorrect ? <CheckCircle className="inline w-3 h-3 ml-2 text-green-600 flex-shrink-0" /> : <XCircle className="inline w-3 h-3 ml-2 text-red-600 flex-shrink-0" />)}
+                                        {!isSelected && isCorrect && <CheckCircle className="inline w-3 h-3 ml-2 text-green-600/70 flex-shrink-0" />}
                                       </div>
                                     </div>
                                   )
@@ -1732,16 +1738,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               </div>}
 
                               {/* Show options if SMCQ */}
-                              {(q?.type || "").toLowerCase() === 'smcq' && q?.subQuestions && (
+                              {(q?.type || "").toLowerCase() === 'smcq' && (q?.subQuestions || q?.sub_questions) && (
                                 <div className="mt-4 space-y-4">
-                                  {(q.subQuestions || []).map((sub: any, si: number) => {
-                                    const subAns = selectedLiveStudent?.answers?.[`${q.id}_sub_${si}`];
-                                    const hasSubAns = subAns !== undefined && subAns !== null && subAns !== "";
+                                  {((Array.isArray(q.subQuestions) ? q.subQuestions : (typeof q.subQuestions === 'string' ? JSON.parse(q.subQuestions) : (q.sub_questions || []))) || []).map((sub: any, si: number) => {
+                                    const subAns = selectedLiveStudent?.answers?.[`${q.id}_sub_${si}`] ?? selectedLiveStudent?.answers?.[`${q.id}_${si}`];
+                                    const hasSubAns = subAns !== undefined && subAns !== null && String(subAns).trim() !== "" && subAns !== "No answer provided";
+
+                                    const subOpts = Array.isArray(sub.options) ? sub.options : (typeof sub.options === 'string' ? JSON.parse(sub.options) : []);
 
                                     // Quick correctness check for UI
                                     let isSubCorrect = false;
-                                    if (sub.options && Array.isArray(sub.options)) {
-                                      const correctOpt = sub.options.find((opt: any) => opt.isCorrect);
+                                    if (subOpts.length > 0) {
+                                      const correctOpt = subOpts.find((opt: any) => typeof opt === 'object' && opt?.isCorrect);
                                       if (correctOpt) {
                                         const correctText = String(typeof correctOpt === 'object' ? correctOpt.text : correctOpt).trim().toLowerCase();
                                         if (String(subAns || "").trim().toLowerCase() === correctText) isSubCorrect = true;
@@ -1749,6 +1757,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     }
                                     if (!isSubCorrect && sub.correctAnswer !== undefined) {
                                       if (String(subAns || "").trim().toLowerCase() === String(sub.correctAnswer).trim().toLowerCase()) isSubCorrect = true;
+                                    }
+                                    if (!isSubCorrect && sub.correct !== undefined) {
+                                      if (String(subAns || "").trim().toLowerCase() === String(sub.correct).trim().toLowerCase()) isSubCorrect = true;
                                     }
 
                                     return (
@@ -1763,29 +1774,30 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             <span className="text-[10px] text-muted-foreground whitespace-nowrap">{sub.marks || 1} M</span>
                                           </div>
                                         </div>
-                                        {hasSubAns && (
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                            {(sub.options || []).map((opt: any, oi: number) => {
-                                              const optText = typeof opt === 'object' ? opt.text : opt;
-                                              const isSelected = String(subAns || "") === String(optText);
-                                              const isCorrect = opt.isCorrect || (sub.correctAnswer !== undefined && (String(sub.correctAnswer) === String(optText) || Number(sub.correctAnswer) === oi));
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                          {subOpts.map((opt: any, oi: number) => {
+                                            const optText = typeof opt === 'object' ? opt.text : opt;
+                                            const isSelected = hasSubAns && (
+                                              String(subAns || "").trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                              (typeof subAns === 'number' && subAns === oi) ||
+                                              (typeof subAns === 'string' && subAns.trim() === String(oi))
+                                            );
+                                            const isCorrect = (typeof opt === 'object' && opt?.isCorrect) || (sub.correctAnswer !== undefined && (String(sub.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase() || Number(sub.correctAnswer) === oi)) || (sub.correct !== undefined && (String(sub.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() || Number(sub.correct) === oi));
 
-                                              if (!isSelected && !isCorrect) return null;
-
-                                              return (
-                                                <div key={oi} className={`text-[10px] p-1.5 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') :
-                                                  isCorrect ? 'bg-green-50 border-green-200' : 'bg-muted/30'
-                                                  }`}>
-                                                  <div className="flex items-center gap-1 overflow-hidden">
-                                                    <span className="font-bold text-gray-500 shrink-0">{MCQ_LABELS?.[oi]}.</span>
-                                                    <div className="truncate"><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></div>
-                                                  </div>
-                                                  {isSelected && (isCorrect ? <CheckCircle className="h-2.5 w-2.5 text-green-600" /> : <XCircle className="h-2.5 w-2.5 text-red-600" />)}
+                                            return (
+                                              <div key={oi} className={`text-[10px] p-1.5 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300 text-green-900' : 'bg-red-100 border-red-300 text-red-900') :
+                                                isCorrect ? 'bg-green-50 border-green-200 text-green-800' : 'bg-muted/30 text-muted-foreground'
+                                                }`}>
+                                                <div className="flex items-center gap-1 overflow-hidden">
+                                                  <span className="font-bold text-gray-500 shrink-0">{MCQ_LABELS?.[oi]}.</span>
+                                                  <div className="truncate"><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></div>
                                                 </div>
-                                              );
-                                            })}
-                                          </div>
-                                        )}
+                                                {isSelected && (isCorrect ? <CheckCircle className="h-2.5 w-2.5 text-green-600" /> : <XCircle className="h-2.5 w-2.5 text-red-600" />)}
+                                                {!isSelected && isCorrect && <CheckCircle className="h-2.5 w-2.5 text-green-600/70" />}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -3185,6 +3197,77 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       </Button>
 
                       <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (!currentStudent || !exam) return;
+
+                          const studentQuestions = (exam.questionsBySet && exam.questionsBySet[currentStudent.examSet || 'A']) || exam.questions || [];
+                          if (!studentQuestions.length) return toast.error("No questions found");
+
+                          const sessionData = studentQuestions.map((q: any) => {
+                            const ans = currentStudent.answers ? currentStudent.answers[q.id] : null;
+                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                            let userIdx = null;
+
+                            const qType = (q.type || '').toLowerCase();
+
+                            if (qType === 'mcq') {
+                              if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                                const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                                const isCorrect = (correctOpt && (
+                                  (typeof ans === 'number' && q.options?.[ans]?.text === correctOpt.text) ||
+                                  (String(ans).trim().toLowerCase() === String(correctOpt.text).trim().toLowerCase())
+                                )) || (q.correct && (
+                                  String(ans).trim().toLowerCase() === String(q.correct).trim().toLowerCase() ||
+                                  Number(q.correct) === Number(ans)
+                                ));
+                                status = isCorrect ? 'correct' : 'wrong';
+                                userIdx = typeof ans === 'number' ? ans : q.options?.findIndex((o: any) => (o.text || o) === ans);
+                              }
+                            } else if (qType === 'smcq') {
+                              const subQs = q.subQuestions || q.sub_questions || [];
+                              const hasAnySub = subQs.some((_: any, sidx: number) => {
+                                const subAns = currentStudent?.answers?.[`${q.id}_sub_${sidx}`] ?? currentStudent?.answers?.[`${q.id}_${sidx}`];
+                                return subAns !== undefined && subAns !== null && subAns !== '' && subAns !== 'No answer provided';
+                              });
+                              status = hasAnySub ? 'correct' : 'unanswered';
+                            } else if (qType === 'ar') {
+                              if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                                const selected = Number(ans?.selectedOption ?? ans);
+                                const correct = Number(q.correctOption ?? q.correct ?? 0);
+                                status = (selected > 0 && selected === correct) ? 'correct' : 'wrong';
+                              }
+                            } else {
+                              if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                                status = 'correct';
+                              }
+                            }
+
+                            return {
+                              ...q,
+                              id: q.id,
+                              questionText: q.questionText || q.text || '',
+                              text: q.questionText || q.text || '',
+                              type: (q.type || '').toUpperCase(),
+                              status,
+                              userAnswer: userIdx !== null ? userIdx : ans,
+                              studentAnswer: ans
+                            };
+                          });
+
+                          localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                          toast.success("Opening Problem-Solving Session...");
+                          window.open(`/problem-solving/session?mode=review&id=${id}&studentId=${currentStudent?.student?.id}`, '_blank');
+                        }}
+                        disabled={!currentStudent}
+                        title="Open this student's exam in interactive Problem-Solving Session"
+                        className="rounded-xl border-indigo-200 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-xs font-bold shadow-sm"
+                      >
+                        <MonitorPlay className="h-4 w-4 sm:mr-1.5 text-indigo-500" />
+                        <span className="hidden sm:inline">Problem-Solving</span> Session
+                      </Button>
+
+                      <Button
                         onClick={submitStudentEvaluation}
                         disabled={saving || !canSubmitStudent()}
                         className={cn(
@@ -3702,8 +3785,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath((currentQuestion?.questionText || currentQuestion?.text || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                   </div>
 
-                                  {/* Subquestions */}
+                                  {/* AR Assertion and Reason Cards in Question View */}
+                                  {currentQuestion?.type?.toLowerCase() === 'ar' && (
+                                    <div className="space-y-3 mb-4">
+                                      <div className="p-3.5 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 flex flex-col gap-1.5 shadow-xs">
+                                        <Badge className="bg-indigo-600 text-white w-fit px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">Assertion (A)</Badge>
+                                        <div className="text-base font-semibold text-foreground">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion?.assertion || currentQuestion?.questionText || currentQuestion?.text || "")}</UniversalMathJax>
+                                        </div>
+                                      </div>
+                                      <div className="p-3.5 bg-purple-500/10 rounded-2xl border border-purple-500/20 flex flex-col gap-1.5 shadow-xs">
+                                        <Badge className="bg-purple-600 text-white w-fit px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">Reason (R)</Badge>
+                                        <div className="text-base font-semibold text-foreground">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion?.reason || "")}</UniversalMathJax>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Subquestions for non-SMCQ */}
                                   {(() => {
+                                    if (currentQuestion?.type?.toLowerCase() === 'smcq') return null;
                                     let rawSubQs = currentQuestion?.subQuestions || (currentQuestion as any)?.sub_questions || [];
                                     if (typeof rawSubQs === 'string') {
                                       try { rawSubQs = JSON.parse(rawSubQs); } catch { rawSubQs = []; }
@@ -3761,227 +3863,326 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   <div className="bg-muted/50 p-4 rounded-lg border border-border">
                                     {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'cma', 'mpc'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="space-y-4">
-                                        {(currentAnswer || ['smcq', 'cma', 'mpc'].includes(currentQuestion?.type?.toLowerCase() || '')) ? (
-                                          <div className="space-y-4">
-                                            {/* Auto-Score Header Badge */}
-                                            {(() => {
-                                              const autoScore = getAutoScore(currentQuestion, currentStudent?.answers);
-                                              const qMarks = Number(currentQuestion?.marks) || 1;
-                                              const isFull = autoScore >= qMarks && qMarks > 0;
-                                              const isPart = !isFull && (autoScore > 0 || (currentQuestion?.type?.toLowerCase() === 'mc' && evaluateMCDetails(currentQuestion, currentAnswer).isPartial) || (currentQuestion?.type?.toLowerCase() === 'mtf' && evaluateMTFDetails(currentQuestion, currentAnswer).correctCount > 0));
-                                              const isNeg = autoScore < 0;
+                                        {/* Auto-Score Header Badge */}
+                                        {(() => {
+                                          const autoScore = getAutoScore(currentQuestion, currentStudent?.answers);
+                                          const qMarks = Number(currentQuestion?.marks) || 1;
+                                          const isFull = autoScore >= qMarks && qMarks > 0;
+                                          const isPart = !isFull && (autoScore > 0 || (currentQuestion?.type?.toLowerCase() === 'mc' && evaluateMCDetails(currentQuestion, currentAnswer).isPartial) || (currentQuestion?.type?.toLowerCase() === 'mtf' && evaluateMTFDetails(currentQuestion, currentAnswer).correctCount > 0));
+                                          const isNeg = autoScore < 0;
 
-                                              return (
-                                                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-card border border-border shadow-sm mb-2">
-                                                  <div className="flex items-center gap-2">
-                                                    {isFull ? (
-                                                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
-                                                        <CheckCircle className="h-4 w-4" /> Correct (+{autoScore}/{qMarks})
-                                                      </Badge>
-                                                    ) : isPart ? (
-                                                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
-                                                        <Activity className="h-4 w-4" /> Partial Credit (+{autoScore}/{qMarks})
-                                                      </Badge>
-                                                    ) : isNeg ? (
-                                                      <Badge className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
-                                                        <XCircle className="h-4 w-4" /> Wrong ({autoScore}/{qMarks})
-                                                      </Badge>
-                                                    ) : (
-                                                      <Badge variant="outline" className="text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1 text-xs py-1 px-2.5">
-                                                        <XCircle className="h-4 w-4 text-rose-500" /> Score: {autoScore} / {qMarks}
-                                                      </Badge>
+                                          return (
+                                            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-card border border-border shadow-sm mb-2">
+                                              <div className="flex items-center gap-2">
+                                                {isFull ? (
+                                                  <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                    <CheckCircle className="h-4 w-4" /> Correct (+{autoScore}/{qMarks})
+                                                  </Badge>
+                                                ) : isPart ? (
+                                                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                    <Activity className="h-4 w-4" /> Partial Credit (+{autoScore}/{qMarks})
+                                                  </Badge>
+                                                ) : isNeg ? (
+                                                  <Badge className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 text-xs py-1 px-2.5 shadow-sm">
+                                                    <XCircle className="h-4 w-4" /> Wrong ({autoScore}/{qMarks})
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1 text-xs py-1 px-2.5">
+                                                    <XCircle className="h-4 w-4 text-rose-500" /> Score: {autoScore} / {qMarks}
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <span className="text-xs font-semibold text-muted-foreground">
+                                                Auto-calculated Score: <span className="font-bold text-foreground">{autoScore}</span> / {qMarks}
+                                                {isNeg && <span className="ml-1.5 text-rose-500 text-xs font-medium">(negative marking applied)</span>}
+                                              </span>
+                                            </div>
+                                          );
+                                        })()}
+
+                                        {/* MCQ Specific Rendering */}
+                                        {currentQuestion?.type?.toLowerCase() === 'mcq' && (
+                                          <div className="space-y-3">
+                                            {(() => {
+                                              let rawOpts = currentQuestion?.options;
+                                              if (typeof rawOpts === 'string') {
+                                                try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; }
+                                              }
+                                              const options: any[] = Array.isArray(rawOpts) ? rawOpts : [];
+                                              const rawAns = currentAnswer;
+                                              const hasAnswered = rawAns !== undefined && rawAns !== null && String(rawAns).trim() !== '' && rawAns !== 'No answer provided';
+
+                                              if (options.length === 0) {
+                                                return (
+                                                  <div className="p-3 bg-card rounded-xl border border-border space-y-2">
+                                                    <div className="text-xs font-semibold text-muted-foreground">Student Answer:</div>
+                                                    <div className="text-base font-medium text-foreground italic">
+                                                      {hasAnswered ? (
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(String(rawAns))}</UniversalMathJax>
+                                                      ) : (
+                                                        <span className="text-muted-foreground opacity-60">Not Answered</span>
+                                                      )}
+                                                    </div>
+                                                    {(currentQuestion?.correct || currentQuestion?.correctAnswer || currentQuestion?.modelAnswer) && (
+                                                      <div className="text-xs text-emerald-700 dark:text-emerald-300 font-bold">
+                                                        Correct Answer: <UniversalMathJax inline dynamic>{cleanupMath(String(currentQuestion?.correct || currentQuestion?.correctAnswer || currentQuestion?.modelAnswer))}</UniversalMathJax>
+                                                      </div>
                                                     )}
                                                   </div>
-                                                  <span className="text-xs font-semibold text-muted-foreground">
-                                                    Auto-calculated Score: <span className="font-bold text-foreground">{autoScore}</span> / {qMarks}
-                                                    {isNeg && <span className="ml-1.5 text-rose-500 text-xs font-medium">(negative marking applied)</span>}
-                                                  </span>
+                                                );
+                                              }
+
+                                              return (
+                                                <div className="space-y-3">
+                                                  {!hasAnswered && (
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+                                                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                                      <span>No Answer Provided by Student</span>
+                                                    </div>
+                                                  )}
+
+                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                                    {options.map((opt: any, idx: number) => {
+                                                      const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
+
+                                                      const isSelected = hasAnswered && (
+                                                        String(rawAns).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                        (typeof rawAns === 'number' && rawAns === idx) ||
+                                                        (typeof rawAns === 'string' && rawAns.trim() === String(idx)) ||
+                                                        (typeof rawAns === 'string' && MCQ_LABELS_BN[idx] && rawAns.trim() === MCQ_LABELS_BN[idx]) ||
+                                                        (typeof rawAns === 'string' && MCQ_LABELS_EN[idx] && rawAns.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                                      );
+
+                                                      const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
+                                                      const isMatchingCorrect = (
+                                                        (currentQuestion?.correct !== undefined && currentQuestion?.correct !== null && (
+                                                          String(currentQuestion.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                          (typeof currentQuestion.correct === 'number' && currentQuestion.correct === idx) ||
+                                                          (typeof currentQuestion.correct === 'string' && currentQuestion.correct.trim() === String(idx)) ||
+                                                          (typeof currentQuestion.correct === 'string' && MCQ_LABELS_BN[idx] && currentQuestion.correct.trim() === MCQ_LABELS_BN[idx]) ||
+                                                          (typeof currentQuestion.correct === 'string' && MCQ_LABELS_EN[idx] && currentQuestion.correct.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                                        )) ||
+                                                        (currentQuestion?.correctAnswer !== undefined && currentQuestion?.correctAnswer !== null && (
+                                                          String(currentQuestion.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                          (typeof currentQuestion.correctAnswer === 'number' && currentQuestion.correctAnswer === idx) ||
+                                                          (typeof currentQuestion.correctAnswer === 'string' && currentQuestion.correctAnswer.trim() === String(idx))
+                                                        )) ||
+                                                        (currentQuestion?.correctOption !== undefined && currentQuestion?.correctOption !== null && (
+                                                          currentQuestion.correctOption === idx ||
+                                                          String(currentQuestion.correctOption) === String(idx)
+                                                        )) ||
+                                                        (currentQuestion?.modelAnswer !== undefined && currentQuestion?.modelAnswer !== null && (
+                                                          String(currentQuestion.modelAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase()
+                                                        ))
+                                                      );
+
+                                                      const isCorrectOpt = isOptionMarkedCorrect || isMatchingCorrect;
+
+                                                      let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                      let labelStyle = "bg-muted text-muted-foreground";
+                                                      let badge = null;
+
+                                                      if (isSelected && isCorrectOpt) {
+                                                        style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                        labelStyle = "bg-emerald-600 text-white";
+                                                        badge = (
+                                                          <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                            <CheckCircle className="h-3 w-3" /> Correct
+                                                          </Badge>
+                                                        );
+                                                      } else if (isSelected && !isCorrectOpt) {
+                                                        style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                        labelStyle = "bg-rose-600 text-white";
+                                                        badge = (
+                                                          <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                            <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                          </Badge>
+                                                        );
+                                                      } else if (!isSelected && isCorrectOpt) {
+                                                        style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                        labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                        badge = (
+                                                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
+                                                            <CheckCircle className="h-3 w-3 text-emerald-600" /> Correct Option
+                                                          </Badge>
+                                                        );
+                                                      }
+
+                                                      return (
+                                                        <div key={idx} className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                              {MCQ_LABELS_BN?.[idx] || String.fromCharCode(65 + idx)}
+                                                            </span>
+                                                            <div className="text-sm font-medium leading-relaxed break-words overflow-x-auto max-w-full">
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                              {opt?.image && (
+                                                                <div className="mt-1.5 block">
+                                                                  <img src={opt.image} alt={`Option ${idx + 1}`} className="max-h-20 rounded border bg-card object-contain" />
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          </div>
+                                                          <div className="shrink-0">{badge}</div>
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
                                                 </div>
                                               );
                                             })()}
+                                          </div>
+                                        )}
 
-                                            {/* MCQ Specific Rendering */}
-                                            {currentQuestion?.type?.toLowerCase() === 'mcq' && (
-                                              <div className="text-base md:text-lg p-3 bg-card rounded-xl border border-border italic font-medium">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(String(currentAnswer))}</UniversalMathJax>
-                                              </div>
-                                            )}
+                                        {/* MC Specific Rendering (Multiple Correct with Partial Marks) */}
+                                        {currentQuestion?.type?.toLowerCase() === 'mc' && (
+                                          <div className="space-y-3">
+                                            {(() => {
+                                              const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
+                                              return (
+                                                <div className="space-y-2">
+                                                  <div className="text-xs font-bold text-muted-foreground flex items-center justify-between">
+                                                    <span>Selected ({mc.selectedIndices.length}) • Correct Keys ({mc.totalCorrect}):</span>
+                                                    {mc.isFullCorrect ? (
+                                                      <span className="text-emerald-600 font-bold">Full Marks Earned (+{mc.score})</span>
+                                                    ) : mc.isPartial ? (
+                                                      <span className="text-amber-600 font-bold">Partial Marks Earned (+{mc.score})</span>
+                                                    ) : (
+                                                      <span className="text-rose-600 font-bold">0 Marks</span>
+                                                    )}
+                                                  </div>
+                                                  <div className="grid grid-cols-1 gap-2">
+                                                    {(currentQuestion?.options || []).map((opt: any, idx: number) => {
+                                                      const isSelected = mc.selectedIndices.includes(idx);
+                                                      const isCorrectOpt = opt?.isCorrect === true;
+                                                      const optText = typeof opt === 'object' ? opt?.text : opt;
 
-                                            {/* MC Specific Rendering (Multiple Correct with Partial Marks) */}
-                                            {currentQuestion?.type?.toLowerCase() === 'mc' && (
-                                              <div className="space-y-3">
-                                                {(() => {
-                                                  const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
-                                                  return (
-                                                    <div className="space-y-2">
-                                                      <div className="text-xs font-bold text-muted-foreground flex items-center justify-between">
-                                                        <span>Selected ({mc.selectedIndices.length}) • Correct Keys ({mc.totalCorrect}):</span>
-                                                        {mc.isFullCorrect ? (
-                                                          <span className="text-emerald-600 font-bold">Full Marks Earned (+{mc.score})</span>
-                                                        ) : mc.isPartial ? (
-                                                          <span className="text-amber-600 font-bold">Partial Marks Earned (+{mc.score})</span>
-                                                        ) : (
-                                                          <span className="text-rose-600 font-bold">0 Marks</span>
-                                                        )}
-                                                      </div>
-                                                      <div className="grid grid-cols-1 gap-2">
-                                                        {(currentQuestion?.options || []).map((opt: any, idx: number) => {
-                                                          const isSelected = mc.selectedIndices.includes(idx);
-                                                          const isCorrectOpt = opt?.isCorrect === true;
-                                                          const optText = typeof opt === 'object' ? opt?.text : opt;
+                                                      let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                      let labelStyle = "bg-muted text-muted-foreground";
+                                                      let badge = null;
 
-                                                          let style = "bg-card/50 border-border text-muted-foreground opacity-60";
-                                                          let labelStyle = "bg-muted text-muted-foreground";
-                                                          let badge = null;
-
-                                                          if (isSelected && isCorrectOpt) {
-                                                            style = "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 opacity-100";
-                                                            labelStyle = "bg-emerald-500 text-white";
-                                                            badge = (
-                                                              <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
-                                                                <CheckCircle className="h-3 w-3" /> Correct
-                                                              </Badge>
-                                                            );
-                                                          } else if (isSelected && !isCorrectOpt) {
-                                                            style = "bg-rose-500/10 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30 opacity-100";
-                                                            labelStyle = "bg-rose-500 text-white";
-                                                            badge = (
-                                                              <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
-                                                                <XCircle className="h-3 w-3" /> Incorrect Choice
-                                                             </Badge>
-                                                            );
-                                                          } else if (!isSelected && isCorrectOpt) {
-                                                            style = "bg-emerald-500/5 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
-                                                            labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
-                                                            badge = (
-                                                              <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2">
-                                                                Missed Correct Option
-                                                              </Badge>
-                                                            );
-                                                          }
-
-                                                          return (
-                                                            <div key={idx} className={`p-3 rounded-xl border-2 flex items-center justify-between gap-3 transition-all ${style}`}>
-                                                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
-                                                                  {MCQ_LABELS_BN?.[idx] || String.fromCharCode(65 + idx)}
-                                                                </span>
-                                                                <div className="text-sm font-medium leading-relaxed break-words overflow-x-auto max-w-full">
-                                                                  <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
-                                                                </div>
-                                                              </div>
-                                                              <div className="shrink-0">{badge}</div>
-                                                            </div>
-                                                          );
-                                                        })}
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })()}
-                                              </div>
-                                            )}
-
-                                            {/* SMCQ Specific Rendering */}
-                                            {currentQuestion?.type?.toLowerCase() === 'smcq' && (
-                                              <div className="space-y-4">
-                                                {(currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).map((subQ: any, sIdx: number) => {
-                                                  const subAns = currentStudent?.answers?.[`${currentQuestion.id}_sub_${sIdx}`];
-
-                                                  const normalize = (s: any) => String(s || "").trim().toLowerCase();
-                                                  const userAns = normalize(subAns);
-                                                  let isSubCorrect = false;
-
-                                                  if (subQ.options && Array.isArray(subQ.options)) {
-                                                    const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
-                                                    if (correctOpt) {
-                                                      const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
-                                                      isSubCorrect = userAns === correctText;
-                                                    }
-                                                  }
-
-                                                  if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
-                                                    const correctIndex = Number(subQ.correctAnswer);
-                                                    if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
-                                                      const opt = subQ.options[correctIndex];
-                                                      const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
-                                                      isSubCorrect = userAns === correctText;
-                                                    } else {
-                                                      isSubCorrect = userAns === normalize(subQ.correctAnswer);
-                                                    }
-                                                  }
-
-                                                  return (
-                                                    <div key={sIdx} className="p-3 bg-card rounded-xl border border-border">
-                                                      <div className="flex items-center justify-between mb-3">
-                                                        <div className="text-sm font-semibold text-indigo-700 dark:text-indigo-300 whitespace-pre-wrap">
-                                                          Part {toBengaliNumerals(sIdx + 1)}: <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                        </div>
-                                                        {subAns ? (
-                                                          isSubCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />
-                                                        ) : (
-                                                          <Badge variant="outline" className="text-xs font-normal">Not Answered</Badge>
-                                                        )}
-                                                      </div>
-                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                        {(subQ.options || []).map((opt: any, oIdx: number) => {
-                                                          const optText = typeof opt === 'object' ? opt.text : opt;
-                                                          const isSelected = normalize(subAns) === normalize(optText);
-                                                          const isCorrect = opt.isCorrect || (subQ.correctAnswer !== undefined && (normalize(subQ.correctAnswer) === normalize(optText) || Number(subQ.correctAnswer) === oIdx));
-
-                                                          return (
-                                                            <div key={oIdx} className={`text-xs p-2 rounded-lg border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 dark:bg-green-950/30 border-green-300' : 'bg-red-100 dark:bg-red-950/30 border-red-300') :
-                                                              isCorrect ? 'bg-green-50 dark:bg-green-950/20 border-green-200 opacity-80' : 'bg-muted/30 border-border opacity-60'
-                                                              }`}>
-                                                              <div className="flex items-center gap-2 whitespace-pre-wrap">
-                                                                <span className="font-bold text-gray-500">{MCQ_LABELS?.[oIdx]}.</span>
-                                                                <UniversalMathJax inline dynamic>{cleanupMath((optText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                              </div>
-                                                              {isSelected && (isCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : <XCircle className="h-3 w-3 text-red-600" />)}
-                                                            </div>
-                                                          )
-                                                        })}
-                                                      </div>
-                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
-                                                        <div className="mt-3 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 p-2 rounded-lg border border-green-100 dark:border-green-900/30 whitespace-pre-wrap">
-                                                          <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                        </div>
-                                                      )}
-                                                      {subQ.explanation && (
-                                                        <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/20 p-2 rounded-lg border border-blue-100 dark:border-blue-900/30 whitespace-pre-wrap">
-                                                          <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-
-                                            {/* AR Specific Rendering */}
-                                            {currentQuestion?.type?.toLowerCase() === 'ar' && (
-                                              <div className="p-3 bg-card rounded-xl border border-border">
-                                                <div className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 mb-1">Selected Option {currentAnswer?.selectedOption || currentAnswer || "N/A"}:</div>
-                                                <div className="text-sm text-foreground italic">
-                                                  {(() => {
-                                                    if (currentQuestion?.options && (currentQuestion?.options?.length || 0) > 0) {
-                                                      const selectedIdx = Number(currentAnswer?.selectedOption || currentAnswer || 0) - 1;
-                                                      if (selectedIdx >= 0 && selectedIdx < (currentQuestion?.options?.length || 0)) {
-                                                        return <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion?.options?.[selectedIdx]?.text || "")}</UniversalMathJax>;
+                                                      if (isSelected && isCorrectOpt) {
+                                                        style = "bg-emerald-500/10 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 opacity-100";
+                                                        labelStyle = "bg-emerald-500 text-white";
+                                                        badge = (
+                                                          <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                            <CheckCircle className="h-3 w-3" /> Correct
+                                                          </Badge>
+                                                        );
+                                                      } else if (isSelected && !isCorrectOpt) {
+                                                        style = "bg-rose-500/10 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30 opacity-100";
+                                                        labelStyle = "bg-rose-500 text-white";
+                                                        badge = (
+                                                          <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                            <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                          </Badge>
+                                                        );
+                                                      } else if (!isSelected && isCorrectOpt) {
+                                                        style = "bg-emerald-500/5 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                        labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                        badge = (
+                                                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2">
+                                                            Missed Correct Option
+                                                          </Badge>
+                                                        );
                                                       }
-                                                    }
 
-                                                    const labels = [
-                                                      "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
-                                                      "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
-                                                      "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                                                      "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                                                      "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                    ];
-                                                    return <UniversalMathJax inline dynamic>{labels?.[Number(currentAnswer?.selectedOption || currentAnswer || 0) - 1] || "Unknown Option"}</UniversalMathJax>;
-                                                  })()}
+                                                      return (
+                                                        <div key={idx} className={`p-3 rounded-xl border-2 flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                              {MCQ_LABELS_BN?.[idx] || String.fromCharCode(65 + idx)}
+                                                            </span>
+                                                            <div className="text-sm font-medium leading-relaxed break-words overflow-x-auto max-w-full">
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                            </div>
+                                                          </div>
+                                                          <div className="shrink-0">{badge}</div>
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            )}
+                                              );
+                                            })()}
+                                          </div>
+                                        )}
+
+                                        {/* SMCQ Specific Rendering */}
+                                        {currentQuestion?.type?.toLowerCase() === 'smcq' && (
+                                          <div className="space-y-4">
+                                            {(() => {
+                                              let rawSubQs = currentQuestion?.subQuestions || (currentQuestion as any)?.sub_questions || [];
+                                              if (typeof rawSubQs === 'string') {
+                                                try { rawSubQs = JSON.parse(rawSubQs); } catch { rawSubQs = []; }
+                                              }
+                                              const subQs: any[] = Array.isArray(rawSubQs) ? rawSubQs : [];
+
+                                              if (subQs.length === 0) {
+                                                return <span className="text-muted-foreground italic text-xs">No scenario sub-questions found.</span>;
+                                              }
+
+                                              return subQs.map((subQ: any, sIdx: number) => {
+                                                const subAns = currentStudent?.answers?.[`${currentQuestion.id}_sub_${sIdx}`] ?? currentStudent?.answers?.[`${currentQuestion.id}_${sIdx}`];
+                                                const hasSubAns = subAns !== undefined && subAns !== null && String(subAns).trim() !== '' && subAns !== 'No answer provided';
+
+                                                let subOpts = subQ.options;
+                                                if (typeof subOpts === 'string') {
+                                                  try { subOpts = JSON.parse(subOpts); } catch { subOpts = []; }
+                                                }
+                                                const options: any[] = Array.isArray(subOpts) ? subOpts : [];
+
+                                                const normalize = (s: any) => String(s || "").trim().toLowerCase();
+                                                const userAns = normalize(subAns);
+                                                let isSubCorrect = false;
+
+                                                if (options.length > 0) {
+                                                  const correctOpt = options.find((opt: any) => typeof opt === 'object' && opt?.isCorrect);
+                                                  if (correctOpt) {
+                                                    const correctText = normalize(typeof correctOpt === 'object' ? (correctOpt.text ?? correctOpt.value) : correctOpt);
+                                                    isSubCorrect = userAns === correctText;
+                                                  }
+                                                }
+
+                                                if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+                                                  const correctIndex = Number(subQ.correctAnswer);
+                                                  if (!isNaN(correctIndex) && options[correctIndex]) {
+                                                    const opt = options[correctIndex];
+                                                    const correctText = normalize(typeof opt === 'object' ? (opt.text ?? opt.value) : opt);
+                                                    isSubCorrect = userAns === correctText;
+                                                  } else {
+                                                    isSubCorrect = userAns === normalize(subQ.correctAnswer);
+                                                  }
+                                                }
+
+                                                if (!isSubCorrect && subQ.correct !== undefined && subQ.correct !== null) {
+                                                  isSubCorrect = userAns === normalize(subQ.correct);
+                                                }
+
+                                                const subMarks = Number(subQ.marks) || 1;
+
+                                                return (
+                                                  <div key={sIdx} className="p-4 bg-card rounded-2xl border border-border space-y-3 shadow-xs">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+                                                      <div className="text-sm font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                                                        <span className="bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-md text-xs font-black uppercase">
+                                                          Part {toBengaliNumerals(sIdx + 1)}
+                                                        </span>
+                                                        <div className="inline whitespace-pre-wrap">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                        {hasSubAns ? (
+                                                          isSubCorrect ? (
+                                                            <Badge className="bg-emerald-600 text-white text-xs py-0.5 px-2.5 flex items-center gap-1 shadow-xs">
+                                                              <CheckCircle className="h-3.5 w-3.5" /> Correct (+{subMarks})
+                                                            </Badge>
+                                                          ) : (
+                                                            <Badge className="bg-rose-600 text-white text-xs py-0.5 px-2.5 flex items-center gap-1 shadow-xs">
+                                                              <XCircle className="h-3.5 w-3.5" /> Wrong ({exam?.mcqNegativeMarking ? `-${((subMarks * exam.mcqNegativeMarking) / 100).toFixed(2)}` : '0'})
+                                                            </Badge>
+                                                          )
 
                                             {/* CMA Specific Rendering */}
                                             {(currentQuestion?.type || "").toLowerCase() === 'cma' && (
