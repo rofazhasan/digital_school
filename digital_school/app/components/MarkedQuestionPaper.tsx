@@ -241,15 +241,57 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
         const getMCQMark = (q: MCQ, userAnswer: any) => {
             if (userAnswer === undefined || userAnswer === null || userAnswer === '' || userAnswer === 'No answer provided') return 0;
-            const correctText = q.correct || q.options?.find(opt => opt.isCorrect)?.text;
+            const normalize = (s: any) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
+            const userAns = normalize(userAnswer);
             let isCorrect = false;
+
             if (q.options && Array.isArray(q.options)) {
-                const optIdx = typeof userAnswer === 'number' ? userAnswer : q.options.findIndex((o: any) => (o.text || o) === userAnswer);
-                if (optIdx !== -1 && q.options[optIdx]?.isCorrect) isCorrect = true;
+                const correctIdx = q.options.findIndex((opt: any) => opt && (opt.isCorrect || (typeof opt === 'object' && opt.isCorrect)));
+                if (correctIdx !== -1) {
+                    const correctOpt = q.options[correctIdx];
+                    const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
+                    const letter = String.fromCharCode(97 + correctIdx);
+                    isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
+                }
+
+                if (!isCorrect) {
+                    const num = parseInt(userAns, 10);
+                    if (!isNaN(num) && num >= 0 && num < q.options.length) {
+                        isCorrect = Boolean(q.options[num]?.isCorrect);
+                    }
+                }
             }
-            if (!isCorrect && correctText !== undefined) {
-                isCorrect = String(userAnswer).trim().toLowerCase() === String(correctText).trim().toLowerCase();
+
+            if (!isCorrect && (q.correct !== undefined || (q as any).correctOption !== undefined || (q as any).correctAnswer !== undefined)) {
+                const rawC = q.correct ?? (q as any).correctOption ?? (q as any).correctAnswer;
+                const cAns = normalize(String(rawC));
+                if (userAns === cAns) {
+                    isCorrect = true;
+                } else if (q.options && Array.isArray(q.options)) {
+                    const cNum = parseInt(cAns, 10);
+                    if (!isNaN(cNum)) {
+                        if (cNum >= 0 && cNum < q.options.length) {
+                            const opt = q.options[cNum];
+                            const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                            if (userAns === optText || userAns === String(cNum)) isCorrect = true;
+                        }
+                        if (!isCorrect && cNum >= 1 && cNum <= q.options.length) {
+                            const opt = q.options[cNum - 1];
+                            const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                            if (userAns === optText || userAns === String(cNum - 1)) isCorrect = true;
+                        }
+                    }
+                    const uNum = parseInt(userAns, 10);
+                    if (!isCorrect && !isNaN(uNum)) {
+                        if (uNum >= 0 && uNum < q.options.length) {
+                            const opt = q.options[uNum];
+                            const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                            if (optText === cAns) isCorrect = true;
+                        }
+                    }
+                }
             }
+
             if (isCorrect) return q.marks || 1;
             return -((q.marks || 1) * negativeRate);
         };
@@ -280,8 +322,22 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
 
         const getARMark = (q: AR, userAnswer: any) => {
-            const selected = Number(userAnswer?.selectedOption ?? (typeof userAnswer === 'number' ? userAnswer : 0));
-            const correct = Number(q.correct || q.correctOption || 0);
+            let selected = 0;
+            if (userAnswer !== undefined && userAnswer !== null && userAnswer !== '' && userAnswer !== 'No answer provided') {
+                if (typeof userAnswer === 'number') {
+                    selected = userAnswer;
+                } else if (typeof userAnswer === 'string' && !isNaN(Number(userAnswer.trim()))) {
+                    selected = Number(userAnswer.trim());
+                } else if (typeof userAnswer === 'object') {
+                    const v = userAnswer.selectedOption ?? userAnswer.answer ?? userAnswer.option ?? userAnswer.value;
+                    if (v !== undefined && v !== null && !isNaN(Number(v))) selected = Number(v);
+                }
+            }
+            const rawCorrect = q.correctOption ?? q.correct ?? (q as any).correctAnswer ?? 0;
+            const correct = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
+                ? Number(rawCorrect.trim())
+                : (typeof rawCorrect === 'number' ? rawCorrect : 0);
+
             if (selected === 0 || correct === 0) return 0;
             if (selected === correct) return q.marks || 1;
             return -((q.marks || 1) * negativeRate);
@@ -1144,15 +1200,28 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                         // AR Rendering
                                         if (q.type === 'AR') {
-                                            const selectedOption = Number(ans?.selectedOption || 0);
-                                            const correctOption = Number(q.correct || 0);
-                                            const isCorrect = selectedOption === correctOption;
+                                            let selectedOption = 0;
+                                            if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                                                if (typeof ans === 'number') {
+                                                    selectedOption = ans;
+                                                } else if (typeof ans === 'string' && !isNaN(Number(ans.trim()))) {
+                                                    selectedOption = Number(ans.trim());
+                                                } else if (typeof ans === 'object') {
+                                                    const v = ans.selectedOption ?? ans.answer ?? ans.option ?? ans.value;
+                                                    if (v !== undefined && v !== null && !isNaN(Number(v))) selectedOption = Number(v);
+                                                }
+                                            }
+                                            const rawCorrect = q.correctOption ?? q.correct ?? (q as any).correctAnswer ?? 0;
+                                            const correctOption = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
+                                                ? Number(rawCorrect.trim())
+                                                : (typeof rawCorrect === 'number' ? rawCorrect : 0);
+                                            const isCorrect = selectedOption > 0 && correctOption > 0 && selectedOption === correctOption;
 
                                             const qMark = getARMark(q, ans);
 
                                             return (
                                                 <div key={q.id || idx} className="break-inside-avoid col-span-full">
-                                                    <div className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : (selectedOption ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')} shadow-sm relative`}>
+                                                    <div className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : (selectedOption > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')} shadow-sm relative`}>
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                         <div className="flex items-start mb-4">
                                                             <span className="font-bold mr-2 text-sm">{qNum}.</span>

@@ -1282,8 +1282,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         assertion: (q as any).assertion || q.questionText,
         reason: (q as any).reason || "",
         marks: q.marks,
-        correct: Number((q as any).correct || (q as any).correctOption || 0),
-        correctOption: Number((q as any).correctOption || (q as any).correct || 0)
+        correct: Number((q as any).correctOption ?? (q as any).correct ?? (q as any).correctAnswer ?? 0),
+        correctOption: Number((q as any).correctOption ?? (q as any).correct ?? (q as any).correctAnswer ?? 0),
+        correctAnswer: Number((q as any).correctOption ?? (q as any).correct ?? (q as any).correctAnswer ?? 0)
       })),
       mtf: result.questions.filter(q => (q.type || "").toLowerCase() === 'mtf').map(q => ({
         id: q.id,
@@ -2883,15 +2884,22 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               // MC stores selectedOptions as index array
                                               isSelected = rawAnswer?.selectedOptions?.includes(optIndex) ?? false;
                                             } else if (type === 'AR') {
-                                              // AR stores selectedOption as 1-indexed number
-                                              isSelected = (rawAnswer?.selectedOption === optIndex + 1) ||
-                                                (Number(rawAnswer) === optIndex + 1);
+                                              // AR stores selectedOption as 1-indexed number (1 to 5)
+                                              let selNum = 0;
+                                              if (typeof rawAnswer === 'number') {
+                                                selNum = rawAnswer;
+                                              } else if (typeof rawAnswer === 'string' && !isNaN(Number(rawAnswer.trim()))) {
+                                                selNum = Number(rawAnswer.trim());
+                                              } else if (typeof rawAnswer === 'object' && rawAnswer !== null) {
+                                                const v = rawAnswer.selectedOption ?? rawAnswer.answer ?? rawAnswer.option ?? rawAnswer.value;
+                                                if (v !== undefined && v !== null && !isNaN(Number(v))) selNum = Number(v);
+                                              }
+                                              isSelected = selNum === optIndex + 1;
                                             } else {
-                                              // MCQ: studentAnswer is the chosen option text (string)
+                                              // MCQ: studentAnswer can be text, 0-based index number, or string index
                                               const isTextMatch = typeof rawAnswer === 'string' &&
                                                 rawAnswer.trim() !== '' &&
-                                                rawAnswer.trim() === String(optText).trim();
-                                              // Fallback: if stored as 0-based index number
+                                                (rawAnswer.trim() === String(optText).trim() || (!isNaN(Number(rawAnswer.trim())) && Number(rawAnswer.trim()) === optIndex));
                                               const isIndexMatch = typeof rawAnswer === 'number' && rawAnswer === optIndex;
                                               isSelected = isTextMatch || isIndexMatch;
                                             }
@@ -2899,13 +2907,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             // --- PRECISE isCorrectOpt DETECTION ---
                                             const isOptionMarkedCorrect = typeof option === 'object' && option.isCorrect === true;
                                             const isOptionMatchingCorrectAnswer =
-                                              (question.correctAnswer !== undefined && question.correctAnswer !== null &&
-                                                String(question.correctAnswer).trim() === String(optText).trim()) ||
-                                              (question.correct !== undefined && question.correct !== null &&
-                                                String(question.correct).trim() === String(optText).trim()) ||
-                                              (typeof question.correctAnswer === 'number' && question.correctAnswer === optIndex) ||
-                                              (typeof question.correct === 'number' && question.correct === optIndex) ||
-                                              ((question as any).correctOption !== undefined && (question as any).correctOption === optIndex);
+                                              type === 'AR'
+                                                ? (Number(question.correctOption ?? question.correct ?? (question as any).correctAnswer) === optIndex + 1)
+                                                : (
+                                                    (question.correctAnswer !== undefined && question.correctAnswer !== null &&
+                                                      String(question.correctAnswer).trim() === String(optText).trim()) ||
+                                                    (question.correct !== undefined && question.correct !== null &&
+                                                      String(question.correct).trim() === String(optText).trim()) ||
+                                                    (typeof question.correctAnswer === 'number' && question.correctAnswer === optIndex) ||
+                                                    (typeof question.correct === 'number' && question.correct === optIndex) ||
+                                                    ((question as any).correctOption !== undefined && Number((question as any).correctOption) === optIndex) ||
+                                                    (typeof question.correctAnswer === 'string' && !isNaN(Number(question.correctAnswer.trim())) && Number(question.correctAnswer.trim()) === optIndex) ||
+                                                    (typeof question.correct === 'string' && !isNaN(Number(question.correct.trim())) && Number(question.correct.trim()) === optIndex)
+                                                  );
 
                                             const isCorrectOpt = isOptionMarkedCorrect || isOptionMatchingCorrectAnswer;
 

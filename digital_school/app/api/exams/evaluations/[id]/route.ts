@@ -426,13 +426,15 @@ export async function GET(
         }
       }
 
+      const resolvedCorrect = q.correctOption ?? q.correct ?? q.correctAnswer ?? null;
+
       return {
         id: q.id,
         type: (q.type || '').toLowerCase(),
         text: q.questionText || q.text || q.question || '',
         questionText: q.questionText || q.text || q.question || '',
         marks: q.marks,
-        correct: q.correct,
+        correct: resolvedCorrect,
         options: parsedOptions,
         subQuestions: parsedSubQuestions,
         sub_questions: parsedSubQuestions,
@@ -440,12 +442,12 @@ export async function GET(
         explanation: explanation || null,
         assertion: q.assertion || null,
         reason: q.reason || null,
-        correctOption: q.correctOption ?? q.correct ?? q.correctAnswer ?? null,
+        correctOption: resolvedCorrect,
         pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
         leftColumn: q.leftColumn,
         rightColumn: q.rightColumn,
         matches: q.matches,
-        correctAnswer: q.correctAnswer || q.correct || q.answer,
+        correctAnswer: q.correctAnswer || resolvedCorrect || q.answer,
         sourceText: q.sourceText || q.source_text || null,
         passage: q.passage || null,
         label: q.label || null,

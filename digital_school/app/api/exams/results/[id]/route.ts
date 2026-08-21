@@ -341,20 +341,50 @@ export async function GET(
             let isCorrect = false;
 
             if (Array.isArray(options)) {
-              const correctOption = options.find((opt: any) => opt.isCorrect);
-              if (correctOption) {
-                isCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
+              const correctIdx = options.findIndex((opt: any) => opt && (opt.isCorrect || (typeof opt === 'object' && opt.isCorrect)));
+              if (correctIdx !== -1) {
+                const correctOpt = options[correctIdx];
+                const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
+                const letter = String.fromCharCode(97 + correctIdx);
+                isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
+              }
+
+              if (!isCorrect) {
+                const num = parseInt(userAns, 10);
+                if (!isNaN(num) && num >= 0 && num < options.length) {
+                  isCorrect = Boolean(options[num]?.isCorrect);
+                }
               }
             }
 
             if (!isCorrect) {
-              const correctRef = question.correctOption !== undefined ? question.correctOption : question.correct;
-              if (correctRef !== undefined && correctRef !== null) {
-                const cIdx = Number(correctRef);
-                if (!isNaN(cIdx) && options[cIdx]) {
-                  isCorrect = userAns === normalize(typeof options[cIdx] === 'object' ? options[cIdx].text : options[cIdx]);
-                } else {
-                  isCorrect = userAns === normalize(correctRef);
+              const rawC = question.correctOption !== undefined ? question.correctOption : (question.correct !== undefined ? question.correct : question.correctAnswer);
+              if (rawC !== undefined && rawC !== null) {
+                const cAns = normalize(String(rawC));
+                if (userAns === cAns) {
+                  isCorrect = true;
+                } else if (Array.isArray(options)) {
+                  const cNum = parseInt(cAns, 10);
+                  if (!isNaN(cNum)) {
+                    if (cNum >= 0 && cNum < options.length) {
+                      const opt = options[cNum];
+                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                      if (userAns === optText || userAns === String(cNum)) isCorrect = true;
+                    }
+                    if (!isCorrect && cNum >= 1 && cNum <= options.length) {
+                      const opt = options[cNum - 1];
+                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                      if (userAns === optText || userAns === String(cNum - 1)) isCorrect = true;
+                    }
+                  }
+                  const uNum = parseInt(userAns, 10);
+                  if (!isCorrect && !isNaN(uNum)) {
+                    if (uNum >= 0 && uNum < options.length) {
+                      const opt = options[uNum];
+                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                      if (optText === cAns) isCorrect = true;
+                    }
+                  }
                 }
               }
             }
@@ -375,7 +405,7 @@ export async function GET(
           calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
         } else if (type === 'INT' || type === 'NUMERIC') {
           const intResult = evaluateINTQuestion(question, studentAnswer);
-          if (!intResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '') {
+          if (!intResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '' && studentAnswer !== 'No answer provided') {
             // Apply negative marking for wrong INT/NUMERIC answers
             calculatedMarks = exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0;
           } else {
@@ -383,11 +413,12 @@ export async function GET(
           }
         } else if (type === 'AR') {
           const arResult = evaluateARQuestion(question, studentAnswer);
-          if (!arResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null) {
-            // Apply negative marking for wrong AR answers
-            calculatedMarks = exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0;
-          } else {
+          if (arResult.isCorrect) {
             calculatedMarks = arResult.score;
+          } else if (arResult.isAttempted && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+            calculatedMarks = -((maxMarks * exam.mcqNegativeMarking) / 100);
+          } else {
+            calculatedMarks = 0;
           }
         } else if (type === 'MTF') {
           const hasMatchSet = studentAnswer && (Array.isArray((studentAnswer as any).matches) ? (studentAnswer as any).matches.length > 0 : Object.keys(studentAnswer as any).length > 0);
@@ -422,6 +453,8 @@ export async function GET(
       awardedMarks = Number(calculatedMarks) || 0;
       // --- BUTTERY FALLBACK EVALUATION END ---
 
+      const resolvedCorrectOption = question.correctOption !== undefined ? question.correctOption : (question.correct !== undefined ? question.correct : null);
+
       return {
         id: question.id,
         type: question.type,
@@ -444,8 +477,9 @@ export async function GET(
         leftColumn: question.leftColumn || null,
         rightColumn: question.rightColumn || null,
         matches: question.matches || null,
-        correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : (question.correctOption !== undefined ? question.correctOption : null),
-        correctOption: question.correctOption !== undefined ? question.correctOption : null,
+        correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : resolvedCorrectOption,
+        correctOption: resolvedCorrectOption,
+        correct: resolvedCorrectOption,
       };
     });
 

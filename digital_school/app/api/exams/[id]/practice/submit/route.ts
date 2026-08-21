@@ -124,9 +124,12 @@ export async function POST(
                 }
             } else if (type === 'AR') {
                 const result = evaluateARQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                if (result.isCorrect) {
+                    questionScore = Number(result.score) || (Number(question.marks) || 1);
+                } else if (result.isAttempted && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 1) * exam.mcqNegativeMarking) / 100);
+                } else {
+                    questionScore = 0;
                 }
             } else if (type === 'MTF') {
                 const result = evaluateMTFQuestion(question, studentAnswer);

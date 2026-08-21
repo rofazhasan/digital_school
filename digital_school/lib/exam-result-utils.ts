@@ -46,6 +46,16 @@ export const hasStudentAnswered = (
         return isAnswerValueValid(studentAnswer);
     }
 
+    if (type === 'AR') {
+        if (typeof studentAnswer === 'number') return studentAnswer > 0;
+        if (typeof studentAnswer === 'string') return studentAnswer.trim() !== '' && studentAnswer !== 'No answer provided' && !isNaN(Number(studentAnswer)) && Number(studentAnswer) > 0;
+        if (studentAnswer && typeof studentAnswer === 'object') {
+            const rawVal = studentAnswer.selectedOption ?? studentAnswer.answer ?? studentAnswer.option ?? studentAnswer.value;
+            return rawVal !== undefined && rawVal !== null && rawVal !== '' && !isNaN(Number(rawVal)) && Number(rawVal) > 0;
+        }
+        return false;
+    }
+
     if (studentAnswer && typeof studentAnswer === 'object' && !Array.isArray(studentAnswer)) {
         return Object.values(studentAnswer).some(v => isAnswerValueValid(v));
     }

@@ -332,17 +332,17 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             let res: any = null;
 
             if (type === 'MCQ') {
-                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '' || studentAnswer === 'No answer provided') continue;
 
                 const normalize = (s: string | number | undefined | null) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
                 if (question.options && Array.isArray(question.options)) {
-                    const correctIdx = question.options.findIndex((opt: QuestionOption) => opt.isCorrect);
+                    const correctIdx = question.options.findIndex((opt: QuestionOption) => opt && (opt.isCorrect || (typeof opt === 'object' && opt.isCorrect)));
                     if (correctIdx !== -1) {
                         const correctOpt = question.options[correctIdx];
-                        const correctText = normalize(correctOpt.text);
+                        const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
                         const letter = String.fromCharCode(97 + correctIdx); // 'a', 'b', 'c'...
                         isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
                     }
@@ -356,14 +356,41 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 }
 
                 if (!isCorrect && (question.correctAnswer !== undefined || question.correct !== undefined || question.correctOption !== undefined)) {
-                    const cAns = normalize(String(question.correctAnswer ?? question.correct ?? question.correctOption));
-                    isCorrect = userAns === cAns;
+                    const rawC = question.correctAnswer ?? question.correct ?? question.correctOption;
+                    const cAns = normalize(String(rawC));
+                    if (userAns === cAns) {
+                        isCorrect = true;
+                    } else if (question.options && Array.isArray(question.options)) {
+                        const cNum = parseInt(cAns, 10);
+                        if (!isNaN(cNum)) {
+                            // 0-based
+                            if (cNum >= 0 && cNum < question.options.length) {
+                                const opt = question.options[cNum];
+                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                                if (userAns === optText || userAns === String(cNum)) isCorrect = true;
+                            }
+                            // 1-based
+                            if (!isCorrect && cNum >= 1 && cNum <= question.options.length) {
+                                const opt = question.options[cNum - 1];
+                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                                if (userAns === optText || userAns === String(cNum - 1)) isCorrect = true;
+                            }
+                        }
+                        const uNum = parseInt(userAns, 10);
+                        if (!isCorrect && !isNaN(uNum)) {
+                            if (uNum >= 0 && uNum < question.options.length) {
+                                const opt = question.options[uNum];
+                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
+                                if (optText === cAns) isCorrect = true;
+                            }
+                        }
+                    }
                 }
 
                 if (isCorrect) {
-                    questionScore = Number(question.marks) || 0;
+                    questionScore = Number(question.marks) || 1;
                 } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                    questionScore = -((Number(question.marks || 1) * exam.mcqNegativeMarking) / 100);
                 }
                 res = { score: questionScore, type, isCorrect };
             } else if (type === 'MC') {
@@ -376,19 +403,19 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 });
                 res = { score: questionScore, type };
             } else if (type === 'INT' || type === 'NUMERIC') {
-                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '' || studentAnswer === 'No answer provided') continue;
                 const evaluationRes = evaluateINTQuestion(question, studentAnswer);
                 questionScore = evaluationRes.score;
                 if (!evaluationRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                    questionScore = -((Number(question.marks || 1) * exam.mcqNegativeMarking) / 100);
                 }
                 res = { score: questionScore, type, isCorrect: evaluationRes.isCorrect };
             } else if (type === 'AR') {
-                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
                 const evaluationRes = evaluateARQuestion(question as unknown as ARQuestion, studentAnswer);
+                if (!evaluationRes.isAttempted) continue;
                 questionScore = evaluationRes.score;
                 if (!evaluationRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                    questionScore = -((Number(question.marks || 1) * exam.mcqNegativeMarking) / 100);
                 }
                 res = { score: questionScore, type, isCorrect: evaluationRes.isCorrect };
             } else if (type === 'SMCQ') {

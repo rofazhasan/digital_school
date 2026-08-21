@@ -2136,9 +2136,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
 
       if (type === 'ar') {
-        const selected = Number(answer?.selectedOption !== undefined ? answer.selectedOption : answer);
-        const correct = Number(question?.correct || (question as any)?.correctOption || (question as any)?.correctAnswer || 0);
-        if (selected === correct && correct > 0) return Number(question?.marks) || 1;
+        const selected = typeof answer === 'object' && answer !== null
+          ? Number(answer.selectedOption ?? answer.answer ?? answer.option ?? 0)
+          : (typeof answer === 'string' && !isNaN(Number(answer.trim())) ? Number(answer.trim()) : (typeof answer === 'number' ? answer : 0));
+        const rawCorrect = question?.correctOption ?? question?.correct ?? (question as any)?.correctAnswer ?? 0;
+        const correct = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
+          ? Number(rawCorrect.trim())
+          : (typeof rawCorrect === 'number' ? rawCorrect : 0);
+        if (selected > 0 && correct > 0 && selected === correct) return Number(question?.marks) || 1;
         const negPct = exam?.mcqNegativeMarking;
         if (negPct && negPct > 0 && selected > 0) return -Math.round((((Number(question?.marks) || 1) * negPct) / 100) * 100) / 100;
         return 0;
@@ -3233,9 +3238,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               status = hasAnySub ? 'correct' : 'unanswered';
                             } else if (qType === 'ar') {
                               if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
-                                const selected = Number(ans?.selectedOption ?? ans);
-                                const correct = Number(q.correctOption ?? q.correct ?? 0);
-                                status = (selected > 0 && selected === correct) ? 'correct' : 'wrong';
+                                const selected = typeof ans === 'object' && ans !== null ? Number(ans.selectedOption ?? ans.answer ?? ans.option ?? 0) : Number(ans);
+                                const correct = Number(q.correctOption ?? q.correct ?? (q as any)?.correctAnswer ?? 0);
+                                status = (selected > 0 && correct > 0 && selected === correct) ? 'correct' : (selected > 0 ? 'wrong' : 'unanswered');
                               }
                             } else {
                               if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
@@ -4471,6 +4476,118 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                           </Badge>
                                                         )}
                                                       </div>
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </div>
+                                            )}
+
+                                            {/* AR Specific Rendering (Assertion-Reason 5-Option Grid) */}
+                                            {currentQuestion?.type?.toLowerCase() === 'ar' && (
+                                              <div className="space-y-3">
+                                                {(() => {
+                                                  const rawAns = currentAnswer;
+                                                  let selectedOption = 0;
+                                                  let hasAnswered = false;
+
+                                                  if (rawAns !== undefined && rawAns !== null && rawAns !== '' && rawAns !== 'No answer provided') {
+                                                    if (typeof rawAns === 'number') {
+                                                      selectedOption = rawAns;
+                                                      hasAnswered = selectedOption > 0;
+                                                    } else if (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim()))) {
+                                                      selectedOption = Number(rawAns.trim());
+                                                      hasAnswered = selectedOption > 0;
+                                                    } else if (typeof rawAns === 'object') {
+                                                      const rawVal = rawAns.selectedOption ?? rawAns.answer ?? rawAns.option ?? rawAns.value;
+                                                      if (rawVal !== undefined && rawVal !== null && rawVal !== '' && !isNaN(Number(rawVal))) {
+                                                        selectedOption = Number(rawVal);
+                                                        hasAnswered = selectedOption > 0;
+                                                      }
+                                                    }
+                                                  }
+
+                                                  const rawCorrect = currentQuestion?.correctOption ?? currentQuestion?.correct ?? (currentQuestion as any)?.correctAnswer ?? 0;
+                                                  const correctOption = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
+                                                    ? Number(rawCorrect.trim())
+                                                    : (typeof rawCorrect === 'number' ? rawCorrect : 0);
+
+                                                  const arOptions = [
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                                  ];
+
+                                                  return (
+                                                    <div className="space-y-3">
+                                                      {!hasAnswered && (
+                                                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+                                                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                                          <span>No Answer Provided by Student</span>
+                                                        </div>
+                                                      )}
+
+                                                      <div className="grid grid-cols-1 gap-2.5">
+                                                        {arOptions.map((optText, oidx) => {
+                                                          const optNum = oidx + 1;
+                                                          const isSelected = hasAnswered && selectedOption === optNum;
+                                                          const isOptionCorrect = correctOption === optNum;
+
+                                                          let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                          let labelStyle = "bg-muted text-muted-foreground";
+                                                          let badge = null;
+
+                                                          if (isSelected && isOptionCorrect) {
+                                                            style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                            labelStyle = "bg-emerald-600 text-white";
+                                                            badge = (
+                                                              <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                                <CheckCircle className="h-3 w-3" /> Correct
+                                                              </Badge>
+                                                            );
+                                                          } else if (isSelected && !isOptionCorrect) {
+                                                            style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                            labelStyle = "bg-rose-600 text-white";
+                                                            badge = (
+                                                              <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                                <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                              </Badge>
+                                                            );
+                                                          } else if (!isSelected && isOptionCorrect) {
+                                                            style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                            labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                            badge = (
+                                                              <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
+                                                                <CheckCircle className="h-3 w-3 text-emerald-600" /> Correct Option
+                                                              </Badge>
+                                                            );
+                                                          }
+
+                                                          return (
+                                                            <div key={oidx} className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                                <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                                  {toBengaliNumerals(optNum)}
+                                                                </span>
+                                                                <div className="text-sm font-medium leading-relaxed break-words overflow-x-auto max-w-full">
+                                                                  <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                                </div>
+                                                              </div>
+                                                              <div className="shrink-0">{badge}</div>
+                                                            </div>
+                                                          );
+                                                        })}
+                                                      </div>
+
+                                                      {currentQuestion?.explanation && (
+                                                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                                                          <span className="font-bold shrink-0">ব্যাখ্যা:</span>
+                                                          <div className="inline">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion.explanation)}</UniversalMathJax>
+                                                          </div>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   );
                                                 })()}
