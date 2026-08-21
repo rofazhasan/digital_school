@@ -4983,7 +4983,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Model Answer / Grading Reference:
                                         </h5>
                                         <div className="text-foreground text-sm md:text-base leading-relaxed">
-                                          <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct))}</UniversalMathJax>
+                                          <UniversalMathJax key={currentQuestion?.id} dynamic>
+                                            {cleanupMath(currentQuestion?.modelAnswer || String(currentQuestion?.correct || ''))}
+                                          </UniversalMathJax>
                                         </div>
                                       </div>
                                     ) : null;
