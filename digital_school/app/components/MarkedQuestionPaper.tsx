@@ -1118,18 +1118,36 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         {/* Options Grid */}
                                                         <div className="ml-2 md:ml-6 mt-1">
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                                                {(q.options || []).map((opt: any, oidx: number) => {
-                                                                    const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
-                                                                    const isCorrectOpt = (typeof opt === 'object' && opt.isCorrect) ||
-                                                                        (q.correct !== undefined && q.correct !== null && (
-                                                                            String(q.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
-                                                                            (typeof q.correct === 'number' && q.correct === oidx) ||
-                                                                            (typeof q.correct === 'string' && q.correct.trim() === String(oidx)) ||
-                                                                            (typeof q.correct === 'string' && MCQ_LABELS[oidx] && q.correct.trim() === MCQ_LABELS[oidx]) ||
-                                                                            (Array.isArray(q.correct) && q.correct.includes(oidx))
-                                                                        )) ||
-                                                                        (q.correctOption !== undefined && (Number(q.correctOption) === oidx || String(q.correctOption) === String(oidx))) ||
-                                                                        (q.correctAnswer !== undefined && String(q.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase());
+                                                                {(() => {
+                                                                    const correctTexts: string[] = [];
+                                                                    (q.options || []).forEach((opt: any, oidx: number) => {
+                                                                        const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
+                                                                        const isDirect = (typeof opt === 'object' && opt.isCorrect) ||
+                                                                            (q.correct !== undefined && q.correct !== null && (
+                                                                                String(q.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                                                (typeof q.correct === 'number' && q.correct === oidx) ||
+                                                                                (typeof q.correct === 'string' && q.correct.trim() === String(oidx)) ||
+                                                                                (typeof q.correct === 'string' && MCQ_LABELS[oidx] && q.correct.trim() === MCQ_LABELS[oidx]) ||
+                                                                                (Array.isArray(q.correct) && q.correct.includes(oidx))
+                                                                            )) ||
+                                                                            (q.correctOption !== undefined && (Number(q.correctOption) === oidx || String(q.correctOption) === String(oidx))) ||
+                                                                            (q.correctAnswer !== undefined && String(q.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase());
+                                                                        if (isDirect && optText) correctTexts.push(String(optText).trim().toLowerCase());
+                                                                    });
+
+                                                                    return (q.options || []).map((opt: any, oidx: number) => {
+                                                                        const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
+                                                                        const isCorrectOpt = (optText && correctTexts.includes(String(optText).trim().toLowerCase())) ||
+                                                                            (typeof opt === 'object' && opt.isCorrect) ||
+                                                                            (q.correct !== undefined && q.correct !== null && (
+                                                                                String(q.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                                                (typeof q.correct === 'number' && q.correct === oidx) ||
+                                                                                (typeof q.correct === 'string' && q.correct.trim() === String(oidx)) ||
+                                                                                (typeof q.correct === 'string' && MCQ_LABELS[oidx] && q.correct.trim() === MCQ_LABELS[oidx]) ||
+                                                                                (Array.isArray(q.correct) && q.correct.includes(oidx))
+                                                                            )) ||
+                                                                            (q.correctOption !== undefined && (Number(q.correctOption) === oidx || String(q.correctOption) === String(oidx))) ||
+                                                                            (q.correctAnswer !== undefined && String(q.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase());
 
                                                                     const isSelected = isMC
                                                                         ? selectedIndices.includes(oidx)

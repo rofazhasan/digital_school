@@ -3057,89 +3057,98 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       {subQ.isCorrect ? "Perfect Result" : "Corrected Response"}
                                                     </div>
                                                   )}
-                                                </div>
 
-                                                {(() => {
-                                                  const subOpts = subQ.options || [];
-                                                  const clean = (s: any) => String(s ?? '').trim().toLowerCase();
-                                                  const subCorrectIndices = new Set<number>();
-                                                  const subCorrectTexts: string[] = [];
+                                                  {(() => {
+                                                    const subOpts = subQ.options || [];
+                                                    const clean = (s: any) => String(s ?? '').trim().toLowerCase();
 
-                                                  subOpts.forEach((opt: any, oi: number) => {
-                                                    const isMarked = typeof opt === 'object' && opt?.isCorrect === true;
-                                                    const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-                                                    if (isMarked) {
-                                                      subCorrectIndices.add(oi);
-                                                      if (oText) subCorrectTexts.push(oText);
-                                                    }
-                                                  });
+                                                    // 1. Collect directly correct indices and texts
+                                                    const directlyCorrectIndices = new Set<number>();
+                                                    const directlyCorrectTexts: string[] = [];
 
-                                                  const rawSubC = subQ.correctOption ?? subQ.correct ?? subQ.correctAnswer ?? subQ.modelAnswer;
-                                                  if (rawSubC !== undefined && rawSubC !== null && clean(rawSubC) !== '') {
-                                                    const cStr = clean(rawSubC);
-                                                    subCorrectTexts.push(cStr);
-                                                    const cNum = parseInt(cStr, 10);
-                                                    if (!isNaN(cNum)) {
-                                                      if (cNum >= 0 && cNum < subOpts.length) subCorrectIndices.add(cNum);
-                                                      if (cNum >= 1 && cNum <= subOpts.length) subCorrectIndices.add(cNum - 1);
-                                                    }
-                                                  }
+                                                    subOpts.forEach((opt: any, oi: number) => {
+                                                      const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+                                                      const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
+                                                      const isMatchingCorrect = (
+                                                        (subQ?.correct !== undefined && subQ?.correct !== null && (
+                                                          clean(subQ.correct) === optText ||
+                                                          (typeof subQ.correct === 'number' && subQ.correct === oi) ||
+                                                          (typeof subQ.correct === 'string' && subQ.correct.trim() === String(oi)) ||
+                                                          (typeof subQ.correct === 'string' && MCQ_LABELS_BN[oi] && subQ.correct.trim() === MCQ_LABELS_BN[oi]) ||
+                                                          (typeof subQ.correct === 'string' && MCQ_LABELS_EN[oi] && subQ.correct.trim().toUpperCase() === MCQ_LABELS_EN[oi])
+                                                        )) ||
+                                                        (subQ?.correctAnswer !== undefined && subQ?.correctAnswer !== null && (
+                                                          clean(subQ.correctAnswer) === optText ||
+                                                          (typeof subQ.correctAnswer === 'number' && subQ.correctAnswer === oi) ||
+                                                          (typeof subQ.correctAnswer === 'string' && subQ.correctAnswer.trim() === String(oi))
+                                                        )) ||
+                                                        (subQ?.correctOption !== undefined && subQ?.correctOption !== null && (
+                                                          subQ.correctOption === oi ||
+                                                          String(subQ.correctOption) === String(oi)
+                                                        )) ||
+                                                        (subQ?.modelAnswer !== undefined && subQ?.modelAnswer !== null && (
+                                                          clean(subQ.modelAnswer) === optText
+                                                        ))
+                                                      );
 
-                                                  // Expand identical options
-                                                  subOpts.forEach((opt: any, oi: number) => {
-                                                    const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-                                                    if (oText && subCorrectTexts.includes(oText)) {
-                                                      subCorrectIndices.add(oi);
-                                                    }
-                                                    for (const cIdx of Array.from(subCorrectIndices)) {
-                                                      const cOptText = clean(typeof subOpts[cIdx] === 'object' ? (subOpts[cIdx]?.text ?? subOpts[cIdx]?.value) : subOpts[cIdx]);
-                                                      if (oText && cOptText && oText === cOptText) {
-                                                        subCorrectIndices.add(oi);
-                                                        if (!subCorrectTexts.includes(oText)) subCorrectTexts.push(oText);
+                                                      if (isOptionMarkedCorrect || isMatchingCorrect) {
+                                                        directlyCorrectIndices.add(oi);
+                                                        if (optText) directlyCorrectTexts.push(optText);
                                                       }
-                                                    }
-                                                  });
+                                                    });
 
-                                                  return (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                      {subOpts.map((opt: any, oi: number) => {
-                                                        const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? String(opt)) : String(opt);
-                                                        const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && (
-                                                          clean(subQ.studentAnswer) === clean(optText) ||
-                                                          (typeof subQ.studentAnswer === 'number' && subQ.studentAnswer === oi) ||
-                                                          (typeof subQ.studentAnswer === 'string' && !isNaN(Number(subQ.studentAnswer.trim())) && Number(subQ.studentAnswer.trim()) === oi)
-                                                        );
-                                                        const isCorOpt = subCorrectIndices.has(oi);
+                                                    // 2. Identical options normalization
+                                                    const subCorrectIndices = new Set<number>(directlyCorrectIndices);
+                                                    subOpts.forEach((opt: any, oi: number) => {
+                                                      const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+                                                      if (optText && directlyCorrectTexts.includes(optText)) {
+                                                        subCorrectIndices.add(oi);
+                                                      }
+                                                    });
 
-                                                        let optStyle = "border-border/80 dark:border-slate-800 bg-card text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
-                                                        let optIcon = null;
+                                                    return (
+                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {subOpts.map((opt: any, oi: number) => {
+                                                          const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? String(opt)) : String(opt);
+                                                          const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && (
+                                                            clean(subQ.studentAnswer) === clean(optText) ||
+                                                            (typeof subQ.studentAnswer === 'number' && subQ.studentAnswer === oi) ||
+                                                            (typeof subQ.studentAnswer === 'string' && !isNaN(Number(subQ.studentAnswer.trim())) && Number(subQ.studentAnswer.trim()) === oi) ||
+                                                            (typeof subQ.studentAnswer === 'string' && MCQ_LABELS_BN[oi] && subQ.studentAnswer.trim() === MCQ_LABELS_BN[oi]) ||
+                                                            (typeof subQ.studentAnswer === 'string' && MCQ_LABELS_EN[oi] && subQ.studentAnswer.trim().toUpperCase() === MCQ_LABELS_EN[oi])
+                                                          );
+                                                          const isCorOpt = subCorrectIndices.has(oi);
 
-                                                        if (isSel && isCorOpt) {
-                                                          optStyle = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 scale-[1.02]";
-                                                          optIcon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
-                                                        } else if (isSel && !isCorOpt) {
-                                                          optStyle = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-50 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10";
-                                                          optIcon = <XCircle className="h-4 w-4 text-rose-600" />;
-                                                        } else if (!isSel && isCorOpt) {
-                                                          optStyle = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed";
-                                                          optIcon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
-                                                        }
+                                                          let optStyle = "border-border/80 dark:border-slate-800 bg-card text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
+                                                          let optIcon = null;
 
-                                                        return (
-                                                          <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
-                                                            <span className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
-                                                              {String.fromCharCode(65 + oi)}
-                                                            </span>
-                                                            <div className="flex-1 font-semibold text-sm">
-                                                              <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                          if (isSel && isCorOpt) {
+                                                            optStyle = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 scale-[1.02]";
+                                                            optIcon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
+                                                          } else if (isSel && !isCorOpt) {
+                                                            optStyle = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-50 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10";
+                                                            optIcon = <XCircle className="h-4 w-4 text-rose-600" />;
+                                                          } else if (!isSel && isCorOpt) {
+                                                            optStyle = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed";
+                                                            optIcon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
+                                                          }
+
+                                                          return (
+                                                            <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
+                                                              <span className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+                                                                {String.fromCharCode(65 + oi)}
+                                                              </span>
+                                                              <div className="flex-1 font-semibold text-sm">
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                              </div>
+                                                              <div className="flex-shrink-0">{optIcon}</div>
                                                             </div>
-                                                            <div className="flex-shrink-0">{optIcon}</div>
-                                                          </div>
-                                                        );
-                                                      })}
-                                                    </div>
-                                                  );
-                                                })()}
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    );
+                                                  })()}
+                                                </div>
                                               </div>
                                             </div>
                                           ))}
@@ -3185,42 +3194,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           const clean = (s: any) => String(s ?? '').trim().toLowerCase();
 
-                                          // 1. Collect baseline correct indices and texts
-                                          const correctIndices = new Set<number>();
-                                          const correctTexts: string[] = [];
+                                          // 1. Collect directly correct indices and texts (matching evaluation page logic)
+                                          const directlyCorrectIndices = new Set<number>();
+                                          const directlyCorrectTexts: string[] = [];
 
-                                          options.forEach((opt: any, oi: number) => {
-                                            const isMarked = typeof opt === 'object' && opt?.isCorrect === true;
-                                            const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-                                            if (isMarked) {
-                                              correctIndices.add(oi);
-                                              if (oText) correctTexts.push(oText);
+                                          options.forEach((opt: any, idx: number) => {
+                                            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+                                            const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
+                                            const isMatchingCorrect = (
+                                              (question?.correct !== undefined && question?.correct !== null && (
+                                                clean(question.correct) === optText ||
+                                                (typeof question.correct === 'number' && question.correct === idx) ||
+                                                (typeof question.correct === 'string' && question.correct.trim() === String(idx)) ||
+                                                (typeof question.correct === 'string' && MCQ_LABELS_BN[idx] && question.correct.trim() === MCQ_LABELS_BN[idx]) ||
+                                                (typeof question.correct === 'string' && MCQ_LABELS_EN[idx] && question.correct.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                              )) ||
+                                              (question?.correctAnswer !== undefined && question?.correctAnswer !== null && (
+                                                clean(question.correctAnswer) === optText ||
+                                                (typeof question.correctAnswer === 'number' && question.correctAnswer === idx) ||
+                                                (typeof question.correctAnswer === 'string' && question.correctAnswer.trim() === String(idx))
+                                              )) ||
+                                              (question?.correctOption !== undefined && question?.correctOption !== null && (
+                                                question.correctOption === idx ||
+                                                String(question.correctOption) === String(idx)
+                                              )) ||
+                                              (question?.modelAnswer !== undefined && question?.modelAnswer !== null && (
+                                                clean(question.modelAnswer) === optText
+                                              ))
+                                            );
+
+                                            if (isOptionMarkedCorrect || isMatchingCorrect) {
+                                              directlyCorrectIndices.add(idx);
+                                              if (optText) directlyCorrectTexts.push(optText);
                                             }
                                           });
 
-                                          const rawC = question.correctOption ?? question.correct ?? question.correctAnswer ?? question.modelAnswer;
-                                          if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
-                                            const cStr = clean(rawC);
-                                            correctTexts.push(cStr);
-                                            const cNum = parseInt(cStr, 10);
-                                            if (!isNaN(cNum)) {
-                                              if (cNum >= 0 && cNum < options.length) correctIndices.add(cNum);
-                                              if (cNum >= 1 && cNum <= options.length) correctIndices.add(cNum - 1);
-                                            }
-                                          }
-
-                                          // 2. Expand identical options
-                                          options.forEach((opt: any, oi: number) => {
-                                            const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-                                            if (oText && correctTexts.includes(oText)) {
-                                              correctIndices.add(oi);
-                                            }
-                                            for (const cIdx of Array.from(correctIndices)) {
-                                              const cOptText = clean(typeof options[cIdx] === 'object' ? (options[cIdx]?.text ?? options[cIdx]?.value) : options[cIdx]);
-                                              if (oText && cOptText && oText === cOptText) {
-                                                correctIndices.add(oi);
-                                                if (!correctTexts.includes(oText)) correctTexts.push(oText);
-                                              }
+                                          // 2. Identical options normalization
+                                          const correctIndices = new Set<number>(directlyCorrectIndices);
+                                          options.forEach((opt: any, idx: number) => {
+                                            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+                                            if (optText && directlyCorrectTexts.includes(optText)) {
+                                              correctIndices.add(idx);
                                             }
                                           });
 

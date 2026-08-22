@@ -223,66 +223,73 @@ export async function GET(
         const cleanU = clean(rawVal);
         if (!cleanU) return false;
 
-        const correctTexts: string[] = [];
-        const correctIndices = new Set<number>();
+        const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ'];
+        const MCQ_LABELS_EN = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+
+        const directlyCorrectIndices = new Set<number>();
+        const directlyCorrectTexts: string[] = [];
 
         if (Array.isArray(options)) {
           options.forEach((opt: any, idx: number) => {
-            const isMarked = typeof opt === 'object' ? opt?.isCorrect === true : false;
-            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-            if (isMarked) {
-              correctIndices.add(idx);
-              if (optText) correctTexts.push(optText);
+            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+            const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
+            const isMatchingCorrect = (
+              (qObj?.correct !== undefined && qObj?.correct !== null && (
+                clean(qObj.correct) === optText ||
+                (typeof qObj.correct === 'number' && qObj.correct === idx) ||
+                (typeof qObj.correct === 'string' && qObj.correct.trim() === String(idx)) ||
+                (typeof qObj.correct === 'string' && MCQ_LABELS_BN[idx] && qObj.correct.trim() === MCQ_LABELS_BN[idx]) ||
+                (typeof qObj.correct === 'string' && MCQ_LABELS_EN[idx] && qObj.correct.trim().toLowerCase() === MCQ_LABELS_EN[idx])
+              )) ||
+              (qObj?.correctAnswer !== undefined && qObj?.correctAnswer !== null && (
+                clean(qObj.correctAnswer) === optText ||
+                (typeof qObj.correctAnswer === 'number' && qObj.correctAnswer === idx) ||
+                (typeof qObj.correctAnswer === 'string' && qObj.correctAnswer.trim() === String(idx))
+              )) ||
+              (qObj?.correctOption !== undefined && qObj?.correctOption !== null && (
+                qObj.correctOption === idx ||
+                String(qObj.correctOption) === String(idx)
+              )) ||
+              (qObj?.modelAnswer !== undefined && qObj?.modelAnswer !== null && (
+                clean(qObj.modelAnswer) === optText
+              ))
+            );
+
+            if (isOptionMarkedCorrect || isMatchingCorrect) {
+              directlyCorrectIndices.add(idx);
+              if (optText) directlyCorrectTexts.push(optText);
             }
           });
-        }
-
-        const rawC = qObj?.correctOption ?? qObj?.correct ?? qObj?.correctAnswer ?? qObj?.modelAnswer;
-        if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
-          const cStr = clean(rawC);
-          correctTexts.push(cStr);
-          const cNum = parseInt(cStr, 10);
-          if (!isNaN(cNum)) {
-            if (cNum >= 0 && Array.isArray(options) && cNum < options.length) correctIndices.add(cNum);
-            if (cNum >= 1 && Array.isArray(options) && cNum <= options.length) correctIndices.add(cNum - 1);
-          }
         }
 
         // IDENTICAL OPTIONS EXPANSION:
+        const finalCorrectIndices = new Set<number>(directlyCorrectIndices);
+        const finalCorrectTexts = [...directlyCorrectTexts];
         if (Array.isArray(options)) {
           options.forEach((opt: any, idx: number) => {
-            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
-            if (optText && correctTexts.includes(optText)) {
-              correctIndices.add(idx);
-            }
-            for (const cIdx of Array.from(correctIndices)) {
-              const cOptText = clean(typeof options[cIdx] === 'object' ? (options[cIdx]?.text ?? options[cIdx]?.value ?? options[cIdx]?.label) : options[cIdx]);
-              if (optText && cOptText && optText === cOptText) {
-                correctIndices.add(idx);
-                if (!correctTexts.includes(optText)) correctTexts.push(optText);
-              }
+            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
+            if (optText && directlyCorrectTexts.includes(optText)) {
+              finalCorrectIndices.add(idx);
+              if (!finalCorrectTexts.includes(optText)) finalCorrectTexts.push(optText);
             }
           });
         }
 
-        if (correctTexts.includes(cleanU)) return true;
+        if (finalCorrectTexts.includes(cleanU)) return true;
 
-        const uNum = parseInt(cleanU, 10);
-        if (!isNaN(uNum)) {
-          if (correctIndices.has(uNum)) return true;
-          if (correctIndices.has(uNum - 1)) return true;
-        }
+        if (Array.isArray(options)) {
+          for (const cIdx of Array.from(finalCorrectIndices)) {
+            if (cleanU === String(cIdx)) return true;
+            if (MCQ_LABELS_BN[cIdx] && cleanU === MCQ_LABELS_BN[cIdx]) return true;
+            if (MCQ_LABELS_EN[cIdx] && cleanU === MCQ_LABELS_EN[cIdx].toLowerCase()) return true;
+          }
 
-        const bnLetters = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
-        const enLetters = ['a', 'b', 'c', 'd', 'e'];
-        for (const cIdx of Array.from(correctIndices)) {
-          if (bnLetters[cIdx] && cleanU === bnLetters[cIdx]) return true;
-          if (enLetters[cIdx] && cleanU === enLetters[cIdx]) return true;
-        }
-
-        if (Array.isArray(options) && !isNaN(uNum) && uNum >= 0 && uNum < options.length) {
-          const selText = clean(typeof options[uNum] === 'object' ? (options[uNum]?.text ?? options[uNum]?.value) : options[uNum]);
-          if (selText && correctTexts.includes(selText)) return true;
+          const uNum = parseInt(cleanU, 10);
+          if (!isNaN(uNum) && uNum >= 0 && uNum < options.length) {
+            if (finalCorrectIndices.has(uNum)) return true;
+            const selText = clean(typeof options[uNum] === 'object' ? (options[uNum]?.text ?? options[uNum]?.value) : options[uNum]);
+            if (selText && finalCorrectTexts.includes(selText)) return true;
+          }
         }
 
         return false;
