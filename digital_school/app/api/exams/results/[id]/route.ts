@@ -205,8 +205,8 @@ export async function GET(
       if ((studentAnswers as any)[`${questionId}_image`]) studentAnswerImages.push((studentAnswers as any)[`${questionId}_image`]);
       if (Array.isArray((studentAnswers as any)[`${questionId}_images`])) studentAnswerImages.push(...(studentAnswers as any)[`${questionId}_images`]);
 
-      const allDrawings = submission.drawings.filter(d => d.questionId === questionId);
-      const drawingData = allDrawings.find(d => d.imageIndex === 0) || null;
+      const allDrawings = submission.drawings.filter((d: any) => d.questionId === questionId);
+      const drawingData = allDrawings.find((d: any) => d.imageIndex === 0) || null;
 
       const type = (question.type || '').toUpperCase();
       let awardedMarks = 0;
@@ -277,7 +277,7 @@ export async function GET(
           const uniqueSubImages = Array.from(new Set(subImages));
 
           // MAP SUB-QUESTION DRAWINGS (Match by original path for accuracy)
-          const subDrawingsForPart = allDrawings.filter(d =>
+          const subDrawingsForPart = allDrawings.filter((d: any) =>
             uniqueSubImages.includes(d.originalImagePath) || d.imageIndex === subIdx
           );
 
@@ -453,7 +453,29 @@ export async function GET(
       awardedMarks = Number(calculatedMarks) || 0;
       // --- BUTTERY FALLBACK EVALUATION END ---
 
-      const resolvedCorrectOption = question.correctOption !== undefined ? question.correctOption : (question.correct !== undefined ? question.correct : null);
+      let parsedOptions = question.options;
+      if (typeof parsedOptions === 'string') {
+        try { parsedOptions = JSON.parse(parsedOptions); } catch { parsedOptions = []; }
+      }
+      if (!Array.isArray(parsedOptions)) parsedOptions = [];
+
+      let resolvedCorrectOption = question.correctOption !== undefined ? question.correctOption : (question.correct !== undefined ? question.correct : (question.correctAnswer !== undefined ? question.correctAnswer : null));
+
+      // If MCQ and option isCorrect is defined, populate correct if missing
+      if (Array.isArray(parsedOptions) && resolvedCorrectOption === null) {
+        const correctIndex = parsedOptions.findIndex((opt: any) => opt && opt.isCorrect);
+        if (correctIndex !== -1) {
+          resolvedCorrectOption = correctIndex;
+        }
+      }
+
+      let explanation = question.explanation;
+      if (!explanation && Array.isArray(parsedOptions)) {
+        const correctOpt = parsedOptions.find((opt: any) => opt && opt.isCorrect);
+        if (correctOpt && correctOpt.explanation) {
+          explanation = correctOpt.explanation;
+        }
+      }
 
       return {
         id: question.id,
@@ -466,10 +488,11 @@ export async function GET(
         studentAnswerImages,
         drawingData,
         allDrawings,
-        options: question.options || [],
+        options: parsedOptions,
         subQuestions: processedSubQuestions,
+        sub_questions: processedSubQuestions,
         modelAnswer: question.modelAnswer || "",
-        explanation: question.explanation || "",
+        explanation: explanation || "",
         // AR fields
         assertion: question.assertion || null,
         reason: question.reason || null,
@@ -477,9 +500,12 @@ export async function GET(
         leftColumn: question.leftColumn || null,
         rightColumn: question.rightColumn || null,
         matches: question.matches || null,
-        correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : resolvedCorrectOption,
+        correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : (resolvedCorrectOption !== null ? resolvedCorrectOption : question.modelAnswer),
         correctOption: resolvedCorrectOption,
         correct: resolvedCorrectOption,
+        parts: question.parts || question.cmaParts || null,
+        stages: question.stages || question.mpcStages || null,
+        scenario: question.scenario || null,
       };
     });
 

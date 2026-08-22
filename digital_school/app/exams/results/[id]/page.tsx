@@ -70,6 +70,207 @@ import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
 
+const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
+const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E'];
+
+function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const selectedIndices: number[] = Array.isArray(studentAnswer?.selectedOptions)
+    ? studentAnswer.selectedOptions
+    : (Array.isArray(studentAnswer) ? studentAnswer : []);
+
+  const correctIndices = options
+    .map((opt: any, idx: number) => ((typeof opt === 'object' ? opt?.isCorrect : false) ? idx : -1))
+    .filter((idx: number) => idx !== -1);
+
+  const totalCorrect = correctIndices.length;
+  const totalMarks = Number(question?.marks) || 1;
+
+  let correctSelected = 0;
+  let wrongSelected = 0;
+
+  selectedIndices.forEach(idx => {
+    if (correctIndices.includes(idx)) {
+      correctSelected++;
+    } else {
+      wrongSelected++;
+    }
+  });
+
+  const isFullCorrect = selectedIndices.length > 0 && totalCorrect > 0 && correctSelected === totalCorrect && wrongSelected === 0;
+
+  let score = 0;
+  if (isFullCorrect) {
+    score = totalMarks;
+  } else if (selectedIndices.length > 0) {
+    const marksPerCorrect = totalCorrect > 0 ? totalMarks / totalCorrect : 0;
+    const partialEarned = correctSelected * marksPerCorrect;
+    const wrongPenalty = negPct > 0 ? (wrongSelected * (negPct / 100) * totalMarks) : 0;
+    score = Math.max(0, Math.round((partialEarned - wrongPenalty) * 100) / 100);
+  }
+
+  const isPartial = !isFullCorrect && (score > 0 || correctSelected > 0);
+  const hasAttempted = selectedIndices.length > 0;
+
+  return {
+    options,
+    selectedIndices,
+    correctIndices,
+    totalCorrect,
+    correctSelected,
+    wrongSelected,
+    isFullCorrect,
+    isPartial,
+    hasAttempted,
+    score
+  };
+}
+
+function evaluateMTFDetails(question: any, studentAnswer: any) {
+  let leftColumn: any[] = question?.leftColumn || [];
+  if (typeof leftColumn === 'string') {
+    try { leftColumn = JSON.parse(leftColumn); } catch { leftColumn = []; }
+  }
+  leftColumn = leftColumn.map((item: any, idx: number) => typeof item === 'string' ? { id: String(idx + 1), text: item } : item);
+
+  let rightColumn: any[] = question?.rightColumn || [];
+  if (typeof rightColumn === 'string') {
+    try { rightColumn = JSON.parse(rightColumn); } catch { rightColumn = []; }
+  }
+  rightColumn = rightColumn.map((item: any, idx: number) => typeof item === 'string' ? { id: String(idx + 1), text: item } : item);
+
+  let correctMatches: Record<string, string> = {};
+  if (typeof question?.matches === 'string') {
+    try { correctMatches = JSON.parse(question.matches); } catch { correctMatches = {}; }
+  } else if (question?.matches && typeof question.matches === 'object') {
+    correctMatches = question.matches;
+  }
+
+  let studentMatches: Record<string, string> = {};
+  const rawStudentAns = studentAnswer;
+  if (typeof rawStudentAns === 'string') {
+    try { studentMatches = JSON.parse(rawStudentAns); } catch { studentMatches = {}; }
+  } else if (rawStudentAns?.matches && typeof rawStudentAns.matches === 'object') {
+    studentMatches = rawStudentAns.matches;
+  } else if (rawStudentAns && typeof rawStudentAns === 'object') {
+    studentMatches = rawStudentAns;
+  }
+
+  const totalPairs = leftColumn.length;
+  const totalMarks = Number(question?.marks) || 1;
+  const marksPerPair = totalPairs > 0 ? totalMarks / totalPairs : 0;
+
+  let correctCount = 0;
+  let answeredCount = 0;
+
+  const rows = leftColumn.map((leftItem, lIdx) => {
+    const studentRightId = studentMatches[leftItem.id] || studentMatches[String(lIdx + 1)];
+    const correctRightId = correctMatches[leftItem.id] || correctMatches[String(lIdx + 1)];
+
+    const hasAnswered = studentRightId !== undefined && studentRightId !== null && String(studentRightId).trim() !== '' && studentRightId !== 'No answer provided';
+    if (hasAnswered) answeredCount++;
+
+    const studentRightItem = rightColumn.find((r: any) => r.id === studentRightId || r.text === studentRightId);
+    const studentRightIdx = rightColumn.findIndex((r: any) => r.id === studentRightId || r.text === studentRightId);
+
+    const correctRightItem = rightColumn.find((r: any) => r.id === correctRightId || r.text === correctRightId);
+    const correctRightIdx = rightColumn.findIndex((r: any) => r.id === correctRightId || r.text === correctRightId);
+
+    let isMatchCorrect = false;
+    if (hasAnswered && correctRightId) {
+      if (studentRightId === correctRightId) {
+        isMatchCorrect = true;
+      } else if (studentRightItem && correctRightItem && (studentRightItem.id === correctRightItem.id || studentRightItem.text === correctRightItem.text)) {
+        isMatchCorrect = true;
+      } else if (studentRightIdx !== -1 && studentRightIdx === correctRightIdx) {
+        isMatchCorrect = true;
+      }
+    }
+
+    if (isMatchCorrect) correctCount++;
+
+    const vlLeft = toBengaliNumerals(lIdx + 1);
+    const vStudentRight = studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
+    const vCorrectRight = correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
+
+    const leftText = leftItem.text || leftItem.id;
+    const studentRightText = studentRightItem ? studentRightItem.text : (studentRightId || 'Unmatched');
+    const correctRightText = correctRightItem ? correctRightItem.text : (correctRightId || 'N/A');
+
+    return {
+      leftItem,
+      lIdx,
+      vlLeft,
+      leftText,
+      studentRightId,
+      studentRightItem,
+      studentRightIdx,
+      vStudentRight,
+      studentRightText,
+      correctRightId,
+      correctRightItem,
+      correctRightIdx,
+      vCorrectRight,
+      correctRightText,
+      isMatchCorrect,
+      hasAnswered
+    };
+  });
+
+  const rawScore = correctCount * marksPerPair;
+  const score = Math.round(rawScore * 100) / 100;
+
+  return {
+    leftColumn,
+    rightColumn,
+    rows,
+    correctCount,
+    answeredCount,
+    totalPairs,
+    marksPerPair,
+    score
+  };
+}
+
+function evaluateINTDetails(question: any, studentAnswer: any, negPct = 0) {
+  const rawCorrect = (question as any)?.correctAnswer ?? question?.modelAnswer ?? question?.correct ?? (question as any)?.answer ?? (question as any)?.explanation ?? '';
+  const rawStudent = studentAnswer?.answer !== undefined ? studentAnswer.answer : (studentAnswer?.value !== undefined ? studentAnswer.value : studentAnswer);
+
+  const hasAttempted = rawStudent !== undefined && rawStudent !== null && String(rawStudent).trim() !== '' && rawStudent !== 'No answer provided';
+  const totalMarks = Number(question?.marks) || 1;
+
+  let isCorrect = false;
+  if (hasAttempted && rawCorrect !== undefined && rawCorrect !== null && String(rawCorrect).trim() !== '') {
+    const strStudent = String(rawStudent).trim().toLowerCase();
+    const strCorrect = String(rawCorrect).trim().toLowerCase();
+
+    if (strStudent === strCorrect) {
+      isCorrect = true;
+    } else {
+      const numStudent = parseFloat(strStudent);
+      const numCorrect = parseFloat(strCorrect);
+      if (!isNaN(numStudent) && !isNaN(numCorrect) && Math.abs(numStudent - numCorrect) < 0.0001) {
+        isCorrect = true;
+      }
+    }
+  }
+
+  let score = 0;
+  if (isCorrect) {
+    score = totalMarks;
+  } else if (hasAttempted && negPct > 0) {
+    score = -Math.round(((totalMarks * negPct) / 100) * 100) / 100;
+  }
+
+  return {
+    studentVal: rawStudent,
+    correctVal: rawCorrect,
+    hasAttempted,
+    isCorrect,
+    score
+  };
+}
+
 // import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
@@ -2858,264 +3059,482 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     )}
 
-                                    {/* Result Rendering Logic (MCQ/MC/AR) */}
-                                    {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
+                                    {/* Result Rendering Logic (Modularized per Type) */}
+                                    {/* 1. MCQ Specific Rendering */}
+                                    {type === 'MCQ' && (
                                       <div className="space-y-4">
                                         {(() => {
-                                          let optionsToRender = question.options;
-                                          // Handle options for AR specifically if missing
-                                          if (type === 'AR' && (!optionsToRender || optionsToRender.length === 0)) {
-                                            optionsToRender = [
-                                              { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
-                                              { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
-                                              { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
-                                              { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false },
-                                              { text: "Assertion (A) ও Reason (R) উভয়ই মিথ্যা", isCorrect: false }
-                                            ];
+                                          let rawOpts = question.options;
+                                          if (typeof rawOpts === 'string') {
+                                            try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; }
                                           }
+                                          const options: any[] = Array.isArray(rawOpts) ? rawOpts : [];
+                                          let rawAns = question.studentAnswer;
+                                          if (typeof rawAns === 'object' && rawAns !== null) {
+                                            rawAns = rawAns.selectedOption ?? rawAns.answer ?? rawAns.option ?? rawAns.value ?? rawAns.text;
+                                          }
+                                          const hasAnswered = rawAns !== undefined && rawAns !== null && String(rawAns).trim() !== '' && rawAns !== 'No answer provided';
 
-                                          return (optionsToRender || []).map((option, optIndex) => {
-                                            const optText = typeof option === 'object' ? option.text : option;
-                                            const rawAnswer = question.studentAnswer;
-
-                                            // --- PRECISE isSelected DETECTION ---
-                                            let isSelected = false;
-                                            if (type === 'MC') {
-                                              // MC stores selectedOptions as index array
-                                              isSelected = rawAnswer?.selectedOptions?.includes(optIndex) ?? false;
-                                            } else if (type === 'AR') {
-                                              // AR stores selectedOption as 1-indexed number (1 to 5)
-                                              let selNum = 0;
-                                              if (typeof rawAnswer === 'number') {
-                                                selNum = rawAnswer;
-                                              } else if (typeof rawAnswer === 'string' && !isNaN(Number(rawAnswer.trim()))) {
-                                                selNum = Number(rawAnswer.trim());
-                                              } else if (typeof rawAnswer === 'object' && rawAnswer !== null) {
-                                                const v = rawAnswer.selectedOption ?? rawAnswer.answer ?? rawAnswer.option ?? rawAnswer.value;
-                                                if (v !== undefined && v !== null && !isNaN(Number(v))) selNum = Number(v);
-                                              }
-                                              isSelected = selNum === optIndex + 1;
-                                            } else {
-                                              // MCQ: studentAnswer can be text, 0-based index number, or string index
-                                              const isTextMatch = typeof rawAnswer === 'string' &&
-                                                rawAnswer.trim() !== '' &&
-                                                (rawAnswer.trim() === String(optText).trim() || (!isNaN(Number(rawAnswer.trim())) && Number(rawAnswer.trim()) === optIndex));
-                                              const isIndexMatch = typeof rawAnswer === 'number' && rawAnswer === optIndex;
-                                              isSelected = isTextMatch || isIndexMatch;
-                                            }
-
-                                            // --- PRECISE isCorrectOpt DETECTION ---
-                                            const isOptionMarkedCorrect = typeof option === 'object' && option.isCorrect === true;
-                                            const isOptionMatchingCorrectAnswer =
-                                              type === 'AR'
-                                                ? (Number(question.correctOption ?? question.correct ?? (question as any).correctAnswer) === optIndex + 1)
-                                                : (
-                                                    (question.correctAnswer !== undefined && question.correctAnswer !== null &&
-                                                      String(question.correctAnswer).trim() === String(optText).trim()) ||
-                                                    (question.correct !== undefined && question.correct !== null &&
-                                                      String(question.correct).trim() === String(optText).trim()) ||
-                                                    (typeof question.correctAnswer === 'number' && question.correctAnswer === optIndex) ||
-                                                    (typeof question.correct === 'number' && question.correct === optIndex) ||
-                                                    ((question as any).correctOption !== undefined && Number((question as any).correctOption) === optIndex) ||
-                                                    (typeof question.correctAnswer === 'string' && !isNaN(Number(question.correctAnswer.trim())) && Number(question.correctAnswer.trim()) === optIndex) ||
-                                                    (typeof question.correct === 'string' && !isNaN(Number(question.correct.trim())) && Number(question.correct.trim()) === optIndex)
-                                                  );
-
-                                            const isCorrectOpt = isOptionMarkedCorrect || isOptionMatchingCorrectAnswer;
-
-                                            let containerStyle = "border-border bg-card/50 text-muted-foreground";
-                                            let labelStyle = "bg-muted text-muted-foreground";
-                                            let icon = null;
-
-                                            if (isSelected && isCorrectOpt) {
-                                              containerStyle = "border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 ring-1 ring-green-500/30";
-                                              labelStyle = "bg-green-500 text-white";
-                                              icon = <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />;
-                                            } else if (isSelected && !isCorrectOpt) {
-                                              containerStyle = "border-red-500 bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30";
-                                              labelStyle = "bg-red-500 text-white";
-                                              icon = <XCircle className="h-5 w-5 text-red-500 shrink-0" />;
-                                            } else if (!isSelected && isCorrectOpt) {
-                                              containerStyle = "border-green-500/50 bg-green-500/5 text-green-700 dark:text-green-300 border-dashed";
-                                              labelStyle = "bg-green-500/20 text-green-700 dark:text-green-300";
-                                              icon = <CheckCircle className="h-5 w-5 text-green-500/50 shrink-0" />;
-                                            }
-
+                                          if (options.length === 0) {
                                             return (
-                                              <div
-                                                key={optIndex}
-                                                className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${containerStyle}`}
-                                              >
-                                                <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${labelStyle}`}>
-                                                  {String.fromCharCode(0x0995 + optIndex)}
-                                                </span>
-                                                <span className="flex-1 font-medium text-base leading-relaxed break-words overflow-x-auto max-w-full scrollbar-thin">
-                                                  <UniversalMathJax inline dynamic>
-                                                    {type === 'AR' ? [
-                                                      "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
-                                                      "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
-                                                      "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                                                      "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                                                      "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                    ][optIndex] : cleanupMath(optText)}
-                                                  </UniversalMathJax>
-                                                </span>
-                                                {icon}
+                                              <div className="p-4 bg-card rounded-2xl border border-border space-y-2">
+                                                <div className="text-xs font-semibold text-muted-foreground">Student Answer:</div>
+                                                <div className="text-base font-medium text-foreground italic">
+                                                  {hasAnswered ? (
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(String(rawAns))}</UniversalMathJax>
+                                                  ) : (
+                                                    <span className="text-muted-foreground opacity-60">Not Answered</span>
+                                                  )}
+                                                </div>
+                                                {(question.correct || question.correctAnswer || question.modelAnswer) && (
+                                                  <div className="text-xs text-emerald-700 dark:text-emerald-300 font-bold">
+                                                    Correct Answer: <UniversalMathJax inline dynamic>{cleanupMath(String(question.correct || question.correctAnswer || question.modelAnswer))}</UniversalMathJax>
+                                                  </div>
+                                                )}
                                               </div>
                                             );
-                                          });
-                                        })()}
-                                      </div>
-                                    ) : (type === 'INT' || type === 'NUMERIC') ? (
-                                      <div className="p-4 bg-card rounded-lg border-2 border-primary/20 flex flex-col gap-4">
-                                        <div className="flex items-center justify-between gap-4">
-                                          <div className="flex items-center gap-4">
-                                            <div className="text-sm font-bold text-gray-600">
-                                              Your Answer:
-                                              {((question.studentAnswer as any)?.answer !== undefined || (question.studentAnswer !== undefined && question.studentAnswer !== null && question.studentAnswer !== '')) ? (
-                                                <span className={`ml-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                                                  {(question.studentAnswer as any)?.answer !== undefined
-                                                    ? String((question.studentAnswer as any).answer)
-                                                    : typeof question.studentAnswer === 'object'
-                                                      ? JSON.stringify(question.studentAnswer)
-                                                      : String(question.studentAnswer)}
-                                                </span>
-                                              ) : (
-                                                <span className="ml-2 text-gray-400 italic">Unanswered</span>
-                                              )}
-                                            </div>
-                                            <div className="w-px h-4 bg-gray-200" />
-                                            <div className="text-sm font-bold text-indigo-600">
-                                              Correct Answer: <span className="ml-2">{(question as any).correctAnswer || (question as any).answer || (question as any).correct || (question as any).modelAnswer}</span>
-                                            </div>
-                                          </div>
-                                          {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : (question.studentAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : null)}
-                                        </div>
-                                      </div>
-                                    ) : type === 'MTF' ? (
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div className="space-y-2">
-                                            <div className="text-xs font-bold text-muted-foreground uppercase">Column A</div>
-                                            {(question as any).leftColumn?.map((item: any, i: number) => {
-                                              const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
-                                              return (
-                                                <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
-                                                  <span className="font-bold mr-2 text-muted-foreground shrink-0">{i + 1}.</span>
-                                                  <div className="flex-1">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                          <div className="space-y-2">
-                                            <div className="text-xs font-bold text-muted-foreground uppercase">Column B</div>
-                                            {(question as any).rightColumn?.map((item: any, i: number) => {
-                                              const itemText = typeof item === 'string' ? item : (item?.text || item?.content || item?.value || '');
-                                              return (
-                                                <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
-                                                  <span className="font-bold mr-2 text-muted-foreground shrink-0">{String.fromCharCode(65 + i)}.</span>
-                                                  <div className="flex-1">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(itemText)}</UniversalMathJax>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                        <div className="p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
-                                          <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-3 text-center">Match Analysis</div>
-                                          <div className="overflow-x-auto rounded-lg border border-indigo-500/20 shadow-sm">
-                                            <table className="w-full text-sm min-w-[500px]">
-                                              <thead className="bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
-                                                <tr>
-                                                  <th className="p-3 text-left w-1/3">Question (Left)</th>
-                                                  <th className="p-3 text-left w-1/3">Your Match</th>
-                                                  <th className="p-3 text-left w-1/3">Correct Match</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody className="divide-y divide-indigo-500/10 bg-card">
-                                                {(question as any).leftColumn?.map((item: any, lIdx: number) => {
-                                                  const correctMatches = (question as any).matches || {};
-                                                  const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
+                                          }
 
-                                                  // Normalize student answer
-                                                  let studentRightId = null;
-                                                  if (Array.isArray(studentMatches)) {
-                                                    const match = studentMatches.find((m: any) => m.leftIndex === lIdx || m.leftId === item.id);
-                                                    if (match) studentRightId = match.studentRightId || match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
-                                                  } else {
-                                                    studentRightId = studentMatches[item.id];
+                                          return (
+                                            <div className="space-y-3">
+                                              {!hasAnswered && (
+                                                <div className="flex items-center gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+                                                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                                  <span>No Answer Provided by Student</span>
+                                                </div>
+                                              )}
+
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {options.map((opt: any, idx: number) => {
+                                                  const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
+
+                                                  const isSelected = hasAnswered && (
+                                                    String(rawAns).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                    (typeof rawAns === 'number' && rawAns === idx) ||
+                                                    (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim())) && Number(rawAns.trim()) === idx) ||
+                                                    (typeof rawAns === 'string' && MCQ_LABELS_BN[idx] && rawAns.trim() === MCQ_LABELS_BN[idx]) ||
+                                                    (typeof rawAns === 'string' && MCQ_LABELS_EN[idx] && rawAns.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                                  );
+
+                                                  const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
+                                                  const isMatchingCorrect = (
+                                                    (question?.correct !== undefined && question?.correct !== null && (
+                                                      String(question.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                      (typeof question.correct === 'number' && question.correct === idx) ||
+                                                      (typeof question.correct === 'string' && !isNaN(Number(question.correct.trim())) && Number(question.correct.trim()) === idx) ||
+                                                      (typeof question.correct === 'string' && MCQ_LABELS_BN[idx] && question.correct.trim() === MCQ_LABELS_BN[idx]) ||
+                                                      (typeof question.correct === 'string' && MCQ_LABELS_EN[idx] && question.correct.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                                    )) ||
+                                                    (question?.correctAnswer !== undefined && question?.correctAnswer !== null && (
+                                                      String(question.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                      (typeof question.correctAnswer === 'number' && question.correctAnswer === idx) ||
+                                                      (typeof question.correctAnswer === 'string' && !isNaN(Number(question.correctAnswer.trim())) && Number(question.correctAnswer.trim()) === idx) ||
+                                                      (typeof question.correctAnswer === 'string' && MCQ_LABELS_BN[idx] && question.correctAnswer.trim() === MCQ_LABELS_BN[idx]) ||
+                                                      (typeof question.correctAnswer === 'string' && MCQ_LABELS_EN[idx] && question.correctAnswer.trim().toUpperCase() === MCQ_LABELS_EN[idx])
+                                                    )) ||
+                                                    (question?.correctOption !== undefined && question?.correctOption !== null && (
+                                                      question.correctOption === idx ||
+                                                      String(question.correctOption) === String(idx)
+                                                    )) ||
+                                                    (question?.modelAnswer !== undefined && question?.modelAnswer !== null && (
+                                                      String(question.modelAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase()
+                                                    ))
+                                                  );
+
+                                                  const isCorrectOpt = isOptionMarkedCorrect || isMatchingCorrect;
+
+                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let badge = null;
+
+                                                  if (isSelected && isCorrectOpt) {
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                    labelStyle = "bg-emerald-600 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                        <CheckCircle className="h-3 w-3" /> Correct
+                                                      </Badge>
+                                                    );
+                                                  } else if (isSelected && !isCorrectOpt) {
+                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                    labelStyle = "bg-rose-600 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                        <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                      </Badge>
+                                                    );
+                                                  } else if (!isSelected && isCorrectOpt) {
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                    badge = (
+                                                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
+                                                        <CheckCircle className="h-3 w-3 text-emerald-600" /> Correct Option
+                                                      </Badge>
+                                                    );
                                                   }
 
-                                                  const correctRightId = correctMatches[item.id];
-                                                  const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
-                                                  const isUnanswered = !studentRightId;
-
-                                                  const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
-                                                  const studentRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === studentRightId);
-
-                                                  const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
-                                                  const correctRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === correctRightId);
-
-                                                  // Visual labels
-                                                  const vlLeft = toBengaliNumerals(lIdx + 1);
-                                                  const vStudentRight = studentRightIdx !== undefined && studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
-                                                  const vCorrectRight = correctRightIdx !== undefined && correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
-
-                                                  const leftText = typeof item === 'string' ? item : (item?.text || item?.content || '');
-                                                  const rightText = typeof rightItem === 'string' ? rightItem : (rightItem?.text || rightItem?.content || '');
-                                                  const correctRightText = typeof correctRightItem === 'string' ? correctRightItem : (correctRightItem?.text || correctRightItem?.content || '');
-
-                                                  // Row styling
-                                                  const rowClass = isMatchCorrect
-                                                    ? "bg-green-500/5 dark:bg-green-500/10"
-                                                    : isUnanswered
-                                                      ? "bg-muted/30 opacity-90"
-                                                      : "bg-red-500/5 dark:bg-red-500/10";
-
                                                   return (
-                                                    <tr key={lIdx} className={rowClass}>
-                                                      <td className="p-3 border-r border-indigo-500/10 font-medium">
-                                                        <div className="flex items-center gap-1">
-                                                          <span className="font-bold text-muted-foreground shrink-0">{vlLeft}.</span>
-                                                          <div className="flex-1">
-                                                            <UniversalMathJax inline dynamic>{cleanupMath(leftText)}</UniversalMathJax>
-                                                          </div>
-                                                        </div>
-                                                      </td>
-                                                      <td className={`p-3 border-r border-indigo-500/10 ${isMatchCorrect ? 'text-green-600 dark:text-green-400 font-bold' : isUnanswered ? 'text-muted-foreground italic' : 'text-red-600 dark:text-red-400 font-bold'}`}>
-                                                        {isUnanswered ? (
-                                                          "No selection"
-                                                        ) : (
-                                                          <div className="flex items-center gap-1">
-                                                            {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
-                                                            <div className="flex-1">
-                                                              <UniversalMathJax inline dynamic>{cleanupMath(rightText || studentRightId)}</UniversalMathJax>
+                                                    <div key={idx} className={`p-4 rounded-2xl border flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                          {MCQ_LABELS_BN[idx] || String.fromCharCode(65 + idx)}
+                                                        </span>
+                                                        <div className="text-sm font-semibold leading-relaxed break-words overflow-x-auto max-w-full">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                          {opt?.image && (
+                                                            <div className="mt-2 block">
+                                                              <img src={opt.image} alt={`Option ${idx + 1}`} className="max-h-24 rounded-lg border bg-card object-contain" />
                                                             </div>
-                                                            {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1 text-green-600 shrink-0" /> : <XCircle className="inline h-4 w-4 ml-1 text-red-600 shrink-0" />}
-                                                          </div>
-                                                        )}
-                                                      </td>
-                                                      <td className="p-3 text-green-600 dark:text-green-400 font-medium">
-                                                        <div className="flex items-center gap-1">
-                                                          {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
-                                                          <div className="flex-1">
-                                                            <UniversalMathJax inline dynamic>{cleanupMath(correctRightText || correctRightId || "N/A")}</UniversalMathJax>
-                                                          </div>
+                                                          )}
                                                         </div>
-                                                      </td>
-                                                    </tr>
+                                                      </div>
+                                                      <div className="shrink-0">{badge}</div>
+                                                    </div>
                                                   );
                                                 })}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
-                                    ) : type === 'CMA' ? (
-                                      <div className="p-4 bg-card rounded-xl border border-border space-y-3">
+                                    )}
+
+                                    {/* 2. MC (Multiple Correct Options) */}
+                                    {type === 'MC' && (
+                                      <div className="space-y-4">
+                                        {(() => {
+                                          const mc = evaluateMCDetails(question, question.studentAnswer, result?.exam?.mcqNegativeMarking || 0);
+                                          return (
+                                            <div className="space-y-3">
+                                              <div className="text-xs font-bold text-muted-foreground flex items-center justify-between">
+                                                <span>Selected ({mc.selectedIndices.length}) • Correct Keys ({mc.totalCorrect}):</span>
+                                                {mc.isFullCorrect ? (
+                                                  <span className="text-emerald-600 font-bold">Full Marks Earned (+{mc.score})</span>
+                                                ) : mc.isPartial ? (
+                                                  <span className="text-amber-600 font-bold">Partial Marks Earned (+{mc.score})</span>
+                                                ) : (
+                                                  <span className="text-rose-600 font-bold">0 Marks</span>
+                                                )}
+                                              </div>
+                                              <div className="grid grid-cols-1 gap-2.5">
+                                                {(question.options || []).map((opt: any, idx: number) => {
+                                                  const isSelected = mc.selectedIndices.includes(idx);
+                                                  const isCorrectOpt = opt?.isCorrect === true;
+                                                  const optText = typeof opt === 'object' ? opt?.text : opt;
+
+                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let badge = null;
+
+                                                  if (isSelected && isCorrectOpt) {
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 opacity-100";
+                                                    labelStyle = "bg-emerald-500 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                        <CheckCircle className="h-3 w-3" /> Correct
+                                                      </Badge>
+                                                    );
+                                                  } else if (isSelected && !isCorrectOpt) {
+                                                    style = "bg-rose-500/10 border-2 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30 opacity-100";
+                                                    labelStyle = "bg-rose-500 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
+                                                        <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                      </Badge>
+                                                    );
+                                                  } else if (!isSelected && isCorrectOpt) {
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                    badge = (
+                                                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2">
+                                                        Missed Correct Option
+                                                      </Badge>
+                                                    );
+                                                  }
+
+                                                  return (
+                                                    <div key={idx} className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                          {MCQ_LABELS_BN[idx] || String.fromCharCode(65 + idx)}
+                                                        </span>
+                                                        <div className="text-sm font-semibold leading-relaxed break-words overflow-x-auto max-w-full">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                        </div>
+                                                      </div>
+                                                      <div className="shrink-0">{badge}</div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* 3. AR (Assertion-Reason 5 Options Grid) */}
+                                    {type === 'AR' && (
+                                      <div className="space-y-4">
+                                        {(() => {
+                                          const rawAns = question.studentAnswer;
+                                          let selectedOption = 0;
+                                          let hasAnswered = false;
+
+                                          if (rawAns !== undefined && rawAns !== null && rawAns !== '' && rawAns !== 'No answer provided') {
+                                            if (typeof rawAns === 'number') {
+                                              selectedOption = rawAns;
+                                              hasAnswered = selectedOption > 0;
+                                            } else if (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim()))) {
+                                              selectedOption = Number(rawAns.trim());
+                                              hasAnswered = selectedOption > 0;
+                                            } else if (typeof rawAns === 'object') {
+                                              const rawVal = rawAns.selectedOption ?? rawAns.answer ?? rawAns.option ?? rawAns.value;
+                                              if (rawVal !== undefined && rawVal !== null && rawVal !== '' && !isNaN(Number(rawVal))) {
+                                                selectedOption = Number(rawVal);
+                                                hasAnswered = selectedOption > 0;
+                                              }
+                                            }
+                                          }
+
+                                          const rawCorrect = question.correctOption ?? question.correct ?? (question as any).correctAnswer ?? 0;
+                                          const correctOption = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
+                                            ? Number(rawCorrect.trim())
+                                            : (typeof rawCorrect === 'number' ? rawCorrect : 0);
+
+                                          const defaultArOptions = [
+                                            "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                            "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                            "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                            "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                            "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                          ];
+
+                                          const arOptions = (Array.isArray(question.options) && question.options.length >= 4)
+                                            ? question.options.map((opt: any) => typeof opt === 'object' && opt !== null ? (opt.text || String(opt)) : String(opt))
+                                            : defaultArOptions;
+
+                                          return (
+                                            <div className="space-y-3">
+                                              {!hasAnswered && (
+                                                <div className="flex items-center gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+                                                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                                  <span>No Answer Provided by Student</span>
+                                                </div>
+                                              )}
+
+                                              <div className="grid grid-cols-1 gap-2.5">
+                                                {arOptions.map((optText, oidx) => {
+                                                  const optNum = oidx + 1;
+                                                  const isSelected = hasAnswered && selectedOption === optNum;
+                                                  const isOptionCorrect = correctOption === optNum;
+
+                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
+                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let badge = null;
+
+                                                  if (isSelected && isOptionCorrect) {
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                    labelStyle = "bg-emerald-600 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                        <CheckCircle className="h-3 w-3" /> Correct
+                                                      </Badge>
+                                                    );
+                                                  } else if (isSelected && !isOptionCorrect) {
+                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                    labelStyle = "bg-rose-600 text-white";
+                                                    badge = (
+                                                      <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
+                                                        <XCircle className="h-3 w-3" /> Incorrect Choice
+                                                      </Badge>
+                                                    );
+                                                  } else if (!isSelected && isOptionCorrect) {
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+                                                    badge = (
+                                                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
+                                                        <CheckCircle className="h-3 w-3 text-emerald-600" /> Correct Option
+                                                      </Badge>
+                                                    );
+                                                  }
+
+                                                  return (
+                                                    <div key={oidx} className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 transition-all ${style}`}>
+                                                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${labelStyle}`}>
+                                                          {toBengaliNumerals(optNum)}
+                                                        </span>
+                                                        <div className="text-sm font-semibold leading-relaxed break-words overflow-x-auto max-w-full">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                        </div>
+                                                      </div>
+                                                      <div className="shrink-0">{badge}</div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* 4. INT / NUMERIC Specific Rendering */}
+                                    {(type === 'INT' || type === 'NUMERIC') && (
+                                      <div className="space-y-4">
+                                        {(() => {
+                                          const intDetails = evaluateINTDetails(question, question.studentAnswer, result?.exam?.mcqNegativeMarking || 0);
+                                          const isCorrect = intDetails.isCorrect;
+                                          const hasAttempted = intDetails.hasAttempted;
+
+                                          return (
+                                            <div className="p-4 bg-card border-2 rounded-2xl overflow-hidden shadow-sm flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+                                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                                <div className="pr-0 sm:pr-4">
+                                                  <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
+                                                    Student&apos;s Answer
+                                                  </div>
+                                                  <div className={`text-2xl font-black ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : hasAttempted ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground italic text-lg font-medium'}`}>
+                                                    {hasAttempted ? (
+                                                      <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.studentVal))}</UniversalMathJax>
+                                                    ) : (
+                                                      "Unanswered"
+                                                    )}
+                                                  </div>
+                                                </div>
+                                                <div className="pt-3 sm:pt-0 pl-0 sm:pl-4">
+                                                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
+                                                    Correct Key / Value
+                                                  </div>
+                                                  <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(String(intDetails.correctVal || "N/A"))}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <div className="shrink-0 flex items-center justify-end">
+                                                {isCorrect ? (
+                                                  <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                    <CheckCircle className="h-4 w-4" /> Correct Key
+                                                  </Badge>
+                                                ) : hasAttempted ? (
+                                                  <Badge className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                                    <XCircle className="h-4 w-4" /> Incorrect Key
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="text-muted-foreground font-bold px-3 py-1.5 rounded-xl">
+                                                    Unanswered
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* 5. MTF (Match The Following) */}
+                                    {type === 'MTF' && (
+                                      <div className="space-y-4">
+                                        {(() => {
+                                          const mtf = evaluateMTFDetails(question, question.studentAnswer);
+                                          return (
+                                            <div className="space-y-4">
+                                              {mtf.rightColumn.length > 0 && (
+                                                <div className="p-3 bg-muted/40 rounded-2xl border border-border">
+                                                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                                                    Column B Items:
+                                                  </div>
+                                                  <div className="flex flex-wrap gap-2">
+                                                    {mtf.rightColumn.map((item, i) => (
+                                                      <div key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-xs font-medium shadow-xs">
+                                                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{String.fromCharCode(65 + i)}.</span>
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              <div className="rounded-2xl border border-indigo-500/20 overflow-hidden bg-indigo-500/5 shadow-sm">
+                                                <div className="p-3 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
+                                                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Activity className="h-3.5 w-3.5" /> Match Breakdown & Analysis
+                                                  </span>
+                                                  <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                                    {mtf.correctCount} / {mtf.totalPairs} Matched (+{mtf.score} marks)
+                                                  </span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                  <table className="w-full text-xs md:text-sm">
+                                                    <thead className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 font-bold uppercase">
+                                                      <tr>
+                                                        <th className="p-3 text-left w-1/3">Column A (Question)</th>
+                                                        <th className="p-3 text-left w-1/3">Student Choice</th>
+                                                        <th className="p-3 text-left w-1/3">Correct Match</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-indigo-500/10 bg-card">
+                                                      {mtf.rows.map((row, lIdx) => {
+                                                        const rowClass = row.isMatchCorrect
+                                                          ? "bg-emerald-500/5 dark:bg-emerald-500/10"
+                                                          : !row.hasAnswered
+                                                            ? "bg-muted/30 opacity-80"
+                                                            : "bg-rose-500/5 dark:bg-rose-500/10";
+
+                                                        return (
+                                                          <tr key={lIdx} className={rowClass}>
+                                                            <td className="p-3 border-r border-indigo-500/10 font-medium">
+                                                              <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-muted-foreground shrink-0">{row.vlLeft}.</span>
+                                                                <div className="flex-1">
+                                                                  <UniversalMathJax inline dynamic>{cleanupMath(row.leftText)}</UniversalMathJax>
+                                                                </div>
+                                                              </div>
+                                                            </td>
+                                                            <td className={`p-3 border-r border-indigo-500/10 ${row.isMatchCorrect ? 'text-emerald-700 dark:text-emerald-300 font-bold' : !row.hasAnswered ? 'text-muted-foreground italic' : 'text-rose-700 dark:text-rose-300 font-bold'}`}>
+                                                              {!row.hasAnswered ? (
+                                                                <span className="text-muted-foreground italic">No selection</span>
+                                                              ) : (
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                    {row.vStudentRight && <span className="font-bold shrink-0">{row.vStudentRight}.</span>}
+                                                                    <div className="flex-1">
+                                                                      <UniversalMathJax inline dynamic>{cleanupMath(row.studentRightText)}</UniversalMathJax>
+                                                                    </div>
+                                                                  </div>
+                                                                  {row.isMatchCorrect ? (
+                                                                    <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                                                                  ) : (
+                                                                    <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                                                  )}
+                                                                </div>
+                                                              )}
+                                                            </td>
+                                                            <td className="p-3 text-emerald-700 dark:text-emerald-300 font-medium">
+                                                              <div className="flex items-center gap-2">
+                                                                {row.vCorrectRight && <span className="font-bold shrink-0">{row.vCorrectRight}.</span>}
+                                                                <div className="flex-1">
+                                                                  <UniversalMathJax inline dynamic>{cleanupMath(row.correctRightText)}</UniversalMathJax>
+                                                                </div>
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {/* 6. CMA (Complex Multi-Action) */}
+                                    {type === 'CMA' && (
+                                      <div className="p-4 bg-card rounded-2xl border border-border space-y-3">
                                         {(() => {
                                           let parsedVal = typeof question.studentAnswer === 'string'
                                             ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
@@ -3145,8 +3564,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           );
                                         })()}
                                       </div>
-                                    ) : type === 'MPC' ? (
-                                      <div className="p-4 bg-card rounded-xl border border-border space-y-3">
+                                    )}
+
+                                    {/* 7. MPC (Multi-Step Problem Chain) */}
+                                    {type === 'MPC' && (
+                                      <div className="p-4 bg-card rounded-2xl border border-border space-y-3">
                                         {(() => {
                                           let parsedVal = typeof question.studentAnswer === 'string'
                                             ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
@@ -3176,7 +3598,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           );
                                         })()}
                                       </div>
-                                    ) : null}
+                                    )}
 
                                     {/* Objective Explanation & Model Answer Breakdown Section */}
                                     {(question.explanation || (question as any).explanationImage || type === 'CMA' || type === 'MPC') && (
