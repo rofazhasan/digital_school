@@ -117,21 +117,33 @@ export function evaluateMTFQuestion(
 
         const hasAnswered = studentRightId !== null && studentRightId !== '' && studentRightId !== 'No answer provided';
 
-        const studentRightItem = rightCol.find((r: any, rIdx: number) =>
-            String(r.id) === studentRightId ||
-            clean(r.text) === clean(studentRightId) ||
-            String(rIdx) === studentRightId ||
-            String(rIdx + 1) === studentRightId ||
-            String.fromCharCode(65 + rIdx).toLowerCase() === clean(studentRightId)
-        );
+        const resolveRightItem = (val: string | null): any => {
+            if (!val) return null;
+            const cleanVal = clean(val);
+            // 1. Direct ID match
+            const byId = rightCol.find((r: any) => String(r.id) === val || clean(r.id) === cleanVal);
+            if (byId) return byId;
+            // 2. Direct text match
+            const byText = rightCol.find((r: any) => clean(r.text) === cleanVal);
+            if (byText) return byText;
+            // 3. Letter key match (A, B, C...)
+            const byLetter = rightCol.find((r: any, rIdx: number) => String.fromCharCode(65 + rIdx).toLowerCase() === cleanVal);
+            if (byLetter) return byLetter;
+            // 4. Numeric index match only if not matched by ID
+            const num = parseInt(val, 10);
+            if (!isNaN(num)) {
+                if (num >= 0 && num < rightCol.length && !rightCol.some((r: any) => String(r.id) === String(num))) {
+                    return rightCol[num];
+                }
+                if (num >= 1 && num <= rightCol.length && !rightCol.some((r: any) => String(r.id) === String(num))) {
+                    return rightCol[num - 1];
+                }
+            }
+            return null;
+        };
 
-        const correctRightItem = rightCol.find((r: any, rIdx: number) =>
-            String(r.id) === correctRightId ||
-            clean(r.text) === clean(correctRightId) ||
-            String(rIdx) === correctRightId ||
-            String(rIdx + 1) === correctRightId ||
-            String.fromCharCode(65 + rIdx).toLowerCase() === clean(correctRightId)
-        );
+        const studentRightItem = resolveRightItem(studentRightId);
+        const correctRightItem = resolveRightItem(correctRightId);
 
         let isMatchedCorrectly = false;
         if (hasAnswered && (correctRightId || correctRightItem)) {
