@@ -1174,7 +1174,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                             {isSelected && (isCorrectOpt ? <CheckCircle className="w-3 h-3 ml-1 inline text-green-600" /> : <XCircle className="w-3 h-3 ml-1 inline text-red-600" />)}
                                                                         </div>
                                                                     );
-                                                                })}
+                                                                });
+                                                            })()}
                                                             </div>
                                                         </div>
                                                     </div>
