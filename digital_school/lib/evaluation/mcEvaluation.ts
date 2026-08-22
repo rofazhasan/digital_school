@@ -48,7 +48,17 @@ export function evaluateMCQuestion(
         return 0;
     }
 
+    const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+    const correctTexts = correctIndices.map(i => clean(question.options[i]?.text)).filter(Boolean);
+
     const correctSet = new Set(correctIndices);
+    // Identical options expansion
+    question.options.forEach((opt, idx) => {
+        const t = clean(opt.text);
+        if (t && correctTexts.includes(t)) {
+            correctSet.add(idx);
+        }
+    });
 
     // Count correct and wrong selections
     let correctSelected = 0;

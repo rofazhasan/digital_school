@@ -40,66 +40,128 @@ export interface MTFResult {
 
 export function evaluateMTFQuestion(
     question: MTFQuestion,
-    studentMatches: MTFAnswer
+    studentMatches: MTFAnswer | any
 ): MTFResult {
-    const leftCol = question.leftColumn || (question as any).leftItems || [];
-    const rightCol = question.rightColumn || (question as any).rightItems || [];
-    const correctMatches = (question.matches || {}) as Record<string, string>;
+    let leftCol: any[] = question.leftColumn || (question as any).leftItems || [];
+    if (typeof leftCol === 'string') {
+        try { leftCol = JSON.parse(leftCol); } catch { leftCol = []; }
+    }
+    leftCol = leftCol.map((item: any, idx: number) => typeof item === 'string' ? { id: String(idx + 1), text: item } : item);
+
+    let rightCol: any[] = question.rightColumn || (question as any).rightItems || [];
+    if (typeof rightCol === 'string') {
+        try { rightCol = JSON.parse(rightCol); } catch { rightCol = []; }
+    }
+    rightCol = rightCol.map((item: any, idx: number) => typeof item === 'string' ? { id: String(idx + 1), text: item } : item);
+
+    let correctMatches: Record<string, string> = {};
+    if (typeof question.matches === 'string') {
+        try { correctMatches = JSON.parse(question.matches); } catch { correctMatches = {}; }
+    } else if (question.matches && typeof question.matches === 'object') {
+        correctMatches = question.matches as Record<string, string>;
+    }
+
     const totalLeftItems = leftCol.length;
     const marksPerMatch = totalLeftItems > 0 ? (Number(question.marks) || 1) / totalLeftItems : 0;
 
-    let correctCount = 0;
-
-    // Normalize student matches: Ensure we have a Record<string, string> of IDs
     let normalizedStudentMatches: Record<string, string> = {};
-
-    const rawMatches = studentMatches?.matches ?? (typeof studentMatches === 'object' ? studentMatches : {});
+    let rawMatches = studentMatches?.matches ?? (typeof studentMatches === 'object' ? studentMatches : {});
+    if (typeof rawMatches === 'string') {
+        try { rawMatches = JSON.parse(rawMatches); } catch {}
+    }
 
     if (Array.isArray(rawMatches)) {
-        // [{leftId: "1", rightId: "A"}, ...] or [{leftIndex: 0, rightIndex: 2}, ...]
-        (rawMatches as MTFRawMatch[]).forEach((m) => {
-            if (m && typeof m === 'object' && m.leftId !== undefined && m.rightId !== undefined) {
-                normalizedStudentMatches[m.leftId] = m.rightId;
-            } else if (m && typeof m === 'object' && m.leftIndex !== undefined && m.rightIndex !== undefined) {
-                const leftItem = leftCol[m.leftIndex];
-                const rightItem = rightCol[m.rightIndex];
-                if (leftItem && rightItem) {
-                    normalizedStudentMatches[leftItem.id] = rightItem.id;
+        rawMatches.forEach((m: any) => {
+            if (m && typeof m === 'object') {
+                if (m.leftId !== undefined && m.rightId !== undefined) {
+                    normalizedStudentMatches[String(m.leftId)] = String(m.rightId);
+                } else if (m.leftIndex !== undefined && m.rightIndex !== undefined) {
+                    const leftItem = leftCol[m.leftIndex];
+                    const rightItem = rightCol[m.rightIndex];
+                    if (leftItem && rightItem) {
+                        normalizedStudentMatches[String(leftItem.id)] = String(rightItem.id);
+                    }
                 }
             }
         });
     } else if (rawMatches && typeof rawMatches === 'object') {
-        // Direct ID-based map: { "A": "1", "B": "2" }
-        normalizedStudentMatches = rawMatches as Record<string, string>;
+        Object.entries(rawMatches).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') {
+                normalizedStudentMatches[String(k)] = String(v);
+            }
+        });
     }
 
-    const matchesDetails = leftCol.map((item: MTFMatchNode, idx: number) => {
-        let correctRightId = correctMatches[item.id];
-        if (!correctRightId) {
-            const leftOrigIdx = (item as any).originalIndex !== undefined ? (item as any).originalIndex : idx;
-            if (rightCol.length > 0) {
-                const rMatch = rightCol.find((r: any) => r.originalIndex === leftOrigIdx);
-                if (rMatch) correctRightId = rMatch.id;
-                else if (rightCol[idx]) correctRightId = rightCol[idx].id;
-            }
+    const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+
+    let correctCount = 0;
+
+    const matchesDetails = leftCol.map((item: any, idx: number) => {
+        let correctRightId: string | null = null;
+        if (correctMatches[item.id] !== undefined) {
+            correctRightId = String(correctMatches[item.id]);
+        } else if (correctMatches[String(idx + 1)] !== undefined) {
+            correctRightId = String(correctMatches[String(idx + 1)]);
+        } else if (correctMatches[String(idx)] !== undefined) {
+            correctRightId = String(correctMatches[String(idx)]);
         }
 
-        const studentRightId = normalizedStudentMatches ? normalizedStudentMatches[item.id] || null : null;
-        const isMatchedCorrectly = correctRightId && studentRightId && correctRightId === studentRightId;
+        let studentRightId: string | null = null;
+        if (normalizedStudentMatches[item.id] !== undefined) {
+            studentRightId = String(normalizedStudentMatches[item.id]);
+        } else if (normalizedStudentMatches[String(idx + 1)] !== undefined) {
+            studentRightId = String(normalizedStudentMatches[String(idx + 1)]);
+        } else if (normalizedStudentMatches[String(idx)] !== undefined) {
+            studentRightId = String(normalizedStudentMatches[String(idx)]);
+        }
+
+        const hasAnswered = studentRightId !== null && studentRightId !== '' && studentRightId !== 'No answer provided';
+
+        const studentRightItem = rightCol.find((r: any, rIdx: number) =>
+            String(r.id) === studentRightId ||
+            clean(r.text) === clean(studentRightId) ||
+            String(rIdx) === studentRightId ||
+            String(rIdx + 1) === studentRightId ||
+            String.fromCharCode(65 + rIdx).toLowerCase() === clean(studentRightId)
+        );
+
+        const correctRightItem = rightCol.find((r: any, rIdx: number) =>
+            String(r.id) === correctRightId ||
+            clean(r.text) === clean(correctRightId) ||
+            String(rIdx) === correctRightId ||
+            String(rIdx + 1) === correctRightId ||
+            String.fromCharCode(65 + rIdx).toLowerCase() === clean(correctRightId)
+        );
+
+        let isMatchedCorrectly = false;
+        if (hasAnswered && (correctRightId || correctRightItem)) {
+            if (studentRightId && correctRightId && studentRightId === correctRightId) {
+                isMatchedCorrectly = true;
+            } else if (studentRightItem && correctRightItem && studentRightItem.id === correctRightItem.id) {
+                isMatchedCorrectly = true;
+            } else if (
+                studentRightItem &&
+                correctRightItem &&
+                clean(studentRightItem.text) !== '' &&
+                clean(studentRightItem.text) === clean(correctRightItem.text)
+            ) {
+                isMatchedCorrectly = true;
+            }
+        }
 
         if (isMatchedCorrectly) {
             correctCount++;
         }
 
         return {
-            leftId: item.id,
-            correctRightId,
-            studentRightId,
-            isCorrect: !!isMatchedCorrectly
+            leftId: String(item.id),
+            correctRightId: correctRightId || (correctRightItem ? String(correctRightItem.id) : ''),
+            studentRightId: hasAnswered ? (studentRightId || '') : null,
+            isCorrect: isMatchedCorrectly
         };
     });
 
-    const score = correctCount * marksPerMatch;
+    const score = Number((correctCount * marksPerMatch).toFixed(2));
     const isCorrect = totalLeftItems > 0 && correctCount === totalLeftItems;
 
     let feedback = `Correctly matched ${correctCount} out of ${totalLeftItems} pairs.`;
@@ -110,7 +172,7 @@ export function evaluateMTFQuestion(
     }
 
     return {
-        score: Number(score.toFixed(2)),
+        score,
         isCorrect,
         matches: matchesDetails,
         feedback

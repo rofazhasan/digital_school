@@ -331,61 +331,86 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             let questionScore = 0;
             let res: any = null;
 
+            const isOptionAnswerMatching = (options: any[], userAns: any, qObj: any): boolean => {
+                if (userAns === undefined || userAns === null || userAns === '' || userAns === 'No answer provided') return false;
+                const clean = (s: any) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
+                
+                let rawVal = userAns;
+                if (typeof rawVal === 'object' && rawVal !== null) {
+                    rawVal = rawVal.selectedOption ?? rawVal.answer ?? rawVal.value ?? rawVal.text ?? rawVal.option;
+                }
+                const cleanU = clean(rawVal);
+                if (!cleanU) return false;
+
+                const correctTexts: string[] = [];
+                const correctIndices = new Set<number>();
+
+                if (Array.isArray(options)) {
+                    options.forEach((opt: any, idx: number) => {
+                        const isMarked = typeof opt === 'object' ? opt?.isCorrect === true : false;
+                        const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                        if (isMarked) {
+                            correctIndices.add(idx);
+                            if (optText) correctTexts.push(optText);
+                        }
+                    });
+                }
+
+                const rawC = qObj?.correctOption ?? qObj?.correct ?? qObj?.correctAnswer ?? qObj?.modelAnswer;
+                if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
+                    const cStr = clean(rawC);
+                    correctTexts.push(cStr);
+                    const cNum = parseInt(cStr, 10);
+                    if (!isNaN(cNum)) {
+                        if (cNum >= 0 && Array.isArray(options) && cNum < options.length) correctIndices.add(cNum);
+                        if (cNum >= 1 && Array.isArray(options) && cNum <= options.length) correctIndices.add(cNum - 1);
+                    }
+                }
+
+                // IDENTICAL OPTIONS EXPANSION:
+                if (Array.isArray(options)) {
+                    options.forEach((opt: any, idx: number) => {
+                        const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                        if (optText && correctTexts.includes(optText)) {
+                            correctIndices.add(idx);
+                        }
+                        for (const cIdx of Array.from(correctIndices)) {
+                            const cOptText = clean(typeof options[cIdx] === 'object' ? (options[cIdx]?.text ?? options[cIdx]?.value ?? options[cIdx]?.label) : options[cIdx]);
+                            if (optText && cOptText && optText === cOptText) {
+                                correctIndices.add(idx);
+                                if (!correctTexts.includes(optText)) correctTexts.push(optText);
+                            }
+                        }
+                    });
+                }
+
+                if (correctTexts.includes(cleanU)) return true;
+
+                const uNum = parseInt(cleanU, 10);
+                if (!isNaN(uNum)) {
+                    if (correctIndices.has(uNum)) return true;
+                    if (correctIndices.has(uNum - 1)) return true;
+                }
+
+                const bnLetters = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
+                const enLetters = ['a', 'b', 'c', 'd', 'e'];
+                for (const cIdx of Array.from(correctIndices)) {
+                    if (bnLetters[cIdx] && cleanU === bnLetters[cIdx]) return true;
+                    if (enLetters[cIdx] && cleanU === enLetters[cIdx]) return true;
+                }
+
+                if (Array.isArray(options) && !isNaN(uNum) && uNum >= 0 && uNum < options.length) {
+                    const selText = clean(typeof options[uNum] === 'object' ? (options[uNum]?.text ?? options[uNum]?.value) : options[uNum]);
+                    if (selText && correctTexts.includes(selText)) return true;
+                }
+
+                return false;
+            };
+
             if (type === 'MCQ') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '' || studentAnswer === 'No answer provided') continue;
 
-                const normalize = (s: string | number | undefined | null) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
-                const userAns = normalize(studentAnswer);
-                let isCorrect = false;
-
-                if (question.options && Array.isArray(question.options)) {
-                    const correctIdx = question.options.findIndex((opt: QuestionOption) => opt && (opt.isCorrect || (typeof opt === 'object' && opt.isCorrect)));
-                    if (correctIdx !== -1) {
-                        const correctOpt = question.options[correctIdx];
-                        const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
-                        const letter = String.fromCharCode(97 + correctIdx); // 'a', 'b', 'c'...
-                        isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
-                    }
-
-                    if (!isCorrect) {
-                        const num = parseInt(userAns, 10);
-                        if (!isNaN(num) && num >= 0 && num < question.options.length) {
-                            isCorrect = Boolean(question.options[num]?.isCorrect);
-                        }
-                    }
-                }
-
-                if (!isCorrect && (question.correctAnswer !== undefined || question.correct !== undefined || question.correctOption !== undefined)) {
-                    const rawC = question.correctAnswer ?? question.correct ?? question.correctOption;
-                    const cAns = normalize(String(rawC));
-                    if (userAns === cAns) {
-                        isCorrect = true;
-                    } else if (question.options && Array.isArray(question.options)) {
-                        const cNum = parseInt(cAns, 10);
-                        if (!isNaN(cNum)) {
-                            // 0-based
-                            if (cNum >= 0 && cNum < question.options.length) {
-                                const opt = question.options[cNum];
-                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                                if (userAns === optText || userAns === String(cNum)) isCorrect = true;
-                            }
-                            // 1-based
-                            if (!isCorrect && cNum >= 1 && cNum <= question.options.length) {
-                                const opt = question.options[cNum - 1];
-                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                                if (userAns === optText || userAns === String(cNum - 1)) isCorrect = true;
-                            }
-                        }
-                        const uNum = parseInt(userAns, 10);
-                        if (!isCorrect && !isNaN(uNum)) {
-                            if (uNum >= 0 && uNum < question.options.length) {
-                                const opt = question.options[uNum];
-                                const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                                if (optText === cAns) isCorrect = true;
-                            }
-                        }
-                    }
-                }
+                const isCorrect = isOptionAnswerMatching(question.options || [], studentAnswer, question);
 
                 if (isCorrect) {
                     questionScore = Number(question.marks) || 1;
@@ -432,28 +457,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     }
 
                     subAttemptCount++;
-                    const normalize = (s: string | number | undefined | null) => String(s || '').trim().toLowerCase();
-                    const userAns = normalize(subAnswer);
-                    let isSubCorrect = false;
-
-                    if (subQ.options && Array.isArray(subQ.options)) {
-                        const correctOption = subQ.options.find((opt: QuestionOption) => opt.isCorrect);
-                        if (correctOption) {
-                            const correctOptionText = normalize(correctOption.text);
-                            isSubCorrect = userAns === correctOptionText;
-                        }
-                    }
-
-                    if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
-                        const correctIndex = Number(subQ.correctAnswer);
-                        if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
-                            const opt = subQ.options[correctIndex];
-                            const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
-                            isSubCorrect = userAns === correctText;
-                        } else {
-                            isSubCorrect = userAns === normalize(subQ.correctAnswer);
-                        }
-                    }
+                    const isSubCorrect = isOptionAnswerMatching(subQ.options || [], subAnswer, subQ);
 
                     if (isSubCorrect) {
                         const sMark = Number(subQ.marks) || 1;

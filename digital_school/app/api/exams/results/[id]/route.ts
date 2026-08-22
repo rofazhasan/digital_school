@@ -212,8 +212,81 @@ export async function GET(
       let awardedMarks = 0;
       const maxMarks = Number(question.marks) || 0;
 
-      // --- BUTTERY FALLBACK EVALUATION START ---
-      const normalize = (s: any) => String(s !== undefined && s !== null ? s : "").trim().toLowerCase();
+      const isOptionAnswerMatching = (options: any[], userAns: any, qObj: any): boolean => {
+        if (userAns === undefined || userAns === null || userAns === '' || userAns === 'No answer provided') return false;
+        const clean = (s: any) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
+        
+        let rawVal = userAns;
+        if (typeof rawVal === 'object' && rawVal !== null) {
+          rawVal = rawVal.selectedOption ?? rawVal.answer ?? rawVal.value ?? rawVal.text ?? rawVal.option;
+        }
+        const cleanU = clean(rawVal);
+        if (!cleanU) return false;
+
+        const correctTexts: string[] = [];
+        const correctIndices = new Set<number>();
+
+        if (Array.isArray(options)) {
+          options.forEach((opt: any, idx: number) => {
+            const isMarked = typeof opt === 'object' ? opt?.isCorrect === true : false;
+            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+            if (isMarked) {
+              correctIndices.add(idx);
+              if (optText) correctTexts.push(optText);
+            }
+          });
+        }
+
+        const rawC = qObj?.correctOption ?? qObj?.correct ?? qObj?.correctAnswer ?? qObj?.modelAnswer;
+        if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
+          const cStr = clean(rawC);
+          correctTexts.push(cStr);
+          const cNum = parseInt(cStr, 10);
+          if (!isNaN(cNum)) {
+            if (cNum >= 0 && Array.isArray(options) && cNum < options.length) correctIndices.add(cNum);
+            if (cNum >= 1 && Array.isArray(options) && cNum <= options.length) correctIndices.add(cNum - 1);
+          }
+        }
+
+        // IDENTICAL OPTIONS EXPANSION:
+        if (Array.isArray(options)) {
+          options.forEach((opt: any, idx: number) => {
+            const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+            if (optText && correctTexts.includes(optText)) {
+              correctIndices.add(idx);
+            }
+            for (const cIdx of Array.from(correctIndices)) {
+              const cOptText = clean(typeof options[cIdx] === 'object' ? (options[cIdx]?.text ?? options[cIdx]?.value ?? options[cIdx]?.label) : options[cIdx]);
+              if (optText && cOptText && optText === cOptText) {
+                correctIndices.add(idx);
+                if (!correctTexts.includes(optText)) correctTexts.push(optText);
+              }
+            }
+          });
+        }
+
+        if (correctTexts.includes(cleanU)) return true;
+
+        const uNum = parseInt(cleanU, 10);
+        if (!isNaN(uNum)) {
+          if (correctIndices.has(uNum)) return true;
+          if (correctIndices.has(uNum - 1)) return true;
+        }
+
+        const bnLetters = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
+        const enLetters = ['a', 'b', 'c', 'd', 'e'];
+        for (const cIdx of Array.from(correctIndices)) {
+          if (bnLetters[cIdx] && cleanU === bnLetters[cIdx]) return true;
+          if (enLetters[cIdx] && cleanU === enLetters[cIdx]) return true;
+        }
+
+        if (Array.isArray(options) && !isNaN(uNum) && uNum >= 0 && uNum < options.length) {
+          const selText = clean(typeof options[uNum] === 'object' ? (options[uNum]?.text ?? options[uNum]?.value) : options[uNum]);
+          if (selText && correctTexts.includes(selText)) return true;
+        }
+
+        return false;
+      };
 
       // 1. Process sub-questions (for SMCQ, CQ, SQ)
       let processedSubQuestions: any[] = [];
@@ -242,36 +315,61 @@ export async function GET(
             }
           }
           
-          // 2. Fallback to flat studentAnswers keys
+          // 2. Direct check in studentAnswers root
           if (!subAns) {
-            const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
-            if (descKeys.length > 0) {
+            const rootDescKeys = Object.keys(studentAnswers as any).filter(k => k.startsWith(descPrefix));
+            if (rootDescKeys.length > 0) {
               const aggregated: Record<string, any> = {};
-              descKeys.forEach(k => {
+              rootDescKeys.forEach(k => {
                 aggregated[k.replace(descPrefix, '')] = (studentAnswers as any)[k];
               });
               subAns = aggregated;
             }
           }
 
-          // MAP SUB-QUESTION IMAGES (Robust prefix-based collection)
+          // Gather Sub-Question Images
           const subImages: string[] = [];
           
-          // Scan for all images associated with this specific sub-question/part
-          Object.keys(studentAnswers).forEach(key => {
-            if (key.startsWith(subId) || key.startsWith(descPrefix)) {
-              const val = (studentAnswers as any)[key];
-              if (typeof val === 'string' && (val.startsWith('http') || val.includes('/uploads/'))) {
-                subImages.push(val);
-              } else if (Array.isArray(val)) {
-                val.forEach(v => {
-                  if (typeof v === 'string' && (v.startsWith('http') || v.includes('/uploads/'))) {
-                    subImages.push(v);
-                  }
-                });
-              }
+          // Legacy direct & indexed keys
+          if ((studentAnswers as any)[`${subId}_image`]) subImages.push((studentAnswers as any)[`${subId}_image`]);
+          if (Array.isArray((studentAnswers as any)[`${subId}_images`])) subImages.push(...(studentAnswers as any)[`${subId}_images`]);
+          
+          // Advanced keys in nested object or root
+          const allKeys = { ...(typeof nested === 'object' && nested !== null ? nested : {}), ...(studentAnswers as any) };
+          Object.keys(allKeys).forEach(k => {
+            if (k.startsWith(descPrefix) && (k.endsWith('_image') || k.endsWith('_images') || k.endsWith('_photos'))) {
+              const val = allKeys[k];
+              if (typeof val === 'string') subImages.push(val);
+              if (Array.isArray(val)) subImages.push(...val);
             }
           });
+
+          // Check if images are embedded in answer parts
+          if (typeof subAns === 'object' && subAns !== null) {
+            Object.values(subAns).forEach((v: any) => {
+              if (typeof v === 'object' && v !== null) {
+                if (v.image) subImages.push(v.image);
+                if (Array.isArray(v.images)) subImages.push(...v.images);
+                if (Array.isArray(v.photos)) subImages.push(...v.photos);
+              }
+            });
+          }
+
+          // Fallback to main question images if sub-question has none (distributed)
+          if (subImages.length === 0 && studentAnswerImages.length > 0) {
+            if (studentAnswerImages[subIdx]) {
+              subImages.push(studentAnswerImages[subIdx]);
+            } else if (rawSubQuestions.length === 1) {
+              subImages.push(...studentAnswerImages);
+            } else {
+              // Distribute sequentially or preserve for first part
+              studentAnswerImages.forEach((img, i) => {
+                if (i % rawSubQuestions.length === subIdx) {
+                  subImages.push(img);
+                }
+              });
+            }
+          }
 
           // Ensure unique images
           const uniqueSubImages = Array.from(new Set(subImages));
@@ -289,24 +387,7 @@ export async function GET(
           if ((subAwarded === undefined || subAwarded === null) && type === 'SMCQ') {
             if (subAns !== undefined && subAns !== null && subAns !== '' && subAns !== 'No answer provided') {
               const subOptions = subQ.options || [];
-              const userAns = normalize(subAns);
-              let isSubCorrect = false;
-
-              if (Array.isArray(subOptions)) {
-                const correctOption = subOptions.find((opt: any) => opt.isCorrect);
-                if (correctOption) {
-                  isSubCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
-                }
-              }
-
-              if (!isSubCorrect && subQ.correctAnswer !== undefined && subQ.correctAnswer !== null) {
-                const correctIdx = Number(subQ.correctAnswer);
-                if (!isNaN(correctIdx) && subOptions[correctIdx]) {
-                  isSubCorrect = userAns === normalize(typeof subOptions[correctIdx] === 'object' ? subOptions[correctIdx].text : subOptions[correctIdx]);
-                } else {
-                  isSubCorrect = userAns === normalize(subQ.correctAnswer);
-                }
-              }
+              const isSubCorrect = isOptionAnswerMatching(subOptions, subAns, subQ);
               subAwarded = isSubCorrect ? (Number(subQ.marks) || 0) : 0;
             } else {
               subAwarded = 0;
@@ -337,57 +418,7 @@ export async function GET(
         if (type === 'MCQ') {
           if (studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '' && studentAnswer !== 'No answer provided') {
             const options = question.options || [];
-            const userAns = normalize(studentAnswer);
-            let isCorrect = false;
-
-            if (Array.isArray(options)) {
-              const correctIdx = options.findIndex((opt: any) => opt && (opt.isCorrect || (typeof opt === 'object' && opt.isCorrect)));
-              if (correctIdx !== -1) {
-                const correctOpt = options[correctIdx];
-                const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
-                const letter = String.fromCharCode(97 + correctIdx);
-                isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
-              }
-
-              if (!isCorrect) {
-                const num = parseInt(userAns, 10);
-                if (!isNaN(num) && num >= 0 && num < options.length) {
-                  isCorrect = Boolean(options[num]?.isCorrect);
-                }
-              }
-            }
-
-            if (!isCorrect) {
-              const rawC = question.correctOption !== undefined ? question.correctOption : (question.correct !== undefined ? question.correct : question.correctAnswer);
-              if (rawC !== undefined && rawC !== null) {
-                const cAns = normalize(String(rawC));
-                if (userAns === cAns) {
-                  isCorrect = true;
-                } else if (Array.isArray(options)) {
-                  const cNum = parseInt(cAns, 10);
-                  if (!isNaN(cNum)) {
-                    if (cNum >= 0 && cNum < options.length) {
-                      const opt = options[cNum];
-                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                      if (userAns === optText || userAns === String(cNum)) isCorrect = true;
-                    }
-                    if (!isCorrect && cNum >= 1 && cNum <= options.length) {
-                      const opt = options[cNum - 1];
-                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                      if (userAns === optText || userAns === String(cNum - 1)) isCorrect = true;
-                    }
-                  }
-                  const uNum = parseInt(userAns, 10);
-                  if (!isCorrect && !isNaN(uNum)) {
-                    if (uNum >= 0 && uNum < options.length) {
-                      const opt = options[uNum];
-                      const optText = normalize(typeof opt === 'object' ? opt.text : opt);
-                      if (optText === cAns) isCorrect = true;
-                    }
-                  }
-                }
-              }
-            }
+            const isCorrect = isOptionAnswerMatching(options, studentAnswer, question);
             calculatedMarks = isCorrect ? maxMarks : (exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0);
           }
         } else if (type === 'MC') {

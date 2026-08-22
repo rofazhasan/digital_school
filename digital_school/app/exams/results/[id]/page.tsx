@@ -79,31 +79,44 @@ function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
     ? studentAnswer.selectedOptions
     : (Array.isArray(studentAnswer) ? studentAnswer : []);
 
+  const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+
   const correctIndices = options
     .map((opt: any, idx: number) => ((typeof opt === 'object' ? opt?.isCorrect : false) ? idx : -1))
     .filter((idx: number) => idx !== -1);
 
-  const totalCorrect = correctIndices.length;
+  // Identical options expansion
+  const correctTexts = correctIndices.map(i => clean(typeof options[i] === 'object' ? options[i]?.text : options[i])).filter(Boolean);
+  const correctSet = new Set<number>(correctIndices);
+  options.forEach((opt: any, idx: number) => {
+    const t = clean(typeof opt === 'object' ? opt?.text : opt);
+    if (t && correctTexts.includes(t)) {
+      correctSet.add(idx);
+    }
+  });
+
+  const allCorrectIndices = Array.from(correctSet);
+  const totalCorrect = Math.max(1, correctIndices.length);
   const totalMarks = Number(question?.marks) || 1;
 
   let correctSelected = 0;
   let wrongSelected = 0;
 
   selectedIndices.forEach(idx => {
-    if (correctIndices.includes(idx)) {
+    if (correctSet.has(idx)) {
       correctSelected++;
     } else {
       wrongSelected++;
     }
   });
 
-  const isFullCorrect = selectedIndices.length > 0 && totalCorrect > 0 && correctSelected === totalCorrect && wrongSelected === 0;
+  const isFullCorrect = selectedIndices.length > 0 && correctSelected >= totalCorrect && wrongSelected === 0;
 
   let score = 0;
   if (isFullCorrect) {
     score = totalMarks;
   } else if (selectedIndices.length > 0) {
-    const marksPerCorrect = totalCorrect > 0 ? totalMarks / totalCorrect : 0;
+    const marksPerCorrect = totalMarks / totalCorrect;
     const partialEarned = correctSelected * marksPerCorrect;
     const wrongPenalty = negPct > 0 ? (wrongSelected * (negPct / 100) * totalMarks) : 0;
     score = Math.max(0, Math.round((partialEarned - wrongPenalty) * 100) / 100);
@@ -115,7 +128,7 @@ function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
   return {
     options,
     selectedIndices,
-    correctIndices,
+    correctIndices: allCorrectIndices,
     totalCorrect,
     correctSelected,
     wrongSelected,
@@ -156,7 +169,9 @@ function evaluateMTFDetails(question: any, studentAnswer: any) {
     studentMatches = rawStudentAns;
   }
 
-  const totalPairs = leftColumn.length;
+  const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+
+  const totalPairs = Math.max(leftColumn.length, 1);
   const totalMarks = Number(question?.marks) || 1;
   const marksPerPair = totalPairs > 0 ? totalMarks / totalPairs : 0;
 
@@ -164,25 +179,61 @@ function evaluateMTFDetails(question: any, studentAnswer: any) {
   let answeredCount = 0;
 
   const rows = leftColumn.map((leftItem, lIdx) => {
-    const studentRightId = studentMatches[leftItem.id] || studentMatches[String(lIdx + 1)];
-    const correctRightId = correctMatches[leftItem.id] || correctMatches[String(lIdx + 1)];
+    let correctRightId: string | null = null;
+    if (correctMatches[leftItem.id] !== undefined) correctRightId = String(correctMatches[leftItem.id]);
+    else if (correctMatches[String(lIdx + 1)] !== undefined) correctRightId = String(correctMatches[String(lIdx + 1)]);
+    else if (correctMatches[String(lIdx)] !== undefined) correctRightId = String(correctMatches[String(lIdx)]);
 
-    const hasAnswered = studentRightId !== undefined && studentRightId !== null && String(studentRightId).trim() !== '' && studentRightId !== 'No answer provided';
+    let studentRightId: string | null = null;
+    if (studentMatches[leftItem.id] !== undefined) studentRightId = String(studentMatches[leftItem.id]);
+    else if (studentMatches[String(lIdx + 1)] !== undefined) studentRightId = String(studentMatches[String(lIdx + 1)]);
+    else if (studentMatches[String(lIdx)] !== undefined) studentRightId = String(studentMatches[String(lIdx)]);
+
+    const hasAnswered = studentRightId !== null && studentRightId !== '' && studentRightId !== 'No answer provided';
     if (hasAnswered) answeredCount++;
 
-    const studentRightItem = rightColumn.find((r: any) => r.id === studentRightId || r.text === studentRightId);
-    const studentRightIdx = rightColumn.findIndex((r: any) => r.id === studentRightId || r.text === studentRightId);
+    const studentRightItem = rightColumn.find((r: any, rIdx: number) =>
+      String(r.id) === studentRightId ||
+      clean(r.text) === clean(studentRightId) ||
+      String(rIdx) === studentRightId ||
+      String(rIdx + 1) === studentRightId ||
+      String.fromCharCode(65 + rIdx).toLowerCase() === clean(studentRightId)
+    );
+    const studentRightIdx = rightColumn.findIndex((r: any, rIdx: number) =>
+      String(r.id) === studentRightId ||
+      clean(r.text) === clean(studentRightId) ||
+      String(rIdx) === studentRightId ||
+      String(rIdx + 1) === studentRightId ||
+      String.fromCharCode(65 + rIdx).toLowerCase() === clean(studentRightId)
+    );
 
-    const correctRightItem = rightColumn.find((r: any) => r.id === correctRightId || r.text === correctRightId);
-    const correctRightIdx = rightColumn.findIndex((r: any) => r.id === correctRightId || r.text === correctRightId);
+    const correctRightItem = rightColumn.find((r: any, rIdx: number) =>
+      String(r.id) === correctRightId ||
+      clean(r.text) === clean(correctRightId) ||
+      String(rIdx) === correctRightId ||
+      String(rIdx + 1) === correctRightId ||
+      String.fromCharCode(65 + rIdx).toLowerCase() === clean(correctRightId)
+    );
+    const correctRightIdx = rightColumn.findIndex((r: any, rIdx: number) =>
+      String(r.id) === correctRightId ||
+      clean(r.text) === clean(correctRightId) ||
+      String(rIdx) === correctRightId ||
+      String(rIdx + 1) === correctRightId ||
+      String.fromCharCode(65 + rIdx).toLowerCase() === clean(correctRightId)
+    );
 
     let isMatchCorrect = false;
-    if (hasAnswered && correctRightId) {
-      if (studentRightId === correctRightId) {
+    if (hasAnswered && (correctRightId || correctRightItem)) {
+      if (studentRightId && correctRightId && studentRightId === correctRightId) {
         isMatchCorrect = true;
-      } else if (studentRightItem && correctRightItem && (studentRightItem.id === correctRightItem.id || studentRightItem.text === correctRightItem.text)) {
+      } else if (studentRightItem && correctRightItem && studentRightItem.id === correctRightItem.id) {
         isMatchCorrect = true;
-      } else if (studentRightIdx !== -1 && studentRightIdx === correctRightIdx) {
+      } else if (
+        studentRightItem &&
+        correctRightItem &&
+        clean(studentRightItem.text) !== '' &&
+        clean(studentRightItem.text) === clean(correctRightItem.text)
+      ) {
         isMatchCorrect = true;
       }
     }
@@ -2907,7 +2958,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       isCorrect ? "bg-emerald-50/30 border-emerald-100/50 dark:bg-emerald-950/10 dark:border-emerald-900/40" :
                                         isPartial ? "bg-amber-50/30 border-amber-100/50 dark:bg-amber-950/10 dark:border-amber-900/40" :
                                           hasAns ? "bg-rose-50/30 border-rose-100/50 dark:bg-rose-950/10 dark:border-rose-900/40" :
-                                            "bg-slate-50/50 border-slate-100 dark:bg-slate-900/20 dark:border-slate-800/40 opacity-60"
+                                            "bg-card border-border/80 dark:bg-slate-900/30 dark:border-slate-800 shadow-xs"
                                     )}
                                   >
                                     {/* Question Type & Index Header */}
@@ -2947,45 +2998,34 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* Question Text (for non-SMCQ) */}
                                      {type === 'AR' ? (
                                        <div className="space-y-4 mb-8">
-                                         {question.questionText && (
-                                           <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
-                                             <UniversalMathJax dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                         <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+                                           <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 flex items-center gap-1.5">
+                                             <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> Assertion (A) / নিশ্চয়তা:
                                            </div>
-                                         )}
-                                         <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-200 dark:border-indigo-800 flex flex-col gap-2">
-                                           <Badge className="bg-indigo-600 text-white w-fit px-2 py-0.5 text-[10px] font-bold uppercase">Assertion (A)</Badge>
-                                           <div className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                             <UniversalMathJax inline dynamic>{cleanupMath((question as any).assertion || question.questionText || "")}</UniversalMathJax>
+                                           <div className="text-base md:text-lg font-medium text-foreground">
+                                             <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || question.questionText || (question as any).text || '')}</UniversalMathJax>
                                            </div>
                                          </div>
-                                         <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-200 dark:border-purple-800 flex flex-col gap-2">
-                                           <Badge className="bg-purple-600 dark:bg-purple-500 text-white w-fit px-2 py-0.5 text-[10px] font-bold uppercase">Reason (R)</Badge>
-                                           <div className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                             <UniversalMathJax inline dynamic>{cleanupMath((question as any).reason || "")}</UniversalMathJax>
+                                         <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40">
+                                           <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 flex items-center gap-1.5">
+                                             <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" /> Reason (R) / যুক্তি:
+                                           </div>
+                                           <div className="text-base md:text-lg font-medium text-foreground">
+                                             <UniversalMathJax inline dynamic>{cleanupMath(question.reason || (question as any).reasonText || '')}</UniversalMathJax>
                                            </div>
                                          </div>
                                        </div>
-                                     ) : type !== 'SMCQ' ? (
-                                       <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
-                                         <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || (question as any).question || (question as any).q || "")}</UniversalMathJax>
+                                     ) : type !== 'SMCQ' && type !== 'CMA' && type !== 'MPC' ? (
+                                       <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
+                                         <UniversalMathJax inline dynamic>{cleanupMath((question.questionText || (question as any).text || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                        </div>
                                      ) : null}
 
-                                    {/* SMCQ Scenario Rendering */}
+                                    {/* SMCQ Question Layout */}
                                     {type === 'SMCQ' && (
-                                      <div className="mb-10 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
-                                        <div className="p-4 md:p-8 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[2rem] md:rounded-[3rem] border-2 border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
-                                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                            <Layers className="h-24 w-24 text-indigo-500" />
-                                          </div>
-                                          <div className="relative z-10">
-                                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-4 border border-indigo-500/30">
-                                              <Sparkles className="h-3.5 w-3.5" /> Scenario Context
-                                            </div>
-                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight max-w-full overflow-x-auto scrollbar-thin">
-                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
-                                            </div>
-                                          </div>
+                                      <div className="space-y-8">
+                                        <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight pb-6 border-b border-border/50">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                         </div>
 
                                         <div className="space-y-12 pl-4 md:pl-12 border-l-4 border-dashed border-indigo-500/20 dark:border-indigo-500/10">
@@ -3002,56 +3042,104 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     <Badge variant="outline" className="rounded-full px-4 py-1 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[10px] uppercase font-black tracking-widest text-slate-500">
                                                       {subQ.marks} MARK{subQ.marks !== 1 ? 'S' : ''}
                                                     </Badge>
+                                                    <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                                                      <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
+                                                    </div>
                                                   </div>
-                                                  <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
-                                                  </div>
+
+                                                  {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
+                                                    <div className={cn(
+                                                      "px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-sm border whitespace-nowrap",
+                                                      subQ.isCorrect
+                                                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                                        : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                                                    )}>
+                                                      {subQ.isCorrect ? "Perfect Result" : "Corrected Response"}
+                                                    </div>
+                                                  )}
                                                 </div>
 
-                                                {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
-                                                  <div className={cn(
-                                                    "px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-sm border whitespace-nowrap",
-                                                    subQ.isCorrect
-                                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                                                      : "bg-rose-500/10 text-rose-600 border-rose-500/30"
-                                                  )}>
-                                                    {subQ.isCorrect ? "Perfect Result" : "Corrected Response"}
-                                                  </div>
-                                                )}
-                                              </div>
+                                                {(() => {
+                                                  const subOpts = subQ.options || [];
+                                                  const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+                                                  const subCorrectIndices = new Set<number>();
+                                                  const subCorrectTexts: string[] = [];
 
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {(subQ.options || []).map((opt: any, oi: number) => {
-                                                  const optText = typeof opt === 'object' ? opt.text : opt;
-                                                  const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && String(subQ.studentAnswer).trim() === String(optText).trim();
-                                                  const isCorOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null && (String(subQ.correctAnswer).trim() === String(optText).trim() || Number(subQ.correctAnswer) === oi)));
+                                                  subOpts.forEach((opt: any, oi: number) => {
+                                                    const isMarked = typeof opt === 'object' && opt?.isCorrect === true;
+                                                    const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                                                    if (isMarked) {
+                                                      subCorrectIndices.add(oi);
+                                                      if (oText) subCorrectTexts.push(oText);
+                                                    }
+                                                  });
 
-                                                  let optStyle = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
-                                                  let optIcon = null;
-
-                                                  if (isSel && isCorOpt) {
-                                                    optStyle = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 grayscale-0 scale-[1.02]";
-                                                    optIcon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
-                                                  } else if (isSel && !isCorOpt) {
-                                                    optStyle = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-50 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10 grayscale-0";
-                                                    optIcon = <XCircle className="h-4 w-4 text-rose-600" />;
-                                                  } else if (!isSel && isCorOpt) {
-                                                    optStyle = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed grayscale-0";
-                                                    optIcon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
+                                                  const rawSubC = subQ.correctOption ?? subQ.correct ?? subQ.correctAnswer ?? subQ.modelAnswer;
+                                                  if (rawSubC !== undefined && rawSubC !== null && clean(rawSubC) !== '') {
+                                                    const cStr = clean(rawSubC);
+                                                    subCorrectTexts.push(cStr);
+                                                    const cNum = parseInt(cStr, 10);
+                                                    if (!isNaN(cNum)) {
+                                                      if (cNum >= 0 && cNum < subOpts.length) subCorrectIndices.add(cNum);
+                                                      if (cNum >= 1 && cNum <= subOpts.length) subCorrectIndices.add(cNum - 1);
+                                                    }
                                                   }
 
+                                                  // Expand identical options
+                                                  subOpts.forEach((opt: any, oi: number) => {
+                                                    const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                                                    if (oText && subCorrectTexts.includes(oText)) {
+                                                      subCorrectIndices.add(oi);
+                                                    }
+                                                    for (const cIdx of Array.from(subCorrectIndices)) {
+                                                      const cOptText = clean(typeof subOpts[cIdx] === 'object' ? (subOpts[cIdx]?.text ?? subOpts[cIdx]?.value) : subOpts[cIdx]);
+                                                      if (oText && cOptText && oText === cOptText) {
+                                                        subCorrectIndices.add(oi);
+                                                        if (!subCorrectTexts.includes(oText)) subCorrectTexts.push(oText);
+                                                      }
+                                                    }
+                                                  });
+
                                                   return (
-                                                    <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
-                                                      <span className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
-                                                        {String.fromCharCode(65 + oi)}
-                                                      </span>
-                                                      <div className="flex-1 font-semibold text-sm">
-                                                        <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
-                                                      </div>
-                                                      <div className="flex-shrink-0">{optIcon}</div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                      {subOpts.map((opt: any, oi: number) => {
+                                                        const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? String(opt)) : String(opt);
+                                                        const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && (
+                                                          clean(subQ.studentAnswer) === clean(optText) ||
+                                                          (typeof subQ.studentAnswer === 'number' && subQ.studentAnswer === oi) ||
+                                                          (typeof subQ.studentAnswer === 'string' && !isNaN(Number(subQ.studentAnswer.trim())) && Number(subQ.studentAnswer.trim()) === oi)
+                                                        );
+                                                        const isCorOpt = subCorrectIndices.has(oi);
+
+                                                        let optStyle = "border-border/80 dark:border-slate-800 bg-card text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
+                                                        let optIcon = null;
+
+                                                        if (isSel && isCorOpt) {
+                                                          optStyle = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 scale-[1.02]";
+                                                          optIcon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
+                                                        } else if (isSel && !isCorOpt) {
+                                                          optStyle = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-50 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10";
+                                                          optIcon = <XCircle className="h-4 w-4 text-rose-600" />;
+                                                        } else if (!isSel && isCorOpt) {
+                                                          optStyle = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed";
+                                                          optIcon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
+                                                        }
+
+                                                        return (
+                                                          <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
+                                                            <span className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+                                                              {String.fromCharCode(65 + oi)}
+                                                            </span>
+                                                            <div className="flex-1 font-semibold text-sm">
+                                                              <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                            </div>
+                                                            <div className="flex-shrink-0">{optIcon}</div>
+                                                          </div>
+                                                        );
+                                                      })}
                                                     </div>
                                                   );
-                                                })}
+                                                })()}
                                               </div>
                                             </div>
                                           ))}
@@ -3083,7 +3171,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   {hasAnswered ? (
                                                     <UniversalMathJax inline dynamic>{cleanupMath(String(rawAns))}</UniversalMathJax>
                                                   ) : (
-                                                    <span className="text-muted-foreground opacity-60">Not Answered</span>
+                                                    <span className="text-muted-foreground">Not Answered</span>
                                                   )}
                                                 </div>
                                                 {(question.correct || question.correctAnswer || question.modelAnswer) && (
@@ -3094,6 +3182,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               </div>
                                             );
                                           }
+
+                                          const clean = (s: any) => String(s ?? '').trim().toLowerCase();
+
+                                          // 1. Collect baseline correct indices and texts
+                                          const correctIndices = new Set<number>();
+                                          const correctTexts: string[] = [];
+
+                                          options.forEach((opt: any, oi: number) => {
+                                            const isMarked = typeof opt === 'object' && opt?.isCorrect === true;
+                                            const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                                            if (isMarked) {
+                                              correctIndices.add(oi);
+                                              if (oText) correctTexts.push(oText);
+                                            }
+                                          });
+
+                                          const rawC = question.correctOption ?? question.correct ?? question.correctAnswer ?? question.modelAnswer;
+                                          if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
+                                            const cStr = clean(rawC);
+                                            correctTexts.push(cStr);
+                                            const cNum = parseInt(cStr, 10);
+                                            if (!isNaN(cNum)) {
+                                              if (cNum >= 0 && cNum < options.length) correctIndices.add(cNum);
+                                              if (cNum >= 1 && cNum <= options.length) correctIndices.add(cNum - 1);
+                                            }
+                                          }
+
+                                          // 2. Expand identical options
+                                          options.forEach((opt: any, oi: number) => {
+                                            const oText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label) : opt);
+                                            if (oText && correctTexts.includes(oText)) {
+                                              correctIndices.add(oi);
+                                            }
+                                            for (const cIdx of Array.from(correctIndices)) {
+                                              const cOptText = clean(typeof options[cIdx] === 'object' ? (options[cIdx]?.text ?? options[cIdx]?.value) : options[cIdx]);
+                                              if (oText && cOptText && oText === cOptText) {
+                                                correctIndices.add(oi);
+                                                if (!correctTexts.includes(oText)) correctTexts.push(oText);
+                                              }
+                                            }
+                                          });
 
                                           return (
                                             <div className="space-y-3">
@@ -3109,46 +3238,21 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
 
                                                   const isSelected = hasAnswered && (
-                                                    String(rawAns).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
+                                                    clean(rawAns) === clean(optText) ||
                                                     (typeof rawAns === 'number' && rawAns === idx) ||
                                                     (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim())) && Number(rawAns.trim()) === idx) ||
                                                     (typeof rawAns === 'string' && MCQ_LABELS_BN[idx] && rawAns.trim() === MCQ_LABELS_BN[idx]) ||
                                                     (typeof rawAns === 'string' && MCQ_LABELS_EN[idx] && rawAns.trim().toUpperCase() === MCQ_LABELS_EN[idx])
                                                   );
 
-                                                  const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
-                                                  const isMatchingCorrect = (
-                                                    (question?.correct !== undefined && question?.correct !== null && (
-                                                      String(question.correct).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
-                                                      (typeof question.correct === 'number' && question.correct === idx) ||
-                                                      (typeof question.correct === 'string' && !isNaN(Number(question.correct.trim())) && Number(question.correct.trim()) === idx) ||
-                                                      (typeof question.correct === 'string' && MCQ_LABELS_BN[idx] && question.correct.trim() === MCQ_LABELS_BN[idx]) ||
-                                                      (typeof question.correct === 'string' && MCQ_LABELS_EN[idx] && question.correct.trim().toUpperCase() === MCQ_LABELS_EN[idx])
-                                                    )) ||
-                                                    (question?.correctAnswer !== undefined && question?.correctAnswer !== null && (
-                                                      String(question.correctAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
-                                                      (typeof question.correctAnswer === 'number' && question.correctAnswer === idx) ||
-                                                      (typeof question.correctAnswer === 'string' && !isNaN(Number(question.correctAnswer.trim())) && Number(question.correctAnswer.trim()) === idx) ||
-                                                      (typeof question.correctAnswer === 'string' && MCQ_LABELS_BN[idx] && question.correctAnswer.trim() === MCQ_LABELS_BN[idx]) ||
-                                                      (typeof question.correctAnswer === 'string' && MCQ_LABELS_EN[idx] && question.correctAnswer.trim().toUpperCase() === MCQ_LABELS_EN[idx])
-                                                    )) ||
-                                                    (question?.correctOption !== undefined && question?.correctOption !== null && (
-                                                      question.correctOption === idx ||
-                                                      String(question.correctOption) === String(idx)
-                                                    )) ||
-                                                    (question?.modelAnswer !== undefined && question?.modelAnswer !== null && (
-                                                      String(question.modelAnswer).trim().toLowerCase() === String(optText).trim().toLowerCase()
-                                                    ))
-                                                  );
+                                                  const isCorrectOpt = correctIndices.has(idx);
 
-                                                  const isCorrectOpt = isOptionMarkedCorrect || isMatchingCorrect;
-
-                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
-                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let style = "bg-card border-border/80 text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
+                                                  let labelStyle = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 font-bold";
                                                   let badge = null;
 
                                                   if (isSelected && isCorrectOpt) {
-                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 shadow-xs";
                                                     labelStyle = "bg-emerald-600 text-white";
                                                     badge = (
                                                       <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
@@ -3156,7 +3260,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (isSelected && !isCorrectOpt) {
-                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 shadow-xs";
                                                     labelStyle = "bg-rose-600 text-white";
                                                     badge = (
                                                       <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
@@ -3164,7 +3268,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (!isSelected && isCorrectOpt) {
-                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed";
                                                     labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
                                                     badge = (
                                                       <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
@@ -3222,12 +3326,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   const isCorrectOpt = opt?.isCorrect === true;
                                                   const optText = typeof opt === 'object' ? opt?.text : opt;
 
-                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
-                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let style = "bg-card border-border/80 text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
+                                                  let labelStyle = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 font-bold";
                                                   let badge = null;
 
                                                   if (isSelected && isCorrectOpt) {
-                                                    style = "bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 opacity-100";
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30";
                                                     labelStyle = "bg-emerald-500 text-white";
                                                     badge = (
                                                       <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
@@ -3235,7 +3339,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (isSelected && !isCorrectOpt) {
-                                                    style = "bg-rose-500/10 border-2 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30 opacity-100";
+                                                    style = "bg-rose-500/10 border-2 border-rose-500/40 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500/30";
                                                     labelStyle = "bg-rose-500 text-white";
                                                     badge = (
                                                       <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-sm">
@@ -3243,7 +3347,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (!isSelected && isCorrectOpt) {
-                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 border-dashed";
                                                     labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
                                                     badge = (
                                                       <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2">
@@ -3329,12 +3433,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   const isSelected = hasAnswered && selectedOption === optNum;
                                                   const isOptionCorrect = correctOption === optNum;
 
-                                                  let style = "bg-card/50 border-border text-muted-foreground opacity-60";
-                                                  let labelStyle = "bg-muted text-muted-foreground";
+                                                  let style = "bg-card border-border/80 text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
+                                                  let labelStyle = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 font-bold";
                                                   let badge = null;
 
                                                   if (isSelected && isOptionCorrect) {
-                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 opacity-100 shadow-xs";
+                                                    style = "bg-emerald-500/10 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 shadow-xs";
                                                     labelStyle = "bg-emerald-600 text-white";
                                                     badge = (
                                                       <Badge className="bg-emerald-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
@@ -3342,7 +3446,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (isSelected && !isOptionCorrect) {
-                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 opacity-100 shadow-xs";
+                                                    style = "bg-rose-500/10 border-2 border-rose-500 text-rose-950 dark:text-rose-100 ring-1 ring-rose-500/30 shadow-xs";
                                                     labelStyle = "bg-rose-600 text-white";
                                                     badge = (
                                                       <Badge className="bg-rose-600 text-white text-[10px] py-0.5 px-2 flex items-center gap-1 shadow-xs">
@@ -3350,7 +3454,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       </Badge>
                                                     );
                                                   } else if (!isSelected && isOptionCorrect) {
-                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed opacity-90";
+                                                    style = "bg-emerald-500/5 border-2 border-emerald-500/40 text-emerald-800 dark:text-emerald-300 border-dashed";
                                                     labelStyle = "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
                                                     badge = (
                                                       <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] py-0.5 px-2 flex items-center gap-1">
@@ -3806,10 +3910,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   return (
                                                     <div key={oi} className={cn(
                                                       "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
-                                                      isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
-                                                        isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
-                                                          !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
-                                                            "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
+                                                      isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-950 dark:text-emerald-50 ring-1 ring-emerald-500/30" :
+                                                        isSel && !isCor ? "bg-rose-500/10 border-rose-500/50 text-rose-950 dark:text-rose-50 ring-1 ring-rose-500/30" :
+                                                          !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/40 text-emerald-850 dark:text-emerald-300 border-dashed" :
+                                                            "bg-card border-border/80 text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
                                                     )}>
                                                       <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
                                                       <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
