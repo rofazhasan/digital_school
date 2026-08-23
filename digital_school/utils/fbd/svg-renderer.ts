@@ -29,7 +29,15 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         svgContent += `<g class="diagram-background">${innerContent}</g>`;
     }
 
-    // 4. Body (Backward compatibility and multi-body support)
+    // 4. Custom SVG Content (Mathematical graphs, shapes, circuits, optics, etc.)
+    if (diagram.customSVG) {
+        const innerContent = diagram.customSVG
+            .replace(/<svg[^>]*>/, '')
+            .replace(/<\/svg>/, '');
+        svgContent += `<g class="diagram-custom-svg">${innerContent}</g>`;
+    }
+
+    // 5. Body (Backward compatibility and multi-body support)
     if (diagram.body) {
         svgContent += renderBody(diagram.body);
     }

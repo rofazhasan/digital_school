@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { cleanupMath } from "@/lib/utils";
+import { extractInlineFBDs } from "@/utils/fbd/inline-parser";
+import { renderFBDToSVG } from "@/utils/fbd/svg-renderer";
 
 declare global {
     interface Window {
@@ -153,6 +155,32 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
     return { text: result, hasChemfig, formulaMap };
 }
 
+/**
+ * Process inline diagram placeholders (##PRESET:...## or ##P1(...) | F1(...)##)
+ * into self-contained, responsive SVG elements
+ */
+function processInlineDiagrams(text: string): string {
+    if (!text || !text.includes('##')) return text;
+    try {
+        const { cleanText, fbds, placeholders } = extractInlineFBDs(text);
+        if (!fbds || fbds.length === 0) return text;
+
+        let result = cleanText;
+        placeholders.forEach((placeholder, idx) => {
+            const diagram = fbds[idx];
+            if (diagram) {
+                const svgString = renderFBDToSVG(diagram);
+                const styledContainer = `<span class="inline-diagram-wrapper my-2 flex justify-center w-full max-w-full overflow-x-auto select-none">${svgString}</span>`;
+                result = result.split(placeholder).join(styledContainer);
+            }
+        });
+        return result;
+    } catch (err) {
+        console.error('Error processing inline diagrams:', err);
+        return text;
+    }
+}
+
 export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJaxProps) {
     const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9));
     const [cacheVersion, setCacheVersion] = useState(0);
@@ -160,9 +188,13 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     const rawText = typeof children === "string" ? children : "";
     const cleanText = cleanupMath(rawText);
 
+    const diagramProcessedText = useMemo(() => {
+        return processInlineDiagrams(cleanText);
+    }, [cleanText]);
+
     const { text: processedText, hasChemfig, formulaMap } = useMemo(() => 
-        processChemfig(cleanText, instanceId), 
-        [cleanText, instanceId, cacheVersion]
+        processChemfig(diagramProcessedText, instanceId), 
+        [diagramProcessedText, instanceId, cacheVersion]
     );
 
     useEffect(() => {
