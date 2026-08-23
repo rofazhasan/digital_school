@@ -157,9 +157,9 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
 
 /**
  * Process inline diagram placeholders (##PRESET:...## or ##P1(...) | F1(...)##)
- * into self-contained, responsive SVG elements
+ * into self-contained, responsive SVG elements with academic card framing
  */
-function processInlineDiagrams(text: string): string {
+function processInlineDiagrams(text: string, isInline: boolean = false): string {
     if (!text || !text.includes('##')) return text;
     try {
         const { cleanText, fbds, placeholders } = extractInlineFBDs(text);
@@ -170,7 +170,11 @@ function processInlineDiagrams(text: string): string {
             const diagram = fbds[idx];
             if (diagram) {
                 const svgString = renderFBDToSVG(diagram);
-                const styledContainer = `<span class="inline-diagram-wrapper my-2 flex justify-center w-full max-w-full overflow-x-auto select-none">${svgString}</span>`;
+                const containerClass = isInline
+                    ? "inline-diagram-card inline-flex my-1 py-1 px-2 items-center justify-center max-w-[200px] rounded-lg border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/60 shadow-xs select-none align-middle"
+                    : "inline-diagram-card my-3 py-2.5 px-3.5 flex flex-col items-center justify-center w-fit max-w-full mx-auto rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-slate-50/75 dark:bg-slate-900/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] backdrop-blur-xs select-none transition-all hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.07)] hover:border-slate-300 dark:hover:border-slate-700";
+
+                const styledContainer = `<span class="${containerClass}">${svgString}</span>`;
                 result = result.split(placeholder).join(styledContainer);
             }
         });
@@ -189,8 +193,8 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     const cleanText = cleanupMath(rawText);
 
     const diagramProcessedText = useMemo(() => {
-        return processInlineDiagrams(cleanText);
-    }, [cleanText]);
+        return processInlineDiagrams(cleanText, !!inline);
+    }, [cleanText, inline]);
 
     const { text: processedText, hasChemfig, formulaMap } = useMemo(() => 
         processChemfig(diagramProcessedText, instanceId), 
