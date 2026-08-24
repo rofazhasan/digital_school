@@ -19,6 +19,8 @@ interface UniversalMathJaxProps {
     children: React.ReactNode;
     inline?: boolean;
     dynamic?: boolean;
+    diagram?: any;
+    fbd?: any;
 }
 
 // Module-level SVG cache — persists across renders for the entire session
@@ -156,16 +158,26 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
 }
 
 /**
- * Process inline diagram placeholders (##PRESET:...## or ##P1(...) | F1(...)##)
- * into self-contained, responsive SVG elements with academic card framing
+ * Tokenize diagrams into safe placeholder tokens and map them to their rendered SVG card strings.
+ * Keeps KaTeX from scanning SVG XML as LaTeX math.
  */
-function processInlineDiagrams(text: string, isInline: boolean = false): string {
-    if (!text || !text.includes('##')) return text;
+function extractAndTokenizeDiagrams(text: string, isInline: boolean, instanceId: string): { 
+    tokenizedText: string; 
+    diagramMap: Record<string, string>; 
+} {
+    if (!text || !text.includes('##')) {
+        return { tokenizedText: text, diagramMap: {} };
+    }
+
     try {
         const { cleanText, fbds, placeholders } = extractInlineFBDs(text);
-        if (!fbds || fbds.length === 0) return text;
+        if (!fbds || fbds.length === 0) {
+            return { tokenizedText: text, diagramMap: {} };
+        }
 
+        const diagramMap: Record<string, string> = {};
         let result = cleanText;
+
         placeholders.forEach((placeholder, idx) => {
             const diagram = fbds[idx];
             if (diagram) {
@@ -175,30 +187,39 @@ function processInlineDiagrams(text: string, isInline: boolean = false): string 
                     : "inline-diagram-card my-3 py-2.5 px-3.5 flex flex-col items-center justify-center w-fit max-w-full mx-auto rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-slate-50/75 dark:bg-slate-900/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] backdrop-blur-xs select-none transition-all hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.07)] hover:border-slate-300 dark:hover:border-slate-700";
 
                 const styledContainer = `<span class="${containerClass}">${svgString}</span>`;
-                result = result.split(placeholder).join(styledContainer);
+                const token = `DSDIAGTOKEN${instanceId}${idx}ENDTOKEN`;
+                diagramMap[token] = styledContainer;
+                result = result.split(placeholder).join(token);
             }
         });
-        return result;
+
+        return { tokenizedText: result, diagramMap };
     } catch (err) {
-        console.error('Error processing inline diagrams:', err);
-        return text;
+        console.error('Error tokenizing inline diagrams:', err);
+        return { tokenizedText: text, diagramMap: {} };
     }
 }
 
-export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJaxProps) {
+export function UniversalMathJax({ children, inline, dynamic, diagram, fbd }: UniversalMathJaxProps) {
     const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9));
     const [cacheVersion, setCacheVersion] = useState(0);
 
     const rawText = typeof children === "string" ? children : "";
-    const cleanText = cleanupMath(rawText);
 
-    const diagramProcessedText = useMemo(() => {
-        return processInlineDiagrams(cleanText, !!inline);
-    }, [cleanText, inline]);
+    // 1. Extract and isolate diagrams into safe tokens
+    const { tokenizedText, diagramMap } = useMemo(() => {
+        return extractAndTokenizeDiagrams(rawText, !!inline, instanceId);
+    }, [rawText, inline, instanceId]);
 
+    // 2. Clean up math delimiters on the tokenized text (KaTeX & LaTeX safe)
+    const cleanText = useMemo(() => {
+        return cleanupMath(tokenizedText);
+    }, [tokenizedText]);
+
+    // 3. Process chemical formulas
     const { text: processedText, hasChemfig, formulaMap } = useMemo(() => 
-        processChemfig(diagramProcessedText, instanceId), 
-        [diagramProcessedText, instanceId, cacheVersion]
+        processChemfig(cleanText, instanceId), 
+        [cleanText, instanceId, cacheVersion]
     );
 
     useEffect(() => {
@@ -272,8 +293,8 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         });
     }, [hasChemfig, formulaMap, cacheVersion]);
 
-    // Pre-render standard math with KaTeX for Instant performance on mobile/low-ram
-    const renderedText = useMemo(() => {
+    // 4. Pre-render standard math with KaTeX safely
+    const mathRenderedText = useMemo(() => {
         let text = processedText;
         
         // 1. Render Display Math $$...$$ or \[...\]
@@ -296,6 +317,33 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         return text;
     }, [processedText]);
 
+    // 5. Re-hydrate diagram tokens with actual SVG cards (KaTeX never touched them!)
+    const finalText = useMemo(() => {
+        let text = mathRenderedText;
+        Object.entries(diagramMap).forEach(([token, svgCard]) => {
+            text = text.split(token).join(svgCard);
+        });
+
+        // If standalone diagram/fbd prop was passed and no diagram was inline
+        const standaloneDiag = diagram || fbd;
+        if (standaloneDiag && Object.keys(diagramMap).length === 0) {
+            try {
+                const diagObj = typeof standaloneDiag === 'string' 
+                    ? extractInlineFBDs(`##${standaloneDiag}##`).fbds[0] 
+                    : standaloneDiag;
+                if (diagObj) {
+                    const svgString = renderFBDToSVG(diagObj);
+                    const containerClass = inline
+                        ? "inline-diagram-card inline-flex my-1 py-1 px-2 items-center justify-center max-w-[200px] rounded-lg border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/60 shadow-xs select-none align-middle"
+                        : "inline-diagram-card my-3 py-2.5 px-3.5 flex flex-col items-center justify-center w-fit max-w-full mx-auto rounded-xl border border-slate-200/90 dark:border-slate-800/90 bg-slate-50/75 dark:bg-slate-900/60 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] backdrop-blur-xs select-none transition-all hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.07)] hover:border-slate-300 dark:hover:border-slate-700";
+                    text += `<span class="${containerClass}">${svgString}</span>`;
+                }
+            } catch (e) {}
+        }
+
+        return text;
+    }, [mathRenderedText, diagramMap, diagram, fbd, inline]);
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss, safely guarded
@@ -305,7 +353,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         try {
             const mj = (window as any).MathJax;
             // Only trigger if MathJax is fully loaded and ready, and there is unrendered math
-            if (mj && typeof mj.typesetPromise === 'function' && (renderedText.includes('\\ce{') || renderedText.includes('\\begin{'))) {
+            if (mj && typeof mj.typesetPromise === 'function' && (finalText.includes('\\ce{') || finalText.includes('\\begin{'))) {
                 if (mj.startup?.promise) {
                     mj.startup.promise.then(() => {
                         if (containerRef.current && mj.typesetPromise) {
@@ -315,14 +363,14 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
                 }
             }
         } catch (e) {}
-    }, [renderedText, cacheVersion]);
+    }, [finalText, cacheVersion]);
 
     if (inline) {
         return (
             <span 
                 ref={containerRef as any}
                 className="inline-block" 
-                dangerouslySetInnerHTML={{ __html: renderedText }} 
+                dangerouslySetInnerHTML={{ __html: finalText }} 
             />
         );
     }
@@ -331,7 +379,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         <div 
             ref={containerRef}
             className="block" 
-            dangerouslySetInnerHTML={{ __html: renderedText }} 
+            dangerouslySetInnerHTML={{ __html: finalText }} 
         />
     );
 }

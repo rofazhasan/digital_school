@@ -187,12 +187,12 @@ function renderPoint(point: FBDPoint): string {
     // Render a small dot or specific symbol for supports
     if (point.type === 'fixed') {
         // Draw a small cross or hatch
-        return `<circle cx="${x}" cy="${y}" r="3" fill="#000" />
-                <path d="M${x - 5},${y} L${x + 5},${y} M${x},${y - 5} L${x},${y + 5}" stroke="#000" stroke-width="1"/>`;
+        return `<circle cx="${x}" cy="${y}" r="3" fill="currentColor" opacity="0.85" />
+                <path d="M${x - 5},${y} L${x + 5},${y} M${x},${y - 5} L${x},${y + 5}" stroke="currentColor" stroke-width="1.2" opacity="0.85" />`;
     }
     // Default dot
-    return `<circle cx="${x}" cy="${y}" r="2" fill="#000" />
-            ${point.label ? `<text x="${x + 5}" y="${y - 5}" font-size="12">${point.label}</text>` : ''}`;
+    return `<circle cx="${x}" cy="${y}" r="2.5" fill="currentColor" opacity="0.85" />
+            ${point.label ? `<text x="${x + 5}" y="${y - 5}" font-size="12" fill="currentColor" opacity="0.9">${point.label}</text>` : ''}`;
 }
 
 function renderForce(force: FBDForce, point: FBDPoint, config: any): string {
