@@ -3,36 +3,11 @@ import type { FBDDiagram, FBDForce, FBDPoint, FBDBody, FBDMoment } from './types
 import { DEFAULT_FBD_CONFIG } from './types';
 
 /**
- * Render FBDDiagram to SVG string with World-Class Academic Sizing & Precision
+ * Render FBDDiagram to SVG string
  */
 export function renderFBDToSVG(diagram: FBDDiagram): string {
-    const { id } = diagram;
-    const width = Number(diagram.width) || 500;
-    const height = Number(diagram.height) || 350;
+    const { width, height, id } = diagram;
     const config = DEFAULT_FBD_CONFIG;
-
-    // Calculate optimal responsive dimensions for academic questions
-    const aspectRatio = width / (height || 1);
-    let optimalWidth = 360;
-    let optimalHeight = 240;
-
-    if (aspectRatio >= 1.6) {
-        // Wide diagrams (beams, long circuits, horizontal setups)
-        optimalWidth = 420;
-        optimalHeight = 210;
-    } else if (aspectRatio >= 1.1) {
-        // Standard landscape (triangles, inclines, pulleys)
-        optimalWidth = 350;
-        optimalHeight = 230;
-    } else if (aspectRatio >= 0.85) {
-        // Square/near-square diagrams (circles, 2D axes, polygons)
-        optimalWidth = 280;
-        optimalHeight = 250;
-    } else {
-        // Tall/portrait diagrams (vertical springs, pendulums, columns)
-        optimalWidth = 240;
-        optimalHeight = 280;
-    }
 
     let svgContent = SVG_DEFS;
 
@@ -54,15 +29,7 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         svgContent += `<g class="diagram-background">${innerContent}</g>`;
     }
 
-    // 4. Custom SVG Content (Mathematical graphs, shapes, circuits, optics, etc.)
-    if (diagram.customSVG) {
-        const innerContent = diagram.customSVG
-            .replace(/<svg[^>]*>/, '')
-            .replace(/<\/svg>/, '');
-        svgContent += `<g class="diagram-custom-svg">${innerContent}</g>`;
-    }
-
-    // 5. Body (Backward compatibility and multi-body support)
+    // 4. Body (Backward compatibility and multi-body support)
     if (diagram.body) {
         svgContent += renderBody(diagram.body);
     }
@@ -72,12 +39,12 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         });
     }
 
-    // 6. Points (Fixed supports, etc.)
+    // 4. Points (Fixed supports, etc.)
     diagram.points.forEach(point => {
         svgContent += renderPoint(point);
     });
 
-    // 7. Forces
+    // 5. Forces
     diagram.forces.forEach(force => {
         const point = diagram.points.find(p => p.id === force.pointId);
         if (point) {
@@ -85,7 +52,7 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         }
     });
 
-    // 8. Moments
+    // 6. Moments
     if (diagram.moments) {
         diagram.moments.forEach(moment => {
             const point = diagram.points.find(p => p.id === moment.pointId);
@@ -95,38 +62,12 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         });
     }
 
-    return `<svg 
-        width="100%" 
-        height="auto" 
-        viewBox="0 0 ${width} ${height}" 
-        preserveAspectRatio="xMidYMid meet" 
-        xmlns="http://www.w3.org/2000/svg" 
-        class="fbd-diagram responsive-svg" 
-        id="${id}" 
-        shape-rendering="geometricPrecision"
-        text-rendering="geometricPrecision"
-        image-rendering="optimizeQuality"
-        style="display: block; width: 100%; max-width: min(100%, ${optimalWidth}px); max-height: ${optimalHeight}px; margin: 0 auto; background-color: ${diagram.backgroundColor || 'transparent'};">
+    return `<svg width="100%" height="auto" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" class="fbd-diagram responsive-svg" id="${id}" style="max-width: ${width}px; background-color: ${diagram.backgroundColor || 'transparent'};">
         <style>
-            .fbd-diagram {
-                color-scheme: light dark;
-            }
             .fbd-diagram text { 
-                font-family: 'Inter', 'Plus Jakarta Sans', 'Kalpurush', 'SolaimanLipi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                user-select: none;
-                -webkit-user-select: none;
+                font-family: 'Inter', 'Kalpurush', 'SolaimanLipi', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             }
-            .fbd-diagram .math-label { 
-                font-family: 'STIX Two Math', 'Latin Modern Math', 'Cambria Math', 'KaTeX_Math', serif; 
-                font-style: italic; 
-            }
-            .fbd-diagram .math-sub, .fbd-diagram .math-sup {
-                font-size: 0.72em;
-            }
-            .fbd-diagram line, .fbd-diagram path, .fbd-diagram polygon, .fbd-diagram circle, .fbd-diagram rect {
-                stroke-linecap: round;
-                stroke-linejoin: round;
-            }
+            .fbd-diagram .math-label { font-family: 'STIX Two Math', 'Latin Modern Math', serif; font-style: italic; }
         </style>
         ${svgContent}
     </svg>`;
@@ -187,12 +128,12 @@ function renderPoint(point: FBDPoint): string {
     // Render a small dot or specific symbol for supports
     if (point.type === 'fixed') {
         // Draw a small cross or hatch
-        return `<circle cx="${x}" cy="${y}" r="3" fill="currentColor" opacity="0.85" />
-                <path d="M${x - 5},${y} L${x + 5},${y} M${x},${y - 5} L${x},${y + 5}" stroke="currentColor" stroke-width="1.2" opacity="0.85" />`;
+        return `<circle cx="${x}" cy="${y}" r="3" fill="#000" />
+                <path d="M${x - 5},${y} L${x + 5},${y} M${x},${y - 5} L${x},${y + 5}" stroke="#000" stroke-width="1"/>`;
     }
     // Default dot
-    return `<circle cx="${x}" cy="${y}" r="2.5" fill="currentColor" opacity="0.85" />
-            ${point.label ? `<text x="${x + 5}" y="${y - 5}" font-size="12" fill="currentColor" opacity="0.9">${point.label}</text>` : ''}`;
+    return `<circle cx="${x}" cy="${y}" r="2" fill="#000" />
+            ${point.label ? `<text x="${x + 5}" y="${y - 5}" font-size="12">${point.label}</text>` : ''}`;
 }
 
 function renderForce(force: FBDForce, point: FBDPoint, config: any): string {

@@ -57,17 +57,15 @@ export function parseExcelFBD(text: string, questionId: string = 'fbd'): FBDDiag
  * - PRESET:beam(400,100)
  */
 function parsePreset(text: string, questionId: string): FBDDiagram | null {
-    const match = text.match(/PRESET:\s*([\w-]+)(?:\s*\(([\s\S]*)\))?/i);
+    const match = text.match(/PRESET:([\w-]+)\s*\(([\s\S]*)\)/);
     if (!match) return null;
 
     const [, presetType, paramsRaw] = match;
-    const params = paramsRaw ? parseArguments(paramsRaw) : [];
-    const presetKey = presetType.toLowerCase().trim();
+    const params = parseArguments(paramsRaw);
+    const presetKey = presetType.toLowerCase();
 
     // 1. Check centralized registry first (modern approach)
-    const generator = DIAGRAM_PRESETS[presetKey] || 
-                      DIAGRAM_PRESETS[presetKey.replace(/-/g, '_')] || 
-                      DIAGRAM_PRESETS[presetKey.replace(/_/g, '-')];
+    const generator = DIAGRAM_PRESETS[presetKey];
     if (generator) {
         try {
             return generator(questionId, ...params);

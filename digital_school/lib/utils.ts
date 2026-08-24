@@ -166,14 +166,6 @@ export function cleanupMath(text: string | null | undefined): string {
 
   let raw = text.trim();
 
-  // Temporarily isolate diagram blocks (##...##) to prevent auto-delimiting and formatting collisions
-  const diagramTokens: string[] = [];
-  raw = raw.replace(/##[\s\S]*?##/g, (match) => {
-    const token = `__DS_DIAG_SHIELD_${diagramTokens.length}__`;
-    diagramTokens.push(match);
-    return token;
-  });
-
   // Auto-delimit raw math/chemical expressions missing $...$
   if (!raw.includes('$')) {
     const hasMathTokens = /\\(frac|sqrt|cdot|times|pm|pi|alpha|beta|theta|gamma|Delta|omega|sigma|partial|int|sum|infty|text|mathrm|mathbf)|(\^[0-9a-zA-Z+-]+)|(\^\{[^{}]+\})|(_[0-9a-zA-Z+-]+)|(_{0,1}\{[^{}]+\})/i.test(raw);
@@ -234,11 +226,6 @@ export function cleanupMath(text: string | null | undefined): string {
       if (/\\text\s*\{$/.test(before)) return m;
       return `\\text{${m}}`;
     });
-  });
-
-  // Restore protected diagram blocks
-  diagramTokens.forEach((diag, index) => {
-    processed = processed.replace(`__DS_DIAG_SHIELD_${index}__`, diag);
   });
 
   return processed;

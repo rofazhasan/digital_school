@@ -38,28 +38,10 @@ export function extractInlineFBDs(text: string): {
         const placeholder = `__FBD_${counter}__`;
 
         try {
-            // Strip size qualifiers if present: [size:small], [size:medium], etc.
-            let pureFbdText = fbdText.replace(/\[size:(?:small|medium|large|tiny)\]/i, '').trim();
-
-            // Check if it's a combination syntax (with or without COMBINE: prefix)
-            const isCombo = pureFbdText.startsWith('COMBINE:') || 
-                            pureFbdText.startsWith('SERIES:') || 
-                            pureFbdText.startsWith('PARALLEL:') ||
-                            pureFbdText.startsWith('GRID:') || 
-                            pureFbdText.startsWith('COMPARE:');
-
-            if (isCombo) {
-                let comboSyntax = pureFbdText;
-                if (pureFbdText.startsWith('COMBINE:')) {
-                    const match = pureFbdText.match(/^COMBINE:(.*?)\[(.*?)\]$/);
-                    if (match) {
-                        comboSyntax = `${match[1]}:${match[2]}`;
-                    } else {
-                        comboSyntax = pureFbdText.replace(/^COMBINE:/, '');
-                    }
-                }
-
-                const diagram = parseCombination(comboSyntax);
+            // Check if it's a combination syntax
+            if (fbdText.startsWith('SERIES:') || fbdText.startsWith('PARALLEL:') ||
+                fbdText.startsWith('GRID:') || fbdText.startsWith('COMPARE:')) {
+                const diagram = parseCombination(fbdText);
                 if (diagram) {
                     diagram.id = `inline-combo-${counter}`;
                     fbds.push(diagram);
@@ -70,8 +52,8 @@ export function extractInlineFBDs(text: string): {
                 }
             }
 
-            // Standard FBD / Preset parsing
-            const diagram = parseExcelFBD(pureFbdText, `inline-fbd-${counter}`);
+            // Standard FBD parsing
+            const diagram = parseExcelFBD(fbdText, `inline-fbd-${counter}`);
             if (diagram) {
                 fbds.push(diagram);
                 placeholders.push(placeholder);
