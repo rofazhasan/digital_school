@@ -35,6 +35,16 @@ function hashString(str: string): string {
     return Math.abs(hash).toString(36);
 }
 
+function extractTextFromChildren(children: React.ReactNode): string {
+    if (typeof children === "string") return children;
+    if (typeof children === "number") return String(children);
+    if (children === null || children === undefined || typeof children === "boolean") return "";
+    if (Array.isArray(children)) {
+        return children.map(extractTextFromChildren).join("");
+    }
+    return "";
+}
+
 /**
  * Extract \chemfig{} blocks and replace with:
  *   - Cached inline SVG (if already rendered before)
@@ -204,7 +214,7 @@ export function UniversalMathJax({ children, inline, dynamic, diagram, fbd }: Un
     const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9));
     const [cacheVersion, setCacheVersion] = useState(0);
 
-    const rawText = typeof children === "string" ? children : "";
+    const rawText = useMemo(() => extractTextFromChildren(children), [children]);
 
     // 1. Extract and isolate diagrams into safe tokens
     const { tokenizedText, diagramMap } = useMemo(() => {

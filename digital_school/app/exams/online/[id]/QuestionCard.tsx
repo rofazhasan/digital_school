@@ -333,7 +333,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
             {type === "smcq" && (
               <div className="space-y-10 mt-6">
-                {(question.subQuestions || []).map((subQ: any, idx: number) => {
+                {(question.subQuestions || question.sub_questions || question.questions || []).map((subQ: any, idx: number) => {
                   const subUserAnswer = answers[`${question.id}_sub_${idx}`];
                   return (
                     <div key={idx} className="space-y-6 text-left">
@@ -342,15 +342,15 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                         <div className="flex-1 space-y-3">
                           <div className="flex justify-between items-start gap-4">
                             <div className={`font-bold text-foreground/95 leading-relaxed ${getTextSize('text-lg')}`}>
-                              <UniversalMathJax inline dynamic>{cleanupMath(subQ.question || subQ.text || "")}</UniversalMathJax>
+                              <UniversalMathJax inline dynamic>{cleanupMath(subQ.question || subQ.questionText || subQ.text || "")}</UniversalMathJax>
                             </div>
-                            <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase bg-primary text-primary-foreground px-2 py-0.5 rounded-lg">{subQ.marks} Pt</Badge>
+                            {subQ.marks && <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase bg-primary text-primary-foreground px-2 py-0.5 rounded-lg">{subQ.marks} Pt</Badge>}
                           </div>
                           {subQ.image && <div className="mt-2 text-left"><ZoomableImage src={subQ.image} alt="Sub" className="max-h-48 w-full rounded-2xl border bg-card p-1" /></div>}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-2 ml-0 md:ml-12">
-                        {(subQ.options || []).map((opt: any, oi: number) => {
+                        {(subQ.options || subQ.opts || []).map((opt: any, oi: number) => {
                           const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
                           const isSelected = String(subUserAnswer).trim() === label.trim();
                           let isCorrect = false;
