@@ -38,13 +38,15 @@ import {
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
   Download, Save, AlertTriangle, LayoutDashboard, Info,
-  BarChart3, Lightbulb, Printer, MoveUp, MoveDown, Layers, Calendar, Clock, ShieldCheck, AlertCircle
+  BarChart3, Lightbulb, Printer, MoveUp, MoveDown, Layers, Calendar, Clock, ShieldCheck, AlertCircle,
+  Camera
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { Capacitor } from "@capacitor/core";
 import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet";
 import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
+import { PictureToQuestionExtractor } from "@/components/question-bank/PictureToQuestionExtractor";
 
 
 // --- Types ---
@@ -1209,6 +1211,9 @@ export default function QuestionBankPage() {
                     <TabsTrigger value="bulk" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
                       <FileSpreadsheet className="w-4 h-4 mr-2" /> Bulk Upload
                     </TabsTrigger>
+                    <TabsTrigger value="ocr" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all text-indigo-600 dark:text-indigo-400 font-bold bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40">
+                      <Camera className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400 animate-pulse" /> 📸 Picture to QBank
+                    </TabsTrigger>
                     <TabsTrigger value="sheet" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all text-indigo-600 dark:text-indigo-400 font-bold">
                       <FileText className="w-4 h-4 mr-2" /> Sheet Maker
                       {sheetQuestions.length > 0 && (
@@ -1466,6 +1471,11 @@ export default function QuestionBankPage() {
                 </TabsContent>
                 <TabsContent value="bulk" className="mt-4">
                   <BulkUpload onQuestionSaved={handleFormSave} />
+                </TabsContent>
+                <TabsContent value="ocr" className="mt-4">
+                  <PictureToQuestionExtractor onQuestionSaved={(_count) => {
+                    fetchData();
+                  }} />
                 </TabsContent>
                 <TabsContent value="sheet" className="mt-4 p-6">
                   <div className="space-y-6">
