@@ -184,25 +184,35 @@ async function validateAndMapRow(row: any, classes: any[]) {
                 const optB = s(getValue(row, [`${prefix} Option B`, `Sub-Question ${i} Option B`, `SQ${i}B`]));
                 const optC = s(getValue(row, [`${prefix} Option C`, `Sub-Question ${i} Option C`, `SQ${i}C`]));
                 const optD = s(getValue(row, [`${prefix} Option D`, `Sub-Question ${i} Option D`, `SQ${i}D`]));
+                const exp = s(getValue(row, [`${prefix} Explanation`, `Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
 
                 const correctOptRaw = s(getValue(row, [`${prefix} Correct Option`, `Sub-Question ${i} Correct Option`, `SQ${i} Correct`])).toUpperCase();
-                let correctIdx = -1;
-                if (/^[A-D]$/.test(correctOptRaw)) {
-                    correctIdx = ['A', 'B', 'C', 'D'].indexOf(correctOptRaw);
-                } else {
-                    correctIdx = n(correctOptRaw) - 1;
-                }
+                
+                // Support both single ("A") and multiple/comma-separated correct options ("A, B, C" or "1, 2")
+                const correctOptsRaw = correctOptRaw.split(/[,\s]+/).map(o => o.trim()).filter(Boolean);
+                const correctOpts = new Set<string>();
 
-                if (correctIdx < 0 || correctIdx > 3) throw new Error(`SMCQ Sub-Question ${i} requires a correct option (A-D or 1-4)`);
+                correctOptsRaw.forEach(opt => {
+                    if (/^[A-D]$/.test(opt)) {
+                        correctOpts.add(opt);
+                    } else {
+                        const idx = n(opt);
+                        if (idx >= 1 && idx <= 4) {
+                            correctOpts.add(['A', 'B', 'C', 'D'][idx - 1]);
+                        }
+                    }
+                });
+
+                if (correctOpts.size === 0) throw new Error(`SMCQ Sub-Question ${i} requires a correct option (A-D, 1-4, or comma-separated like A, B)`);
 
                 const options = [
-                    { text: optA, isCorrect: correctIdx === 0 },
-                    { text: optB, isCorrect: correctIdx === 1 },
+                    { text: optA, isCorrect: correctOpts.has('A') },
+                    { text: optB, isCorrect: correctOpts.has('B') },
                 ];
-                if (optC) options.push({ text: optC, isCorrect: correctIdx === 2 });
-                if (optD) options.push({ text: optD, isCorrect: correctIdx === 3 });
+                if (optC) options.push({ text: optC, isCorrect: correctOpts.has('C') });
+                if (optD) options.push({ text: optD, isCorrect: correctOpts.has('D') });
 
-                data.subQuestions.push({ question: q, marks: m, options });
+                data.subQuestions.push({ question: q, marks: m, options, explanation: exp });
             }
 
             if (data.subQuestions.length === 0) throw new Error("SMCQ requires at least one Sub-Question");

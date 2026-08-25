@@ -31,11 +31,14 @@ const questionSchema = z.object({
         image: z.string().optional().nullable()
     })).nullable().default(null),
     subQuestions: z.array(z.object({
-        question: z.string().min(1, "Sub-question text is required"),
-        marks: z.number().int().min(1, "Sub-question marks must be at least 1"),
+        question: z.string().optional().nullable(),
+        text: z.string().optional().nullable(),
+        marks: z.number().optional().nullable(),
         modelAnswer: z.string().optional().nullable(),
+        explanation: z.string().optional().nullable(),
+        options: z.array(z.any()).optional().nullable(),
         image: z.string().optional().nullable()
-    })).nullable().default(null),
+    }).passthrough()).nullable().default(null),
     modelAnswer: z.string().optional().nullable(),
     assertion: z.string().optional().nullable(),
     reason: z.string().optional().nullable(),
