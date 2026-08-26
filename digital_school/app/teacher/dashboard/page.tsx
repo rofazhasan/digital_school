@@ -60,7 +60,6 @@ const sidebarItems: SidebarItem[] = [
     { id: 'questions', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
     { id: 'admit-cards', label: 'Admit Cards', icon: ClipboardList, href: '#admit-cards' },
     { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
-    { id: 'omr-scanner', label: 'OMR Scanner', icon: Scan, href: '/omr_scanner' },
     { id: 'attendance', label: 'Attendance', icon: Calendar, href: '#attendance' },
     { id: 'check-in', label: 'NFC Check-in', icon: Lock, href: '/teacher/check-in' },
     { id: 'notices', label: 'Notices', icon: Bell, href: '#notices' },

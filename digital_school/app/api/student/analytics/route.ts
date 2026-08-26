@@ -2,7 +2,23 @@ import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 import { calculateGrade, calculateGPA } from "@/lib/utils";
-import { ExamSetResolver } from "@/lib/omr/exam-set-resolver";
+
+function parseRawQuestionsJson(raw: any): { questions: any[] } {
+    let parsed: any[] = [];
+    try {
+        if (typeof raw === 'string') {
+            const data = JSON.parse(raw);
+            parsed = Array.isArray(data) ? data : data.questions || [];
+        } else if (Array.isArray(raw)) {
+            parsed = raw;
+        } else if (raw && typeof raw === 'object') {
+            parsed = raw.questions || [];
+        }
+    } catch (e) {
+        parsed = [];
+    }
+    return { questions: parsed };
+}
 
 const analyticsCache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL_MS = 15000; // 15 seconds
@@ -182,7 +198,7 @@ export async function GET(req: NextRequest) {
             const examSets = examItem.examSets || [];
 
             examSets.forEach((set: any) => {
-                const canonicalSet = ExamSetResolver.parseRawQuestionsJson(set.questionsJson, set.id, set.name, examItem.examId);
+                const canonicalSet = parseRawQuestionsJson(set.questionsJson);
                 canonicalSet.questions.forEach((q) => {
                     const studentAns = studentAnswers[q.id];
                     const marksAwarded = studentAnswers[`${q.id}_marks`];
