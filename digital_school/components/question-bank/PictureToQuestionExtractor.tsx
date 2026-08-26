@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import UniversalMathJax from '@/app/components/UniversalMathJax';
+import { UniversalMathJax } from '@/app/components/UniversalMathJax';
 import { preprocessImageForOcr } from '@/lib/ocr/imagePreprocessor';
 import { parseRawOcrTextToQuestions, ExtractedQuestion, ExtractedOption } from '@/lib/ocr/questionParser';
 import { generateQuestionBankExcel, downloadExcelFile } from '@/lib/ocr/excelGenerator';
@@ -126,14 +126,48 @@ export function PictureToQuestionExtractor({
         )
       );
 
-      // 4. Run Tesseract.js in browser worker (100% Free, zero external API key)
-      const langs = ocrLanguage.split('+');
-      const worker = await createWorker(langs);
-      
-      const ret = await worker.recognize(imageToOcr as any);
-      await worker.terminate();
+      // 4. Run OCR: Try client-side Tesseract.js worker first, with server API fallback
+      let ocrText = '';
+      try {
+        const langs = ocrLanguage.split('+');
+        const worker = await createWorker(langs);
+        const ret = await worker.recognize(imageToOcr as any);
+        await worker.terminate();
+        ocrText = ret.data.text || '';
+      } catch (clientOcrErr) {
+        console.warn('Client-side OCR fallback to server API:', clientOcrErr);
+        // Fallback to server route
+        const formData = new FormData();
+        formData.append('image', imageToOcr instanceof Blob ? imageToOcr : item.file);
+        formData.append('language', ocrLanguage);
+        formData.append('defaultClass', defaultClass);
+        formData.append('defaultSubject', defaultSubject);
 
-      const ocrText = ret.data.text || '';
+        const res = await fetch('/api/question-bank/ocr-extract', {
+          method: 'POST',
+          body: formData,
+        });
+        if (res.ok) {
+          const apiData = await res.json();
+          if (apiData.questions && apiData.questions.length > 0) {
+            setImageQueue((prev) =>
+              prev.map((it) =>
+                it.id === item.id
+                  ? {
+                      ...it,
+                      status: 'completed',
+                      progress: 100,
+                      enhancedUrl,
+                      extractedQuestions: apiData.questions,
+                    }
+                  : it
+              )
+            );
+            return apiData.questions;
+          }
+          ocrText = apiData.rawText || '';
+        }
+      }
 
       // 5. Parse into structured questions with LaTeX math synthesis
       const extracted = parseRawOcrTextToQuestions(ocrText, {

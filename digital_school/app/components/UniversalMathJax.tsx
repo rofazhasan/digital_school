@@ -299,3 +299,5 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         />
     );
 }
+
+export default UniversalMathJax;
