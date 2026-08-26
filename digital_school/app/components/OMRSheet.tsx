@@ -7,7 +7,16 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { toBengaliNumerals, formatBengaliDuration } from "@/utils/numeralConverter";
-import FiducialMarker from "@/components/omr/FiducialMarker";
+
+function FiducialMarker({ id, size = 40, className = "" }: { id?: number; size?: number; className?: string }) {
+  return (
+    <div className={`flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
+      <div className="w-full h-full bg-black flex items-center justify-center">
+        <div className="w-1/2 h-1/2 bg-white" />
+      </div>
+    </div>
+  );
+}
 
 interface OMRSheetProps {
   questions: {
