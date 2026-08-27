@@ -364,6 +364,66 @@ export function ExamContextProvider({
     };
   }, [exam.questions]);
 
+  // --- Multiple Subject (MS) Logic ---
+  const isMS = exam.subjectType === 'MS' || (exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+  const msSubjects = useMemo(() => {
+    if (!isMS) return [];
+    const configured: any[] = (exam.subjectsConfig as any)?.subjects || [];
+    if (configured.length > 0) return configured;
+    const questionSubjects = Array.from(new Set((exam.questions || []).map((q: any) => q.subject).filter(Boolean)));
+    return questionSubjects.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
+  }, [isMS, exam.subjectsConfig, exam.questions]);
+
+  const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
+
+  // Track attempted optional subjects
+  const { attemptedOptionalSubjects, attemptedSubjects, isExceedingOptional } = useMemo(() => {
+    if (!isMS) {
+      return { attemptedOptionalSubjects: new Set<string>(), attemptedSubjects: new Set<string>(), isExceedingOptional: false };
+    }
+    const attemptedSubjs = new Set<string>();
+    const attemptedOptSubjs = new Set<string>();
+
+    const qMap = new Map<string, any>();
+    (exam.questions || []).forEach((q: any) => {
+      if (q.id) qMap.set(q.id, q);
+    });
+
+    Object.keys(answers).forEach((k) => {
+      if (k.endsWith('_marks') || k.endsWith('_images') || k.startsWith('_')) return;
+      const val = answers[k];
+      const hasAnswer = val !== undefined && val !== null && val !== '' && val !== 'No answer provided' && (typeof val !== 'object' || Object.keys(val).length > 0);
+      if (hasAnswer) {
+        const rawId = k.split('_')[0];
+        const q = qMap.get(k) || qMap.get(rawId);
+        if (q && q.subject) {
+          attemptedSubjs.add(q.subject);
+          const subConfig = msSubjects.find(s => s.name?.toLowerCase().trim() === q.subject?.toLowerCase().trim());
+          if (subConfig && !subConfig.isMandatory) {
+            attemptedOptSubjs.add(q.subject);
+          }
+        }
+      }
+    });
+
+    const maxAllowedOptional = Number((exam.subjectsConfig as any)?.requiredOptionalCount) || 1;
+    const isExceeding = attemptedOptSubjs.size > maxAllowedOptional;
+
+    return {
+      attemptedOptionalSubjects: attemptedOptSubjs,
+      attemptedSubjects: attemptedSubjs,
+      isExceedingOptional: isExceeding
+    };
+  }, [isMS, answers, exam.questions, msSubjects, exam.subjectsConfig]);
+
+  // Filtered sorted questions based on selectedSubject
+  const filteredSortedQuestions = useMemo(() => {
+    if (!isMS || selectedSubject === 'ALL') {
+      return sortedQuestions;
+    }
+    return sortedQuestions.filter((q: any) => (q.subject || '').toLowerCase().trim() === selectedSubject.toLowerCase().trim());
+  }, [isMS, selectedSubject, sortedQuestions]);
+
   // Optimized Context Value to prevent unnecessary re-renders in consumers
   const contextValue = useMemo(() => ({
     exam,
@@ -392,10 +452,18 @@ export function ExamContextProvider({
     hasObjective,
     hasCqSq,
     sortedQuestions,
+    filteredSortedQuestions,
     setOrderedQuestions,
     switchExamSet,
     fullSortedQuestions,
-    groupedQuestions
+    groupedQuestions,
+    isMS,
+    msSubjects,
+    selectedSubject,
+    setSelectedSubject,
+    attemptedOptionalSubjects,
+    attemptedSubjects,
+    isExceedingOptional
   }), [
     exam,
     patchExam,
@@ -423,10 +491,18 @@ export function ExamContextProvider({
     hasObjective,
     hasCqSq,
     sortedQuestions,
+    filteredSortedQuestions,
     setOrderedQuestions,
     switchExamSet,
     fullSortedQuestions,
-    groupedQuestions
+    groupedQuestions,
+    isMS,
+    msSubjects,
+    selectedSubject,
+    setSelectedSubject,
+    attemptedOptionalSubjects,
+    attemptedSubjects,
+    isExceedingOptional
   ]);
 
   return (

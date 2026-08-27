@@ -91,6 +91,8 @@ export async function GET(request: NextRequest) {
         objectiveTime: exam.objectiveTime || null,
         cqSqTime: exam.cqSqTime || null,
         cqSubsections: exam.cqSubsections || null,
+        subjectType: exam.subjectType || 'SS',
+        subjectsConfig: exam.subjectsConfig || null,
       };
 
       // Cache the result for 5 minutes (TTL)
@@ -163,6 +165,7 @@ export async function GET(request: NextRequest) {
           isActive: true,
           classId: true,
           type: true,
+          subjectType: true,
           allowRetake: true,
           duration: true,
           mcqNegativeMarking: true, // Always include for cards
@@ -187,6 +190,7 @@ export async function GET(request: NextRequest) {
             objectiveTime: true,
             cqSqTime: true,
             cqSubsections: true,
+            subjectsConfig: true,
           });
         }
 
@@ -235,6 +239,7 @@ export async function GET(request: NextRequest) {
         classId: exam.classId,
         createdAt: summary ? undefined : exam.createdAt,
         type: exam.type,
+        subjectType: exam.subjectType || 'SS',
         allowRetake: exam.allowRetake || false,
         duration: exam.duration,
         mcqNegativeMarking: exam.mcqNegativeMarking,
@@ -248,6 +253,7 @@ export async function GET(request: NextRequest) {
         objectiveTime: summary ? undefined : exam.objectiveTime,
         cqSqTime: summary ? undefined : exam.cqSqTime,
         cqSubsections: summary ? undefined : exam.cqSubsections,
+        subjectsConfig: summary ? undefined : exam.subjectsConfig,
       };
     });
 
@@ -324,6 +330,8 @@ export async function POST(request: NextRequest) {
         objectiveTime,
         cqSqTime,
         cqSubsections,
+        subjectType,
+        subjectsConfig,
       } = item;
 
       if (!name || !date || !classId) {
@@ -347,6 +355,8 @@ export async function POST(request: NextRequest) {
         endTime: isNaN(endObj.getTime()) ? new Date(dateObj.getTime() + dur * 60000) : endObj,
         duration: dur,
         type: (type || 'OFFLINE').toUpperCase(),
+        subjectType: (subjectType === 'MS') ? 'MS' : 'SS',
+        subjectsConfig: subjectsConfig || null,
         totalMarks: totalMarks !== undefined && totalMarks !== null ? Number(totalMarks) : 100,
         passMarks: passMarks !== undefined && passMarks !== null ? Number(passMarks) : 33,
         isActive: false,
@@ -394,6 +404,7 @@ export async function POST(request: NextRequest) {
         name: createdExam.name,
         date: createdExam.date,
         type: createdExam.type,
+        subjectType: createdExam.subjectType,
         message: 'Exam created successfully',
       },
       'Exam created successfully',
@@ -435,6 +446,8 @@ export async function PATCH(request: NextRequest) {
     if (typeof rawUpdateData.allowRetake === 'boolean') updateData.allowRetake = rawUpdateData.allowRetake;
     if (typeof rawUpdateData.isActive === 'boolean') updateData.isActive = rawUpdateData.isActive;
     if (rawUpdateData.type) updateData.type = rawUpdateData.type;
+    if (rawUpdateData.subjectType) updateData.subjectType = rawUpdateData.subjectType;
+    if (rawUpdateData.subjectsConfig !== undefined) updateData.subjectsConfig = rawUpdateData.subjectsConfig;
     if (rawUpdateData.objectiveTime !== undefined) updateData.objectiveTime = rawUpdateData.objectiveTime ? Number(rawUpdateData.objectiveTime) : null;
     if (rawUpdateData.cqSqTime !== undefined) updateData.cqSqTime = rawUpdateData.cqSqTime ? Number(rawUpdateData.cqSqTime) : null;
     if (typeof rawUpdateData.totalMarks === 'number') updateData.totalMarks = rawUpdateData.totalMarks;

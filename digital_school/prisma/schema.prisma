@@ -192,6 +192,8 @@ model Exam {
   mcPartialMarking      Boolean?                   @default(true)
   cqSqTime              Int?
   objectiveTime         Int?
+  subjectType           ExamSubjectType            @default(SS)
+  subjectsConfig        Json?
   examSubmissions       ExamSubmission[]
   admitCards            AdmitCard[]
   evaluationAssignments ExamEvaluationAssignment[]
@@ -1090,6 +1092,11 @@ enum ExamType {
   ONLINE
   OFFLINE
   MIXED
+}
+
+enum ExamSubjectType {
+  SS
+  MS
 }
 
 enum BadgeType {

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle, Plus, Trash2, LayoutDashboard, FileSpreadsheet, Upload, Download, AlertTriangle, ArrowRight, ArrowLeft, BookOpen } from "lucide-react";
+import { CheckCircle, Plus, Trash2, LayoutDashboard, FileSpreadsheet, Upload, Download, AlertTriangle, ArrowRight, ArrowLeft, BookOpen, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +29,19 @@ const cqSubsectionSchema = z.object({
   requiredQuestions: z.coerce.number().min(1, "Required questions must be at least 1"),
 });
 
+const subjectItemSchema = z.object({
+  name: z.string().min(1, "Subject name is required"),
+  totalMarks: z.coerce.number().min(1, "Marks must be at least 1"),
+  isMandatory: z.boolean().default(true),
+});
+
+const subjectsConfigSchema = z.object({
+  subjects: z.array(subjectItemSchema),
+  mandatoryCount: z.coerce.number().min(0).default(0),
+  optionalCount: z.coerce.number().min(0).default(0),
+  requiredOptionalCount: z.coerce.number().min(0).default(0),
+}).optional().nullable();
+
 const schema = z.object({
   name: z.string().min(2, "Exam name is required"),
   description: z.string().optional(),
@@ -37,6 +50,8 @@ const schema = z.object({
   endTime: z.string().min(1, "End time is required"),
   duration: z.coerce.number().min(1, "Duration is required"),
   type: z.enum(["ONLINE", "OFFLINE", "MIXED"]),
+  subjectType: z.enum(["SS", "MS"]).default("SS"),
+  subjectsConfig: subjectsConfigSchema,
   totalMarks: z.coerce.number().min(1, "Total marks required"),
   passMarks: z.coerce.number().min(0, "Pass marks required"),
   classId: z.string().min(1, "Class is required"),
@@ -84,6 +99,7 @@ const schema = z.object({
 
 type ExamForm = z.infer<typeof schema>;
 type CQSubsection = z.infer<typeof cqSubsectionSchema>;
+type SubjectItem = z.infer<typeof subjectItemSchema>;
 type ClassOption = { id: string; name: string };
 type BulkExam = ExamForm & { validationError?: string; rowIndex: number; rawClassName?: string };
 
@@ -97,7 +113,7 @@ export default function CreateExamPage() {
   const router = useRouter();
 
   const form = useForm<ExamForm>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name: "",
       description: "",
@@ -106,6 +122,19 @@ export default function CreateExamPage() {
       endTime: "",
       duration: 60,
       type: "OFFLINE",
+      subjectType: "SS",
+      subjectsConfig: {
+        subjects: [
+          { name: "Physics", totalMarks: 25, isMandatory: true },
+          { name: "Chemistry", totalMarks: 25, isMandatory: true },
+          { name: "Mathematics", totalMarks: 25, isMandatory: true },
+          { name: "Biology", totalMarks: 25, isMandatory: false },
+          { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
+        ],
+        mandatoryCount: 3,
+        optionalCount: 2,
+        requiredOptionalCount: 1,
+      },
       totalMarks: 100,
       passMarks: 33,
       classId: "",
@@ -196,6 +225,66 @@ export default function CreateExamPage() {
     form.setValue("cqSubsections", updatedSubsections);
   };
 
+  const subjectType = form.watch("subjectType");
+  const subjectsConfig = form.watch("subjectsConfig");
+
+  const addSubject = () => {
+    const current = form.getValues("subjectsConfig")?.subjects || [];
+    const updated = [
+      ...current,
+      { name: `Subject ${current.length + 1}`, totalMarks: 25, isMandatory: true }
+    ];
+    const mandatoryCount = updated.filter(s => s.isMandatory).length;
+    const optionalCount = updated.filter(s => !s.isMandatory).length;
+    const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    form.setValue("subjectsConfig", {
+      subjects: updated,
+      mandatoryCount,
+      optionalCount,
+      requiredOptionalCount: optionalCount > 0 ? (currentReq || 1) : 0,
+    });
+  };
+
+  const removeSubject = (index: number) => {
+    const current = form.getValues("subjectsConfig")?.subjects || [];
+    if (current.length <= 1) return;
+    const updated = current.filter((_, i) => i !== index);
+    const mandatoryCount = updated.filter(s => s.isMandatory).length;
+    const optionalCount = updated.filter(s => !s.isMandatory).length;
+    const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    form.setValue("subjectsConfig", {
+      subjects: updated,
+      mandatoryCount,
+      optionalCount,
+      requiredOptionalCount: Math.min(currentReq, optionalCount),
+    });
+  };
+
+  const updateSubject = (index: number, field: keyof SubjectItem, value: any) => {
+    const current = form.getValues("subjectsConfig")?.subjects || [];
+    const updated = [...current];
+    updated[index] = { ...updated[index], [field]: value };
+    const mandatoryCount = updated.filter(s => s.isMandatory).length;
+    const optionalCount = updated.filter(s => !s.isMandatory).length;
+    const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    form.setValue("subjectsConfig", {
+      subjects: updated,
+      mandatoryCount,
+      optionalCount,
+      requiredOptionalCount: Math.min(currentReq, optionalCount),
+    });
+  };
+
+  const updateRequiredOptionalCount = (count: number) => {
+    const current = form.getValues("subjectsConfig");
+    if (current) {
+      form.setValue("subjectsConfig", {
+        ...current,
+        requiredOptionalCount: count,
+      });
+    }
+  };
+
   useEffect(() => {
     setClassesLoading(true);
     fetch("/api/classes")
@@ -260,6 +349,7 @@ export default function CreateExamPage() {
     const headers = [
       "Exam Name",
       "Select Class",
+      "Subject Type (SS/MS)",
       "Description",
       "Date",
       "Start Time",
@@ -285,12 +375,30 @@ export default function CreateExamPage() {
       "Sub 2 Name",
       "Sub 2 Start",
       "Sub 2 End",
-      "Sub 2 Required"
+      "Sub 2 Required",
+      // MS Subjects
+      "MS Subject 1 Name",
+      "MS Subject 1 Marks",
+      "MS Subject 1 Mandatory",
+      "MS Subject 2 Name",
+      "MS Subject 2 Marks",
+      "MS Subject 2 Mandatory",
+      "MS Subject 3 Name",
+      "MS Subject 3 Marks",
+      "MS Subject 3 Mandatory",
+      "MS Subject 4 Name",
+      "MS Subject 4 Marks",
+      "MS Subject 4 Mandatory",
+      "MS Subject 5 Name",
+      "MS Subject 5 Marks",
+      "MS Subject 5 Mandatory",
+      "MS Required Optional Count"
     ];
 
-    const sampleData = [
-      "Mid Term Math",
+    const sampleDataSS = [
+      "Mid Term Math (SS Example)",
       classes[0]?.name || "Class 9",
+      "SS",
       "Mid term examination for mathematics",
       "2026-10-15",
       "2026-10-15 10:00",
@@ -308,13 +416,45 @@ export default function CreateExamPage() {
       20, // Objective Time
       40, // CQ/SQ Time
       "Algebra", 1, 3, 2, // Sub 1
-      "Geometry", 4, 8, 3 // Sub 2
+      "Geometry", 4, 8, 3, // Sub 2
+      "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+    ];
+
+    const sampleDataMS = [
+      "Science Combined Exam (MS Example)",
+      classes[0]?.name || "Class 9",
+      "MS",
+      "Combined exam with 3 mandatory subjects & 1 optional subject",
+      "2026-10-16",
+      "2026-10-16 10:00",
+      "2026-10-16 13:00",
+      180,
+      "OFFLINE",
+      100,
+      33,
+      "Answer 3 mandatory subjects and 1 optional subject.",
+      0.25,
+      0,
+      0,
+      0,
+      0,
+      60,
+      120,
+      "", "", "", "",
+      "", "", "", "",
+      // MS Subjects
+      "Physics", 25, "TRUE",
+      "Chemistry", 25, "TRUE",
+      "Mathematics", 25, "TRUE",
+      "Biology", 25, "FALSE",
+      "Higher Mathematics", 25, "FALSE",
+      1 // MS Required Optional Count
     ];
 
     const wb = XLSX.utils.book_new();
 
     // Template Sheet
-    const ws = XLSX.utils.aoa_to_sheet([headers, sampleData]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleDataSS, sampleDataMS]);
     XLSX.utils.book_append_sheet(wb, ws, "Template");
 
     // Valid Classes Reference Sheet
@@ -323,7 +463,7 @@ export default function CreateExamPage() {
     const wsClasses = XLSX.utils.aoa_to_sheet([classHeaders, ...classRows]);
     XLSX.utils.book_append_sheet(wb, wsClasses, "Classes (Reference)");
 
-    XLSX.writeFile(wb, "exam_import_template_v3.xlsx");
+    XLSX.writeFile(wb, "exam_import_template_v4.xlsx");
   };
 
   const parseExcelDate = (dateVal: any): string => {
@@ -386,9 +526,6 @@ export default function CreateExamPage() {
       const fullDateParse = Date.parse(str);
       if (!isNaN(fullDateParse)) {
         const d = new Date(fullDateParse);
-        // If the date part of this string is valid, return the full ISO string
-        // instead of forcing it to dateStr's date.
-        // We only overwrite the date if it's a very small dummy date (like 1970 or 1899 from Excel)
         if (d.getFullYear() > 1900) {
             return d.toISOString();
         }
@@ -461,11 +598,8 @@ export default function CreateExamPage() {
         const keys = Object.keys(row);
         for (const k of keys) {
           const lowerK = k.toLowerCase();
-          // Check exact matches or startsWith for robust handling
           if (keywords.some(kw => lowerK === kw.toLowerCase() || lowerK.startsWith(kw.toLowerCase()))) {
             const val = row[k];
-            // Treat empty string or undefined as null to trigger defaults later if needed, 
-            // BUT preserve 0. Allow 0 to be a valid value.
             if (val === undefined || val === null || (typeof val === 'string' && val.trim() === "")) return null;
             return val;
           }
@@ -477,7 +611,7 @@ export default function CreateExamPage() {
         const className = getValue(row, ["Select Class", "Class"]) || "";
 
         // Flexible Date/Time matching
-        const rawDate = getValue(row, ["Date"]); // Matches "Date", "Date (e.g...)"
+        const rawDate = getValue(row, ["Date"]);
         const rawStart = getValue(row, ["Start Time"]);
         const rawEnd = getValue(row, ["End Time"]);
 
@@ -506,6 +640,45 @@ export default function CreateExamPage() {
           });
         }
 
+        // Parse Subject Type and Multiple Subjects (MS)
+        const rawSubjectType = String(getValue(row, ["Subject Type", "Exam Subject Type", "SubjectType"]) || "SS").toUpperCase().trim();
+        const isMS = rawSubjectType === "MS" || !!getValue(row, ["MS Subject 1 Name", "Subject 1 Name"]);
+        const subjectType: "SS" | "MS" = isMS ? "MS" : "SS";
+
+        const msSubjects: any[] = [];
+        for (let sIdx = 1; sIdx <= 8; sIdx++) {
+          const sName = getValue(row, [`MS Subject ${sIdx} Name`, `Subject ${sIdx} Name`, `Subj ${sIdx} Name`]);
+          if (sName) {
+            const sMarks = Number(getValue(row, [`MS Subject ${sIdx} Marks`, `Subject ${sIdx} Marks`]) || 25);
+            const sMandatoryRaw = getValue(row, [`MS Subject ${sIdx} Mandatory`, `Subject ${sIdx} Mandatory`]);
+            const isMandatory = sMandatoryRaw === true || String(sMandatoryRaw).toLowerCase() === 'true' || String(sMandatoryRaw).toLowerCase() === 'yes' || sMandatoryRaw === 1;
+            msSubjects.push({
+              name: sName,
+              totalMarks: sMarks,
+              isMandatory: isMandatory,
+            });
+          }
+        }
+
+        let subjectsConfig: any = null;
+        if (subjectType === "MS" || msSubjects.length > 0) {
+          const mandatoryCount = msSubjects.filter(s => s.isMandatory).length;
+          const optionalCount = msSubjects.filter(s => !s.isMandatory).length;
+          const reqOptCount = Number(getValue(row, ["MS Required Optional Count", "Required Optional Count", "Required Optional"]) || (optionalCount > 0 ? 1 : 0));
+          subjectsConfig = {
+            subjects: msSubjects.length > 0 ? msSubjects : [
+              { name: "Physics", totalMarks: 25, isMandatory: true },
+              { name: "Chemistry", totalMarks: 25, isMandatory: true },
+              { name: "Mathematics", totalMarks: 25, isMandatory: true },
+              { name: "Biology", totalMarks: 25, isMandatory: false },
+              { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
+            ],
+            mandatoryCount,
+            optionalCount,
+            requiredOptionalCount: reqOptCount,
+          };
+        }
+
         const exam: any = {
           name: getValue(row, ["Exam Name", "Name"]) || `Exam ${index + 1}`,
           description: getValue(row, ["Description", "Desc"]) || "",
@@ -513,10 +686,12 @@ export default function CreateExamPage() {
           startTime: startTimeStr,
           endTime: endTimeStr,
           duration: Number(getValue(row, ["Duration"]) ?? 0) || 0,
-          type: (String(getValue(row, ["Type"]) || "OFFLINE")).toUpperCase(), // Normalized
-          totalMarks: Number(getValue(row, ["Total Marks", "Marks"]) ?? 0) || 0,
-          passMarks: Number(getValue(row, ["Pass Marks"]) ?? 0) || 0,
-          classId: "", // Will be resolved in validation
+          type: (String(getValue(row, ["Type"]) || "OFFLINE")).toUpperCase(),
+          subjectType: subjectType,
+          subjectsConfig: subjectsConfig,
+          totalMarks: Number(getValue(row, ["Total Marks", "Marks"]) ?? 0) || 100,
+          passMarks: Number(getValue(row, ["Pass Marks"]) ?? 0) || 33,
+          classId: "",
           allowRetake: !!getValue(row, ["Allow Retake", "Retake"]),
           instructions: getValue(row, ["Instructions"]) || "",
           mcqNegativeMarking: parseFloat(getValue(row, ["MCQ Negative Marking", "Negative Marking"]) ?? 0) || 0,
@@ -535,7 +710,6 @@ export default function CreateExamPage() {
       setBulkExams(parsedExams);
     };
     reader.readAsBinaryString(file);
-    // Reset input
     e.target.value = '';
   };
 
@@ -703,6 +877,148 @@ export default function CreateExamPage() {
                           <FormItem><FormLabel>Instructions</FormLabel><FormControl><Textarea placeholder="Instructions" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
 
+                        {/* Exam Subject Structure: Single Subject (SS) vs Multiple Subjects (MS) */}
+                        <div className="space-y-4 border-t pt-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-gray-800/60 dark:to-blue-950/30 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                            <div>
+                              <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <Layers className="w-5 h-5 text-blue-600 dark:text-blue-400" /> Exam Subject Structure
+                              </h3>
+                              <p className="text-xs text-gray-500 mt-0.5">Select single subject or multi-subject format</p>
+                            </div>
+                            <div className="flex bg-gray-200/80 dark:bg-gray-800 p-1 rounded-lg border border-border">
+                              <button
+                                type="button"
+                                onClick={() => form.setValue("subjectType", "SS")}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                  subjectType === "SS"
+                                    ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-300 shadow-sm"
+                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
+                                }`}
+                              >
+                                Single Subject (SS)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => form.setValue("subjectType", "MS")}
+                                className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                  subjectType === "MS"
+                                    ? "bg-blue-600 text-white shadow-sm"
+                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
+                                }`}
+                              >
+                                Multiple Subjects (MS)
+                              </button>
+                            </div>
+                          </div>
+
+                          {subjectType === "MS" && (
+                            <div className="p-5 bg-blue-50/40 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/60 rounded-xl space-y-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-bold text-sm text-blue-950 dark:text-blue-200">
+                                    Subjects & Rules Configuration
+                                  </h4>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    Configure mandatory and optional subjects for this exam. Students answer all mandatory subjects and required number of optional subjects.
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={addSubject}
+                                  className="gap-1 border-blue-300 text-blue-700 dark:text-blue-300 bg-white dark:bg-gray-800"
+                                >
+                                  <Plus className="w-4 h-4" /> Add Subject
+                                </Button>
+                              </div>
+
+                              <div className="space-y-2">
+                                {subjectsConfig?.subjects?.map((subj, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex flex-wrap sm:flex-nowrap items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-lg border border-border shadow-sm"
+                                  >
+                                    <span className="font-bold text-xs w-6 text-gray-500">{idx + 1}.</span>
+                                    <div className="flex-1 min-w-[140px]">
+                                      <Input
+                                        placeholder="Subject Name (e.g. Physics)"
+                                        value={subj.name}
+                                        onChange={(e) => updateSubject(idx, "name", e.target.value)}
+                                        className="h-9 text-sm"
+                                      />
+                                    </div>
+                                    <div className="w-28">
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        placeholder="Marks"
+                                        value={subj.totalMarks}
+                                        onChange={(e) => updateSubject(idx, "totalMarks", Number(e.target.value) || 0)}
+                                        className="h-9 text-sm"
+                                      />
+                                    </div>
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded border">
+                                      <Checkbox
+                                        id={`subj-mand-${idx}`}
+                                        checked={subj.isMandatory}
+                                        onCheckedChange={(checked) => updateSubject(idx, "isMandatory", !!checked)}
+                                      />
+                                      <label htmlFor={`subj-mand-${idx}`} className="text-xs font-semibold cursor-pointer select-none">
+                                        {subj.isMandatory ? (
+                                          <span className="text-emerald-600 dark:text-emerald-400">Mandatory</span>
+                                        ) : (
+                                          <span className="text-amber-600 dark:text-amber-400">Optional</span>
+                                        )}
+                                      </label>
+                                    </div>
+                                    {subjectsConfig.subjects.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-500 hover:text-red-700 p-1 h-8 w-8"
+                                        onClick={() => removeSubject(idx)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-blue-200/60 dark:border-blue-800/40">
+                                <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-border">
+                                  <p className="text-[11px] uppercase font-bold text-gray-500">Mandatory Subjects</p>
+                                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                                    {subjectsConfig?.mandatoryCount || 0}
+                                  </p>
+                                </div>
+                                <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-border">
+                                  <p className="text-[11px] uppercase font-bold text-gray-500">Optional Subjects</p>
+                                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                                    {subjectsConfig?.optionalCount || 0}
+                                  </p>
+                                </div>
+                                <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-border">
+                                  <label className="text-[11px] uppercase font-bold text-gray-500 block mb-1">
+                                    Required Optional to Answer
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={subjectsConfig?.optionalCount || 0}
+                                    value={subjectsConfig?.requiredOptionalCount || 0}
+                                    onChange={(e) => updateRequiredOptionalCount(Number(e.target.value) || 0)}
+                                    className="h-8 text-sm font-bold"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Settings */}
                         <div className="space-y-4 border-t pt-4">
                           <h3 className="font-semibold">Negative Marking</h3>
@@ -767,7 +1083,7 @@ export default function CreateExamPage() {
                     <FileSpreadsheet className="w-5 h-5" /> Bulk Import Instructions
                   </h3>
                   <p className="text-sm mt-2 text-blue-700 dark:text-blue-400">
-                    1. Download Sample. 2. Fill Data (Use "Classes" sheet for reference). 3. Upload. 4. <strong>Edit errors directly in table below.</strong>
+                    1. Download Sample (includes both SS & MS templates). 2. Fill Data. 3. Upload. 4. <strong>Edit errors directly in table below.</strong>
                   </p>
                   <Button variant="outline" size="sm" className="mt-4 gap-2 border-blue-200" onClick={downloadSample}>
                     <Download className="w-4 h-4" /> Download Sample
@@ -792,12 +1108,13 @@ export default function CreateExamPage() {
                     </div>
 
                     <div className="border rounded-lg overflow-x-auto max-h-[500px]">
-                      <Table className="min-w-[1000px]">
+                      <Table className="min-w-[1100px]">
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[50px]">#</TableHead>
                             <TableHead className="w-[180px]">Exam Name</TableHead>
                             <TableHead className="w-[150px]">Class</TableHead>
+                            <TableHead className="w-[100px]">Structure</TableHead>
                             <TableHead className="w-[140px]">Date</TableHead>
                             <TableHead className="w-[140px]">Start Time</TableHead>
                             <TableHead className="w-[140px]">End Time</TableHead>
@@ -818,6 +1135,15 @@ export default function CreateExamPage() {
                                   <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Class" /></SelectTrigger>
                                   <SelectContent>
                                     {classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select value={exam.subjectType || "SS"} onValueChange={(val) => handleCellChange(i, 'subjectType', val as any)}>
+                                  <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="SS">SS</SelectItem>
+                                    <SelectItem value="MS">MS</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </TableCell>

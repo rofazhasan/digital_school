@@ -86,7 +86,7 @@ function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
     .filter((idx: number) => idx !== -1);
 
   // Identical options expansion
-  const correctTexts = correctIndices.map(i => clean(typeof options[i] === 'object' ? options[i]?.text : options[i])).filter(Boolean);
+  const correctTexts = correctIndices.map((i: number) => clean(typeof options[i] === 'object' ? options[i]?.text : options[i])).filter(Boolean);
   const correctSet = new Set<number>(correctIndices);
   options.forEach((opt: any, idx: number) => {
     const t = clean(typeof opt === 'object' ? opt?.text : opt);
@@ -382,6 +382,7 @@ interface SubmissionInfo {
   cqSqStatus?: string;
   cqSqStartedAt?: string;
   cqSqSubmittedAt?: string;
+  answers?: any;
 }
 
 interface SubQuestion {
@@ -2547,14 +2548,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </motion.div>
                   )}
-                  {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
+                  {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED' || (result.submission?.answers as any)?._suspended) && (
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-4 p-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
                       <div className="p-2 rounded-xl bg-red-500/20">
                         <XCircle className="h-6 w-6" />
                       </div>
                       <div>
                         <p className="font-bold">EXAM SUSPENDED (পরীক্ষা বাতিল)</p>
-                        <p className="text-sm opacity-80">{result.result?.suspensionReason || 'Violation of exam rules detected.'}</p>
+                        <p className="text-sm opacity-80">{result.result?.suspensionReason || (result.submission?.answers as any)?._suspensionReason || 'Violation of exam rules detected.'}</p>
                       </div>
                     </motion.div>
                   )}
@@ -2677,6 +2678,53 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           </div>
                         </div>
                       </div>
+
+                      {/* Subject-Wise Breakdown for Multiple Subject (MS) Exams */}
+                      {(() => {
+                        const subjectBreakdown = (result.submission?.answers as any)?._subjectWiseBreakdown;
+                        const isMS = (result.exam as any)?.subjectType === 'MS' || (result.exam as any)?.subjectsConfig;
+                        
+                        if (!isMS && !subjectBreakdown) return null;
+
+                        const subjectsList: any[] = (result.exam as any)?.subjectsConfig?.subjects || [];
+                        const entries = subjectBreakdown ? Object.entries(subjectBreakdown) : subjectsList.map(s => [s.name, { totalScore: 0, maxMarks: s.totalMarks, isMandatory: s.isMandatory, attempted: false }]);
+
+                        if (entries.length === 0) return null;
+
+                        return (
+                          <div className="mt-6 space-y-4">
+                            <h5 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                              <BookOpen className="w-4 h-4 text-indigo-600" />
+                              বিষয়ভিত্তিক ফলাফল (Subject Breakdown)
+                            </h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {entries.map((entry: any) => {
+                                const sName = entry[0];
+                                const data = entry[1];
+                                return (
+                                  <div key={sName} className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 shadow-sm flex items-center justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{sName}</span>
+                                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 rounded-md ${data.isMandatory ? 'border-indigo-300 text-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/40 dark:text-indigo-300' : 'border-amber-300 text-amber-700 bg-amber-50/50 dark:bg-amber-950/40 dark:text-amber-300'}`}>
+                                          {data.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}
+                                        </Badge>
+                                      </div>
+                                      <p className="text-[11px] text-slate-400 mt-0.5">
+                                        {data.attempted ? 'উত্তর করা হয়েছে' : 'অনুপস্থিত / উত্তর করা হয়নি'}
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-xl font-black text-indigo-600 dark:text-indigo-400">{data.totalScore ?? 0}</span>
+                                      <span className="text-xs text-slate-400 font-bold">/{data.maxMarks ?? '--'}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Summary Section */}

@@ -29,11 +29,13 @@ import {
   ZoomOut,
   Maximize2,
   CheckCircle2,
-  CircleDot
+  CircleDot,
+  ChevronRight
 } from "lucide-react";
 import { useExamContext } from "./ExamContext";
 import { toBengaliNumerals, toBengaliAlphabets } from "@/utils/numeralConverter";
-import { cn } from "@/lib/utils";
+import { cn, cleanupMath } from "@/lib/utils";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Timer from "./Timer";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { toast } from "sonner";

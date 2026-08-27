@@ -80,6 +80,8 @@ interface QuestionPaperProps {
     sqRequiredQuestions?: number;
     cqSubsections?: any[];
     id?: string;
+    subjectType?: 'SS' | 'MS';
+    subjectsConfig?: any;
   };
   questions: {
     mcq: MCQ[];
@@ -314,7 +316,39 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
           {/* Special Instruction Box */}
           <div className="instruction-box">
-            {hideOMR ? (
+            {examInfo.subjectType === 'MS' && examInfo.subjectsConfig ? (
+              <div className="space-y-1">
+                <p>
+                  <strong>{isEn ? 'Multiple Subjects Instructions:' : 'বহু-বিষয় ভিত্তিক পরীক্ষার নির্দেশাবলী:'}</strong>{' '}
+                  {isEn
+                    ? `This examination consists of ${examInfo.subjectsConfig.subjects?.length || 0} subjects.`
+                    : `এই পরীক্ষায় সর্বমোট ${toBengaliNumerals(examInfo.subjectsConfig.subjects?.length || 0)}টি বিষয় অন্তর্ভুক্ত রয়েছে।`}
+                  {' '}
+                  {examInfo.subjectsConfig.mandatoryCount > 0 && (
+                    <span>
+                      {isEn
+                        ? `All ${examInfo.subjectsConfig.mandatoryCount} mandatory subject(s) must be answered.`
+                        : `সকল ${toBengaliNumerals(examInfo.subjectsConfig.mandatoryCount)}টি আবশ্যক বিষয়ের উত্তর প্রদান বাধ্যতামূলক।`}
+                      {' '}
+                    </span>
+                  )}
+                  {examInfo.subjectsConfig.optionalCount > 0 && (
+                    <span>
+                      {isEn
+                        ? `Answer any ${examInfo.subjectsConfig.requiredOptionalCount || 1} optional subject(s) out of ${examInfo.subjectsConfig.optionalCount}. Answering more optional subjects than permitted will lead to disqualification.`
+                        : `মোট ${toBengaliNumerals(examInfo.subjectsConfig.optionalCount)}টি ঐচ্ছিক বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(examInfo.subjectsConfig.requiredOptionalCount || 1)}টি বিষয়ের উত্তর করতে হবে। অনুমোদিত সংখ্যার চেয়ে বেশি ঐচ্ছিক বিষয়ের উত্তর প্রদান করলে খাতা বাতিল গণ্য হবে।`}
+                    </span>
+                  )}
+                  {Number(examInfo.mcqNegativeMarking) > 0 && (
+                    <span className="font-semibold block mt-0.5">
+                      {isEn
+                        ? `Negative marking of ${examInfo.mcqNegativeMarking}% will be deducted for each wrong answer.`
+                        : `প্রতিটি ভুল উত্তরের জন্য ${toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কাটা যাবে।`}
+                    </span>
+                  )}
+                </p>
+              </div>
+            ) : hideOMR ? (
               <p>
                 <strong>{isEn ? 'General Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
                 {isEn
@@ -363,6 +397,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       questionCounter++;
                     }
                     const qNum = isEn ? String(startNum) : toBengaliNumerals(startNum);
+
+                    const showSubjectHeader = examInfo.subjectType === 'MS' && q.subject && (idx === 0 || allObjective[idx - 1]?.subject !== q.subject);
+                    const matchedSub = examInfo.subjectsConfig?.subjects?.find((s: any) => s.name?.toLowerCase() === q.subject?.toLowerCase());
+
+                    const renderQuestionContent = () => {
 
                     if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
                       // Column count based on max single option length (Bengali chars ~2x wider)
@@ -599,9 +638,28 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       );
                     }
 
-
-
                     return null;
+                  };
+
+                    return (
+                      <React.Fragment key={idx}>
+                        {showSubjectHeader && (
+                          <div className="my-4 py-1.5 px-3 bg-gray-100 border-l-4 border-black font-bold text-sm flex justify-between items-center break-inside-avoid">
+                            <span>
+                              {isEn ? 'Subject: ' : 'বিষয়: '} {q.subject}
+                            </span>
+                            {matchedSub && (
+                              <span className="text-xs font-bold text-gray-700">
+                                {matchedSub.isMandatory
+                                  ? (isEn ? `[Mandatory - ${matchedSub.totalMarks} Marks]` : `[আবশ্যক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)
+                                  : (isEn ? `[Optional - ${matchedSub.totalMarks} Marks]` : `[ঐচ্ছিক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {renderQuestionContent()}
+                      </React.Fragment>
+                    );
                   });
                 })()}
               </div>

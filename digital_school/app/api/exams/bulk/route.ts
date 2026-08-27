@@ -33,6 +33,8 @@ const examSchema = z.object({
     objectiveTime: z.coerce.number().optional().nullable(),
     cqSqTime: z.coerce.number().optional().nullable(),
     cqSubsections: z.array(cqSubsectionSchema).optional().nullable(),
+    subjectType: z.enum(["SS", "MS"]).optional().default("SS"),
+    subjectsConfig: z.any().optional().nullable(),
 });
 
 const bulkCreateSchema = z.array(examSchema);
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
                         endTime: isNaN(endObj.getTime()) ? new Date(dateObj.getTime() + dur * 60000) : endObj,
                         duration: dur,
                         type: exam.type,
+                        subjectType: exam.subjectType || "SS",
+                        subjectsConfig: (exam.subjectsConfig as any) || null,
                         totalMarks: Number(exam.totalMarks) || 100,
                         passMarks: Number(exam.passMarks) || 33,
                         classId: exam.classId,

@@ -793,12 +793,48 @@ export default function ExamBuilderPage() {
     }
     setIsSubmitting(true);
     try {
-      const setsToSave = Array.from({ length: numSets }).map((_, i) => {
-        const cqQuestions = selectedQuestions.filter(q => q.type === 'CQ');
-        const otherQuestions = selectedQuestions.filter(q => q.type !== 'CQ');
-        const shuffledOthers = shuffleArray(otherQuestions);
+      const isMS = exam?.subjectType === 'MS' || (exam?.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
 
-        const orderedQuestions = [...cqQuestions, ...shuffledOthers].map(q => {
+      const setsToSave = Array.from({ length: numSets }).map((_, i) => {
+        let orderedQuestionsRaw: any[] = [];
+
+        if (isMS) {
+          // Multiple Subject (MS): Shuffling happens strictly WITHIN each subject.
+          const subjectsConfigList: string[] = ((exam?.subjectsConfig as any)?.subjects || []).map((s: any) => s.name);
+          const distinctQuestionSubjects = Array.from(new Set(selectedQuestions.map(q => q.subject).filter(Boolean)));
+          const subjectOrder = Array.from(new Set([...subjectsConfigList, ...distinctQuestionSubjects]));
+
+          // Group and shuffle questions within each subject group
+          subjectOrder.forEach(subjectName => {
+            const subjectQuestions = selectedQuestions.filter(q =>
+              (q.subject || '').trim().toLowerCase() === subjectName.trim().toLowerCase()
+            );
+            if (subjectQuestions.length > 0) {
+              const cqInSubject = subjectQuestions.filter(q => q.type === 'CQ');
+              const otherInSubject = subjectQuestions.filter(q => q.type !== 'CQ');
+              const shuffledOthersInSubject = shuffleArray(otherInSubject);
+              orderedQuestionsRaw.push(...cqInSubject, ...shuffledOthersInSubject);
+            }
+          });
+
+          // Any questions without explicit matching subject
+          const unassignedQuestions = selectedQuestions.filter(q =>
+            !subjectOrder.some(s => s.trim().toLowerCase() === (q.subject || '').trim().toLowerCase())
+          );
+          if (unassignedQuestions.length > 0) {
+            const cqUnassigned = unassignedQuestions.filter(q => q.type === 'CQ');
+            const otherUnassigned = unassignedQuestions.filter(q => q.type !== 'CQ');
+            orderedQuestionsRaw.push(...cqUnassigned, ...shuffleArray(otherUnassigned));
+          }
+        } else {
+          // Single Subject (SS): Global CQ first, then shuffled others
+          const cqQuestions = selectedQuestions.filter(q => q.type === 'CQ');
+          const otherQuestions = selectedQuestions.filter(q => q.type !== 'CQ');
+          const shuffledOthers = shuffleArray(otherQuestions);
+          orderedQuestionsRaw = [...cqQuestions, ...shuffledOthers];
+        }
+
+        const orderedQuestions = orderedQuestionsRaw.map(q => {
           let processedQuestion = { ...q };
 
           // Shuffle MCQ/MC options

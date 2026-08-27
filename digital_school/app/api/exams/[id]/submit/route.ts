@@ -163,6 +163,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (exam.cqRequiredQuestions && cqAnswered > exam.cqRequiredQuestions) exceededQuestionLimit = true;
     if (exam.sqRequiredQuestions && sqAnswered > exam.sqRequiredQuestions) exceededQuestionLimit = true;
 
+    // For Multiple Subject (MS) exams: check optional subject limit
+    const isMS = (exam as any).subjectType === 'MS' || ((exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0);
+    if (isMS && (exam as any).subjectsConfig) {
+      const msConfig = (exam as any).subjectsConfig as any;
+      const optionalSubjectNames = (msConfig.subjects || [])
+        .filter((s: any) => !s.isMandatory)
+        .map((s: any) => (s.name || '').toLowerCase().trim());
+      const maxAllowedOptional = Number(msConfig.requiredOptionalCount) || 1;
+
+      // Build questionId -> subject mapping
+      const questionSubjectMap = new Map<string, string>();
+      for (const examSet of setsToProcess) {
+        if (!examSet.questionsJson) continue;
+        const questions = Array.isArray(examSet.questionsJson)
+          ? examSet.questionsJson
+          : typeof examSet.questionsJson === "string"
+            ? JSON.parse(examSet.questionsJson)
+            : [];
+        for (const q of questions) {
+          if (q.id && q.subject) {
+            questionSubjectMap.set(q.id, (q.subject || '').toLowerCase().trim());
+          }
+        }
+      }
+
+      const attemptedOptionalSubjects = new Set<string>();
+      for (const qId of answerKeys) {
+        const val = data.answers[qId];
+        const hasAttempted = val !== undefined && val !== null && val !== "" && val !== "No answer provided" && (typeof val !== 'object' || Object.keys(val).length > 0);
+        if (hasAttempted) {
+          const rawId = qId.split('_')[0];
+          const subj = questionSubjectMap.get(qId) || questionSubjectMap.get(rawId);
+          if (subj && optionalSubjectNames.includes(subj)) {
+            attemptedOptionalSubjects.add(subj);
+          }
+        }
+      }
+
+      if (attemptedOptionalSubjects.size > maxAllowedOptional) {
+        console.warn(`[Submit] User ${studentId} exceeded optional subject limit: attempted ${attemptedOptionalSubjects.size} optional subjects (max ${maxAllowedOptional}). Flagging submission as suspended.`);
+        exceededQuestionLimit = true;
+        processedAnswers._suspended = true;
+        processedAnswers._suspensionReason = `Disqualified: Answered ${attemptedOptionalSubjects.size} optional subjects while only ${maxAllowedOptional} allowed.`;
+      }
+    }
+
     // Check if there is a CQ/SQ section to follow
     const hasCqSqSection = (exam.cqTotalQuestions || 0) > 0 ||
       (exam.sqTotalQuestions || 0) > 0 ||

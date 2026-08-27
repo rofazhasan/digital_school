@@ -523,10 +523,68 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     totalScore += cqMarks + sqMarks;
 
-    // 3. Update Submission
-    const percentage = calculatePercentage(totalScore, exam.totalMarks);
+    // --- Multiple Subject (MS) Evaluation & Disqualification check ---
+    const isMS = (exam as any).subjectType === 'MS' || ((exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0);
+    const msConfig = (exam as any).subjectsConfig as any;
+    let isDisqualified = (answers as any)?._suspended === true;
+
+    const subjectWiseBreakdown: Record<string, { totalScore: number; maxMarks: number; isMandatory: boolean; attempted: boolean }> = {};
+
+    if (isMS && msConfig && Array.isArray(msConfig.subjects)) {
+        const optionalSubjectsAttempted = new Set<string>();
+
+        // Build question subject map
+        const qList = (typeof targetSet?.questionsJson === 'string' ? JSON.parse(targetSet.questionsJson) : targetSet?.questionsJson) || [];
+        
+        msConfig.subjects.forEach((sub: any) => {
+            const subName = sub.name;
+            const subQuestions = (qList as any[]).filter((q: any) => (q.subject || '').toLowerCase().trim() === subName.toLowerCase().trim());
+            let subScore = 0;
+            let subAttempted = false;
+
+            subQuestions.forEach((q: any) => {
+                const mark = (answers as any)[`${q.id}_marks`];
+                if (typeof mark === 'number') subScore += mark;
+
+                const ans = (answers as any)[q.id];
+                if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                    subAttempted = true;
+                }
+            });
+
+            subjectWiseBreakdown[subName] = {
+                totalScore: Math.max(0, subScore),
+                maxMarks: sub.totalMarks || 0,
+                isMandatory: sub.isMandatory ?? true,
+                attempted: subAttempted
+            };
+
+            if (!sub.isMandatory && subAttempted) {
+                optionalSubjectsAttempted.add(subName);
+            }
+        });
+
+        const maxOptionalAllowed = Number(msConfig.requiredOptionalCount) || 1;
+        if (optionalSubjectsAttempted.size > maxOptionalAllowed) {
+            isDisqualified = true;
+            (answers as any)._suspended = true;
+            (answers as any)._suspensionReason = `Disqualified: Answered ${optionalSubjectsAttempted.size} optional subjects while only ${maxOptionalAllowed} allowed.`;
+        }
+    }
+
+    if (isDisqualified) {
+        totalScore = 0;
+        mcqMarks = 0;
+        cqMarks = 0;
+        sqMarks = 0;
+    }
+
+    (answers as any)._subjectWiseBreakdown = subjectWiseBreakdown;
+
+    // 4. Update Submission
+    const percentage = isDisqualified ? 0 : calculatePercentage(totalScore, exam.totalMarks);
     const passMark = Number(exam.passMarks) || 33;
-    const grade = calculateGrade(percentage, passMark);
+    const grade = isDisqualified ? "F (Disqualified)" : calculateGrade(percentage, passMark);
 
     if (saveToDb) {
         await prisma.examSubmission.update({

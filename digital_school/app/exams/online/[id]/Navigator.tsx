@@ -77,11 +77,36 @@ const NavButton = memo(({
 NavButton.displayName = 'NavButton';
 
 const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
-  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions } = useExamContext();
+  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions, isMS, msSubjects } = useExamContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const questionList = sortedQuestions || questions || [];
   if (questionList.length === 0) return null;
+
+  const subjectGroups = useMemo(() => {
+    if (!isMS) return null;
+    const groups: { name: string; isMandatory?: boolean; questions: any[] }[] = [];
+    const subjectsMap = new Map<string, any[]>();
+    
+    questionList.forEach((q: any) => {
+      const sName = q.subject || 'General';
+      if (!subjectsMap.has(sName)) {
+        subjectsMap.set(sName, []);
+      }
+      subjectsMap.get(sName)!.push(q);
+    });
+
+    subjectsMap.forEach((qList, sName) => {
+      const subConf = msSubjects?.find((s: any) => s.name?.toLowerCase().trim() === sName.toLowerCase().trim());
+      groups.push({
+        name: sName,
+        isMandatory: subConf ? subConf.isMandatory : true,
+        questions: qList
+      });
+    });
+
+    return groups;
+  }, [isMS, questionList, msSubjects]);
 
   // Helper to render a group of questions
   const renderGroup = (title: string, groupQuestions: any[], startIndex: number) => {
@@ -128,19 +153,33 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
       {/* Scrollable Content - Uses native scroll for better mobile reliability */}
       <div className="flex-1 w-full overflow-y-auto overscroll-behavior-contain scrollbar-thin">
         <div className="p-3 pb-20">
-          {/* Render CQ Group */}
-          {groupedQuestions?.creative?.length > 0 && renderGroup("Creative (CQ)", groupedQuestions.creative, 0)}
+          {isMS && subjectGroups ? (
+            subjectGroups.map((grp) => (
+              <React.Fragment key={grp.name}>
+                {renderGroup(
+                  `${grp.name} (${grp.isMandatory ? 'Mandatory' : 'Optional'})`,
+                  grp.questions,
+                  0
+                )}
+              </React.Fragment>
+            ))
+          ) : (
+            <>
+              {/* Render CQ Group */}
+              {groupedQuestions?.creative?.length > 0 && renderGroup("Creative (CQ)", groupedQuestions.creative, 0)}
 
-          {/* Render SQ Group */}
-          {groupedQuestions?.short?.length > 0 && renderGroup("Short (SQ)", groupedQuestions.short, 0)}
+              {/* Render SQ Group */}
+              {groupedQuestions?.short?.length > 0 && renderGroup("Short (SQ)", groupedQuestions.short, 0)}
 
-          {/* Render Objective Group */}
-          {groupedQuestions?.objective?.length > 0 && renderGroup("Objective (MCQ)", groupedQuestions.objective, 0)}
+              {/* Render Objective Group */}
+              {groupedQuestions?.objective?.length > 0 && renderGroup("Objective (MCQ)", groupedQuestions.objective, 0)}
 
-          {/* Fallback if no groups defined (legacy support) */}
-          {(!groupedQuestions || (groupedQuestions.creative.length === 0 && groupedQuestions.short.length === 0 && groupedQuestions.objective.length === 0)) &&
-            renderGroup("Questions", questionList, 0)
-          }
+              {/* Fallback if no groups defined (legacy support) */}
+              {(!groupedQuestions || (groupedQuestions.creative.length === 0 && groupedQuestions.short.length === 0 && groupedQuestions.objective.length === 0)) &&
+                renderGroup("Questions", questionList, 0)
+              }
+            </>
+          )}
         </div>
       </div>
 

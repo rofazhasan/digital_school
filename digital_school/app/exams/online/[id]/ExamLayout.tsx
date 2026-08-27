@@ -174,7 +174,14 @@ export default function ExamLayout() {
     hasObjective,
     hasCqSq,
     fullSortedQuestions,
-    setAnswers
+    setAnswers,
+    isMS,
+    msSubjects,
+    selectedSubject,
+    setSelectedSubject,
+    attemptedOptionalSubjects,
+    attemptedSubjects,
+    isExceedingOptional
   } = useExamContext();
 
   const questions = sortedQuestions || [];
@@ -945,6 +952,63 @@ export default function ExamLayout() {
                   answers={answers || {}}
                   marked={navigation.marked || {}}
                 />
+              </div>
+            )}
+
+            {/* Multiple Subjects (MS) Information & Live Warnings */}
+            {isMS && (
+              <div className="space-y-3">
+                {/* Warning if student exceeded allowed optional subjects */}
+                {isExceedingOptional && (
+                  <div className="bg-red-500/10 border-2 border-red-500 text-red-700 dark:text-red-300 p-4 rounded-2xl flex items-start gap-3 shadow-lg animate-pulse">
+                    <ShieldAlert className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-black text-sm uppercase tracking-wide text-red-600 dark:text-red-400">
+                        সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করা হয়েছে! (Disqualification Warning)
+                      </h4>
+                      <p className="text-xs font-semibold mt-1">
+                        আপনি অনুমোদিত সীমার চেয়ে বেশি ({attemptedOptionalSubjects.size}টি) ঐচ্ছিক বিষয়ের প্রশ্নের উত্তর দিয়েছেন। এই পরীক্ষায় সর্বোচ্চ {(exam.subjectsConfig as any)?.requiredOptionalCount || 1}টি ঐচ্ছিক বিষয় উত্তর করার নিয়ম রয়েছে। অনুগ্রহ করে অতিরিক্ত বিষয়ের উত্তর মুছে ফেলুন, নতুবা আপনার সম্পূর্ণ পরীক্ষা বাতিল (০ নম্বর) গণ্য হবে।
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Subject Selector Tabs */}
+                {msSubjects && msSubjects.length > 0 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {msSubjects.map((sub: any) => {
+                      const isAttempted = attemptedSubjects?.has(sub.name);
+                      const isCurrentSubject = (currentQuestion?.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim();
+                      const firstQIndex = sortedQuestions.findIndex((q: any) => (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim());
+
+                      return (
+                        <button
+                          key={sub.name}
+                          type="button"
+                          onClick={() => {
+                            if (firstQIndex !== -1) {
+                              navigateToQuestion(firstQIndex);
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border shadow-sm",
+                            isCurrentSubject
+                              ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
+                              : isAttempted
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                              : "bg-background text-muted-foreground hover:bg-accent border-border"
+                          )}
+                        >
+                          <span>{sub.name}</span>
+                          <span className="text-[10px] opacity-75 font-normal">
+                            ({sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'})
+                          </span>
+                          {isAttempted && <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

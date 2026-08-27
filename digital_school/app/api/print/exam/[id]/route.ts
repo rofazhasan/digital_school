@@ -100,6 +100,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     objectiveTime: (exam as any).objectiveTime || null,
     cqSqTime: (exam as any).cqSqTime || null,
     cqSubsections: exam.cqSubsections || null,
+    subjectType: (exam as any).subjectType || 'SS',
+    subjectsConfig: (exam as any).subjectsConfig || null,
   };
 
   // Collect all question IDs to fetch fresh difficultyDetail/explanation
