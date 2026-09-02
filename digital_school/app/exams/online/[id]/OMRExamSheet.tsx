@@ -75,6 +75,9 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     switchExamSet,
     activeSection,
     hasCqSq,
+    isMS,
+    msSubjects,
+    matchSubject
   } = useExamContext();
 
   // In Only OMR mode: strictly adhere to the physical generated set's exact question order (1, 2, 3, 4...)
@@ -822,8 +825,138 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
               </div>
             ) : (
               (() => {
-                // Responsive column layout: on mobile 1 col, md 2 cols, xl 3 cols
-                // Chunk questions logically for clean layout
+                if (isMS && msSubjects && msSubjects.length > 0) {
+                  // Subject-wise Grouping for Multi-Subject (MS) Exams
+                  const subjectSections: { name: string; isMandatory?: boolean; totalMarks?: number; questions: any[] }[] = [];
+                  const mapped = new Set<string>();
+
+                  msSubjects.forEach((sub: any) => {
+                    const subQs = displayedQuestions.filter((q: any) => 
+                      matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+                    );
+                    if (subQs.length > 0) {
+                      subQs.forEach((q: any) => mapped.add(q.id));
+                      subjectSections.push({
+                        name: sub.name,
+                        isMandatory: sub.isMandatory ?? true,
+                        totalMarks: sub.totalMarks,
+                        questions: subQs
+                      });
+                    }
+                  });
+
+                  // Remaining unmapped questions (if any)
+                  const unmapped = displayedQuestions.filter((q: any) => !mapped.has(q.id));
+                  if (unmapped.length > 0) {
+                    subjectSections.push({
+                      name: 'General / Other',
+                      isMandatory: true,
+                      questions: unmapped
+                    });
+                  }
+
+                  return (
+                    <div className="space-y-8">
+                      {subjectSections.map((sec, secIdx) => {
+                        const secAnswered = sec.questions.filter((q: any) => answeredStatusMap[q.id]).length;
+                        const isComplete = secAnswered === sec.questions.length && sec.questions.length > 0;
+                        const columnChunk = sec.questions.length > 30 ? 15 : sec.questions.length > 15 ? 10 : 8;
+                        const secCols = [];
+                        for (let i = 0; i < sec.questions.length; i += columnChunk) {
+                          secCols.push(sec.questions.slice(i, i + columnChunk));
+                        }
+
+                        return (
+                          <div key={sec.name} className="border-2 border-slate-300 dark:border-slate-700 rounded-3xl overflow-hidden shadow-sm bg-slate-50/50 dark:bg-slate-900/40 p-4 sm:p-6">
+                            {/* Subject Section Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                                  {String.fromCharCode(65 + secIdx)}
+                                </span>
+                                <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight">
+                                  {sec.name}
+                                </h3>
+                                <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 ${sec.isMandatory ? 'border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' : 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300'}`}>
+                                  {sec.isMandatory ? 'আবশ্যক (Mandatory)' : 'ঐচ্ছিক (Optional)'}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs font-bold">
+                                <span className="text-muted-foreground">উত্তর করা হয়েছে:</span>
+                                <Badge variant={isComplete ? "default" : "secondary"} className={isComplete ? "bg-emerald-600 text-white" : ""}>
+                                  {toBengaliNumerals(secAnswered)} / {toBengaliNumerals(sec.questions.length)} প্রশ্ন {isComplete ? '✓' : ''}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Columns inside this Subject Section */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                              {secCols.map((colQuestions, colIdx) => (
+                                <div
+                                  key={colIdx}
+                                  className="bg-white dark:bg-slate-800/80 rounded-2xl border-2 border-slate-800 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col"
+                                >
+                                  {/* Column Header */}
+                                  <div className="bg-slate-900 text-white dark:bg-slate-700 px-2.5 sm:px-3 py-2 flex items-center justify-between text-[11px] sm:text-xs font-bold tracking-wider">
+                                    <span className="w-10 sm:w-12 text-center">নং (Q)</span>
+                                    <div className="flex-1 flex justify-around px-1 sm:px-2">
+                                      <span>ক (A)</span>
+                                      <span>খ (B)</span>
+                                      <span>গ (C)</span>
+                                      <span>ঘ (D)</span>
+                                    </div>
+                                    <span className="w-6 text-center opacity-70 text-[9px] sm:text-[10px]">রিসেট</span>
+                                  </div>
+
+                                  {/* Question Rows in Column */}
+                                  <div className="divide-y divide-slate-200 dark:divide-slate-700/60 p-0.5 sm:p-1 flex-1">
+                                    {colQuestions.map((q: any) => {
+                                      const globalIdx = questions.indexOf(q);
+                                      const isAnswered = answeredStatusMap[q.id];
+                                      const isHighlighted = highlightedQId === q.id;
+
+                                      return (
+                                        <div
+                                          key={q.id}
+                                          ref={(el) => { questionRefs.current[q.id] = el; }}
+                                          className={cn(
+                                            "transition-all duration-300",
+                                            isHighlighted && "bg-indigo-100 dark:bg-indigo-950/80 ring-2 ring-indigo-500 rounded-xl"
+                                          )}
+                                        >
+                                          <OMRQuestionRow
+                                            question={q}
+                                            index={globalIdx}
+                                            userAnswer={answers[q.id]}
+                                            subAnswers={answers}
+                                            isAnswered={isAnswered}
+                                            bubbleSizeScale={bubbleSizeScale}
+                                            onMCQSelect={handleMCQSelect}
+                                            onMCToggle={handleMCToggle}
+                                            onSMCQSelect={handleSMCQSelect}
+                                            onMTFPair={handleMTFPair}
+                                            onNumericInput={handleNumericInput}
+                                            onCMAPartChange={handleCMAPartChange}
+                                            onMPCStageChange={handleMPCStageChange}
+                                            onARSelect={handleARSelect}
+                                            onClearAnswer={handleClearAnswer}
+                                            disabled={isSubmitting}
+                                          />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                // Default Single Subject (SS) Layout - 100% Preserved
                 const columnChunk = displayedQuestions.length > 50 ? 25 : displayedQuestions.length > 25 ? 15 : 10;
                 const columns = [];
                 for (let i = 0; i < displayedQuestions.length; i += columnChunk) {
@@ -1035,27 +1168,72 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
               </div>
 
               {/* Grid of question numbers */}
-              <div className="flex-1 overflow-y-auto p-1 grid grid-cols-5 sm:grid-cols-6 gap-2">
-                {questions.map((q: any, i: number) => {
-                  const isAnswered = answeredStatusMap[q.id];
-                  return (
-                    <button
-                      key={q.id}
-                      type="button"
-                      onClick={() => handleJumpToQuestion(q.id)}
-                      className={cn(
-                        "h-11 rounded-xl flex flex-col items-center justify-center font-bold text-xs transition-all active:scale-95 border-2",
-                        isAnswered
-                          ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
-                          : "bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                      )}
-                    >
-                      <span className="font-mono">{toBengaliNumerals(i + 1)}</span>
-                      <span className="text-[9px] opacity-70">({i + 1})</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {isMS && msSubjects && msSubjects.length > 0 ? (
+                <div className="flex-1 overflow-y-auto p-1 space-y-4">
+                  {msSubjects.map((sub: any) => {
+                    const subQs = questions.filter((q: any) => 
+                      matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+                    );
+                    if (subQs.length === 0) return null;
+                    const subAnswered = subQs.filter((q: any) => answeredStatusMap[q.id]).length;
+
+                    return (
+                      <div key={sub.name} className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 pb-1 border-b border-slate-200 dark:border-slate-700">
+                          <span className="text-primary font-black">{sub.name}</span>
+                          <span className="text-[10px] text-muted-foreground font-semibold">
+                            পূরণকৃত: {toBengaliNumerals(subAnswered)}/{toBengaliNumerals(subQs.length)}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                          {subQs.map((q: any) => {
+                            const i = questions.indexOf(q);
+                            const isAnswered = answeredStatusMap[q.id];
+                            return (
+                              <button
+                                key={q.id}
+                                type="button"
+                                onClick={() => handleJumpToQuestion(q.id)}
+                                className={cn(
+                                  "h-11 rounded-xl flex flex-col items-center justify-center font-bold text-xs transition-all active:scale-95 border-2",
+                                  isAnswered
+                                    ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                                    : "bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                )}
+                              >
+                                <span className="font-mono">{toBengaliNumerals(i + 1)}</span>
+                                <span className="text-[9px] opacity-70">({i + 1})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto p-1 grid grid-cols-5 sm:grid-cols-6 gap-2">
+                  {questions.map((q: any, i: number) => {
+                    const isAnswered = answeredStatusMap[q.id];
+                    return (
+                      <button
+                        key={q.id}
+                        type="button"
+                        onClick={() => handleJumpToQuestion(q.id)}
+                        className={cn(
+                          "h-11 rounded-xl flex flex-col items-center justify-center font-bold text-xs transition-all active:scale-95 border-2",
+                          isAnswered
+                            ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                            : "bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                        )}
+                      >
+                        <span className="font-mono">{toBengaliNumerals(i + 1)}</span>
+                        <span className="text-[9px] opacity-70">({i + 1})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-3">
                 <Button

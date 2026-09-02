@@ -534,6 +534,49 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [saving, setSaving] = useState(false);
   const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc'>('all');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'PARTIAL' | 'WRONG' | 'UNANSWERED'>('ALL');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+
+  // MS Subject Matching Helper
+  const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+    if (!questionSubject || !targetSubjectName) return false;
+    const qClean = questionSubject.trim().toLowerCase();
+    const tClean = targetSubjectName.trim().toLowerCase();
+    if (qClean === tClean) return true;
+    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+    const aliases: Record<string, string[]> = {
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+      'bangla': ['বাংলা', 'bengali'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+    };
+
+    for (const [key, list] of Object.entries(aliases)) {
+      const isTarget = tClean === key || list.some(a => tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      if (isTarget && isQuestion) return true;
+    }
+
+    return false;
+  }, []);
+
+  const isMS = Boolean(exam?.subjectType === 'MS' || exam?.subjectsConfig);
+  const msSubjects = useMemo(() => {
+    if (!isMS || !exam) return [];
+    const configured = (exam.subjectsConfig as any)?.subjects || [];
+    if (configured.length > 0) return configured;
+    const distinct: string[] = [];
+    (exam.questions || []).forEach((q: any) => {
+      if (q.subject && !distinct.some(d => matchSubject(q.subject, d))) {
+        distinct.push(q.subject);
+      }
+    });
+    return distinct.map(name => ({ name, isMandatory: true, totalMarks: 0 }));
+  }, [isMS, exam, matchSubject]);
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
@@ -2311,9 +2354,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return counts;
   }, [activeQuestions, currentStudent?.answers]);
 
-  // Filtered questions based on Type & Status filter
+  // Filtered questions based on Type, Status & Subject filter
   const filteredQuestions = useMemo(() => {
     return activeQuestions?.filter(q => {
+      if (isMS && subjectFilter !== 'all') {
+        if (!matchSubject(q?.subject, subjectFilter)) return false;
+      }
       if (questionTypeFilter !== 'all') {
         const qType = (q?.type || '').toLowerCase();
         if (qType !== questionTypeFilter.toLowerCase()) return false;
@@ -2324,7 +2370,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
       return true;
     }) || [];
-  }, [activeQuestions, questionTypeFilter, filterStatus, currentStudent?.answers]);
+  }, [activeQuestions, isMS, subjectFilter, questionTypeFilter, filterStatus, currentStudent?.answers, matchSubject]);
 
   const currentQuestion = filteredQuestions?.[currentQuestionIndex];
 
@@ -3606,6 +3652,45 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     </div>
                   </div>
 
+                  {/* Subject Selector Tabs for MS Exams */}
+                  {isMS && msSubjects.length > 0 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto p-2 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-xl border border-indigo-100 dark:border-indigo-900/40 scrollbar-thin">
+                      <span className="text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+                        <BookOpen className="w-3.5 h-3.5" /> Subject:
+                      </span>
+                      <button
+                        onClick={() => { setSubjectFilter('all'); setCurrentQuestionIndex(0); }}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 border",
+                          subjectFilter === 'all'
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                            : "bg-card border-border hover:bg-muted text-foreground"
+                        )}
+                      >
+                        All ({activeQuestions.length})
+                      </button>
+                      {msSubjects.map((sub: any) => {
+                        const subQs = activeQuestions.filter((q: any) => matchSubject(q.subject, sub.name));
+                        const isSel = subjectFilter === sub.name;
+                        return (
+                          <button
+                            key={sub.name}
+                            onClick={() => { setSubjectFilter(sub.name); setCurrentQuestionIndex(0); }}
+                            className={cn(
+                              "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 border flex items-center gap-1.5",
+                              isSel
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                : "bg-card border-border hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <span>{sub.name}</span>
+                            <span className="text-[10px] opacity-75 font-normal">({subQs.length})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {/* Question Jumper Pills */}
                   {filteredQuestions.length > 1 && (
                     <div className="flex items-center gap-1.5 overflow-x-auto p-2 bg-muted/30 rounded-xl border border-border/50 scrollbar-thin">
@@ -3807,13 +3892,20 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 {/* Question */}
                                 <div>
                                   <div className="flex items-center justify-between mb-2">
-                                    <Badge className={
-                                      ['mcq', 'smcq'].includes(currentQuestion?.type?.toLowerCase() || '') ? 'bg-blue-100 text-blue-800' :
-                                        currentQuestion?.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
-                                          'bg-yellow-100 text-yellow-800'
-                                    }>
-                                      {(currentQuestion?.type || "unknown").toUpperCase()}
-                                    </Badge>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {isMS && currentQuestion?.subject && (
+                                        <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs px-2.5 py-0.5">
+                                          {currentQuestion.subject}
+                                        </Badge>
+                                      )}
+                                      <Badge className={
+                                        ['mcq', 'smcq'].includes(currentQuestion?.type?.toLowerCase() || '') ? 'bg-blue-100 text-blue-800' :
+                                          currentQuestion?.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
+                                            'bg-yellow-100 text-yellow-800'
+                                      }>
+                                        {(currentQuestion?.type || "unknown").toUpperCase()}
+                                      </Badge>
+                                    </div>
                                     <div className="flex flex-col items-end gap-1">
                                       <div className="text-sm text-muted-foreground">
                                         {currentQuestion?.marks} mark{currentQuestion?.marks > 1 ? 's' : ''}

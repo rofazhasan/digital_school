@@ -50,7 +50,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     setIsUploading,
     fontSize,
     answers,
-    setAnswers
+    setAnswers,
+    isMS
   } = useExamContext();
 
   const questions = exam.questions || [];
@@ -140,7 +141,12 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isMS && question?.subject && (
+                <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs px-2.5 py-0.5">
+                  {question.subject}
+                </Badge>
+              )}
               <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border uppercase">
                 {type.toUpperCase()}
               </Badge>

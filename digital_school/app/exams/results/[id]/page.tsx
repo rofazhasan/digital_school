@@ -540,6 +540,49 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [cqPage, setCqPage] = useState(1);
   const [sqPage, setSqPage] = useState(1);
   const [descriptivePage, setDescriptivePage] = useState(1);
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+
+  // MS Subject Matching Helper
+  const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+    if (!questionSubject || !targetSubjectName) return false;
+    const qClean = questionSubject.trim().toLowerCase();
+    const tClean = targetSubjectName.trim().toLowerCase();
+    if (qClean === tClean) return true;
+    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+    const aliases: Record<string, string[]> = {
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+      'bangla': ['বাংলা', 'bengali'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+    };
+
+    for (const [key, list] of Object.entries(aliases)) {
+      const isTarget = tClean === key || list.some(a => tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      if (isTarget && isQuestion) return true;
+    }
+
+    return false;
+  }, []);
+
+  const isMS = Boolean((result?.exam as any)?.subjectType === 'MS' || (result?.exam as any)?.subjectsConfig);
+  const msSubjects = useMemo(() => {
+    if (!isMS || !result) return [];
+    const configured = (result.exam as any)?.subjectsConfig?.subjects || [];
+    if (configured.length > 0) return configured;
+    const distinct: string[] = [];
+    (result.questions || []).forEach((q: any) => {
+      if (q.subject && !distinct.some(d => matchSubject(q.subject, d))) {
+        distinct.push(q.subject);
+      }
+    });
+    return distinct.map(name => ({ name, isMandatory: true, totalMarks: 0 }));
+  }, [isMS, result, matchSubject]);
 
   // Section Constants
   const OBJECTIVE_PER_PAGE = 15;
@@ -2932,7 +2975,53 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       </CardTitle>
                     </div>
                   </div>
-                  <CardContent className="p-8 md:p-12">
+                    {/* Subject Filter Bar for MS Exams */}
+                    {isMS && msSubjects.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 mb-6 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100 dark:border-indigo-900/40">
+                        <span className="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mr-2 flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5" /> Filter by Subject:
+                        </span>
+                        <Button
+                          type="button"
+                          variant={selectedSubjectFilter === 'ALL' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => { setSelectedSubjectFilter('ALL'); setObjectivePage(1); }}
+                          className={cn(
+                            "rounded-xl text-xs font-bold transition-all",
+                            selectedSubjectFilter === 'ALL' ? "bg-indigo-600 text-white shadow-md" : "border-slate-200 dark:border-slate-800 text-slate-600"
+                          )}
+                        >
+                          All Subjects ({result?.questions?.length || 0})
+                        </Button>
+                        {msSubjects.map((sub: any) => {
+                          const subQs = (result?.questions || []).filter((q: any) => matchSubject(q.subject, sub.name));
+                          const subScore = (result?.submission?.answers as any)?._subjectWiseBreakdown?.[sub.name]?.totalScore;
+                          const isSelected = selectedSubjectFilter === sub.name;
+                          return (
+                            <Button
+                              key={sub.name}
+                              type="button"
+                              variant={isSelected ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => { setSelectedSubjectFilter(sub.name); setObjectivePage(1); }}
+                              className={cn(
+                                "rounded-xl text-xs font-bold transition-all",
+                                isSelected ? "bg-indigo-600 text-white shadow-md" : "border-slate-200 dark:border-slate-800 text-slate-600"
+                              )}
+                            >
+                              <span>{sub.name}</span>
+                              <span className="text-[10px] opacity-80 font-normal">({subQs.length} Q)</span>
+                              {typeof subScore === 'number' && (
+                                <Badge variant="secondary" className="ml-1 text-[9px] px-1.5 py-0 bg-white/20 text-current">
+                                  {subScore}M
+                                </Badge>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {/* Filter Controls (Consolidated for Objective) */}
                     <div className="flex flex-wrap items-center gap-3 mb-12 p-6 bg-slate-50/50 dark:bg-slate-800/30 rounded-[2rem] border border-slate-200/50 dark:border-slate-700/30 backdrop-blur-sm shadow-inner">
                       <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mr-2">Filter Objective:</span>
@@ -2965,6 +3054,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
+
+                          if (isMS && selectedSubjectFilter !== 'ALL') {
+                            if (!matchSubject(q.subject, selectedSubjectFilter)) return false;
+                          }
 
                           const status = evaluateQuestionResultStatus(q);
                           if (filterStatus === 'ALL') return true;
@@ -3011,8 +3104,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   >
                                     {/* Question Type & Index Header */}
                                     <div className="flex items-center justify-between gap-4 mb-8">
-                                      <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-3 flex-wrap">
                                         <Badge className="bg-indigo-600 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest shadow-lg shadow-indigo-500/20">#{gIdx + 1}</Badge>
+                                        {isMS && question.subject && (
+                                          <Badge className="bg-purple-600 text-white text-[10px] font-bold rounded-xl px-3 py-1 shadow-sm">
+                                            {question.subject}
+                                          </Badge>
+                                        )}
                                         <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40">
                                           {type === 'INT' ? 'INT / NUMERIC' : type}
                                         </Badge>
