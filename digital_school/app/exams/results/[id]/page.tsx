@@ -445,6 +445,8 @@ interface Question {
   matches?: Record<string, number>;
   correctAnswer?: any;
   correct?: any;
+  subject?: string;
+  [key: string]: any;
 }
 
 interface Statistics {

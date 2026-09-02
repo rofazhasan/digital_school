@@ -42,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     const studentProfile = user?.studentProfile || (studentId ? await prisma.studentProfile.findUnique({ where: { id: studentId }, include: { class: true } }) : null);
-    const studentName = user?.name || user?.username || tokenData.user.name || "পরীক্ষার্থী";
+    const studentName = user?.name || (user as any)?.username || tokenData.user.name || "পরীক্ষার্থী";
     const studentRoll = studentProfile?.roll || tokenData.user.studentProfile?.roll || tokenData.user.roll || "01";
     const studentReg = studentProfile?.registrationNo || tokenData.user.studentProfile?.registrationNo || "";
 

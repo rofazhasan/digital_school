@@ -363,8 +363,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     }
                     const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
-                    const showSubjectHeader = examInfo?.subjectType === 'MS' && q.subject && (idx === 0 || allObjective[idx - 1]?.subject !== q.subject);
-                    const matchedSub = examInfo?.subjectsConfig?.subjects?.find((s: any) => s.name?.toLowerCase() === q.subject?.toLowerCase());
+                    const showSubjectHeader = (examInfo as any)?.subjectType === 'MS' && q.subject && (idx === 0 || allObjective[idx - 1]?.subject !== q.subject);
+                    const matchedSub = (examInfo as any)?.subjectsConfig?.subjects?.find((s: any) => s.name?.toLowerCase() === q.subject?.toLowerCase());
 
                     const renderQuestionContent = () => {
                     if (q.type === 'MCQ' || q.type === 'MC') {

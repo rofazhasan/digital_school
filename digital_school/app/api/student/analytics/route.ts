@@ -65,7 +65,8 @@ export async function GET(req: NextRequest) {
                         select: {
                             id: true,
                             name: true,
-                            subject: true,
+                            subjectType: true,
+                            subjectsConfig: true,
                             totalMarks: true,
                             date: true,
                             mcqNegativeMarking: true,
@@ -88,7 +89,8 @@ export async function GET(req: NextRequest) {
                         select: {
                             id: true,
                             name: true,
-                            subject: true,
+                            subjectType: true,
+                            subjectsConfig: true,
                             totalMarks: true,
                             date: true,
                             examSets: {

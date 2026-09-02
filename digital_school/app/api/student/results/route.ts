@@ -140,8 +140,8 @@ export async function GET(request: NextRequest) {
           percentage: calculatedPct,
           comment: sub.evaluatorNotes || '',
           isPublished: true,
-          publishedAt: sub.evaluatedAt || sub.createdAt,
-          date: sub.evaluatedAt || sub.createdAt,
+          publishedAt: sub.evaluatedAt || (sub as any).createdAt || new Date(),
+          date: sub.evaluatedAt || (sub as any).createdAt || new Date(),
           className: sub.exam?.class?.name
         });
       }

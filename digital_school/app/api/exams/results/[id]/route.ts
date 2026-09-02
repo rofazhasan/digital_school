@@ -201,7 +201,7 @@ export async function GET(
       const studentAnswer = (studentAnswers as any)[questionId];
 
       // Extract images efficiently
-      const studentAnswerImages = [];
+      const studentAnswerImages: string[] = [];
       if ((studentAnswers as any)[`${questionId}_image`]) studentAnswerImages.push((studentAnswers as any)[`${questionId}_image`]);
       if (Array.isArray((studentAnswers as any)[`${questionId}_images`])) studentAnswerImages.push(...(studentAnswers as any)[`${questionId}_images`]);
 

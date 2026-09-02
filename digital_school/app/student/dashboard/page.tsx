@@ -177,6 +177,8 @@ const DEFAULT_FALLBACK_USER: UserProfile = {
   studentProfile: {
     id: "sp-initial",
     roll: "01",
+    registrationNo: "",
+    classId: "",
     class: { name: "Class 10", section: "A" }
   }
 };

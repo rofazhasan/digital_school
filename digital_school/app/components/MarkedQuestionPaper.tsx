@@ -334,9 +334,9 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                     if (v !== undefined && v !== null && !isNaN(Number(v))) selected = Number(v);
                 }
             }
-            const rawCorrect = q.correctOption ?? q.correct ?? (q as any).correctAnswer ?? 0;
-            const correct = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
-                ? Number(rawCorrect.trim())
+            const rawCorrect: any = (q as any).correctOption ?? (q as any).correct ?? (q as any).correctAnswer ?? 0;
+            const correct = typeof rawCorrect === 'string' && !isNaN(Number(String(rawCorrect).trim()))
+                ? Number(String(rawCorrect).trim())
                 : (typeof rawCorrect === 'number' ? rawCorrect : 0);
 
             if (selected === 0 || correct === 0) return 0;
@@ -373,7 +373,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 matches.forEach((m: any) => {
                     const leftPart = pairs[m.leftIndex]?.left;
                     const rightPart = pairs[m.rightIndex]?.right;
-                    const actualRight = pairs.find(p => p.left === leftPart)?.right;
+                    const actualRight = pairs.find((p: any) => p.left === leftPart)?.right;
                     if (rightPart === actualRight) legacyCorrectCount++;
                 });
 

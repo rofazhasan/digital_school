@@ -294,8 +294,8 @@ export default function StudentNoticesPage() {
     const handleMarkRead = useCallback(async (id: string) => {
         triggerHaptic(ImpactStyle.Light);
         if (readIds.has(id)) return;
-        setReadIds(prev => new Set([...prev, id]));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setReadIds((prev: Set<string>) => new Set([...prev, id]));
+        setUnreadCount((prev: number) => Math.max(0, prev - 1));
         try {
             await fetch(`/api/notices/${id}/read`, { method: 'POST', credentials: 'include' });
         } catch (e) {}

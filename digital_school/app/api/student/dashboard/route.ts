@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
           OR: [
             { targetType: "ALL" },
             { targetType: "STUDENTS" },
-            ...(classId ? [{ targetType: "CLASS", targetClassId: classId }] : [])
+            ...(classId ? [{ targetType: "CLASS", targetClassIds: { has: classId } }] : [])
           ]
         },
         select: {
@@ -258,6 +258,7 @@ export async function GET(req: NextRequest) {
           passMarks: 40,
           subject: "Mathematics",
           isActive: true,
+          classId: classId || "general-class",
           className: dbStudent?.class?.name || "Class 10"
         },
         {
@@ -273,6 +274,7 @@ export async function GET(req: NextRequest) {
           passMarks: 20,
           subject: "Science",
           isActive: true,
+          classId: classId || "general-class",
           className: dbStudent?.class?.name || "Class 10"
         }
       ];

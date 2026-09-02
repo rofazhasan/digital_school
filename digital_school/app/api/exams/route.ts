@@ -379,7 +379,7 @@ export async function POST(request: NextRequest) {
       const parsedList = examList.map(parseExamData);
       const db = await DatabaseClient.getInstance();
       const createdExams = await db.$transaction(
-        parsedList.map(data => db.exam.create({ data }))
+        parsedList.map(data => db.exam.create({ data: data as any }))
       );
 
       DatabaseCache.invalidate('exams');
@@ -394,7 +394,7 @@ export async function POST(request: NextRequest) {
     // Single exam creation
     const examData = parseExamData(examList[0]);
     const db = await DatabaseClient.getInstance();
-    const createdExam = await db.exam.create({ data: examData });
+    const createdExam = await db.exam.create({ data: examData as any });
 
     DatabaseCache.invalidate('exams');
 

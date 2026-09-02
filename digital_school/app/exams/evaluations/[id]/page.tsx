@@ -297,7 +297,7 @@ export function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0)
     .filter((idx: number) => idx !== -1);
 
   // Identical options expansion
-  const correctTexts = correctIndices.map(i => clean(typeof options[i] === 'object' ? options[i]?.text : options[i])).filter(Boolean);
+  const correctTexts = correctIndices.map((i: number) => clean(typeof options[i] === 'object' ? options[i]?.text : options[i])).filter(Boolean);
   const correctSet = new Set<number>(correctIndices);
   options.forEach((opt: any, idx: number) => {
     const t = clean(typeof opt === 'object' ? opt?.text : opt);
@@ -438,9 +438,14 @@ interface StudentSubmission {
     cqMarks: number;
     sqMarks: number;
     total: number;
+    totalMarks?: number;
     isPublished?: boolean;
+    [key: string]: any;
   };
   examSetId?: string;
+  examSet?: string;
+  totalScore?: number;
+  [key: string]: any;
 }
 
 interface Question {
@@ -453,20 +458,24 @@ interface Question {
   mark?: number;
   modelAnswer?: string;
   correct?: string;
+  correctAnswer?: any;
   answer?: string;
   explanation?: string;
   subQuestions?: any[];
   sub_questions?: any[];
   parts?: any[];
+  stages?: any[];
   options?: any[];
   assertion?: string;
   reason?: string;
-  correctOption?: string;
+  correctOption?: string | number;
   correctAnswers?: any[];
   correctMatches?: any;
   leftColumn?: any[];
   rightColumn?: any[];
   pairs?: any[];
+  subject?: string;
+  [key: string]: any;
 }
 
 interface Exam {
@@ -478,6 +487,9 @@ interface Exam {
   questions: Question[];
   submissions: StudentSubmission[];
   questionsBySet?: Record<string, Question[]>;
+  subjectType?: string;
+  subjectsConfig?: any;
+  [key: string]: any;
 }
 
 const mathJaxConfig = {
@@ -6293,7 +6305,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           <div className="flex items-center gap-3 shrink-0">
                             <div className="text-right">
                               <div className="text-xs font-bold text-foreground">
-                                Score: {sub?.result?.totalMarks ?? sub?.totalScore ?? '—'}
+                                Score: {sub?.result?.total ?? (sub?.result as any)?.totalMarks ?? sub?.totalScore ?? '—'}
                               </div>
                               <div className="text-[10px] text-muted-foreground">
                                 / {totalMarks} marks

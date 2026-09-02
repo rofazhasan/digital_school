@@ -383,7 +383,7 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
       {q.type === 'CMA' && (
         <div className="space-y-1.5 pt-1.5 border-t border-cyan-200/50 dark:border-cyan-700/50 text-[11px]">
           <span className="font-bold text-cyan-600 dark:text-cyan-400 block text-[10px] uppercase">CMA Sub-Parts:</span>
-          {(((q.parts || q.cmaParts || q.subQuestions) || []) as any[]).map((part: any, i: number) => (
+          {(((q.parts || (q as any).cmaParts || q.subQuestions) || []) as any[]).map((part: any, i: number) => (
             <div key={i} className="flex justify-between items-center bg-cyan-50/40 dark:bg-cyan-950/20 px-2 py-1 rounded border border-cyan-100 dark:border-cyan-900/50">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 <span className="font-bold text-cyan-600 mr-1">({part.label || ['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i] || i + 1})</span>
@@ -401,7 +401,7 @@ const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any
       {q.type === 'MPC' && (
         <div className="space-y-1.5 pt-1.5 border-t border-indigo-200/50 dark:border-indigo-700/50 text-[11px]">
           <span className="font-bold text-indigo-600 dark:text-indigo-400 block text-[10px] uppercase">MPC Problem Chain:</span>
-          {(((q.stages || q.mpcStages || q.subQuestions) || []) as any[]).map((stage: any, i: number) => (
+          {(((q.stages || (q as any).mpcStages || q.subQuestions) || []) as any[]).map((stage: any, i: number) => (
             <div key={i} className="flex justify-between items-center bg-indigo-50/40 dark:bg-indigo-950/20 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-900/50">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 <span className="font-bold text-indigo-600 mr-1">Stage {i + 1}:</span>
