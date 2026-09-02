@@ -36,10 +36,14 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     });
     if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
 
+    const isExamMS = (exam as any).subjectType === 'MS' || Boolean(
+      (exam as any).subjectsConfig && (((exam as any).subjectsConfig as any)?.subjects || []).length > 0
+    );
+
     // Extract subject from questions - get the most common subject or first available
-    let examSubject = '';
+    let examSubject = isExamMS ? 'বহু-বিষয়ক পরীক্ষা (Multi-Subject)' : '';
     const allQuestions = exam.examSets.flatMap((set: any) => set.questions);
-    if (allQuestions.length > 0) {
+    if (!isExamMS && allQuestions.length > 0) {
       // Get the most common subject from questions
       const subjectCounts: { [key: string]: number } = {};
       allQuestions.forEach((q: any) => {
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     }
 
   // If no subject found from questions relation, try to get from questionsJson
-  if (!examSubject) {
+  if (!examSubject && !isExamMS) {
     for (const set of exam.examSets) {
       if (set.questionsJson && Array.isArray(set.questionsJson)) {
         const jsonQuestions = set.questionsJson;
@@ -76,14 +80,14 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   }
 
   // If still no subject, try to get from the first question's subject
-  if (!examSubject && allQuestions.length > 0) {
+  if (!examSubject && allQuestions.length > 0 && !isExamMS) {
     examSubject = allQuestions[0].subject || '';
   }
 
   const examInfo = {
     id: exam.id,
     title: exam.name,
-    subject: examSubject, // Use the actual subject from questions
+    subject: examSubject, // Use the actual subject from questions or Multi-Subject
     class: exam.class?.name || '',
     date: exam.date.toISOString().split('T')[0],
     duration: exam.duration ? `${exam.duration} মিনিট` : '',
@@ -100,11 +104,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     objectiveTime: (exam as any).objectiveTime || null,
     cqSqTime: (exam as any).cqSqTime || null,
     cqSubsections: exam.cqSubsections || null,
-    subjectType: (exam as any).subjectType || 'SS',
+    subjectType: (exam as any).subjectType || (isExamMS ? 'MS' : 'SS'),
     subjectsConfig: (exam as any).subjectsConfig || null,
   };
 
-  // Collect all question IDs to fetch fresh difficultyDetail/explanation
+  // Collect all question IDs to fetch fresh difficultyDetail/explanation and missing subjects
   const questionIds = new Set<string>();
 
   exam.examSets.forEach((set: any) => {
@@ -122,8 +126,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     });
   });
 
-  // Fetch fresh details from DB
+  // Fetch fresh details & subjects from DB
   const questionDetailsMap = new Map<string, string>();
+  const questionSubjectMap = new Map<string, string>();
   if (questionIds.size > 0) {
     try {
       const dbQuestions = await prismadb.question.findMany({
@@ -134,12 +139,14 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         },
         select: {
           id: true,
-
+          explanation: true,
+          subject: true
         }
       });
 
       dbQuestions.forEach((q: any) => {
-
+        if (q.explanation) questionDetailsMap.set(q.id, q.explanation);
+        if (q.subject) questionSubjectMap.set(q.id, q.subject);
       });
     } catch (error) {
       console.error("Error fetching question details:", error);
@@ -154,6 +161,17 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     } else if (set.questions && Array.isArray(set.questions)) {
       questionsArr = set.questions;
     }
+
+    // Backfill missing subject or explanation on question objects
+    questionsArr = questionsArr.map((q: any) => {
+      const dbSub = questionSubjectMap.get(q.id);
+      const dbExp = questionDetailsMap.get(q.id);
+      return {
+        ...q,
+        subject: q.subject || dbSub || '',
+        explanation: q.explanation || dbExp || ''
+      };
+    });
     const mcq = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => {
       // Extract correct answer index from MCQ options and map to Bengali labels
       let correctAnswer = 'ক'; // Default fallback

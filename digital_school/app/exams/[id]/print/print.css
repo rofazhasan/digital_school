@@ -197,6 +197,21 @@
     line-height: 1.5;
   }
 
+  /* Multi-Subject (MS) Print Section Headers */
+  .ms-subject-header {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border-top: 2px solid #000 !important;
+    border-bottom: 2px solid #000 !important;
+    background-color: #f3f4f6 !important;
+    padding: 6px 10px !important;
+    margin-top: 1.25rem !important;
+    margin-bottom: 1rem !important;
+    color: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   /* Signature Blocks */
   .signature-container {
     margin-top: 3rem;

@@ -182,6 +182,97 @@ const Text = ({ children }: { children: string }) => (
   </span>
 );
 
+// Bilingual subject alias matching helper
+const matchSubject = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+  if (!questionSubject || !targetSubjectName) return false;
+  const qClean = questionSubject.trim().toLowerCase();
+  const tClean = targetSubjectName.trim().toLowerCase();
+  if (qClean === tClean) return true;
+  if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+  const aliases: Record<string, string[]> = {
+    'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
+    'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
+    'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths', 'সাধারণ গণিত', 'general math', 'math 1st', 'math 2nd'],
+    'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
+    'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
+    'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
+    'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
+    'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
+  };
+
+  for (const [key, list] of Object.entries(aliases)) {
+    const isTarget = tClean === key || list.some(a => tClean.includes(a));
+    const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+    if (isTarget && isQuestion) return true;
+  }
+
+  return false;
+};
+
+// Prestigious Print Section Header for Multi-Subject (MS) Exams
+const MSSubjectHeader = ({
+  subject,
+  isEn,
+  questionRangeText,
+  optionalInstruction
+}: {
+  subject: {
+    name: string;
+    sectionLetter?: string;
+    sectionBengali?: string;
+    isMandatory?: boolean;
+    totalMarks?: number;
+  };
+  isEn: boolean;
+  questionRangeText?: string;
+  optionalInstruction?: string;
+}) => {
+  return (
+    <div className="ms-subject-header my-5 break-inside-avoid border-y-2 border-black bg-gray-100/80 p-2.5 sm:p-3 text-black">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2.5">
+          {subject.sectionLetter && (
+            <span className="inline-flex items-center justify-center bg-black text-white font-black text-xs px-2.5 py-1 uppercase tracking-wider rounded-xs shadow-xs">
+              {isEn ? `SECTION - ${subject.sectionLetter}` : `বিভাগ - ${subject.sectionBengali || subject.sectionLetter}`}
+            </span>
+          )}
+          <h3 className="text-base sm:text-lg font-black tracking-tight uppercase">
+            {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
+          <span className={`px-2.5 py-0.5 rounded-xs border font-extrabold uppercase tracking-wide ${
+            subject.isMandatory
+              ? 'border-black bg-white text-black'
+              : 'border-black bg-black text-white'
+          }`}>
+            {subject.isMandatory
+              ? (isEn ? 'COMPULSORY / MANDATORY' : 'আবশ্যক বিষয়')
+              : (isEn ? 'OPTIONAL' : 'ঐচ্ছিক বিষয়')}
+          </span>
+          {questionRangeText && (
+            <span className="bg-white border border-black/40 px-2 py-0.5 rounded-xs text-[11px] font-semibold">
+              {questionRangeText}
+            </span>
+          )}
+          {subject.totalMarks && subject.totalMarks > 0 ? (
+            <span className="font-extrabold text-xs">
+              [{isEn ? `Full Marks: ${subject.totalMarks}` : `পূর্ণমান: ${toBengaliNumerals(subject.totalMarks)}`}]
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {!subject.isMandatory && optionalInstruction && (
+        <div className="mt-1.5 text-[11px] font-semibold italic text-gray-800 border-t border-black/20 pt-1 flex items-center gap-1">
+          <span>*</span>
+          <span>{optionalInstruction}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lang = 'bn' }: {
   examInfo: any,
   type: 'objective' | 'cqsq',
@@ -193,6 +284,9 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
   lang?: 'bn' | 'en'
 }) => {
   const isHEn = lang === 'en';
+  const isExamMS = examInfo.subjectType === 'MS' || Boolean(
+    examInfo.subjectsConfig && ((examInfo.subjectsConfig as any)?.subjects || []).length > 0
+  );
   return (
     <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
       <div className="flex items-center justify-between gap-4">
@@ -225,6 +319,12 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
 
       <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
         <span><strong>{isHEn ? 'Class' : 'শ্রেণি'}:</strong> {isHEn ? examInfo.class : toBengaliNumerals(examInfo.class)}</span>
+        <span>
+          <strong>{isHEn ? 'Subject' : 'বিষয়'}:</strong>{' '}
+          {isExamMS
+            ? (isHEn ? 'Multi-Subject Examination' : 'বহু-বিষয়ক পরীক্ষা')
+            : (examInfo.subject || (isHEn ? 'General' : 'সাধারণ'))}
+        </span>
         {showDate !== false && (
           <span><strong>{isHEn ? 'Date' : 'তারিখ'}:</strong> {isHEn ? examInfo.date : toBengaliNumerals(examInfo.date)}</span>
         )}
@@ -302,6 +402,120 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const cqSqTotalMarks = cqRequiredMarksNum + sqRequiredMarksNum + descMarks;
     const grandTotalMarks = objectiveTotal + cqSqTotalMarks;
 
+    const parsedSubjectsConfig = React.useMemo(() => {
+      if (!examInfo.subjectsConfig) return null;
+      if (typeof examInfo.subjectsConfig === 'string') {
+        try {
+          return JSON.parse(examInfo.subjectsConfig);
+        } catch {
+          return null;
+        }
+      }
+      return examInfo.subjectsConfig;
+    }, [examInfo.subjectsConfig]);
+
+    const isMS = Boolean(
+      examInfo.subjectType === 'MS' ||
+      (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0)
+    );
+
+    const configuredSubjects = React.useMemo(() => {
+      if (!isMS) return [];
+      const rawList: any[] = parsedSubjectsConfig?.subjects || [];
+      if (rawList.length > 0) {
+        return rawList.map((s: any, idx: number) => ({
+          name: s.name,
+          sectionLetter: String.fromCharCode(65 + idx),
+          sectionBengali: ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ'][idx] || String(idx + 1),
+          isMandatory: s.isMandatory !== false && s.isOptional !== true,
+          totalMarks: Number(s.totalMarks) || 0
+        }));
+      }
+      const discovered: string[] = [];
+      allObjective.forEach((q: any) => {
+        const sub = q.subject || q.subjectName;
+        if (sub && !discovered.some(d => matchSubject(sub, d))) {
+          discovered.push(sub);
+        }
+      });
+      return discovered.map((name, idx) => ({
+        name,
+        sectionLetter: String.fromCharCode(65 + idx),
+        sectionBengali: ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ'][idx] || String(idx + 1),
+        isMandatory: true,
+        totalMarks: 0
+      }));
+    }, [isMS, parsedSubjectsConfig, allObjective]);
+
+    const orderedObjective = React.useMemo(() => {
+      if (!isMS || configuredSubjects.length === 0) {
+        return allObjective;
+      }
+      const result: any[] = [];
+      const assigned = new Set<string>();
+
+      configuredSubjects.forEach(sub => {
+        const subQuestions = allObjective.filter((q: any) => 
+          matchSubject(q.subject || q.subjectName, sub.name)
+        );
+        subQuestions.forEach((q: any) => {
+          assigned.add(q.id || `${q.type}_${q.q}`);
+          result.push({
+            ...q,
+            _canonicalSubject: sub.name,
+            _subConfig: sub
+          });
+        });
+      });
+
+      // Remaining unassigned questions
+      allObjective.filter((q: any) => !assigned.has(q.id || `${q.type}_${q.q}`)).forEach((q: any) => {
+        result.push({
+          ...q,
+          _canonicalSubject: q.subject || (isEn ? 'General' : 'সাধারণ'),
+          _subConfig: {
+            name: q.subject || (isEn ? 'General' : 'সাধারণ'),
+            isMandatory: true,
+            totalMarks: 0
+          }
+        });
+      });
+
+      return result;
+    }, [isMS, configuredSubjects, allObjective, isEn]);
+
+    const subjectQuestionRanges = React.useMemo(() => {
+      if (!isMS) return new Map<string, string>();
+      const ranges = new Map<string, string>();
+      let counter = 1;
+      let curSub = '';
+      let subStart = 1;
+
+      orderedObjective.forEach((q: any, i: number) => {
+        const qSub = q._canonicalSubject || '';
+        const qCount = q.type?.toUpperCase() === 'SMCQ' ? (q.subQuestions?.length || 1) : 1;
+
+        if (i === 0) {
+          curSub = qSub;
+          subStart = 1;
+        } else if (qSub !== curSub) {
+          const subEnd = counter - 1;
+          ranges.set(curSub, isEn ? `Questions: ${subStart} - ${subEnd}` : `প্রশ্ন: ${toBengaliNumerals(subStart)} - ${toBengaliNumerals(subEnd)}`);
+          curSub = qSub;
+          subStart = counter;
+        }
+
+        counter += qCount;
+
+        if (i === orderedObjective.length - 1) {
+          const subEnd = counter - 1;
+          ranges.set(curSub, isEn ? `Questions: ${subStart} - ${subEnd}` : `প্রশ্ন: ${toBengaliNumerals(subStart)} - ${toBengaliNumerals(subEnd)}`);
+        }
+      });
+
+      return ranges;
+    }, [isMS, orderedObjective, isEn]);
+
     return (
       <div
         ref={ref}
@@ -326,12 +540,43 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
           />
           {/* Special Instruction Box */}
           <div className="instruction-box">
-            <p>
-              <strong>{isEn ? 'Answer Sheet / Solution:' : 'উত্তরপত্র / সমাধান:'}</strong>{' '}
-              {isEn
-                ? 'This document contains the correct answers and explanations for the exam questions.'
-                : 'এই নথিতে পরীক্ষার প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা দেওয়া হয়েছে।'}
-            </p>
+            {isMS && (parsedSubjectsConfig || configuredSubjects.length > 0) ? (
+              <div className="space-y-1.5 text-xs sm:text-sm">
+                <div className="flex items-center justify-between border-b border-black/20 pb-1 flex-wrap gap-1">
+                  <span className="font-black text-sm uppercase tracking-wide">
+                    {isEn ? 'MULTI-SUBJECT SOLUTION SHEET GUIDELINES' : 'বহু-বিষয় ভিত্তিক পরীক্ষার উত্তরপত্র নির্দেশাবলী'}
+                  </span>
+                  <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded-xs">
+                    {isEn ? `Total Subjects: ${configuredSubjects.length}` : `মোট বিষয়: ${toBengaliNumerals(configuredSubjects.length)}টি`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs pt-0.5">
+                  <div>
+                    <strong>{isEn ? '1. Mandatory Subjects:' : '১. আবশ্যক বিষয়সমূহ:'}</strong>{' '}
+                    {(parsedSubjectsConfig?.mandatoryCount || 0) > 0
+                      ? (isEn
+                        ? `All ${parsedSubjectsConfig.mandatoryCount} mandatory subject(s) solutions.`
+                        : `সকল ${toBengaliNumerals(parsedSubjectsConfig.mandatoryCount)}টি আবশ্যক বিষয়ের সমাধান।`)
+                      : (isEn ? 'All subject solutions.' : 'সকল নির্ধারিত বিষয়ের সমাধান।')}
+                  </div>
+                  <div>
+                    <strong>{isEn ? '2. Optional Subjects:' : '২. ঐচ্ছিক বিষয়সমূহ:'}</strong>{' '}
+                    {(parsedSubjectsConfig?.optionalCount || 0) > 0
+                      ? (isEn
+                        ? `Includes all ${parsedSubjectsConfig.optionalCount} optional subjects (Evaluate any ${parsedSubjectsConfig.requiredOptionalCount || 1}).`
+                        : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount)}টি ঐচ্ছিক বিষয়ের সমাধান অন্তর্ভুক্ত (যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি নির্বাচনীয়)।`)
+                      : (isEn ? 'No optional subjects.' : 'কোনো ঐচ্ছিক বিষয় নেই।')}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p>
+                <strong>{isEn ? 'Answer Sheet / Solution:' : 'উত্তরপত্র / সমাধান:'}</strong>{' '}
+                {isEn
+                  ? 'This document contains the correct answers and explanations for the exam questions.'
+                  : 'এই নথিতে পরীক্ষার প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা দেওয়া হয়েছে।'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -354,7 +599,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               <div className="mcq-container">
                 {(() => {
                   let questionCounter = 1;
-                  return allObjective.map((q: any, idx: number) => {
+                  return orderedObjective.map((q: any, idx: number) => {
                     const startNum = questionCounter;
                     if (q.type?.toUpperCase() === 'SMCQ') {
                       questionCounter += (q.subQuestions?.length || 0);
@@ -363,8 +608,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     }
                     const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
-                    const showSubjectHeader = (examInfo as any)?.subjectType === 'MS' && q.subject && (idx === 0 || allObjective[idx - 1]?.subject !== q.subject);
-                    const matchedSub = (examInfo as any)?.subjectsConfig?.subjects?.find((s: any) => s.name?.toLowerCase() === q.subject?.toLowerCase());
+                    const showSubjectHeader = isMS && (
+                      idx === 0 || 
+                      orderedObjective[idx - 1]?._canonicalSubject !== q._canonicalSubject
+                    );
+                    const matchedSub = q._subConfig || configuredSubjects.find((s: any) => matchSubject(q.subject, s.name));
 
                     const renderQuestionContent = () => {
                     if (q.type === 'MCQ' || q.type === 'MC') {
@@ -763,19 +1011,19 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                     return (
                       <React.Fragment key={idx}>
-                        {showSubjectHeader && (
-                          <div className="my-4 py-1.5 px-3 bg-gray-100 border-l-4 border-black font-bold text-sm flex justify-between items-center break-inside-avoid">
-                            <span>
-                              {isEn ? 'Subject: ' : 'বিষয়: '} {q.subject}
-                            </span>
-                            {matchedSub && (
-                              <span className="text-xs font-bold text-gray-700">
-                                {matchedSub.isMandatory
-                                  ? (isEn ? `[Mandatory - ${matchedSub.totalMarks} Marks]` : `[আবশ্যক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)
-                                  : (isEn ? `[Optional - ${matchedSub.totalMarks} Marks]` : `[ঐচ্ছিক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)}
-                              </span>
-                            )}
-                          </div>
+                        {showSubjectHeader && matchedSub && (
+                          <MSSubjectHeader
+                            subject={matchedSub}
+                            isEn={isEn}
+                            questionRangeText={subjectQuestionRanges.get(q._canonicalSubject)}
+                            optionalInstruction={
+                              !matchedSub.isMandatory && parsedSubjectsConfig?.requiredOptionalCount
+                                ? (isEn
+                                  ? `Select and evaluate any ${parsedSubjectsConfig.requiredOptionalCount} optional subject(s) out of ${parsedSubjectsConfig.optionalCount || 1}.`
+                                  : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount || 1)}টি ঐচ্ছিক বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি উত্তরপত্র মূল্যায়ন প্রযোজ্য।`)
+                                : undefined
+                            }
+                          />
                         )}
                         {renderQuestionContent()}
                       </React.Fragment>
@@ -877,41 +1125,53 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   ) : (
                     // Single subsection or no subsections - render normally
                     <div>
-                      {cqs.map((q: CQ, idx: number) => (
-                        <div key={idx} className="mb-3 text-left cq-question">
-                          <div className="flex items-start">
-                            <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
-                            <div className="flex-1">
-                              <UniversalMathJax dynamic>{`${q.questionText} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
-                              <div className="text-red-600 font-bold mt-2 mb-2">
-                                {isEn ? 'Answer:' : 'উত্তর:'}
-                              </div>
-                              {q.subQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0 ? (
-                                <ul className="list-inside mt-1 ml-4">
-                                  {q.subQuestions.map((sub, sidx) => (
-                                    <li key={sidx} className="ml-4 flex items-start mb-2">
-                                      <span className="font-bold mr-1">{isEn ? (ENGLISH_SUB_LABELS[sidx] || String.fromCharCode(97 + sidx)) : (BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx))}.</span>
-                                      <span className="flex-1">
-                                        <div className="mb-1">
-                                          <UniversalMathJax inline>{sub.question || sub.questionText || sub.text || ''}</UniversalMathJax>
-                                          <span className="ml-1">[{isEn ? (sub.marks || '?') : toBengaliNumerals(sub.marks || '?')} {isEn ? 'Marks' : 'নম্বর'}]</span>
-                                        </div>
-                                        <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
-                                          <UniversalMathJax dynamic>{(sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
-                                        </div>
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
-                                  <UniversalMathJax inline dynamic>{(q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
+                      {cqs.map((q: CQ, idx: number) => {
+                        const showCqSubjectHeader = isMS && (q as any).subject && (idx === 0 || (cqs[idx - 1] as any)?.subject !== (q as any).subject);
+                        const matchedCqSub = (q as any).subject ? (configuredSubjects.find((s: any) => matchSubject((q as any).subject, s.name)) || { name: (q as any).subject, isMandatory: true, totalMarks: 0 }) : null;
+                        return (
+                          <React.Fragment key={idx}>
+                            {showCqSubjectHeader && matchedCqSub && (
+                              <MSSubjectHeader
+                                subject={matchedCqSub}
+                                isEn={isEn}
+                              />
+                            )}
+                            <div className="mb-3 text-left cq-question">
+                              <div className="flex items-start">
+                                <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
+                                <div className="flex-1">
+                                  <UniversalMathJax dynamic>{`${q.questionText} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
+                                  <div className="text-red-600 font-bold mt-2 mb-2">
+                                    {isEn ? 'Answer:' : 'উত্তর:'}
+                                  </div>
+                                  {q.subQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0 ? (
+                                    <ul className="list-inside mt-1 ml-4">
+                                      {q.subQuestions.map((sub, sidx) => (
+                                        <li key={sidx} className="ml-4 flex items-start mb-2">
+                                          <span className="font-bold mr-1">{isEn ? (ENGLISH_SUB_LABELS[sidx] || String.fromCharCode(97 + sidx)) : (BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx))}.</span>
+                                          <span className="flex-1">
+                                            <div className="mb-1">
+                                              <UniversalMathJax inline>{sub.question || sub.questionText || sub.text || ''}</UniversalMathJax>
+                                              <span className="ml-1">[{isEn ? (sub.marks || '?') : toBengaliNumerals(sub.marks || '?')} {isEn ? 'Marks' : 'নম্বর'}]</span>
+                                            </div>
+                                            <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                              <UniversalMathJax dynamic>{(sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                            </div>
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                      <UniversalMathJax inline dynamic>{(q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))}
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
                   )}
                 </>
@@ -1513,22 +1773,34 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     </div>
                   </div>
                   <div>
-                    {sqs.map((q, idx) => (
-                      <div key={idx} className="mb-3 text-left sq-question">
-                        <div className="flex items-start">
-                          <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
-                          <div className="flex-1">
-                            <div className="whitespace-pre-wrap">
-                              <UniversalMathJax dynamic>{`${(q.questionText || "").replace(/\|\|/g, '\n')} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
-                            </div>
-                            <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer:' : 'উত্তর:'}</div>
-                            <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
-                              <UniversalMathJax dynamic>{(q.modelAnswer || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
+                    {sqs.map((q, idx) => {
+                      const showSqSubjectHeader = isMS && (q as any).subject && (idx === 0 || (sqs[idx - 1] as any)?.subject !== (q as any).subject);
+                      const matchedSqSub = (q as any).subject ? (configuredSubjects.find((s: any) => matchSubject((q as any).subject, s.name)) || { name: (q as any).subject, isMandatory: true, totalMarks: 0 }) : null;
+                      return (
+                        <React.Fragment key={idx}>
+                          {showSqSubjectHeader && matchedSqSub && (
+                            <MSSubjectHeader
+                              subject={matchedSqSub}
+                              isEn={isEn}
+                            />
+                          )}
+                          <div className="mb-3 text-left sq-question">
+                            <div className="flex items-start">
+                              <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
+                              <div className="flex-1">
+                                <div className="whitespace-pre-wrap">
+                                  <UniversalMathJax dynamic>{`${(q.questionText || "").replace(/\|\|/g, '\n')} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
+                                </div>
+                                <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer:' : 'উত্তর:'}</div>
+                                <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                  <UniversalMathJax dynamic>{(q.modelAnswer || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 </>
               )}
