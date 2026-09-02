@@ -280,18 +280,20 @@ export async function POST(
     let currentMarks = 0;
 
     if (isMS && configuredSubjects.length > 0) {
+      const usedQuestionIds = new Set<string>();
       // Multiple Subject (MS): Auto-generate questions strictly balanced by each subject's quota
       for (const subj of configuredSubjects) {
         const targetMarks = subj.totalMarks;
         let subjectMarks = 0;
 
         const subjectCandidates = shuffledQuestions.filter(q =>
-          matchSubject(q.subject, subj.name)
+          !usedQuestionIds.has(q.id) && matchSubject(q.subject, subj.name)
         );
 
         for (const question of subjectCandidates) {
           if (subjectMarks + question.marks <= targetMarks) {
             generatedSet.push({ ...question, subject: subj.name });
+            usedQuestionIds.add(question.id);
             subjectMarks += question.marks;
           }
           if (subjectMarks === targetMarks) break;

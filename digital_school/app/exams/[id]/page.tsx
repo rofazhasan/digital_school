@@ -1023,15 +1023,25 @@ export default function ExamBuilderPage() {
 
         if (isMS) {
           // Multiple Subject (MS): Shuffling happens strictly WITHIN each subject.
-          const subjectsConfigList: string[] = configuredSubjects.map(s => s.name);
-          const distinctQuestionSubjects = Array.from(new Set(selectedQuestions.map(q => q.subject).filter(Boolean)));
-          const subjectOrder = Array.from(new Set([...subjectsConfigList, ...distinctQuestionSubjects]));
+          // Partition selectedQuestions so each question belongs to strictly ONE subject group
+          const subjectGroups = new Map<string, Question[]>();
+          configuredSubjects.forEach(s => {
+            subjectGroups.set(s.name, []);
+          });
+          const unassignedQuestions: Question[] = [];
+
+          selectedQuestions.forEach(q => {
+            const matched = findConfiguredSubject(q);
+            if (matched && subjectGroups.has(matched.name)) {
+              subjectGroups.get(matched.name)!.push(q);
+            } else {
+              unassignedQuestions.push(q);
+            }
+          });
 
           // Group and shuffle questions strictly within each subject section
-          subjectOrder.forEach(subjectName => {
-            const subjectQuestions = selectedQuestions.filter(q =>
-              matchSubject(q.subject, subjectName)
-            );
+          configuredSubjects.forEach(subj => {
+            const subjectQuestions = subjectGroups.get(subj.name) || [];
             if (subjectQuestions.length > 0) {
               const cqInSubject = subjectQuestions.filter(q => q.type === 'CQ');
               const otherInSubject = subjectQuestions.filter(q => q.type !== 'CQ');
@@ -1040,16 +1050,13 @@ export default function ExamBuilderPage() {
               // Canonicalize subject name
               const canonicalized = [...cqInSubject, ...shuffledOthersInSubject].map(q => ({
                 ...q,
-                subject: subjectName
+                subject: subj.name
               }));
               orderedQuestionsRaw.push(...canonicalized);
             }
           });
 
-          // Any unassigned questions (fallback)
-          const unassignedQuestions = selectedQuestions.filter(q =>
-            !subjectOrder.some(s => matchSubject(q.subject, s))
-          );
+          // Any unassigned questions (fallback - processed strictly once)
           if (unassignedQuestions.length > 0) {
             const cqUnassigned = unassignedQuestions.filter(q => q.type === 'CQ');
             const otherUnassigned = unassignedQuestions.filter(q => q.type !== 'CQ');
