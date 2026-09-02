@@ -214,19 +214,25 @@ export default function ExamLayout() {
   const submissionId = exam.submissionId || 'active';
   const examModeStorageKey = `exam-mode-${exam.id}-${submissionId}`;
 
-  // Initialize instructions visibility based on whether the current active section has started
-  const hasLocalStart = typeof window !== 'undefined'
-    ? !!localStorage.getItem(activeSection === 'objective' ? `exam-start-objective-${exam.id}-${submissionId}` : `exam-start-cqsq-${exam.id}-${submissionId}`)
-    : false;
+  // Initialize instructions visibility based on server state to guarantee 100% hydration parity
+  const hasServerSectionStarted = activeSection === 'objective'
+    ? (exam.objectiveStatus !== 'PENDING' || !!exam.objectiveStartedAt)
+    : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt);
 
-  const hasCurrentSectionStarted = activeSection === 'objective'
-    ? (exam.objectiveStatus !== 'PENDING' || !!exam.objectiveStartedAt || hasLocalStart)
-    : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt || hasLocalStart);
-
-  const [showInstructions, setShowInstructions] = useState(!hasCurrentSectionStarted);
+  const [showInstructions, setShowInstructions] = useState(!hasServerSectionStarted);
   const [isStarting, setIsStarting] = useState(false);
 
-  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING' || hasLocalStart);
+  // Safe client-side check after hydration to dismiss instructions if started offline
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasLocal = !!localStorage.getItem(activeSection === 'objective' ? `exam-start-objective-${exam.id}-${submissionId}` : `exam-start-cqsq-${exam.id}-${submissionId}`);
+    if (hasLocal && showInstructions) {
+      setShowInstructions(false);
+      setIsExamActive(true);
+    }
+  }, [activeSection, exam.id, submissionId, showInstructions]);
+
+  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
   const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
   const isActuallyResuming = hasStartedAny && !exam.hasSubmitted;
 

@@ -152,11 +152,11 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
         </div>
       </div>
 
-      <div className="flex flex-col">
+      <div className="flex flex-col" suppressHydrationWarning>
         <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest opacity-60 ${timerColor}`}>
           Time Remaining
         </span>
-        <span className={`text-base sm:text-xl font-black tabular-nums tracking-tight leading-none ${timerColor}`}>
+        <span suppressHydrationWarning className={`text-base sm:text-xl font-black tabular-nums tracking-tight leading-none ${timerColor}`}>
           {formatTime(secondsLeft)}
         </span>
       </div>

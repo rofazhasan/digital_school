@@ -1043,6 +1043,12 @@ export async function autoSubmitExpiredSections(submission: ExamSubmission, exam
     }
 
     // 3. Check Overall Duration (Combined sections safety limit)
+    const firstStartTime = submission.objectiveStartedAt
+        ? new Date(submission.objectiveStartedAt).getTime()
+        : submission.cqSqStartedAt
+            ? new Date(submission.cqSqStartedAt).getTime()
+            : ((submission as any).createdAt ? new Date((submission as any).createdAt).getTime() : null);
+
     const effectiveTotalMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
         ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
         : (Number(exam.duration) || 0);

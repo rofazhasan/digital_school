@@ -69,19 +69,9 @@ export function ExamContextProvider({
       ? shuffleArrayWithSeed(origQuestions, seed) 
       : origQuestions;
 
-    const subId = examProp.submissionId || 'active';
-    let localObjectiveStart: string | null = null;
-    let localCqSqStart: string | null = null;
-    if (typeof window !== 'undefined') {
-      localObjectiveStart = localStorage.getItem(`exam-start-objective-${examProp.id}-${subId}`);
-      localCqSqStart = localStorage.getItem(`exam-start-cqsq-${examProp.id}-${subId}`);
-    }
-
     return {
       ...examProp,
       questions: shuffledQuestions,
-      objectiveStartedAt: examProp.objectiveStartedAt || localObjectiveStart,
-      cqSqStartedAt: examProp.cqSqStartedAt || localCqSqStart,
     };
   });
 
@@ -100,6 +90,22 @@ export function ExamContextProvider({
       return updated;
     });
   }, []);
+
+  // Safe client-side recovery of offline timestamps after hydration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const subId = examProp.submissionId || 'active';
+    const localObjectiveStart = localStorage.getItem(`exam-start-objective-${examProp.id}-${subId}`);
+    const localCqSqStart = localStorage.getItem(`exam-start-cqsq-${examProp.id}-${subId}`);
+
+    if ((!exam.objectiveStartedAt && localObjectiveStart) || (!exam.cqSqStartedAt && localCqSqStart)) {
+      setExamState((prev: any) => ({
+        ...prev,
+        objectiveStartedAt: prev.objectiveStartedAt || localObjectiveStart,
+        cqSqStartedAt: prev.cqSqStartedAt || localCqSqStart
+      }));
+    }
+  }, [examProp.id, examProp.submissionId, exam.objectiveStartedAt, exam.cqSqStartedAt]);
 
   const [answers, setAnswers] = useState<any>(examProp.savedAnswers || {});
   const [navigation, setNavigation] = useState<any>({ current: 0, marked: {} });
@@ -135,21 +141,13 @@ export function ExamContextProvider({
     if (examProp.objectiveStatus === 'SUBMITTED' || !hasObjective) return 'cqsq';
     if (examProp.cqSqStatus === 'IN_PROGRESS') return 'cqsq';
 
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('section') === 'cqsq') return 'cqsq';
-    }
-
     // Fairness check: if objective section was started and time has elapsed
-    const subId = examProp.submissionId || 'active';
-    const objStart = examProp.objectiveStartedAt || (typeof window !== 'undefined' ? localStorage.getItem(`exam-start-objective-${examProp.id}-${subId}`) : null);
-    if (objStart) {
+    if (examProp.objectiveStartedAt) {
       const objTime = (Number(examProp.objectiveTime) > 0 ? Number(examProp.objectiveTime) : Number(examProp.duration)) || 0;
-      const startTime = new Date(objStart).getTime();
-      const now = Date.now();
+      const startTime = new Date(examProp.objectiveStartedAt).getTime();
       const limitMs = objTime * 60 * 1000;
 
-      if (limitMs > 0 && now >= startTime + limitMs) {
+      if (limitMs > 0 && Date.now() >= startTime + limitMs) {
         return 'cqsq';
       }
     }
