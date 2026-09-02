@@ -186,6 +186,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Collect all question IDs needing subject lookup
+    const allQuestionIdsToLookup = new Set<string>();
+    questions.forEach((q: any) => {
+      if (q?.id && (!q.subject || typeof q.subject !== 'string' || !q.subject.trim())) {
+        allQuestionIdsToLookup.add(q.id);
+      }
+    });
+
     // Add 'correct' field to MCQ questions if missing
     questions = questions.map((q: Record<string, unknown>) => {
       if (((q.type as string)?.toLowerCase?.() === 'mcq' || (q.questionType as string)?.toLowerCase?.() === 'mcq') && Array.isArray(q.options)) {
@@ -213,7 +221,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     });
 
-    const allSets = fullExamSets.map(s => {
+    const allSetsRaw = fullExamSets.map(s => {
       let setQuestions: any[] = [];
       try {
         setQuestions = Array.isArray(s.questionsJson)
@@ -224,6 +232,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       } catch {
         setQuestions = [];
       }
+      setQuestions.forEach((q: any) => {
+        if (q?.id && (!q.subject || typeof q.subject !== 'string' || !q.subject.trim())) {
+          allQuestionIdsToLookup.add(q.id);
+        }
+      });
       return {
         id: s.id,
         name: s.name,
@@ -231,6 +244,39 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         questions: setQuestions
       };
     });
+
+    // Backfill missing subjects from database if any questions lack subject
+    if (allQuestionIdsToLookup.size > 0) {
+      try {
+        const dbQuestions = await prisma.question.findMany({
+          where: { id: { in: Array.from(allQuestionIdsToLookup) } },
+          select: { id: true, subject: true }
+        });
+        const subMap = new Map(dbQuestions.map(dq => [dq.id, dq.subject]));
+        questions = questions.map((q: any) => {
+          if ((!q.subject || !String(q.subject).trim()) && subMap.has(q.id)) {
+            return { ...q, subject: subMap.get(q.id) };
+          }
+          return q;
+        });
+        allSetsRaw.forEach(set => {
+          set.questions = set.questions.map((q: any) => {
+            if ((!q.subject || !String(q.subject).trim()) && subMap.has(q.id)) {
+              return { ...q, subject: subMap.get(q.id) };
+            }
+            return q;
+          });
+        });
+      } catch (e) {
+        console.warn("[OnlineExamAPI] Could not backfill question subjects:", e);
+      }
+    }
+
+    const allSets = allSetsRaw;
+
+    const isExamMS = exam.subjectType === 'MS' || Boolean(
+      exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
+    );
 
     return NextResponse.json({
       id: exam.id,
@@ -249,7 +295,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedSet: assignedExamSet ? { id: assignedExamSet.id, name: assignedExamSet.name } : null,
       examSets: exam.examSets?.map(s => ({ id: s.id, name: s.name })),
       allSets,
-      subject: (questions[0] as any)?.subject || exam.class?.name || '',
+      subject: isExamMS ? 'বহু-বিষয়ক পরীক্ষা (Multi-Subject)' : ((questions[0] as any)?.subject || exam.class?.name || ''),
+      subjectType: exam.subjectType || (isExamMS ? 'MS' : 'SS'),
+      subjectsConfig: exam.subjectsConfig || null,
       questions,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,

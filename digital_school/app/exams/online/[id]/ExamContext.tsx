@@ -400,14 +400,14 @@ export function ExamContextProvider({
     if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
 
     const aliases: Record<string, string[]> = {
-      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
-      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
-      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
-      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
-      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
-      'bangla': ['বাংলা', 'bengali'],
-      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
-      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
+      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths', 'সাধারণ গণিত', 'general math', 'math 1st', 'math 2nd'],
+      'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
+      'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
     };
 
     for (const [key, list] of Object.entries(aliases)) {
@@ -419,14 +419,53 @@ export function ExamContextProvider({
     return false;
   }, []);
 
-  const isMS = exam.subjectType === 'MS' || (exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+  // Safely parse subjectsConfig whether delivered as string or object
+  const parsedSubjectsConfig = useMemo(() => {
+    if (!exam?.subjectsConfig) return null;
+    if (typeof exam.subjectsConfig === 'string') {
+      try {
+        return JSON.parse(exam.subjectsConfig);
+      } catch {
+        return null;
+      }
+    }
+    return exam.subjectsConfig;
+  }, [exam?.subjectsConfig]);
+
+  // Check if questions themselves contain multiple distinct subjects
+  const hasMultipleQuestionSubjects = useMemo(() => {
+    const rawSubjects = (exam?.questions || [])
+      .map((q: any) => (q.subject || q.subjectName || '').trim())
+      .filter(Boolean);
+    const canonical: string[] = [];
+    rawSubjects.forEach((rs: string) => {
+      if (!canonical.some(c => matchSubject(rs, c))) {
+        canonical.push(rs);
+      }
+    });
+    return canonical.length > 1;
+  }, [exam?.questions, matchSubject]);
+
+  const isMS = Boolean(
+    exam?.subjectType === 'MS' ||
+    (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0) ||
+    hasMultipleQuestionSubjects
+  );
+
   const msSubjects = useMemo(() => {
     if (!isMS) return [];
-    const configured: any[] = (exam.subjectsConfig as any)?.subjects || [];
-    if (configured.length > 0) return configured;
+    const configured: any[] = parsedSubjectsConfig?.subjects || [];
+    if (configured.length > 0) {
+      return configured.map((s: any) => ({
+        ...s,
+        name: s.name,
+        isMandatory: s.isMandatory !== false && s.isOptional !== true,
+        totalMarks: Number(s.totalMarks) || 0
+      }));
+    }
     
     // Discover distinct canonical subjects from questions using aliases
-    const rawSubjects = (exam.questions || []).map((q: any) => q.subject).filter(Boolean);
+    const rawSubjects = (exam?.questions || []).map((q: any) => q.subject || q.subjectName).filter(Boolean);
     const canonical: string[] = [];
     rawSubjects.forEach((rs: string) => {
       if (!canonical.some(c => matchSubject(rs, c))) {
@@ -434,7 +473,7 @@ export function ExamContextProvider({
       }
     });
     return canonical.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
-  }, [isMS, exam.subjectsConfig, exam.questions, matchSubject]);
+  }, [isMS, parsedSubjectsConfig, exam?.questions, matchSubject]);
 
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
 
@@ -458,9 +497,10 @@ export function ExamContextProvider({
       if (hasAnswer) {
         const rawId = k.split('_')[0];
         const q = qMap.get(k) || qMap.get(rawId);
-        if (q && q.subject) {
-          const subConfig = msSubjects.find(s => matchSubject(q.subject, s.name));
-          const canonicalName = subConfig ? subConfig.name : q.subject;
+        const qSubject = q?.subject || q?.subjectName;
+        if (q && qSubject) {
+          const subConfig = msSubjects.find(s => matchSubject(qSubject, s.name));
+          const canonicalName = subConfig ? subConfig.name : qSubject;
           attemptedSubjs.add(canonicalName);
           if (subConfig && !subConfig.isMandatory) {
             attemptedOptSubjs.add(canonicalName);
@@ -469,7 +509,7 @@ export function ExamContextProvider({
       }
     });
 
-    const maxAllowedOptional = Number((exam.subjectsConfig as any)?.requiredOptionalCount) || 1;
+    const maxAllowedOptional = Number(parsedSubjectsConfig?.requiredOptionalCount) || 1;
     const isExceeding = attemptedOptSubjs.size > maxAllowedOptional;
 
     return {
@@ -477,7 +517,7 @@ export function ExamContextProvider({
       attemptedSubjects: attemptedSubjs,
       isExceedingOptional: isExceeding
     };
-  }, [isMS, answers, exam.questions, msSubjects, exam.subjectsConfig, matchSubject]);
+  }, [isMS, answers, exam.questions, msSubjects, parsedSubjectsConfig, matchSubject]);
 
   // Filtered sorted questions based on selectedSubject
   const filteredSortedQuestions = useMemo(() => {

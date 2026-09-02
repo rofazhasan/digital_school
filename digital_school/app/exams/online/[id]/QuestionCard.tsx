@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { Check, Upload, X, Camera as CameraIcon } from "lucide-react";
+import { Check, Upload, X, Camera as CameraIcon, Tag } from "lucide-react";
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
@@ -60,8 +60,9 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
 
-  const subConfig = isMS && (question?.subject || msSubjects)
-    ? msSubjects?.find((s: any) => matchSubject ? matchSubject(question?.subject, s.name) : (question?.subject || '').toLowerCase().trim() === s.name?.toLowerCase().trim())
+  const currentSubjectName = question?.subject || question?.subjectName || '';
+  const subConfig = (currentSubjectName || msSubjects)
+    ? msSubjects?.find((s: any) => matchSubject ? matchSubject(currentSubjectName, s.name) : currentSubjectName.toLowerCase().trim() === s.name?.toLowerCase().trim())
     : null;
   const [cameraTarget, setCameraTarget] = useState<{ qId: string, idx?: number } | null>(null);
 
@@ -148,15 +149,23 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-2 flex-wrap">
-              {isMS && (question?.subject || subConfig) && (
+              {(currentSubjectName || subConfig) && (
                 <Badge className={cn(
-                  "font-bold text-xs shadow-xs px-2.5 py-0.5 flex items-center gap-1 text-white",
-                  subConfig?.isMandatory === false ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                  "font-bold text-xs shadow-xs px-2.5 py-1 flex items-center gap-1.5 text-white transition-all",
+                  subConfig?.isMandatory === false
+                    ? "bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 border border-amber-400/30"
+                    : "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 border border-indigo-400/30"
                 )}>
-                  <span>{subConfig?.name || question?.subject}</span>
-                  <span className="text-[10px] opacity-85 font-normal">
-                    [{subConfig?.isMandatory === false ? 'ঐচ্ছিক' : 'আবশ্যক'}]
-                  </span>
+                  <Tag className="w-3 h-3" />
+                  <span>{subConfig?.name || currentSubjectName}</span>
+                  {isMS && (
+                    <span className={cn(
+                      "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                      subConfig?.isMandatory === false ? "bg-amber-950/60 text-amber-200" : "bg-indigo-950/60 text-indigo-200"
+                    )}>
+                      {subConfig?.isMandatory === false ? 'ঐচ্ছিক (Optional)' : 'আবশ্যক (Compulsory)'}
+                    </span>
+                  )}
                 </Badge>
               )}
               <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border uppercase">

@@ -164,7 +164,7 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
             subjectGroups.map((grp) => (
               <React.Fragment key={grp.name}>
                 {renderGroup(
-                  `${grp.name} (${grp.isMandatory ? 'Mandatory' : 'Optional'})`,
+                  `${grp.name} • ${grp.isMandatory ? 'আবশ্যক (Mandatory)' : 'ঐচ্ছিক (Optional)'}`,
                   grp.questions,
                   0
                 )}

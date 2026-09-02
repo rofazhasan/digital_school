@@ -808,7 +808,14 @@ export default function ExamLayout() {
               <div className="flex items-center gap-3">
                 <img src={instituteLogo} alt="Logo" className="h-8 w-auto hidden sm:block rounded" />
                 <div className="flex flex-col">
-                  <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
+                    {isMS && (
+                      <Badge className="bg-purple-600 text-white text-[9px] font-extrabold px-1.5 py-0 h-4 uppercase">
+                        MS
+                      </Badge>
+                    )}
+                  </div>
                   <Badge variant="outline" className={cn(
                     "text-[10px] h-4 py-0 px-1 border-primary/30 w-fit",
                     activeSection === 'objective' ? "text-indigo-600 border-indigo-200 bg-indigo-50/50" : "text-emerald-600 border-emerald-200 bg-emerald-50/50"
@@ -1050,8 +1057,13 @@ export default function ExamLayout() {
                           <span className="text-[10px] font-semibold opacity-90">
                             ({answeredCount}/{subjectQuestions.length})
                           </span>
-                          <span className="text-[9px] opacity-75 font-normal">
-                            [{sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}]
+                          <span className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wider",
+                            sub.isMandatory
+                              ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
+                              : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
+                          )}>
+                            {sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}
                           </span>
                           {isAttempted && <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
                         </button>
