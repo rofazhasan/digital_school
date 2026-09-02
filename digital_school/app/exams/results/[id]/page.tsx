@@ -2729,7 +2729,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         if (!isMS && !subjectBreakdown) return null;
 
                         const subjectsList: any[] = (result.exam as any)?.subjectsConfig?.subjects || [];
-                        const entries = subjectBreakdown ? Object.entries(subjectBreakdown) : subjectsList.map(s => [s.name, { totalScore: 0, maxMarks: s.totalMarks, isMandatory: s.isMandatory, attempted: false }]);
+                        let entries = subjectBreakdown ? Object.entries(subjectBreakdown) : subjectsList.map(s => [s.name, { totalScore: 0, maxMarks: s.totalMarks, isMandatory: s.isMandatory, attempted: false }]);
+
+                        if (entries.length === 0 && isMS) {
+                          const qList = (result.exam as any)?.questions || [];
+                          const distinct = Array.from(new Set(qList.map((q: any) => q.subject).filter(Boolean)));
+                          entries = distinct.map((sName: any) => [sName, { totalScore: 0, maxMarks: 0, isMandatory: true, attempted: false }]);
+                        }
 
                         if (entries.length === 0) return null;
 
@@ -2748,8 +2754,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{sName}</span>
-                                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 rounded-md ${data.isMandatory ? 'border-indigo-300 text-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/40 dark:text-indigo-300' : 'border-amber-300 text-amber-700 bg-amber-50/50 dark:bg-amber-950/40 dark:text-amber-300'}`}>
-                                          {data.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}
+                                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 rounded-md ${
+                                          data.isCounted === false
+                                            ? 'border-red-300 text-red-700 bg-red-50/50 dark:bg-red-950/40 dark:text-red-300'
+                                            : data.isMandatory
+                                            ? 'border-indigo-300 text-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/40 dark:text-indigo-300'
+                                            : 'border-amber-300 text-amber-700 bg-amber-50/50 dark:bg-amber-950/40 dark:text-amber-300'
+                                        }`}>
+                                          {data.isCounted === false ? 'গণনা বহির্ভূত' : data.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}
                                         </Badge>
                                       </div>
                                       <p className="text-[11px] text-slate-400 mt-0.5">

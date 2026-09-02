@@ -48,15 +48,20 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     navigation,
     markQuestion,
     setIsUploading,
-    fontSize,
     answers,
     setAnswers,
-    isMS
+    isMS,
+    msSubjects,
+    matchSubject
   } = useExamContext();
 
   const questions = exam.questions || [];
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
+
+  const subConfig = isMS && (question?.subject || msSubjects)
+    ? msSubjects?.find((s: any) => matchSubject ? matchSubject(question?.subject, s.name) : (question?.subject || '').toLowerCase().trim() === s.name?.toLowerCase().trim())
+    : null;
   const [cameraTarget, setCameraTarget] = useState<{ qId: string, idx?: number } | null>(null);
 
   const handleCapture = async (file: File, qId: string, subIdx?: number) => {
@@ -142,9 +147,15 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-2 flex-wrap">
-              {isMS && question?.subject && (
-                <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs px-2.5 py-0.5">
-                  {question.subject}
+              {isMS && (question?.subject || subConfig) && (
+                <Badge className={cn(
+                  "font-bold text-xs shadow-xs px-2.5 py-0.5 flex items-center gap-1 text-white",
+                  subConfig?.isMandatory === false ? "bg-amber-600 hover:bg-amber-700" : "bg-indigo-600 hover:bg-indigo-700"
+                )}>
+                  <span>{subConfig?.name || question?.subject}</span>
+                  <span className="text-[10px] opacity-85 font-normal">
+                    [{subConfig?.isMandatory === false ? 'ঐচ্ছিক' : 'আবশ্যক'}]
+                  </span>
                 </Badge>
               )}
               <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border uppercase">

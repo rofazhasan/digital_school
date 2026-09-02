@@ -30,7 +30,8 @@ import {
   Maximize2,
   CheckCircle2,
   CircleDot,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from "lucide-react";
 import { useExamContext } from "./ExamContext";
 import { toBengaliNumerals, toBengaliAlphabets } from "@/utils/numeralConverter";
@@ -77,8 +78,13 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     hasCqSq,
     isMS,
     msSubjects,
-    matchSubject
+    matchSubject,
+    attemptedOptionalSubjects,
+    attemptedSubjects,
+    isExceedingOptional
   } = useExamContext();
+
+  const [selectedOmrSubject, setSelectedOmrSubject] = useState<string>('ALL');
 
   // In Only OMR mode: strictly adhere to the physical generated set's exact question order (1, 2, 3, 4...)
   const questions = setOrderedQuestions || sortedQuestions || [];
@@ -400,9 +406,15 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     return ranges;
   }, [totalQuestions, chunkSize]);
 
-  // Filtered questions list based on active tab and range chunk
+  // Filtered questions list based on active tab, range chunk and subject selection
   const displayedQuestions = useMemo(() => {
     let list = questions;
+
+    if (isMS && selectedOmrSubject !== 'ALL') {
+      list = list.filter((q: any) => 
+        matchSubject ? matchSubject(q.subject, selectedOmrSubject) : (q.subject || '').toLowerCase().trim() === selectedOmrSubject.toLowerCase().trim()
+      );
+    }
 
     if (filterTab === "unanswered") {
       list = list.filter((q: any) => !answeredStatusMap[q.id]);
@@ -411,7 +423,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     }
 
     return list;
-  }, [questions, filterTab, answeredStatusMap]);
+  }, [questions, filterTab, answeredStatusMap, isMS, selectedOmrSubject, matchSubject]);
 
   return (
     <div className="w-full min-h-screen bg-slate-100/90 dark:bg-slate-950 py-2 sm:py-6 px-1.5 sm:px-4 md:px-6 font-sans select-none pb-28 md:pb-12">
@@ -567,6 +579,76 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Warning if student exceeded allowed optional subjects */}
+        {isMS && isExceedingOptional && (
+          <div className="bg-red-500/10 border-2 border-red-500 text-red-700 dark:text-red-300 p-4 rounded-2xl flex items-start gap-3 shadow-lg animate-pulse">
+            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-black text-sm uppercase tracking-wide text-red-600 dark:text-red-400">
+                সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করা হয়েছে!
+              </h4>
+              <p className="text-xs font-semibold mt-1">
+                আপনি অনুমোদিত সীমার চেয়ে বেশি ({attemptedOptionalSubjects?.size}টি) ঐচ্ছিক বিষয়ের উত্তর পূরণ করেছেন। নিয়মানুযায়ী সর্বোচ্চ {(exam.subjectsConfig as any)?.requiredOptionalCount || 1}টি ঐচ্ছিক বিষয় স্বয়ংক্রিয়ভাবে গণনা করা হবে।
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* MS Subject Selector Tabs with Live Question Counters */}
+        {isMS && msSubjects && msSubjects.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setSelectedOmrSubject('ALL')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border flex items-center gap-1.5 shadow-sm",
+                selectedOmrSubject === 'ALL'
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-md scale-105"
+                  : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100"
+              )}
+            >
+              <span>সকল বিষয়</span>
+              <span className="text-[10px] opacity-75 font-normal">({toBengaliNumerals(totalQuestions)})</span>
+            </button>
+            {msSubjects.map((sub: any) => {
+              const subQuestions = questions.filter((q: any) => 
+                matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+              );
+              const subAnswered = subQuestions.filter((q: any) => answeredStatusMap[q.id]).length;
+              const isSelected = selectedOmrSubject === sub.name;
+              const isSubAttempted = attemptedSubjects?.has(sub.name);
+              return (
+                <button
+                  key={sub.name}
+                  type="button"
+                  onClick={() => setSelectedOmrSubject(sub.name)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border flex items-center gap-1.5 shadow-sm",
+                    isSelected
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/20 shadow-md scale-105"
+                      : isSubAttempted
+                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                      : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-indigo-50/50"
+                  )}
+                >
+                  <span>{sub.name}</span>
+                  <span className="text-[10px] opacity-85 font-normal">
+                    ({toBengaliNumerals(subAnswered)}/{toBengaliNumerals(subQuestions.length)})
+                  </span>
+                  <span className={cn(
+                    "text-[9px] px-1 py-0.2 rounded font-normal",
+                    sub.isMandatory
+                      ? "bg-indigo-100/80 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
+                      : "bg-amber-100/80 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                  )}>
+                    {sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* --- AUTHENTIC BANGLADESH OMR SHEET CONTAINER --- */}
         <div className="relative bg-[#fffdfa] dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-700 rounded-2xl sm:rounded-3xl p-3 sm:p-8 shadow-2xl overflow-hidden">

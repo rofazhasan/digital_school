@@ -202,10 +202,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       if (attemptedOptionalSubjects.size > maxAllowedOptional) {
-        console.warn(`[Submit] User ${studentId} exceeded optional subject limit: attempted ${attemptedOptionalSubjects.size} optional subjects (max ${maxAllowedOptional}). Flagging submission as suspended.`);
-        exceededQuestionLimit = true;
-        processedAnswers._suspended = true;
-        processedAnswers._suspensionReason = `Disqualified: Answered ${attemptedOptionalSubjects.size} optional subjects while only ${maxAllowedOptional} allowed.`;
+        console.warn(`[Submit] User ${studentId} answered ${attemptedOptionalSubjects.size} optional subjects (max ${maxAllowedOptional}). Scoring engine will count top ${maxAllowedOptional} subjects.`);
       }
     }
 
@@ -255,31 +252,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { evaluateSubmission, finalizeAndReleaseExam } = await import("@/lib/exam-logic");
 
       // Auto-evaluate this submission
-      await evaluateSubmission(submission, exam, exam.examSets);
-      console.log(`✅ Auto-graded/evaluated submission ${submission.id}`);
+      await evaluateSubmission(submission, exam, exam.examSets, true, isFinalSubmission);
+      console.log(`✅ Auto-graded/evaluated submission ${submission.id} (isFinal: ${isFinalSubmission})`);
 
-      // Check Auto-Release Conditions for all exam types:
-      // Condition A: All active students in the class have submitted
-      // Condition B: Time is over
-      const totalStudentsCount = await prisma.studentProfile.count({
-        where: { classId: exam.classId, user: { isActive: true } }
-      });
+      if (isFinalSubmission) {
+        // Check Auto-Release Conditions for all exam types:
+        // Condition A: All active students in the class have submitted
+        // Condition B: Time is over
+        const totalStudentsCount = await prisma.studentProfile.count({
+          where: { classId: exam.classId, user: { isActive: true } }
+        });
 
-      const submittedCount = await prisma.examSubmission.count({
-        where: {
-          examId: examId,
-          status: 'SUBMITTED'
+        const submittedCount = await prisma.examSubmission.count({
+          where: {
+            examId: examId,
+            status: 'SUBMITTED'
+          }
+        });
+
+        const isTimeOver = new Date() > new Date(exam.endTime);
+        const allSubmitted = totalStudentsCount > 0 && submittedCount >= totalStudentsCount;
+
+        console.log(`[Auto-Release Check] Exam ${examId}: Submitted ${submittedCount}/${totalStudentsCount}, TimeOver: ${isTimeOver}`);
+
+        if (allSubmitted || isTimeOver) {
+          console.log(`🚀 Triggering Auto-Release for Exam ${examId}`);
+          await finalizeAndReleaseExam(examId);
         }
-      });
-
-      const isTimeOver = new Date() > new Date(exam.endTime);
-      const allSubmitted = totalStudentsCount > 0 && submittedCount >= totalStudentsCount;
-
-      console.log(`[Auto-Release Check] Exam ${examId}: Submitted ${submittedCount}/${totalStudentsCount}, TimeOver: ${isTimeOver}`);
-
-      if (allSubmitted || isTimeOver) {
-        console.log(`🚀 Triggering Auto-Release for Exam ${examId}`);
-        await finalizeAndReleaseExam(examId);
       }
 
     } catch (evalError) {

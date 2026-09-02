@@ -258,6 +258,13 @@ export default function ExamLayout() {
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 
+  // Ensure that if activeSection is cqsq, view mode cannot be omr
+  useEffect(() => {
+    if (activeSection === 'cqsq' && examViewMode === 'omr') {
+      setExamViewMode('full');
+    }
+  }, [activeSection, examViewMode, setExamViewMode]);
+
   // ------------ PROCTORING INTEGRATION ------------
   const [isExamActive, setIsExamActive] = useState(hasCurrentSectionStarted && !showInstructions);
   const [instituteSettings, setInstituteSettings] = useState<any>(null);
@@ -1200,7 +1207,42 @@ export default function ExamLayout() {
           <SectionTransitionOverlay
             type="objective_submitted"
             stats={{ answered: answeredCount, total: totalQuestions }}
-            onAction={() => window.location.reload()} // Still reload for now to cleanly switch context, but with better UI first
+            onAction={async () => {
+              try {
+                // 1. Tell backend that cqsq section is starting
+                await fetch(`/api/exams/${exam.id}/start`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ section: 'cqsq' })
+                });
+              } catch (err) {
+                console.error("Failed to start cqsq section on server:", err);
+              }
+
+              // 2. Clear ?action=start from URL so manual reload doesn't reset
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('action');
+                url.searchParams.set('mode', 'full');
+                url.searchParams.set('section', 'cqsq');
+                window.history.replaceState(null, '', url.toString());
+                localStorage.setItem(examModeStorageKey, 'full');
+              }
+
+              // 3. Patch exam state in memory
+              const nowIso = new Date().toISOString();
+              patchExam({
+                objectiveStatus: 'SUBMITTED',
+                cqSqStatus: 'IN_PROGRESS',
+                cqSqStartedAt: exam.cqSqStartedAt || nowIso
+              });
+
+              // 4. Update view mode and section
+              setExamViewMode('full');
+              setActiveSection('cqsq');
+              setTransitionState(null);
+              navigateToQuestion(0);
+            }}
           />
         )}
       </div>

@@ -158,7 +158,7 @@ export function isMCQOnlyExam(exam: Partial<Exam>, examSets: Partial<ExamSet>[] 
  * Evaluate a single submission and update its Result
  * @param saveToDb - if true (default), updates the submission status and saves the result to the DB. If false, calculates and returns scores in-memory without mutating the DB. Useful for previewing evaluations.
  */
-export async function evaluateSubmission(submission: ExamSubmission, exam: Exam, examSets: ExamSet[], saveToDb: boolean = true) {
+export async function evaluateSubmission(submission: ExamSubmission, exam: Exam, examSets: ExamSet[], saveToDb: boolean = true, isFinal: boolean = true) {
     let totalScore = 0;
     let mcqMarks = 0;
     let cqMarks = 0;
@@ -615,13 +615,29 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         });
 
         const maxOptionalAllowed = Number(msConfig?.requiredOptionalCount) || 1;
-        if (optionalSubjectsAttempted.size > maxOptionalAllowed) {
-            isDisqualified = true;
-            (answers as any)._suspended = true;
-            (answers as any)._suspensionReason = `Disqualified: Answered ${optionalSubjectsAttempted.size} optional subjects while only ${maxOptionalAllowed} allowed.`;
-        }
+        
+        // Graceful handling of optional subjects: sort attempted optional subjects by total score (highest first)
+        const optionalSubjsList = msSubjectsList.filter((s: any) => !s.isMandatory);
+        const attemptedOptionalList = optionalSubjsList
+            .filter((s: any) => subjectWiseBreakdown[s.name]?.attempted)
+            .sort((a: any, b: any) => (subjectWiseBreakdown[b.name]?.totalScore || 0) - (subjectWiseBreakdown[a.name]?.totalScore || 0));
 
-        // Aggregate multi-subject score: mandatory subjects + allowed optional subjects
+        const countedOptionalNames = new Set<string>();
+        attemptedOptionalList.slice(0, maxOptionalAllowed).forEach((s: any) => {
+            countedOptionalNames.add(s.name);
+            if (subjectWiseBreakdown[s.name]) {
+                (subjectWiseBreakdown[s.name] as any).isCounted = true;
+            }
+        });
+
+        attemptedOptionalList.slice(maxOptionalAllowed).forEach((s: any) => {
+            if (subjectWiseBreakdown[s.name]) {
+                (subjectWiseBreakdown[s.name] as any).isCounted = false;
+                (subjectWiseBreakdown[s.name] as any).note = 'অতিরিক্ত ঐচ্ছিক বিষয় (গণনা বহির্ভূত)';
+            }
+        });
+
+        // Aggregate multi-subject score: mandatory subjects + top allowed optional subjects
         let msTotalScore = 0;
         let msMcqMarks = 0;
         let msCqMarks = 0;
@@ -630,7 +646,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         msSubjectsList.forEach((sub: any) => {
             const subBreakdown = subjectWiseBreakdown[sub.name];
             if (!subBreakdown) return;
-            if (sub.isMandatory || (!sub.isMandatory && subBreakdown.attempted && !isDisqualified)) {
+            if (sub.isMandatory) {
+                (subBreakdown as any).isCounted = true;
+                msTotalScore += subBreakdown.totalScore;
+            } else if (countedOptionalNames.has(sub.name)) {
                 msTotalScore += subBreakdown.totalScore;
             }
         });
@@ -663,45 +682,54 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
     const grade = isDisqualified ? "F (Disqualified)" : calculateGrade(percentage, passMark);
 
     if (saveToDb) {
+        const updateData: any = {
+            answers: answers as any, // Include populated _marks
+            score: totalScore, // Keep score for backward compatibility
+            evaluatedAt: new Date()
+        };
+
+        if (isFinal) {
+            updateData.status = SubmissionStatus.SUBMITTED;
+            updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
+            updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
+        } else {
+            updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
+        }
+
         await prisma.examSubmission.update({
             where: { id: submission.id },
-            data: {
-                answers: answers as any, // Include populated _marks
-                score: totalScore, // Keep score for backward compatibility
-                status: SubmissionStatus.SUBMITTED,
-                objectiveStatus: SubmissionStatus.SUBMITTED,
-                cqSqStatus: SubmissionStatus.SUBMITTED,
-                evaluatedAt: new Date()
-            }
+            data: updateData
         });
 
-        // 4. Upsert Result
-        await prisma.result.upsert({
-            where: {
-                studentId_examId: {
+        if (isFinal) {
+            // 4. Upsert Result
+            await prisma.result.upsert({
+                where: {
+                    studentId_examId: {
+                        studentId: submission.studentId,
+                        examId: exam.id
+                    }
+                },
+                update: {
+                    total: totalScore,
+                    mcqMarks, cqMarks, sqMarks,
+                    percentage,
+                    grade,
+                    isPublished: false, // Don't publish individual results yet (wait for release)
+                    examSubmissionId: submission.id
+                },
+                create: {
                     studentId: submission.studentId,
-                    examId: exam.id
+                    examId: exam.id,
+                    total: totalScore,
+                    mcqMarks, cqMarks, sqMarks,
+                    percentage,
+                    grade,
+                    isPublished: false,
+                    examSubmissionId: submission.id
                 }
-            },
-            update: {
-                total: totalScore,
-                mcqMarks, cqMarks, sqMarks,
-                percentage,
-                grade,
-                isPublished: false, // Don't publish individual results yet (wait for release)
-                examSubmissionId: submission.id
-            },
-            create: {
-                studentId: submission.studentId,
-                examId: exam.id,
-                total: totalScore,
-                mcqMarks, cqMarks, sqMarks,
-                percentage,
-                grade,
-                isPublished: false,
-                examSubmissionId: submission.id
-            }
-        });
+            });
+        }
     }
 
     return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks, evaluationResult };
