@@ -69,13 +69,36 @@ export function ExamContextProvider({
       ? shuffleArrayWithSeed(origQuestions, seed) 
       : origQuestions;
 
+    const subId = examProp.submissionId || 'active';
+    let localObjectiveStart: string | null = null;
+    let localCqSqStart: string | null = null;
+    if (typeof window !== 'undefined') {
+      localObjectiveStart = localStorage.getItem(`exam-start-objective-${examProp.id}-${subId}`);
+      localCqSqStart = localStorage.getItem(`exam-start-cqsq-${examProp.id}-${subId}`);
+    }
+
     return {
       ...examProp,
-      questions: shuffledQuestions
+      questions: shuffledQuestions,
+      objectiveStartedAt: examProp.objectiveStartedAt || localObjectiveStart,
+      cqSqStartedAt: examProp.cqSqStartedAt || localCqSqStart,
     };
   });
+
   const patchExam = useCallback((patch: Partial<any>) => {
-    setExamState((prev: any) => ({ ...prev, ...patch }));
+    setExamState((prev: any) => {
+      const updated = { ...prev, ...patch };
+      if (typeof window !== 'undefined') {
+        const subId = updated.submissionId || 'active';
+        if (patch.objectiveStartedAt) {
+          localStorage.setItem(`exam-start-objective-${updated.id}-${subId}`, patch.objectiveStartedAt);
+        }
+        if (patch.cqSqStartedAt) {
+          localStorage.setItem(`exam-start-cqsq-${updated.id}-${subId}`, patch.cqSqStartedAt);
+        }
+      }
+      return updated;
+    });
   }, []);
 
   const [answers, setAnswers] = useState<any>(examProp.savedAnswers || {});
@@ -109,18 +132,24 @@ export function ExamContextProvider({
 
   const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(() => {
     // If explicitly submitted or no objective section, always cqsq
-    if (exam.objectiveStatus === 'SUBMITTED' || !hasObjective) return 'cqsq';
+    if (examProp.objectiveStatus === 'SUBMITTED' || !hasObjective) return 'cqsq';
+    if (examProp.cqSqStatus === 'IN_PROGRESS') return 'cqsq';
 
-    // Fairness (insaf) check: if objective section was started and time has elapsed
-    // even if it wasn't marked as SUBMITTED yet (e.g. user closed tab),
-    // we should treat it as expired if the objectiveTime has passed.
-    if (exam.objectiveStartedAt && (exam.objectiveTime || exam.duration)) {
-      const objTime = exam.objectiveTime || exam.duration;
-      const startTime = new Date(exam.objectiveStartedAt).getTime();
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('section') === 'cqsq') return 'cqsq';
+    }
+
+    // Fairness check: if objective section was started and time has elapsed
+    const subId = examProp.submissionId || 'active';
+    const objStart = examProp.objectiveStartedAt || (typeof window !== 'undefined' ? localStorage.getItem(`exam-start-objective-${examProp.id}-${subId}`) : null);
+    if (objStart) {
+      const objTime = (Number(examProp.objectiveTime) > 0 ? Number(examProp.objectiveTime) : Number(examProp.duration)) || 0;
+      const startTime = new Date(objStart).getTime();
       const now = Date.now();
       const limitMs = objTime * 60 * 1000;
 
-      if (now > startTime + limitMs) {
+      if (limitMs > 0 && now >= startTime + limitMs) {
         return 'cqsq';
       }
     }

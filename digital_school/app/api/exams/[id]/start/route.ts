@@ -129,9 +129,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     console.log(`[Exam Start] Student ${studentId} started exam ${examId} successfully`);
 
+    const finalSubmission = await prisma.examSubmission.findUnique({
+      where: { id: submission.id },
+      select: {
+        id: true,
+        objectiveStartedAt: true,
+        cqSqStartedAt: true,
+        objectiveStatus: true,
+        cqSqStatus: true,
+        status: true
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      message: "Exam started successfully"
+      message: "Exam started successfully",
+      serverTime: now.toISOString(),
+      startedAt: section === 'objective' ? finalSubmission?.objectiveStartedAt : finalSubmission?.cqSqStartedAt,
+      objectiveStartedAt: finalSubmission?.objectiveStartedAt,
+      cqSqStartedAt: finalSubmission?.cqSqStartedAt,
+      objectiveStatus: finalSubmission?.objectiveStatus,
+      cqSqStatus: finalSubmission?.cqSqStatus,
+      status: finalSubmission?.status
     });
 
   } catch (e) {

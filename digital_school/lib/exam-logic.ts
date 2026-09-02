@@ -1030,7 +1030,10 @@ export async function autoSubmitExpiredSections(submission: ExamSubmission, exam
     // 2. Check CQ/SQ Section
     if (submission.cqSqStatus === SubmissionStatus.IN_PROGRESS && submission.cqSqStartedAt && hasCqSq) {
         const cqStartTime = new Date(submission.cqSqStartedAt).getTime();
-        const cqLimitMs = ((Number(exam.cqSqTime) > 0 ? Number(exam.cqSqTime) : Number(exam.duration)) || 0) * 60 * 1000;
+        const cqDurationMin = Number(exam.cqSqTime) > 0 
+            ? Number(exam.cqSqTime) 
+            : (Number(exam.duration) > Number(exam.objectiveTime || 0) ? Number(exam.duration) - Number(exam.objectiveTime || 0) : Number(exam.duration));
+        const cqLimitMs = (cqDurationMin || 0) * 60 * 1000;
         if (cqLimitMs > 0 && nowTime >= cqStartTime + cqLimitMs) {
             updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
             updateData.cqSqSubmittedAt = submission.cqSqSubmittedAt || new Date(cqStartTime + cqLimitMs);
@@ -1039,14 +1042,12 @@ export async function autoSubmitExpiredSections(submission: ExamSubmission, exam
         }
     }
 
-    // 3. Check Overall Duration (Based on when student started)
-    const firstStartTime = submission.objectiveStartedAt
-        ? new Date(submission.objectiveStartedAt).getTime()
-        : submission.cqSqStartedAt
-            ? new Date(submission.cqSqStartedAt).getTime()
-            : ((submission as any).createdAt ? new Date((submission as any).createdAt).getTime() : null);
+    // 3. Check Overall Duration (Combined sections safety limit)
+    const effectiveTotalMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
+        ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
+        : (Number(exam.duration) || 0);
 
-    const overallDurationMs = (Number(exam.duration) || 0) * 60 * 1000;
+    const overallDurationMs = effectiveTotalMinutes * 60 * 1000;
     if (firstStartTime && overallDurationMs > 0 && nowTime >= firstStartTime + overallDurationMs) {
         updateData.status = SubmissionStatus.SUBMITTED;
         updateData.objectiveStatus = SubmissionStatus.SUBMITTED;

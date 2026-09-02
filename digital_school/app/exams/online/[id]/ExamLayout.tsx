@@ -211,22 +211,26 @@ export default function ExamLayout() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transitionState, setTransitionState] = useState<'objective_submitted' | 'cqsq_starting' | null>(null);
+  const submissionId = exam.submissionId || 'active';
+  const examModeStorageKey = `exam-mode-${exam.id}-${submissionId}`;
+
   // Initialize instructions visibility based on whether the current active section has started
+  const hasLocalStart = typeof window !== 'undefined'
+    ? !!localStorage.getItem(activeSection === 'objective' ? `exam-start-objective-${exam.id}-${submissionId}` : `exam-start-cqsq-${exam.id}-${submissionId}`)
+    : false;
+
   const hasCurrentSectionStarted = activeSection === 'objective'
-    ? exam.objectiveStatus !== 'PENDING'
-    : exam.cqSqStatus !== 'PENDING';
+    ? (exam.objectiveStatus !== 'PENDING' || !!exam.objectiveStartedAt || hasLocalStart)
+    : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt || hasLocalStart);
+
   const [showInstructions, setShowInstructions] = useState(!hasCurrentSectionStarted);
   const [isStarting, setIsStarting] = useState(false);
 
-  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
+  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING' || hasLocalStart);
   const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
   const isActuallyResuming = hasStartedAny && !exam.hasSubmitted;
 
   const [illusionMode, setIllusionMode] = useState(false);
-
-  // Storage key to strictly persist and enforce the started exam mode (OMR vs Full) across resumes and refreshes
-  const submissionId = exam.submissionId || 'active';
-  const examModeStorageKey = `exam-mode-${exam.id}-${submissionId}`;
 
   // View Mode: 'omr' (physical-style OMR sheet with no question text) vs 'full' (full question cards)
   const [examViewMode, setExamViewModeState] = useState<'omr' | 'full'>(() => {
@@ -382,9 +386,13 @@ export default function ExamLayout() {
 
   // Check initial start state
   useEffect(() => {
+    const hasLocalCurrentStart = typeof window !== 'undefined'
+      ? !!localStorage.getItem(activeSection === 'objective' ? `exam-start-objective-${exam.id}-${submissionId}` : `exam-start-cqsq-${exam.id}-${submissionId}`)
+      : false;
+
     const hasStartedCurrent = activeSection === 'objective'
-      ? exam.objectiveStatus !== 'PENDING'
-      : exam.cqSqStatus !== 'PENDING';
+      ? (exam.objectiveStatus !== 'PENDING' || !!exam.objectiveStartedAt || hasLocalCurrentStart)
+      : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt || hasLocalCurrentStart);
 
     if (hasStartedCurrent && !showInstructions) {
       setIsExamActive(true);
@@ -395,7 +403,7 @@ export default function ExamLayout() {
       setKeepAwake(false);
       stopSpeech();
     };
-  }, [exam.objectiveStartedAt, exam.cqSqStartedAt, showInstructions, activeSection, exam.objectiveStatus, exam.cqSqStatus]);
+  }, [exam.objectiveStartedAt, exam.cqSqStartedAt, showInstructions, activeSection, exam.objectiveStatus, exam.cqSqStatus, submissionId, exam.id]);
 
 
   const handleStartExam = async (sectionToStart: 'objective' | 'cqsq', mode: 'omr' | 'full' = 'full') => {
@@ -428,14 +436,23 @@ export default function ExamLayout() {
       });
 
       if (!res.ok) throw new Error("Failed to start exam session");
+      const startData = await res.json().catch(() => ({}));
 
-      // ✅ Patch the exam context with the new startedAt so Timer picks it up immediately
-      // Record the time BEFORE awaiting anything else — closest to the true server time
-      const startedNow = new Date().toISOString();
+      // ✅ Patch the exam context with the true startedAt so Timer picks it up immediately
+      const serverStartedAt = sectionToStart === 'objective' ? startData.objectiveStartedAt : startData.cqSqStartedAt;
+      const startedNow = serverStartedAt || new Date().toISOString();
       if (sectionToStart === 'objective') {
-        patchExam({ objectiveStartedAt: exam.objectiveStartedAt || startedNow, objectiveStatus: 'IN_PROGRESS' });
+        const effStart = exam.objectiveStartedAt || startedNow;
+        patchExam({ objectiveStartedAt: effStart, objectiveStatus: 'IN_PROGRESS' });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`exam-start-objective-${exam.id}-${submissionId}`, effStart);
+        }
       } else if (sectionToStart === 'cqsq') {
-        patchExam({ cqSqStartedAt: exam.cqSqStartedAt || startedNow, cqSqStatus: 'IN_PROGRESS' });
+        const effStart = exam.cqSqStartedAt || startedNow;
+        patchExam({ cqSqStartedAt: effStart, cqSqStatus: 'IN_PROGRESS' });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`exam-start-cqsq-${exam.id}-${submissionId}`, effStart);
+        }
       }
 
       // 3. Update local state to show exam
@@ -1208,13 +1225,18 @@ export default function ExamLayout() {
             type="objective_submitted"
             stats={{ answered: answeredCount, total: totalQuestions }}
             onAction={async () => {
+              let serverCqStart: string | null = null;
               try {
                 // 1. Tell backend that cqsq section is starting
-                await fetch(`/api/exams/${exam.id}/start`, {
+                const res = await fetch(`/api/exams/${exam.id}/start`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ section: 'cqsq' })
                 });
+                if (res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  serverCqStart = data.cqSqStartedAt;
+                }
               } catch (err) {
                 console.error("Failed to start cqsq section on server:", err);
               }
@@ -1229,17 +1251,22 @@ export default function ExamLayout() {
                 localStorage.setItem(examModeStorageKey, 'full');
               }
 
-              // 3. Patch exam state in memory
-              const nowIso = new Date().toISOString();
+              // 3. Patch exam state in memory and localStorage
+              const nowIso = serverCqStart || new Date().toISOString();
+              const effectiveCqStart = exam.cqSqStartedAt || nowIso;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(`exam-start-cqsq-${exam.id}-${submissionId}`, effectiveCqStart);
+              }
               patchExam({
                 objectiveStatus: 'SUBMITTED',
                 cqSqStatus: 'IN_PROGRESS',
-                cqSqStartedAt: exam.cqSqStartedAt || nowIso
+                cqSqStartedAt: effectiveCqStart
               });
 
               // 4. Update view mode and section
               setExamViewMode('full');
               setActiveSection('cqsq');
+              setShowInstructions(false);
               setTransitionState(null);
               navigateToQuestion(0);
             }}

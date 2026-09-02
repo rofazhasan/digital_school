@@ -269,6 +269,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       objectiveStartedAt: (existingSubmission as any)?.objectiveStartedAt || null,
       cqSqStatus: (existingSubmission as any)?.cqSqStatus || 'PENDING',
       cqSqStartedAt: (existingSubmission as any)?.cqSqStartedAt || null,
+      serverTime: new Date().toISOString(),
     });
   } catch (error) {
     console.error(`[OnlineExamAPI] Error loading exam ${examId}:`, error);

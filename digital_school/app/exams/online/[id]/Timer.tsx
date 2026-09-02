@@ -20,75 +20,71 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredTimeUp = useRef(false);
+
+  const isObjective = activeSection === 'objective';
+  const sectionDurationMin = isObjective
+    ? ((Number(exam.objectiveTime) > 0 ? Number(exam.objectiveTime) : Number(exam.duration)) || 0)
+    : ((Number(exam.cqSqTime) > 0
+        ? Number(exam.cqSqTime)
+        : (Number(exam.duration) > Number(exam.objectiveTime || 0)
+            ? Number(exam.duration) - Number(exam.objectiveTime || 0)
+            : Number(exam.duration))) || 0);
+
+  const durationSeconds = sectionDurationMin * 60;
+  const submissionId = exam.submissionId || 'active';
+
+  const sectionStartedAt = isObjective
+    ? (exam.objectiveStartedAt || (typeof window !== 'undefined' ? localStorage.getItem(`exam-start-objective-${exam.id}-${submissionId}`) : null))
+    : (exam.cqSqStartedAt || (typeof window !== 'undefined' ? localStorage.getItem(`exam-start-cqsq-${exam.id}-${submissionId}`) : null));
+
+  const checkTime = React.useCallback(() => {
+    if (!sectionStartedAt) {
+      setSecondsLeft(durationSeconds);
+      return;
+    }
+
+    const startTime = new Date(sectionStartedAt).getTime();
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - startTime) / 1000);
+    const remaining = Math.max(0, durationSeconds - elapsedSeconds);
+
+    setSecondsLeft(remaining);
+
+    if (remaining <= 0 && !hasTriggeredTimeUp.current) {
+      hasTriggeredTimeUp.current = true;
+      if (onTimeUp) {
+        onTimeUp();
+      }
+    }
+  }, [sectionStartedAt, durationSeconds, onTimeUp]);
 
   useEffect(() => {
-    const isObjective = activeSection === 'objective';
-    const sectionTime = (isObjective ? exam.objectiveTime : exam.cqSqTime) || exam.duration;
-    const durationSeconds = sectionTime * 60;
     setTotalDuration(durationSeconds);
-
-    const calculateTimeLeft = () => {
-      const sectionStartedAt = isObjective ? exam.objectiveStartedAt : exam.cqSqStartedAt;
-
-      if (sectionStartedAt) {
-        const startTime = new Date(sectionStartedAt).getTime();
-        const now = Date.now();
-        const elapsedSeconds = Math.floor((now - startTime) / 1000);
-        return Math.max(0, durationSeconds - elapsedSeconds);
-      }
-      return durationSeconds;
-    };
-
-    setSecondsLeft(calculateTimeLeft());
-  }, [exam.duration, exam.objectiveTime, exam.cqSqTime, exam.objectiveStartedAt, exam.cqSqStartedAt, activeSection]);
-
-  useEffect(() => {
-    const checkTime = () => {
-      const isObjective = activeSection === 'objective';
-      const sectionStartedAt = isObjective ? exam.objectiveStartedAt : exam.cqSqStartedAt;
-      const sectionTime = (isObjective ? exam.objectiveTime : exam.cqSqTime) || exam.duration;
-
-      if (sectionStartedAt) {
-        const startTime = new Date(sectionStartedAt).getTime();
-        const now = Date.now();
-        const durationSeconds = sectionTime * 60;
-        const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
-
-        if (newTime !== secondsLeft) {
-          setSecondsLeft(newTime);
-        }
-
-        if (newTime <= 0) {
-          if (onTimeUp) onTimeUp();
-        }
-      } else {
-        setSecondsLeft(prev => {
-          const next = Math.max(0, prev - 1);
-          if (next === 0 && onTimeUp) onTimeUp();
-          return next;
-        });
-      }
-    };
-
+    hasTriggeredTimeUp.current = false;
     checkTime();
+
     intervalRef.current = setInterval(checkTime, 1000);
 
-    // Visibility Listener: Recalculate immediately when returning to tab
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkTime();
-      }
+    // Instant Recalculate on tab focus, visibility change, and online recovery
+    const handleSync = () => {
+      checkTime();
     };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    document.addEventListener("visibilitychange", handleSync);
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("online", handleSync);
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleSync);
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("online", handleSync);
     };
-  }, [onTimeUp, exam.duration, activeSection, exam.objectiveStartedAt, exam.cqSqStartedAt, exam.objectiveTime, exam.cqSqTime]);
+  }, [checkTime, durationSeconds, activeSection]);
 
   const percentage = totalDuration > 0 ? (secondsLeft / totalDuration) * 100 : 0;
   const isUrgent = secondsLeft <= 60; // 1 minute
