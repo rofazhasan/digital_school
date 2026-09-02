@@ -88,12 +88,29 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const skip = (page - 1) * limit;
 
     // 3. Construct a dynamic where clause for professional-grade filtering
+    let subjectFilterClause: Prisma.QuestionWhereInput | undefined = undefined;
+    if (subject && subject.trim() !== '' && subject.toLowerCase() !== 'all') {
+      const sClean = subject.trim().toLowerCase();
+      const aliasTerms = [subject.trim()];
+      for (const [key, list] of Object.entries(aliases)) {
+        if (sClean === key || list.some(a => sClean.includes(a) || a.includes(sClean))) {
+          aliasTerms.push(key, ...list);
+        }
+      }
+      const uniqueTerms = Array.from(new Set(aliasTerms));
+      subjectFilterClause = {
+        OR: uniqueTerms.map(term => ({
+          subject: { contains: term, mode: 'insensitive' as const }
+        }))
+      };
+    }
+
     const whereClause: Prisma.QuestionWhereInput = {
       classId: exam.classId, // CRITICAL: Only show questions for the exam's class
       // Add other filters if they are provided
       ...(type && { type }),
       ...(difficulty && { difficulty }),
-      ...(subject && { subject: { contains: subject, mode: 'insensitive' } }),
+      ...(subjectFilterClause ? subjectFilterClause : {}),
       ...(topic && { topic: { contains: topic, mode: 'insensitive' } }),
       ...(startDate && endDate ? {
         createdAt: {
@@ -402,5 +419,32 @@ export async function POST(
       return NextResponse.json({ error: 'An exam set with this name already exists for this exam.' }, { status: 409 });
     }
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+// PATCH handler for updating exam settings (e.g. subjectsConfig, subjectType)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: examId } = await params;
+    const body = await request.json();
+    const { subjectsConfig, subjectType, totalMarks } = body;
+
+    const prisma = await DatabaseClient.getInstance();
+    const updatedExam = await prisma.exam.update({
+      where: { id: examId },
+      data: {
+        ...(subjectType && { subjectType }),
+        ...(subjectsConfig !== undefined && { subjectsConfig }),
+        ...(totalMarks !== undefined && { totalMarks: Number(totalMarks) }),
+      }
+    });
+
+    return NextResponse.json({ success: true, exam: updatedExam });
+  } catch (error: any) {
+    console.error('PATCH /api/exams/[id] Error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update exam' }, { status: 500 });
   }
 }

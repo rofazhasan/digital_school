@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -126,13 +126,28 @@ const MathRenderer = ({ content, inline = true }: { content: string; inline?: bo
   }
 };
 
-const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, selectionReason }: {
+const QuestionCard = ({
+  question,
+  onAdd,
+  onRemove,
+  isAdded,
+  isSelectable,
+  selectionReason,
+  isMS,
+  configuredSubjects,
+  assignedSubject,
+  onAssignSubject,
+}: {
   question: Question;
   onAdd?: (q: Question) => void;
   onRemove?: (id: string) => void;
   isAdded: boolean;
   isSelectable: boolean;
   selectionReason?: string;
+  isMS?: boolean;
+  configuredSubjects?: SubjectConfigItem[];
+  assignedSubject?: string;
+  onAssignSubject?: (subj: string) => void;
 }) => (
   <div className={`p-4 border rounded-lg mb-3 transition-all ${isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
     <div className="grid grid-cols-[1fr_auto] gap-4 relative w-full items-start">
@@ -375,7 +390,28 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
         {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ', 'CMA', 'MPC'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
-        <Badge variant="outline">Sub: {question.subject}</Badge>
+        {isMS && configuredSubjects && configuredSubjects.length > 0 ? (
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border text-xs">
+            <span className="font-bold text-muted-foreground text-[10px]">Subject:</span>
+            <select
+              value={assignedSubject || question.subject || configuredSubjects[0]?.name || ''}
+              onChange={(e) => onAssignSubject && onAssignSubject(e.target.value)}
+              disabled={isAdded}
+              className="text-xs font-bold py-0.5 px-1.5 rounded border bg-background text-foreground border-input focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-85 disabled:cursor-not-allowed"
+            >
+              {configuredSubjects.map(s => (
+                <option key={s.name} value={s.name}>
+                  {s.name} ({s.totalMarks}M)
+                </option>
+              ))}
+              {question.subject && !configuredSubjects.some(s => s.name.toLowerCase() === question.subject.toLowerCase()) && (
+                <option value={question.subject}>{question.subject} (Bank Tag)</option>
+              )}
+            </select>
+          </div>
+        ) : (
+          question.subject && <Badge variant="outline">Sub: {question.subject}</Badge>
+        )}
         {question.topic && <Badge variant="outline" className="text-teal-600 border-teal-600 dark:text-teal-400 dark:border-teal-400">{question.topic}</Badge>}
         {selectionReason && (
           <Badge variant="outline" className="text-xs">{selectionReason}</Badge>
@@ -486,6 +522,9 @@ export default function ExamBuilderPage() {
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [questionSubjectOverrides, setQuestionSubjectOverrides] = useState<Record<string, string>>({});
+  const [configureSubjectsOpen, setConfigureSubjectsOpen] = useState(false);
+  const [editingSubjects, setEditingSubjects] = useState<SubjectConfigItem[]>([]);
 
   const handleBulkAddQuestions = (newQuestions: Question[]) => {
     setSelectedQuestions((prev) => {
@@ -684,8 +723,31 @@ export default function ExamBuilderPage() {
     if (!isMS) return [];
     const subjects = (exam?.subjectsConfig as any)?.subjects;
     if (Array.isArray(subjects) && subjects.length > 0) return subjects;
+
+    // Fallback: If exam is MS but subjectsConfig is not pre-configured,
+    // strictly follow and discover the subjects present in the questions themselves!
+    const discoveredSubjectNames = Array.from(new Set([
+      ...selectedQuestions.map(q => q.subject).filter(Boolean),
+      ...(questionsData?.data?.map(q => q.subject).filter(Boolean) || [])
+    ])) as string[];
+
+    if (discoveredSubjectNames.length > 0) {
+      const marksPerSubj = Math.floor((exam?.totalMarks || 100) / discoveredSubjectNames.length);
+      return discoveredSubjectNames.map((name, i) => ({
+        name,
+        totalMarks: i === discoveredSubjectNames.length - 1
+          ? (exam?.totalMarks || 100) - marksPerSubj * (discoveredSubjectNames.length - 1)
+          : marksPerSubj,
+        isMandatory: true
+      }));
+    }
+
     return [];
-  }, [isMS, exam?.subjectsConfig]);
+  }, [isMS, exam?.subjectsConfig, exam?.totalMarks, selectedQuestions, questionsData?.data]);
+
+  const getQuestionSubject = useCallback((q: Question): string => {
+    return questionSubjectOverrides[q.id] || q.subject || '';
+  }, [questionSubjectOverrides]);
 
   // Subject matching helper with aliases and normalization
   const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
@@ -718,8 +780,9 @@ export default function ExamBuilderPage() {
 
   const findConfiguredSubject = useCallback((question: Question): SubjectConfigItem | undefined => {
     if (!isMS || configuredSubjects.length === 0) return undefined;
-    return configuredSubjects.find(s => matchSubject(question.subject, s.name));
-  }, [isMS, configuredSubjects, matchSubject]);
+    const sub = getQuestionSubject(question);
+    return configuredSubjects.find(s => matchSubject(sub, s.name));
+  }, [isMS, configuredSubjects, matchSubject, getQuestionSubject]);
 
   // Track marks and questions selected per subject for MS exams
   const subjectMarksBreakdown = useMemo(() => {
@@ -739,7 +802,8 @@ export default function ExamBuilderPage() {
     });
 
     selectedQuestions.forEach(q => {
-      const matched = configuredSubjects.find(s => matchSubject(q.subject, s.name));
+      const sub = getQuestionSubject(q);
+      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
       if (matched) {
         const entry = map.get(matched.name);
         if (entry) {
@@ -750,7 +814,7 @@ export default function ExamBuilderPage() {
     });
 
     return map;
-  }, [isMS, configuredSubjects, selectedQuestions, matchSubject]);
+  }, [isMS, configuredSubjects, selectedQuestions, matchSubject, getQuestionSubject]);
 
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
@@ -801,10 +865,14 @@ export default function ExamBuilderPage() {
 
   // MS Validation: every configured subject must have selected questions equaling its totalMarks
   const isMSValid = useMemo(() => {
-    if (!isMS || configuredSubjects.length === 0) return false;
-    for (const s of configuredSubjects) {
-      const entry = subjectMarksBreakdown.get(s.name);
-      if (!entry || entry.current !== s.totalMarks) {
+    if (!isMS) return true;
+    if (configuredSubjects.length === 0) return false;
+
+    // Check mandatory subjects have reached their exact totalMarks
+    for (const subj of configuredSubjects) {
+      const entry = subjectMarksBreakdown.get(subj.name);
+      const current = entry?.current || 0;
+      if (subj.isMandatory && current !== subj.totalMarks) {
         return false;
       }
     }
@@ -823,7 +891,7 @@ export default function ExamBuilderPage() {
   const selectedQuestionIds = useMemo(() => new Set(selectedQuestions.map(q => q.id)), [selectedQuestions]);
 
   // Helper function to check if a question can be added based on exam constraints
-  const canAddQuestion = useCallback((question: Question) => {
+  const canAddQuestion = useCallback((question: Question, targetSubjectOverride?: string) => {
     if (!exam) return false;
 
     // Check if already selected
@@ -831,8 +899,15 @@ export default function ExamBuilderPage() {
 
     // Multiple Subject (MS) Check: Ensure subject quota is not exceeded
     if (isMS && configuredSubjects.length > 0) {
-      const matched = findConfiguredSubject(question);
-      if (!matched) return false;
+      const sub = targetSubjectOverride || getQuestionSubject(question);
+      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
+      if (!matched) {
+        // If question doesn't match a subject yet, allow adding if ANY configured subject has room
+        return configuredSubjects.some(s => {
+          const entry = subjectMarksBreakdown.get(s.name);
+          return (entry?.current || 0) + question.marks <= s.totalMarks;
+        });
+      }
       const entry = subjectMarksBreakdown.get(matched.name);
       const current = entry?.current || 0;
       if (current + question.marks > matched.totalMarks) {
@@ -854,7 +929,7 @@ export default function ExamBuilderPage() {
     }
 
     return true;
-  }, [exam, isMS, configuredSubjects, findConfiguredSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
+  }, [exam, isMS, configuredSubjects, matchSubject, getQuestionSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
 
   // Helper function to get selection reason for tooltip
   const getSelectionReason = useCallback((question: Question) => {
@@ -864,9 +939,10 @@ export default function ExamBuilderPage() {
 
     // Multiple Subject (MS) Tooltip
     if (isMS && configuredSubjects.length > 0) {
-      const matched = findConfiguredSubject(question);
+      const sub = getQuestionSubject(question);
+      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
       if (!matched) {
-        return `Subject "${question.subject || 'Unknown'}" is not in configured exam subjects`;
+        return `Assign to an exam section with open quota`;
       }
       const entry = subjectMarksBreakdown.get(matched.name);
       const current = entry?.current || 0;
@@ -889,12 +965,79 @@ export default function ExamBuilderPage() {
     }
 
     return 'Add Question';
-  }, [exam, isMS, configuredSubjects, findConfiguredSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
+  }, [exam, isMS, configuredSubjects, getQuestionSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
 
   // Event Handlers
   const handleAddQuestion = (question: Question) => {
-    if (!selectedQuestionIds.has(question.id) && canAddQuestion(question)) {
-      setSelectedQuestions(prev => [...prev, question]);
+    let sub = getQuestionSubject(question);
+    if (isMS && configuredSubjects.length > 0) {
+      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
+      if (!matched) {
+        // Auto-assign to the first subject that has room
+        const available = configuredSubjects.find(s => {
+          const entry = subjectMarksBreakdown.get(s.name);
+          return (entry?.current || 0) + question.marks <= s.totalMarks;
+        });
+        if (available) {
+          sub = available.name;
+          setQuestionSubjectOverrides(prev => ({ ...prev, [question.id]: available.name }));
+        }
+      }
+    }
+    const qWithSubject = { ...question, subject: sub || question.subject };
+    if (!selectedQuestionIds.has(question.id) && canAddQuestion(qWithSubject)) {
+      setSelectedQuestions(prev => [...prev, qWithSubject]);
+    }
+  };
+
+  const handleAssignSubject = (questionId: string, newSubject: string) => {
+    setQuestionSubjectOverrides(prev => ({ ...prev, [questionId]: newSubject }));
+    setSelectedQuestions(prev => prev.map(q => {
+      if (q.id === questionId) {
+        return { ...q, subject: newSubject };
+      }
+      return q;
+    }));
+  };
+
+  const handleOpenConfigureSubjects = () => {
+    if (configuredSubjects.length > 0) {
+      setEditingSubjects([...configuredSubjects]);
+    } else {
+      setEditingSubjects([
+        { name: 'Physics', totalMarks: Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+        { name: 'Chemistry', totalMarks: Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+        { name: 'Higher Math', totalMarks: (exam?.totalMarks || 100) - 2 * Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+      ]);
+    }
+    setConfigureSubjectsOpen(true);
+  };
+
+  const handleSaveSubjectsConfig = async () => {
+    if (!examId) return;
+    const totalAssigned = editingSubjects.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0);
+    if (totalAssigned !== exam?.totalMarks) {
+      toast.warning(`Total subject marks (${totalAssigned}) does not match exam total marks (${exam?.totalMarks}).`);
+    }
+    try {
+      const res = await fetch(`/api/exams/${examId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subjectType: 'MS',
+          subjectsConfig: {
+            subjects: editingSubjects,
+            mandatoryCount: editingSubjects.filter(s => s.isMandatory).length,
+            optionalCount: editingSubjects.filter(s => !s.isMandatory).length,
+          }
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update subjects configuration');
+      toast.success('Subject configuration updated successfully!');
+      setConfigureSubjectsOpen(false);
+      fetchExamData(filters, dateRange);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update subjects');
     }
   };
 
@@ -1388,6 +1531,16 @@ export default function ExamBuilderPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" size="sm" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
                   <Button variant="secondary" size="sm" onClick={() => router.push('/question-bank')} className="bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-100"><BookOpen className="mr-2 h-4 w-4" /> Question Bank</Button>
+                  {isMS && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenConfigureSubjects}
+                      className="border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 font-bold shadow-sm"
+                    >
+                      <Settings className="mr-1.5 h-4 w-4" /> Configure Quotas
+                    </Button>
+                  )}
                   <Button
                     variant="default"
                     size="sm"
@@ -1496,7 +1649,25 @@ export default function ExamBuilderPage() {
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
-                    <Input placeholder="Search by subject..." value={filters.subject} onChange={(e) => handleFilterChange('subject', e.target.value)} />
+                    {isMS && configuredSubjects.length > 0 ? (
+                      <Select value={filters.subject || 'all'} onValueChange={(v) => handleFilterChange('subject', v)}>
+                        <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Subjects ({questionsData?.meta.total ?? 0})</SelectItem>
+                          {configuredSubjects.map(s => {
+                            const stats = subjectMarksBreakdown.get(s.name);
+                            const curr = stats?.current || 0;
+                            return (
+                              <SelectItem key={s.name} value={s.name}>
+                                {s.name} ({curr}/{s.totalMarks} M){curr === s.totalMarks ? ' ✓' : ''}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input placeholder="Search by subject..." value={filters.subject} onChange={(e) => handleFilterChange('subject', e.target.value)} />
+                    )}
                     <Input placeholder="Search by topic..." onChange={(e) => handleFilterChange('topic', e.target.value)} />
                     <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
                       <SelectTrigger><SelectValue placeholder="Filter by Type" /></SelectTrigger>
@@ -1550,6 +1721,10 @@ export default function ExamBuilderPage() {
                           isAdded={isAdded}
                           isSelectable={canAddQuestion(q)}
                           selectionReason={getSelectionReason(q)}
+                          isMS={isMS}
+                          configuredSubjects={configuredSubjects}
+                          assignedSubject={getQuestionSubject(q)}
+                          onAssignSubject={(newSubj) => handleAssignSubject(q.id, newSubj)}
                         />
                       );
                     })}
@@ -1691,7 +1866,74 @@ export default function ExamBuilderPage() {
                   </div>
                   <h3 className="text-md font-semibold mb-2">Selected Questions ({selectedQuestions.length})</h3>
                   <ScrollArea className="h-[45vh] pr-4">
-                    {selectedQuestions.length > 0 ? selectedQuestions.map(q => <QuestionCard key={q.id} question={q} onRemove={handleRemoveQuestion} isAdded={true} isSelectable={false} />) : <div className="text-center py-10 border-2 border-dashed rounded-lg"><p className="text-muted-foreground">Add questions from the bank.</p></div>}
+                    {selectedQuestions.length > 0 ? (
+                      isMS && configuredSubjects.length > 0 ? (
+                        <div className="space-y-4">
+                          {configuredSubjects.map(subj => {
+                            const stats = subjectMarksBreakdown.get(subj.name);
+                            const curr = stats?.current || 0;
+                            const target = subj.totalMarks;
+                            const isDone = curr === target;
+                            const subjQuestions = selectedQuestions.filter(q => {
+                              const s = getQuestionSubject(q);
+                              return matchSubject(s, subj.name);
+                            });
+
+                            return (
+                              <div key={subj.name} className="border rounded-lg p-3 bg-white dark:bg-slate-900/60 shadow-sm">
+                                <div className="flex items-center justify-between pb-2 mb-2 border-b">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-foreground">{subj.name}</span>
+                                    <Badge
+                                      variant={isDone ? "default" : "outline"}
+                                      className={`text-[10px] px-1.5 py-0 font-bold ${
+                                        isDone ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'text-amber-600 border-amber-300'
+                                      }`}
+                                    >
+                                      {curr} / {target} M {isDone ? '✓' : ''}
+                                    </Badge>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground font-semibold">{subjQuestions.length} Questions</span>
+                                </div>
+                                {subjQuestions.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {subjQuestions.map(q => (
+                                      <QuestionCard
+                                        key={q.id}
+                                        question={q}
+                                        onRemove={handleRemoveQuestion}
+                                        isAdded={true}
+                                        isSelectable={false}
+                                        isMS={isMS}
+                                        configuredSubjects={configuredSubjects}
+                                        assignedSubject={getQuestionSubject(q)}
+                                        onAssignSubject={(newSubj) => handleAssignSubject(q.id, newSubj)}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground italic py-3 text-center">No questions added yet for {subj.name}.</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        selectedQuestions.map(q => (
+                          <QuestionCard
+                            key={q.id}
+                            question={q}
+                            onRemove={handleRemoveQuestion}
+                            isAdded={true}
+                            isSelectable={false}
+                          />
+                        ))
+                      )
+                    ) : (
+                      <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                        <p className="text-muted-foreground">Add questions from the bank.</p>
+                      </div>
+                    )}
                   </ScrollArea>
                   <TooltipProvider>
                     <Tooltip>
@@ -1991,6 +2233,114 @@ export default function ExamBuilderPage() {
               onQuestionsPermanentlySaved={() => fetchExamData(filters, dateRange)}
             />
           )}
+
+          {/* Dialog for Configuring MS Subjects and Quotas */}
+          <Dialog open={configureSubjectsOpen} onOpenChange={setConfigureSubjectsOpen}>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-primary" />
+                  Configure MS Subject Quotas
+                </DialogTitle>
+                <DialogDescription>
+                  Configure the subjects and their exact required marks for this Multi-Subject Exam ({exam?.totalMarks} Total Marks).
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto pr-1">
+                {editingSubjects.map((subj, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50 dark:bg-slate-900/40">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-muted-foreground">Subject Name</label>
+                      <Input
+                        value={subj.name}
+                        onChange={(e) => {
+                          const updated = [...editingSubjects];
+                          updated[idx] = { ...updated[idx], name: e.target.value };
+                          setEditingSubjects(updated);
+                        }}
+                        placeholder="e.g. Physics"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className="text-[11px] font-bold text-muted-foreground">Target Marks</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={subj.totalMarks}
+                        onChange={(e) => {
+                          const updated = [...editingSubjects];
+                          updated[idx] = { ...updated[idx], totalMarks: Number(e.target.value) || 0 };
+                          setEditingSubjects(updated);
+                        }}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="pt-4 flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant={subj.isMandatory ? "default" : "outline"}
+                        size="sm"
+                        className={`h-8 text-xs font-bold ${subj.isMandatory ? 'bg-primary' : ''}`}
+                        onClick={() => {
+                          const updated = [...editingSubjects];
+                          updated[idx] = { ...updated[idx], isMandatory: !subj.isMandatory };
+                          setEditingSubjects(updated);
+                        }}
+                      >
+                        {subj.isMandatory ? 'Mandatory' : 'Optional'}
+                      </Button>
+                      {editingSubjects.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setEditingSubjects(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingSubjects(prev => [
+                      ...prev,
+                      { name: `Subject ${prev.length + 1}`, totalMarks: 25, isMandatory: true }
+                    ]);
+                  }}
+                  className="w-full border-dashed"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" /> Add Another Subject
+                </Button>
+
+                <div className="flex justify-between items-center p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-semibold">
+                  <span>Sum of Subject Marks:</span>
+                  <span className={
+                    editingSubjects.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0) === exam?.totalMarks
+                      ? "text-emerald-600 font-bold"
+                      : "text-amber-600 font-bold"
+                  }>
+                    {editingSubjects.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0)} / {exam?.totalMarks} Marks
+                  </span>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setConfigureSubjectsOpen(false)}>Cancel</Button>
+                <Button onClick={handleSaveSubjectsConfig} className="font-bold">Save Quotas & Sync</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </MathJaxContext>
