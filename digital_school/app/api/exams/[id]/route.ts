@@ -18,6 +18,18 @@ const getQuestionsQuerySchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
+// Global subject aliases dictionary
+const SUBJECT_ALIASES: Record<string, string[]> = {
+  'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+  'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+  'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+  'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+  'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+  'bangla': ['বাংলা', 'bengali'],
+  'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+  'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+};
+
 // Subject matching helper with aliases
 function matchSubject(questionSubject: string | undefined | null, targetSubjectName: string): boolean {
   if (!questionSubject || !targetSubjectName) return false;
@@ -26,18 +38,7 @@ function matchSubject(questionSubject: string | undefined | null, targetSubjectN
   if (qClean === tClean) return true;
   if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
 
-  const aliases: Record<string, string[]> = {
-    'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
-    'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
-    'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
-    'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
-    'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
-    'bangla': ['বাংলা', 'bengali'],
-    'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
-    'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
-  };
-
-  for (const [key, list] of Object.entries(aliases)) {
+  for (const [key, list] of Object.entries(SUBJECT_ALIASES)) {
     const isTarget = tClean === key || list.some(a => tClean.includes(a));
     const isQuestion = qClean === key || list.some(a => qClean.includes(a));
     if (isTarget && isQuestion) return true;
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (subject && subject.trim() !== '' && subject.toLowerCase() !== 'all') {
       const sClean = subject.trim().toLowerCase();
       const aliasTerms = [subject.trim()];
-      for (const [key, list] of Object.entries(aliases)) {
+      for (const [key, list] of Object.entries(SUBJECT_ALIASES)) {
         if (sClean === key || list.some(a => sClean.includes(a) || a.includes(sClean))) {
           aliasTerms.push(key, ...list);
         }
