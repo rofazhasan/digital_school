@@ -2975,6 +2975,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       </CardTitle>
                     </div>
                   </div>
+                  <CardContent className="p-8 md:p-12">
                     {/* Subject Filter Bar for MS Exams */}
                     {isMS && msSubjects.length > 0 && (
                       <div className="flex flex-wrap items-center gap-2 mb-6 p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100 dark:border-indigo-900/40">
