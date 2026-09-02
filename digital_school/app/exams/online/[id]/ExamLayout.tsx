@@ -218,6 +218,7 @@ export default function ExamLayout() {
   const hasServerSectionStarted = activeSection === 'objective'
     ? (exam.objectiveStatus !== 'PENDING' || !!exam.objectiveStartedAt)
     : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt);
+  const hasCurrentSectionStarted = hasServerSectionStarted;
 
   const [showInstructions, setShowInstructions] = useState(!hasServerSectionStarted);
   const [isStarting, setIsStarting] = useState(false);
