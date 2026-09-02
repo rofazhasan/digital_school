@@ -24,7 +24,7 @@ import { startOfDay, endOfDay } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { CheckSquare } from "lucide-react";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, shuffleArray } from "@/lib/utils";
 
 import { CMARenderer, MPCRenderer } from '@/components/ui/QuestionRenderers';
 import { BulkAddExamQuestionsDialog } from './BulkAddExamQuestionsDialog';
@@ -547,9 +547,33 @@ export default function ExamBuilderPage() {
   const handleSelectAll = () => {
     if (!questionsData?.data) return;
 
-    const newQuestions = questionsData.data.filter(q =>
-      !selectedQuestionIds.has(q.id) && canAddQuestion(q)
-    );
+    const newQuestions: Question[] = [];
+    const runningSubMarks = new Map<string, number>();
+    if (isMS && configuredSubjects.length > 0) {
+      configuredSubjects.forEach(s => {
+        const entry = subjectMarksBreakdown.get(s.name);
+        runningSubMarks.set(s.name, entry?.current || 0);
+      });
+    }
+    let runningMarks = currentMarks;
+
+    for (const q of questionsData.data) {
+      if (selectedQuestionIds.has(q.id)) continue;
+      if (isMS && configuredSubjects.length > 0) {
+        const matched = findConfiguredSubject(q);
+        if (!matched) continue;
+        const cur = runningSubMarks.get(matched.name) || 0;
+        if (cur + q.marks <= matched.totalMarks) {
+          runningSubMarks.set(matched.name, cur + q.marks);
+          newQuestions.push(q);
+        }
+      } else {
+        if (canAddQuestion(q) && (runningMarks + q.marks <= (exam?.totalMarks || 0))) {
+          runningMarks += q.marks;
+          newQuestions.push(q);
+        }
+      }
+    }
 
     if (newQuestions.length === 0) {
       toast.info("No new valid questions to add from this page.");
@@ -588,9 +612,33 @@ export default function ExamBuilderPage() {
 
       const allMatchingQuestions: Question[] = data.questions.data;
 
-      const newQuestions = allMatchingQuestions.filter(q =>
-        !selectedQuestionIds.has(q.id) && canAddQuestion(q)
-      );
+      const newQuestions: Question[] = [];
+      const runningSubMarks = new Map<string, number>();
+      if (isMS && configuredSubjects.length > 0) {
+        configuredSubjects.forEach(s => {
+          const entry = subjectMarksBreakdown.get(s.name);
+          runningSubMarks.set(s.name, entry?.current || 0);
+        });
+      }
+      let runningMarks = currentMarks;
+
+      for (const q of allMatchingQuestions) {
+        if (selectedQuestionIds.has(q.id)) continue;
+        if (isMS && configuredSubjects.length > 0) {
+          const matched = findConfiguredSubject(q);
+          if (!matched) continue;
+          const cur = runningSubMarks.get(matched.name) || 0;
+          if (cur + q.marks <= matched.totalMarks) {
+            runningSubMarks.set(matched.name, cur + q.marks);
+            newQuestions.push(q);
+          }
+        } else {
+          if (canAddQuestion(q) && (runningMarks + q.marks <= (exam?.totalMarks || 0))) {
+            runningMarks += q.marks;
+            newQuestions.push(q);
+          }
+        }
+      }
 
       if (newQuestions.length === 0) {
         toast.info("No new valid questions found in database matching criteria.");
@@ -722,8 +770,23 @@ export default function ExamBuilderPage() {
 
   const mcqMarks = useMemo(() => selectedMCQQuestions.reduce((total, q) => total + q.marks, 0), [selectedMCQQuestions]);
 
-  // Total marks is sum of required CQ + required SQ + all MCQ/Objective/Multi-step
-  const currentMarks = useMemo(() => cqMarks + sqMarks + mcqMarks, [cqMarks, sqMarks, mcqMarks]);
+  // For MS exams: total selected marks is the sum of marks across all configured subjects
+  const msCurrentMarks = useMemo(() => {
+    if (!isMS) return 0;
+    let sum = 0;
+    subjectMarksBreakdown.forEach(s => {
+      sum += s.current;
+    });
+    return sum;
+  }, [isMS, subjectMarksBreakdown]);
+
+  // Total marks is sum of required CQ + required SQ + all MCQ/Objective/Multi-step (for SS), or msCurrentMarks (for MS)
+  const currentMarks = useMemo(() => {
+    if (isMS) {
+      return msCurrentMarks;
+    }
+    return cqMarks + sqMarks + mcqMarks;
+  }, [isMS, msCurrentMarks, cqMarks, sqMarks, mcqMarks]);
 
   // Validation logic
   const isMarksMatched = useMemo(() => exam ? currentMarks === exam.totalMarks : false, [currentMarks, exam]);
@@ -914,6 +977,16 @@ export default function ExamBuilderPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper function to shuffle array
+  const shuffleArrayHelper = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   };
 
   // On generate, create N sets with shuffled questions and MCQ options
