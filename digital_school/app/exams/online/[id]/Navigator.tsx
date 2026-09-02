@@ -77,7 +77,7 @@ const NavButton = memo(({
 NavButton.displayName = 'NavButton';
 
 const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
-  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions, isMS, msSubjects } = useExamContext();
+  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions, isMS, msSubjects, matchSubject } = useExamContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const questionList = sortedQuestions || questions || [];
@@ -89,15 +89,22 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
     const subjectsMap = new Map<string, any[]>();
     
     questionList.forEach((q: any) => {
-      const sName = q.subject || 'General';
-      if (!subjectsMap.has(sName)) {
-        subjectsMap.set(sName, []);
+      const qSub = q.subject || 'General';
+      const matchedConfig = msSubjects?.find((s: any) => 
+        matchSubject ? matchSubject(qSub, s.name) : s.name?.toLowerCase().trim() === qSub.toLowerCase().trim()
+      );
+      const canonicalName = matchedConfig ? matchedConfig.name : qSub;
+
+      if (!subjectsMap.has(canonicalName)) {
+        subjectsMap.set(canonicalName, []);
       }
-      subjectsMap.get(sName)!.push(q);
+      subjectsMap.get(canonicalName)!.push(q);
     });
 
     subjectsMap.forEach((qList, sName) => {
-      const subConf = msSubjects?.find((s: any) => s.name?.toLowerCase().trim() === sName.toLowerCase().trim());
+      const subConf = msSubjects?.find((s: any) => 
+        matchSubject ? matchSubject(sName, s.name) : s.name?.toLowerCase().trim() === sName.toLowerCase().trim()
+      );
       groups.push({
         name: sName,
         isMandatory: subConf ? subConf.isMandatory : true,
@@ -106,7 +113,7 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
     });
 
     return groups;
-  }, [isMS, questionList, msSubjects]);
+  }, [isMS, questionList, msSubjects, matchSubject]);
 
   // Helper to render a group of questions
   const renderGroup = (title: string, groupQuestions: any[], startIndex: number) => {

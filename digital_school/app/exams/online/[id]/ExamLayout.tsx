@@ -177,6 +177,7 @@ export default function ExamLayout() {
     setAnswers,
     isMS,
     msSubjects,
+    matchSubject,
     selectedSubject,
     setSelectedSubject,
     attemptedOptionalSubjects,
@@ -973,13 +974,28 @@ export default function ExamLayout() {
                   </div>
                 )}
 
-                {/* Subject Selector Tabs */}
+                {/* Subject Selector Tabs with Live Question Counters */}
                 {msSubjects && msSubjects.length > 0 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                     {msSubjects.map((sub: any) => {
                       const isAttempted = attemptedSubjects?.has(sub.name);
-                      const isCurrentSubject = (currentQuestion?.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim();
-                      const firstQIndex = sortedQuestions.findIndex((q: any) => (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim());
+                      const isCurrentSubject = matchSubject
+                        ? matchSubject(currentQuestion?.subject, sub.name)
+                        : (currentQuestion?.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim();
+                      const firstQIndex = sortedQuestions.findIndex((q: any) => 
+                        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+                      );
+                      
+                      // Count answered vs total questions for this subject
+                      const subjectQuestions = sortedQuestions.filter((q: any) => 
+                        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+                      );
+                      const answeredCount = subjectQuestions.filter((q: any) => {
+                        const val = answers[q.id];
+                        const hasDirect = val !== undefined && val !== null && val !== '' && val !== 'No answer provided' && (typeof val !== 'object' || Object.keys(val).length > 0);
+                        const hasSub = Object.keys(answers).some(k => k.startsWith(`${q.id}_`) && !k.endsWith('_marks') && answers[k] !== undefined && answers[k] !== null && answers[k] !== '');
+                        return hasDirect || hasSub;
+                      }).length;
 
                       return (
                         <button
@@ -1000,8 +1016,11 @@ export default function ExamLayout() {
                           )}
                         >
                           <span>{sub.name}</span>
-                          <span className="text-[10px] opacity-75 font-normal">
-                            ({sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'})
+                          <span className="text-[10px] font-semibold opacity-90">
+                            ({answeredCount}/{subjectQuestions.length})
+                          </span>
+                          <span className="text-[9px] opacity-75 font-normal">
+                            [{sub.isMandatory ? 'আবশ্যক' : 'ঐচ্ছিক'}]
                           </span>
                           {isAttempted && <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
                         </button>

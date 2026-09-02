@@ -557,13 +557,25 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         return false;
     };
 
-    if (isMS && msConfig && Array.isArray(msConfig.subjects)) {
+    if (isMS) {
         const optionalSubjectsAttempted = new Set<string>();
 
         // Build question subject map
         const qList = (typeof targetSet?.questionsJson === 'string' ? JSON.parse(targetSet.questionsJson) : targetSet?.questionsJson) || [];
         
-        msConfig.subjects.forEach((sub: any) => {
+        let msSubjectsList: any[] = Array.isArray(msConfig?.subjects) && msConfig.subjects.length > 0 ? msConfig.subjects : [];
+        if (msSubjectsList.length === 0) {
+            const rawSubjects = (qList as any[]).map((q: any) => q.subject).filter(Boolean);
+            const distinct: string[] = [];
+            rawSubjects.forEach((rs: string) => {
+                if (!distinct.some(d => matchSubjectName(rs, d))) {
+                    distinct.push(rs);
+                }
+            });
+            msSubjectsList = distinct.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
+        }
+
+        msSubjectsList.forEach((sub: any) => {
             const subName = sub.name;
             const subQuestions = (qList as any[]).filter((q: any) => matchSubjectName(q.subject, subName));
             let subScore = 0;
@@ -602,12 +614,38 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             }
         });
 
-        const maxOptionalAllowed = Number(msConfig.requiredOptionalCount) || 1;
+        const maxOptionalAllowed = Number(msConfig?.requiredOptionalCount) || 1;
         if (optionalSubjectsAttempted.size > maxOptionalAllowed) {
             isDisqualified = true;
             (answers as any)._suspended = true;
             (answers as any)._suspensionReason = `Disqualified: Answered ${optionalSubjectsAttempted.size} optional subjects while only ${maxOptionalAllowed} allowed.`;
         }
+
+        // Aggregate multi-subject score: mandatory subjects + allowed optional subjects
+        let msTotalScore = 0;
+        let msMcqMarks = 0;
+        let msCqMarks = 0;
+        let msSqMarks = 0;
+
+        msSubjectsList.forEach((sub: any) => {
+            const subBreakdown = subjectWiseBreakdown[sub.name];
+            if (!subBreakdown) return;
+            if (sub.isMandatory || (!sub.isMandatory && subBreakdown.attempted && !isDisqualified)) {
+                msTotalScore += subBreakdown.totalScore;
+            }
+        });
+
+        (qList as any[]).forEach((q: any) => {
+            const mark = (answers as any)[`${q.id}_marks`] || 0;
+            if (q.type === 'CQ') msCqMarks += mark;
+            else if (q.type === 'SQ' || q.type === 'DESCRIPTIVE') msSqMarks += mark;
+            else msMcqMarks += mark;
+        });
+
+        totalScore = msTotalScore;
+        mcqMarks = msMcqMarks;
+        cqMarks = msCqMarks;
+        sqMarks = msSqMarks;
     }
 
     if (isDisqualified) {

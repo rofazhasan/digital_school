@@ -365,14 +365,49 @@ export function ExamContextProvider({
   }, [exam.questions]);
 
   // --- Multiple Subject (MS) Logic ---
+  const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+    if (!questionSubject || !targetSubjectName) return false;
+    const qClean = questionSubject.trim().toLowerCase();
+    const tClean = targetSubjectName.trim().toLowerCase();
+    if (qClean === tClean) return true;
+    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+    const aliases: Record<string, string[]> = {
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+      'bangla': ['বাংলা', 'bengali'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+    };
+
+    for (const [key, list] of Object.entries(aliases)) {
+      const isTarget = tClean === key || list.some(a => tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      if (isTarget && isQuestion) return true;
+    }
+
+    return false;
+  }, []);
+
   const isMS = exam.subjectType === 'MS' || (exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
   const msSubjects = useMemo(() => {
     if (!isMS) return [];
     const configured: any[] = (exam.subjectsConfig as any)?.subjects || [];
     if (configured.length > 0) return configured;
-    const questionSubjects = Array.from(new Set((exam.questions || []).map((q: any) => q.subject).filter(Boolean)));
-    return questionSubjects.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
-  }, [isMS, exam.subjectsConfig, exam.questions]);
+    
+    // Discover distinct canonical subjects from questions using aliases
+    const rawSubjects = (exam.questions || []).map((q: any) => q.subject).filter(Boolean);
+    const canonical: string[] = [];
+    rawSubjects.forEach((rs: string) => {
+      if (!canonical.some(c => matchSubject(rs, c))) {
+        canonical.push(rs);
+      }
+    });
+    return canonical.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
+  }, [isMS, exam.subjectsConfig, exam.questions, matchSubject]);
 
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
 
@@ -397,10 +432,11 @@ export function ExamContextProvider({
         const rawId = k.split('_')[0];
         const q = qMap.get(k) || qMap.get(rawId);
         if (q && q.subject) {
-          attemptedSubjs.add(q.subject);
-          const subConfig = msSubjects.find(s => s.name?.toLowerCase().trim() === q.subject?.toLowerCase().trim());
+          const subConfig = msSubjects.find(s => matchSubject(q.subject, s.name));
+          const canonicalName = subConfig ? subConfig.name : q.subject;
+          attemptedSubjs.add(canonicalName);
           if (subConfig && !subConfig.isMandatory) {
-            attemptedOptSubjs.add(q.subject);
+            attemptedOptSubjs.add(canonicalName);
           }
         }
       }
@@ -414,20 +450,21 @@ export function ExamContextProvider({
       attemptedSubjects: attemptedSubjs,
       isExceedingOptional: isExceeding
     };
-  }, [isMS, answers, exam.questions, msSubjects, exam.subjectsConfig]);
+  }, [isMS, answers, exam.questions, msSubjects, exam.subjectsConfig, matchSubject]);
 
   // Filtered sorted questions based on selectedSubject
   const filteredSortedQuestions = useMemo(() => {
     if (!isMS || selectedSubject === 'ALL') {
       return sortedQuestions;
     }
-    return sortedQuestions.filter((q: any) => (q.subject || '').toLowerCase().trim() === selectedSubject.toLowerCase().trim());
-  }, [isMS, selectedSubject, sortedQuestions]);
+    return sortedQuestions.filter((q: any) => matchSubject(q.subject, selectedSubject));
+  }, [isMS, selectedSubject, sortedQuestions, matchSubject]);
 
   // Optimized Context Value to prevent unnecessary re-renders in consumers
   const contextValue = useMemo(() => ({
     exam,
     patchExam,
+    matchSubject,
     answers,
     setAnswers,
     navigation,
@@ -467,6 +504,7 @@ export function ExamContextProvider({
   }), [
     exam,
     patchExam,
+    matchSubject,
     answers,
     setAnswers,
     navigation,
