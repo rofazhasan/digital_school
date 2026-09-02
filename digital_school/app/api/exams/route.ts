@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
         cqSqTime: exam.cqSqTime || null,
         cqSubsections: exam.cqSubsections || null,
         subjectType: exam.subjectType || 'SS',
-        subjectsConfig: exam.subjectsConfig || null,
+        subjectsConfig: exam.subjectType === 'MS' ? (exam.subjectsConfig || null) : null,
       };
 
       // Cache the result for 5 minutes (TTL)
@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
         objectiveTime: summary ? undefined : exam.objectiveTime,
         cqSqTime: summary ? undefined : exam.cqSqTime,
         cqSubsections: summary ? undefined : exam.cqSubsections,
-        subjectsConfig: summary ? undefined : exam.subjectsConfig,
+        subjectsConfig: summary ? undefined : (exam.subjectType === 'MS' ? exam.subjectsConfig : null),
       };
     });
 
@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
         duration: dur,
         type: (type || 'OFFLINE').toUpperCase(),
         subjectType: (subjectType === 'MS') ? 'MS' : 'SS',
-        subjectsConfig: subjectsConfig || null,
+        subjectsConfig: (subjectType === 'MS') ? (subjectsConfig || null) : null,
         totalMarks: totalMarks !== undefined && totalMarks !== null ? Number(totalMarks) : 100,
         passMarks: passMarks !== undefined && passMarks !== null ? Number(passMarks) : 33,
         isActive: false,
@@ -446,8 +446,17 @@ export async function PATCH(request: NextRequest) {
     if (typeof rawUpdateData.allowRetake === 'boolean') updateData.allowRetake = rawUpdateData.allowRetake;
     if (typeof rawUpdateData.isActive === 'boolean') updateData.isActive = rawUpdateData.isActive;
     if (rawUpdateData.type) updateData.type = rawUpdateData.type;
-    if (rawUpdateData.subjectType) updateData.subjectType = rawUpdateData.subjectType;
-    if (rawUpdateData.subjectsConfig !== undefined) updateData.subjectsConfig = rawUpdateData.subjectsConfig;
+    if (rawUpdateData.subjectType) {
+      updateData.subjectType = rawUpdateData.subjectType;
+      if (rawUpdateData.subjectType === 'SS') {
+        updateData.subjectsConfig = null;
+      }
+    }
+    if (rawUpdateData.subjectsConfig !== undefined) {
+      updateData.subjectsConfig = (rawUpdateData.subjectType === 'SS' || (!rawUpdateData.subjectType && updateData.subjectType === 'SS'))
+        ? null
+        : rawUpdateData.subjectsConfig;
+    }
     if (rawUpdateData.objectiveTime !== undefined) updateData.objectiveTime = rawUpdateData.objectiveTime ? Number(rawUpdateData.objectiveTime) : null;
     if (rawUpdateData.cqSqTime !== undefined) updateData.cqSqTime = rawUpdateData.cqSqTime ? Number(rawUpdateData.cqSqTime) : null;
     if (typeof rawUpdateData.totalMarks === 'number') updateData.totalMarks = rawUpdateData.totalMarks;

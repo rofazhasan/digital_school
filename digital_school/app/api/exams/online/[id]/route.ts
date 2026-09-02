@@ -274,7 +274,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const allSets = allSetsRaw;
 
-    const isExamMS = exam.subjectType === 'MS' || Boolean(
+    const isExamMS = exam.subjectType ? exam.subjectType === 'MS' : Boolean(
       exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
     );
 
@@ -297,7 +297,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       allSets,
       subject: isExamMS ? 'বহু-বিষয়ক পরীক্ষা (Multi-Subject)' : ((questions[0] as any)?.subject || exam.class?.name || ''),
       subjectType: exam.subjectType || (isExamMS ? 'MS' : 'SS'),
-      subjectsConfig: exam.subjectsConfig || null,
+      subjectsConfig: isExamMS ? (exam.subjectsConfig || null) : null,
       questions,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,

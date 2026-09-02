@@ -284,7 +284,7 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
   lang?: 'bn' | 'en'
 }) => {
   const isHEn = lang === 'en';
-  const isExamMS = examInfo.subjectType === 'MS' || Boolean(
+  const isExamMS = examInfo.subjectType ? examInfo.subjectType === 'MS' : Boolean(
     examInfo.subjectsConfig && ((examInfo.subjectsConfig as any)?.subjects || []).length > 0
   );
   return (
@@ -415,8 +415,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     }, [examInfo.subjectsConfig]);
 
     const isMS = Boolean(
-      examInfo.subjectType === 'MS' ||
-      (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0)
+      examInfo.subjectType ? examInfo.subjectType === 'MS' : (
+        parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0
+      )
     );
 
     const configuredSubjects = React.useMemo(() => {

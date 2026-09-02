@@ -571,7 +571,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     return false;
   }, []);
 
-  const isMS = Boolean((result?.exam as any)?.subjectType === 'MS' || (result?.exam as any)?.subjectsConfig);
+  const isMS = Boolean(
+    (result?.exam as any)?.subjectType
+      ? (result?.exam as any)?.subjectType === 'MS'
+      : ((result?.exam as any)?.subjectsConfig && ((result?.exam as any)?.subjectsConfig?.subjects || []).length > 0)
+  );
   const msSubjects = useMemo(() => {
     if (!isMS || !result) return [];
     const configured = (result.exam as any)?.subjectsConfig?.subjects || [];
@@ -2726,7 +2730,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {/* Subject-Wise Breakdown for Multiple Subject (MS) Exams */}
                       {(() => {
                         const subjectBreakdown = (result.submission?.answers as any)?._subjectWiseBreakdown;
-                        const isMS = (result.exam as any)?.subjectType === 'MS' || (result.exam as any)?.subjectsConfig;
+                        const isMS = (result.exam as any)?.subjectType
+                          ? (result.exam as any)?.subjectType === 'MS'
+                          : Boolean((result.exam as any)?.subjectsConfig && ((result.exam as any)?.subjectsConfig?.subjects || []).length > 0);
                         
                         if (!isMS && !subjectBreakdown) return null;
 

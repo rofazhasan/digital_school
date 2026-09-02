@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     });
     if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
 
-    const isExamMS = (exam as any).subjectType === 'MS' || Boolean(
+    const isExamMS = (exam as any).subjectType ? (exam as any).subjectType === 'MS' : Boolean(
       (exam as any).subjectsConfig && (((exam as any).subjectsConfig as any)?.subjects || []).length > 0
     );
 
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     cqSqTime: (exam as any).cqSqTime || null,
     cqSubsections: exam.cqSubsections || null,
     subjectType: (exam as any).subjectType || (isExamMS ? 'MS' : 'SS'),
-    subjectsConfig: (exam as any).subjectsConfig || null,
+    subjectsConfig: isExamMS ? ((exam as any).subjectsConfig || null) : null,
   };
 
   // Collect all question IDs to fetch fresh difficultyDetail/explanation and missing subjects

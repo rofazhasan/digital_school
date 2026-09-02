@@ -447,9 +447,10 @@ export function ExamContextProvider({
   }, [exam?.questions, matchSubject]);
 
   const isMS = Boolean(
-    exam?.subjectType === 'MS' ||
-    (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0) ||
-    hasMultipleQuestionSubjects
+    exam?.subjectType ? exam?.subjectType === 'MS' : (
+      (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0) ||
+      hasMultipleQuestionSubjects
+    )
   );
 
   const msSubjects = useMemo(() => {

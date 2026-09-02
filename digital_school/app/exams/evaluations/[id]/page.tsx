@@ -576,7 +576,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return false;
   }, []);
 
-  const isMS = Boolean(exam?.subjectType === 'MS' || exam?.subjectsConfig);
+  const isMS = Boolean(
+    exam?.subjectType
+      ? exam.subjectType === 'MS'
+      : (exam?.subjectsConfig && ((exam?.subjectsConfig as any)?.subjects || []).length > 0)
+  );
   const msSubjects = useMemo(() => {
     if (!isMS || !exam) return [];
     const configured = (exam.subjectsConfig as any)?.subjects || [];

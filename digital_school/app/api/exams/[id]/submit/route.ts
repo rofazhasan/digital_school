@@ -164,7 +164,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (exam.sqRequiredQuestions && sqAnswered > exam.sqRequiredQuestions) exceededQuestionLimit = true;
 
     // For Multiple Subject (MS) exams: check optional subject limit
-    const isMS = (exam as any).subjectType === 'MS' || ((exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0);
+    const isMS = (exam as any).subjectType ? (exam as any).subjectType === 'MS' : Boolean(
+      (exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0
+    );
     if (isMS && (exam as any).subjectsConfig) {
       const msConfig = (exam as any).subjectsConfig as any;
       const optionalSubjectNames = (msConfig.subjects || [])

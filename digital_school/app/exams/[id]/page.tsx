@@ -718,7 +718,9 @@ export default function ExamBuilderPage() {
   }, [examId]);
 
   // --- Multiple Subject (MS) & Single Subject (SS) Logic ---
-  const isMS = exam?.subjectType === 'MS' || (exam?.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+  const isMS = exam?.subjectType ? exam.subjectType === 'MS' : Boolean(
+    exam?.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
+  );
   const configuredSubjects = useMemo<SubjectConfigItem[]>(() => {
     if (!isMS) return [];
     const subjects = (exam?.subjectsConfig as any)?.subjects;
@@ -998,6 +1000,34 @@ export default function ExamBuilderPage() {
       }
       return q;
     }));
+  };
+
+  const handleToggleSubjectType = async (newType: 'SS' | 'MS') => {
+    if (!examId) return;
+    try {
+      const res = await fetch(`/api/exams/${examId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subjectType: newType,
+          subjectsConfig: newType === 'MS' ? (exam?.subjectsConfig || {
+            subjects: [
+              { name: 'Physics', totalMarks: Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+              { name: 'Chemistry', totalMarks: Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+              { name: 'Higher Math', totalMarks: (exam?.totalMarks || 100) - 2 * Math.floor((exam?.totalMarks || 100) / 3), isMandatory: true },
+            ],
+            mandatoryCount: 3,
+            optionalCount: 0,
+            requiredOptionalCount: 0,
+          }) : null
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update exam subject type');
+      toast.success(`Exam converted to ${newType === 'SS' ? 'Single Subject (SS)' : 'Multiple Subjects (MS)'}`);
+      fetchExamData(filters, dateRange);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update subject structure');
+    }
   };
 
   const handleOpenConfigureSubjects = () => {
@@ -1494,6 +1524,14 @@ export default function ExamBuilderPage() {
                         Single Subject (SS)
                       </Badge>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleSubjectType(isMS ? 'SS' : 'MS')}
+                      className="h-6 px-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground border border-dashed border-gray-300 dark:border-gray-700 rounded transition-all hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      {isMS ? "Switch to SS" : "Switch to MS"}
+                    </Button>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Exam Builder | Total Marks: <span className="font-bold text-foreground">{exam.totalMarks}</span>

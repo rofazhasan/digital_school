@@ -123,18 +123,7 @@ export default function CreateExamPage() {
       duration: 60,
       type: "OFFLINE",
       subjectType: "SS",
-      subjectsConfig: {
-        subjects: [
-          { name: "Physics", totalMarks: 25, isMandatory: true },
-          { name: "Chemistry", totalMarks: 25, isMandatory: true },
-          { name: "Mathematics", totalMarks: 25, isMandatory: true },
-          { name: "Biology", totalMarks: 25, isMandatory: false },
-          { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
-        ],
-        mandatoryCount: 3,
-        optionalCount: 2,
-        requiredOptionalCount: 1,
-      },
+      subjectsConfig: null,
       totalMarks: 100,
       passMarks: 33,
       classId: "",
@@ -316,10 +305,16 @@ export default function CreateExamPage() {
     }
     setLoading(true);
     try {
+      const submissionData = {
+        ...data,
+        subjectType: data.subjectType,
+        subjectsConfig: data.subjectType === "MS" ? (data.subjectsConfig || null) : null,
+      };
+
       const res = await fetch("/api/exams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(submissionData),
       });
 
       const result = await res.json();
@@ -736,6 +731,24 @@ export default function CreateExamPage() {
         const timePart = currentExam.endTime.split('T')[1];
         currentExam.endTime = `${value}T${timePart}`;
       }
+    } else if (field === 'subjectType') {
+      currentExam.subjectType = value;
+      if (value === 'SS') {
+        currentExam.subjectsConfig = null;
+      } else if (value === 'MS' && (!currentExam.subjectsConfig || !currentExam.subjectsConfig.subjects?.length)) {
+        currentExam.subjectsConfig = {
+          subjects: [
+            { name: "Physics", totalMarks: 25, isMandatory: true },
+            { name: "Chemistry", totalMarks: 25, isMandatory: true },
+            { name: "Mathematics", totalMarks: 25, isMandatory: true },
+            { name: "Biology", totalMarks: 25, isMandatory: false },
+            { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
+          ],
+          mandatoryCount: 3,
+          optionalCount: 2,
+          requiredOptionalCount: 1,
+        };
+      }
     } else {
       (currentExam as any)[field] = value;
     }
@@ -753,8 +766,13 @@ export default function CreateExamPage() {
     }
     setLoading(true);
     try {
+      const sanitizedExams = validExams.map(e => ({
+        ...e,
+        subjectType: e.subjectType || "SS",
+        subjectsConfig: e.subjectType === "MS" ? (e.subjectsConfig || null) : null,
+      }));
       const res = await fetch("/api/exams/bulk", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(validExams)
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sanitizedExams)
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || result.message || "Bulk import failed");
@@ -889,7 +907,10 @@ export default function CreateExamPage() {
                             <div className="flex bg-gray-200/80 dark:bg-gray-800 p-1 rounded-lg border border-border">
                               <button
                                 type="button"
-                                onClick={() => form.setValue("subjectType", "SS")}
+                                onClick={() => {
+                                  form.setValue("subjectType", "SS");
+                                  form.setValue("subjectsConfig", null);
+                                }}
                                 className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
                                   subjectType === "SS"
                                     ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-300 shadow-sm"
@@ -900,7 +921,24 @@ export default function CreateExamPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => form.setValue("subjectType", "MS")}
+                                onClick={() => {
+                                  form.setValue("subjectType", "MS");
+                                  const currentCfg = form.getValues("subjectsConfig");
+                                  if (!currentCfg || !currentCfg.subjects || currentCfg.subjects.length === 0) {
+                                    form.setValue("subjectsConfig", {
+                                      subjects: [
+                                        { name: "Physics", totalMarks: 25, isMandatory: true },
+                                        { name: "Chemistry", totalMarks: 25, isMandatory: true },
+                                        { name: "Mathematics", totalMarks: 25, isMandatory: true },
+                                        { name: "Biology", totalMarks: 25, isMandatory: false },
+                                        { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
+                                      ],
+                                      mandatoryCount: 3,
+                                      optionalCount: 2,
+                                      requiredOptionalCount: 1,
+                                    });
+                                  }
+                                }}
                                 className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
                                   subjectType === "MS"
                                     ? "bg-blue-600 text-white shadow-sm"

@@ -136,8 +136,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       prisma.question.count({ where: whereClause }),
     ]);
 
+    const sanitizedExam = exam ? {
+      ...exam,
+      subjectsConfig: exam.subjectType === 'MS' ? exam.subjectsConfig : null
+    } : null;
+
     return NextResponse.json({
-      exam,
+      exam: sanitizedExam,
       questions: {
         data: availableQuestions,
         meta: {
@@ -291,7 +296,9 @@ export async function POST(
     // Shuffle candidates to get unique sets each time
     const shuffledQuestions = candidateQuestions.sort(() => 0.5 - Math.random());
 
-    const isMS = (exam as any).subjectType === 'MS' || (exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+    const isMS = (exam as any).subjectType ? (exam as any).subjectType === 'MS' : Boolean(
+      exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
+    );
     const configuredSubjects: any[] = isMS ? ((exam.subjectsConfig as any)?.subjects || []) : [];
 
     const generatedSet: any[] = [];
@@ -433,14 +440,25 @@ export async function PATCH(
     const body = await request.json();
     const { subjectsConfig, subjectType, totalMarks } = body;
 
-    const prisma = await DatabaseClient.getInstance();
+    const updateData: any = {};
+    if (subjectType) {
+      updateData.subjectType = subjectType;
+      if (subjectType === 'SS') {
+        updateData.subjectsConfig = null;
+      }
+    }
+    if (subjectsConfig !== undefined) {
+      updateData.subjectsConfig = (subjectType === 'SS' || (!subjectType && updateData.subjectType === 'SS'))
+        ? null
+        : subjectsConfig;
+    }
+    if (totalMarks !== undefined) {
+      updateData.totalMarks = Number(totalMarks);
+    }
+
     const updatedExam = await prisma.exam.update({
       where: { id: examId },
-      data: {
-        ...(subjectType && { subjectType }),
-        ...(subjectsConfig !== undefined && { subjectsConfig }),
-        ...(totalMarks !== undefined && { totalMarks: Number(totalMarks) }),
-      }
+      data: updateData
     });
 
     return NextResponse.json({ success: true, exam: updatedExam });
