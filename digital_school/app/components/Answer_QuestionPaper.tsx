@@ -363,6 +363,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     }
                     const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
+                    const showSubjectHeader = examInfo?.subjectType === 'MS' && q.subject && (idx === 0 || allObjective[idx - 1]?.subject !== q.subject);
+                    const matchedSub = examInfo?.subjectsConfig?.subjects?.find((s: any) => s.name?.toLowerCase() === q.subject?.toLowerCase());
+
+                    const renderQuestionContent = () => {
                     if (q.type === 'MCQ' || q.type === 'MC') {
                       const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
                       let gridClass = "options-grid-2"; // default: 2-col (standard BD exam format)
@@ -754,7 +758,28 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
 
 
-                    return null;
+                      return null;
+                    };
+
+                    return (
+                      <React.Fragment key={idx}>
+                        {showSubjectHeader && (
+                          <div className="my-4 py-1.5 px-3 bg-gray-100 border-l-4 border-black font-bold text-sm flex justify-between items-center break-inside-avoid">
+                            <span>
+                              {isEn ? 'Subject: ' : 'বিষয়: '} {q.subject}
+                            </span>
+                            {matchedSub && (
+                              <span className="text-xs font-bold text-gray-700">
+                                {matchedSub.isMandatory
+                                  ? (isEn ? `[Mandatory - ${matchedSub.totalMarks} Marks]` : `[আবশ্যক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)
+                                  : (isEn ? `[Optional - ${matchedSub.totalMarks} Marks]` : `[ঐচ্ছিক - পূর্ণমান: ${toBengaliNumerals(matchedSub.totalMarks)}]`)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {renderQuestionContent()}
+                      </React.Fragment>
+                    );
                   });
                 })()}
               </div>

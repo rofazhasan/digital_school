@@ -18,6 +18,34 @@ const getQuestionsQuerySchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
+// Subject matching helper with aliases
+function matchSubject(questionSubject: string | undefined | null, targetSubjectName: string): boolean {
+  if (!questionSubject || !targetSubjectName) return false;
+  const qClean = questionSubject.trim().toLowerCase();
+  const tClean = targetSubjectName.trim().toLowerCase();
+  if (qClean === tClean) return true;
+  if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+  const aliases: Record<string, string[]> = {
+    'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+    'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+    'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+    'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+    'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+    'bangla': ['বাংলা', 'bengali'],
+    'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+    'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+  };
+
+  for (const [key, list] of Object.entries(aliases)) {
+    const isTarget = tClean === key || list.some(a => tClean.includes(a));
+    const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+    if (isTarget && isQuestion) return true;
+  }
+
+  return false;
+}
+
 // GET handler to fetch exam details and a paginated/filtered list of available questions
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -245,23 +273,53 @@ export async function POST(
     // Shuffle candidates to get unique sets each time
     const shuffledQuestions = candidateQuestions.sort(() => 0.5 - Math.random());
 
-    const generatedSet: Question[] = [];
+    const isMS = (exam as any).subjectType === 'MS' || (exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+    const configuredSubjects: any[] = isMS ? ((exam.subjectsConfig as any)?.subjects || []) : [];
+
+    const generatedSet: any[] = [];
     let currentMarks = 0;
 
-    // A simple greedy algorithm to find a matching set
-    for (const question of shuffledQuestions) {
-      if (currentMarks + question.marks <= exam.totalMarks) {
-        generatedSet.push(question);
-        currentMarks += question.marks;
+    if (isMS && configuredSubjects.length > 0) {
+      // Multiple Subject (MS): Auto-generate questions strictly balanced by each subject's quota
+      for (const subj of configuredSubjects) {
+        const targetMarks = subj.totalMarks;
+        let subjectMarks = 0;
+
+        const subjectCandidates = shuffledQuestions.filter(q =>
+          matchSubject(q.subject, subj.name)
+        );
+
+        for (const question of subjectCandidates) {
+          if (subjectMarks + question.marks <= targetMarks) {
+            generatedSet.push({ ...question, subject: subj.name });
+            subjectMarks += question.marks;
+          }
+          if (subjectMarks === targetMarks) break;
+        }
+
+        if (subjectMarks !== targetMarks) {
+          return NextResponse.json({
+            error: `Could not automatically fulfill quota for subject "${subj.name}" (${subjectMarks}/${targetMarks} marks found). Please add more questions for this subject or create a set manually.`
+          }, { status: 409 });
+        }
+        currentMarks += subjectMarks;
       }
-      if (currentMarks === exam.totalMarks) break;
+    } else {
+      // Single Subject (SS): Strictly preserved greedy algorithm
+      for (const question of shuffledQuestions) {
+        if (currentMarks + question.marks <= exam.totalMarks) {
+          generatedSet.push(question);
+          currentMarks += question.marks;
+        }
+        if (currentMarks === exam.totalMarks) break;
+      }
     }
 
     if (currentMarks !== exam.totalMarks) {
       return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 });
     }
 
-    // Process questions: Shuffle options and calculate negative marks
+    // Process questions: Shuffle options, attach originalIndex, and calculate negative marks
     const generatedSetWithNegativeMarks = generatedSet.map(q => {
       const processedQuestion = { ...q } as any;
 
@@ -269,9 +327,21 @@ export async function POST(
         if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
           processedQuestion.options = processedQuestion.options.map((opt: any, idx: number) => {
             if (typeof opt === 'string') return { text: opt, originalIndex: idx };
-            return { ...opt, originalIndex: idx };
+            return { ...opt, originalIndex: opt.originalIndex !== undefined ? opt.originalIndex : idx };
           });
           processedQuestion.options = shuffleArray(processedQuestion.options);
+
+          // Recalculate correctAnswer
+          const correctIndices = processedQuestion.options.reduce((acc: number[], opt: any, idx: number) => {
+            if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+              acc.push(idx);
+            }
+            return acc;
+          }, []);
+
+          if (correctIndices.length > 0) {
+            processedQuestion.correctAnswer = correctIndices.map((idx: number) => String.fromCharCode(65 + idx)).join('');
+          }
         }
       }
 

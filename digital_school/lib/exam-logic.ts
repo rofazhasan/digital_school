@@ -530,6 +530,33 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     const subjectWiseBreakdown: Record<string, { totalScore: number; maxMarks: number; isMandatory: boolean; attempted: boolean }> = {};
 
+    const matchSubjectName = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+        if (!questionSubject || !targetSubjectName) return false;
+        const qClean = questionSubject.trim().toLowerCase();
+        const tClean = targetSubjectName.trim().toLowerCase();
+        if (qClean === tClean) return true;
+        if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+        const aliases: Record<string, string[]> = {
+            'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+            'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+            'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+            'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+            'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+            'bangla': ['বাংলা', 'bengali'],
+            'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+            'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+        };
+
+        for (const [key, list] of Object.entries(aliases)) {
+            const isTarget = tClean === key || list.some(a => tClean.includes(a));
+            const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+            if (isTarget && isQuestion) return true;
+        }
+
+        return false;
+    };
+
     if (isMS && msConfig && Array.isArray(msConfig.subjects)) {
         const optionalSubjectsAttempted = new Set<string>();
 
@@ -538,7 +565,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         
         msConfig.subjects.forEach((sub: any) => {
             const subName = sub.name;
-            const subQuestions = (qList as any[]).filter((q: any) => (q.subject || '').toLowerCase().trim() === subName.toLowerCase().trim());
+            const subQuestions = (qList as any[]).filter((q: any) => matchSubjectName(q.subject, subName));
             let subScore = 0;
             let subAttempted = false;
 
@@ -547,7 +574,18 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 if (typeof mark === 'number') subScore += mark;
 
                 const ans = (answers as any)[q.id];
-                if (ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided') {
+                const hasDirectAns = ans !== undefined && ans !== null && ans !== '' && ans !== 'No answer provided';
+                const hasSubAns = Object.keys(answers || {}).some(k => 
+                    k.startsWith(`${q.id}_`) && 
+                    !k.endsWith('_marks') && 
+                    (answers as any)[k] !== undefined && 
+                    (answers as any)[k] !== null && 
+                    (answers as any)[k] !== '' && 
+                    (answers as any)[k] !== 'No answer provided'
+                );
+                const hasMarks = typeof mark === 'number' && mark > 0;
+
+                if (hasDirectAns || hasSubAns || hasMarks) {
                     subAttempted = true;
                 }
             });

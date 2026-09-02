@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +65,19 @@ interface Question {
   modelAnswer?: string;
 }
 
+interface SubjectConfigItem {
+  name: string;
+  totalMarks: number;
+  isMandatory: boolean;
+}
+
+interface SubjectsConfig {
+  subjects: SubjectConfigItem[];
+  mandatoryCount?: number;
+  optionalCount?: number;
+  requiredOptionalCount?: number;
+}
+
 interface ExamSet {
   id: string;
   name: string;
@@ -82,6 +95,8 @@ interface Exam {
   sqRequiredQuestions: number;
   mcqNegativeMarking?: number;
   mcNegativeMarking?: number;
+  subjectType?: 'SS' | 'MS';
+  subjectsConfig?: SubjectsConfig;
   examSets: ExamSet[];
 }
 
@@ -615,6 +630,80 @@ export default function ExamBuilderPage() {
     fetchSets();
   }, [examId]);
 
+  // --- Multiple Subject (MS) & Single Subject (SS) Logic ---
+  const isMS = exam?.subjectType === 'MS' || (exam?.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
+  const configuredSubjects = useMemo<SubjectConfigItem[]>(() => {
+    if (!isMS) return [];
+    const subjects = (exam?.subjectsConfig as any)?.subjects;
+    if (Array.isArray(subjects) && subjects.length > 0) return subjects;
+    return [];
+  }, [isMS, exam?.subjectsConfig]);
+
+  // Subject matching helper with aliases and normalization
+  const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+    if (!questionSubject || !targetSubjectName) return false;
+    const qClean = questionSubject.trim().toLowerCase();
+    const tClean = targetSubjectName.trim().toLowerCase();
+    if (qClean === tClean) return true;
+    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+    // Common Bengali / English aliases
+    const aliases: Record<string, string[]> = {
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
+      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
+      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
+      'bangla': ['বাংলা', 'bengali'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+    };
+
+    for (const [key, list] of Object.entries(aliases)) {
+      const isTarget = tClean === key || list.some(a => tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      if (isTarget && isQuestion) return true;
+    }
+
+    return false;
+  }, []);
+
+  const findConfiguredSubject = useCallback((question: Question): SubjectConfigItem | undefined => {
+    if (!isMS || configuredSubjects.length === 0) return undefined;
+    return configuredSubjects.find(s => matchSubject(question.subject, s.name));
+  }, [isMS, configuredSubjects, matchSubject]);
+
+  // Track marks and questions selected per subject for MS exams
+  const subjectMarksBreakdown = useMemo(() => {
+    if (!isMS || configuredSubjects.length === 0) {
+      return new Map<string, { current: number; target: number; isMandatory: boolean; count: number; name: string }>();
+    }
+
+    const map = new Map<string, { current: number; target: number; isMandatory: boolean; count: number; name: string }>();
+    configuredSubjects.forEach(s => {
+      map.set(s.name, {
+        name: s.name,
+        current: 0,
+        target: s.totalMarks,
+        isMandatory: s.isMandatory ?? true,
+        count: 0
+      });
+    });
+
+    selectedQuestions.forEach(q => {
+      const matched = configuredSubjects.find(s => matchSubject(q.subject, s.name));
+      if (matched) {
+        const entry = map.get(matched.name);
+        if (entry) {
+          entry.current += q.marks;
+          entry.count += 1;
+        }
+      }
+    });
+
+    return map;
+  }, [isMS, configuredSubjects, selectedQuestions, matchSubject]);
+
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
@@ -646,7 +735,27 @@ export default function ExamBuilderPage() {
     if (!exam) return false;
     return selectedSQQuestions.length >= exam.sqRequiredQuestions && selectedSQQuestions.length <= exam.sqTotalQuestions;
   }, [selectedSQQuestions.length, exam]);
-  const isSelectionValid = useMemo(() => isCQValid && isSQValid && isMarksMatched, [isCQValid, isSQValid, isMarksMatched]);
+
+  // MS Validation: every configured subject must have selected questions equaling its totalMarks
+  const isMSValid = useMemo(() => {
+    if (!isMS || configuredSubjects.length === 0) return false;
+    for (const s of configuredSubjects) {
+      const entry = subjectMarksBreakdown.get(s.name);
+      if (!entry || entry.current !== s.totalMarks) {
+        return false;
+      }
+    }
+    return true;
+  }, [isMS, configuredSubjects, subjectMarksBreakdown]);
+
+  // Overall selection validity
+  const isSelectionValid = useMemo(() => {
+    if (isMS) {
+      return isMSValid;
+    }
+    // Single Subject (SS): Strictly preserved
+    return isCQValid && isSQValid && isMarksMatched;
+  }, [isMS, isMSValid, isCQValid, isSQValid, isMarksMatched]);
 
   const selectedQuestionIds = useMemo(() => new Set(selectedQuestions.map(q => q.id)), [selectedQuestions]);
 
@@ -657,7 +766,19 @@ export default function ExamBuilderPage() {
     // Check if already selected
     if (selectedQuestionIds.has(question.id)) return false;
 
-    // Check type-specific constraints first
+    // Multiple Subject (MS) Check: Ensure subject quota is not exceeded
+    if (isMS && configuredSubjects.length > 0) {
+      const matched = findConfiguredSubject(question);
+      if (!matched) return false;
+      const entry = subjectMarksBreakdown.get(matched.name);
+      const current = entry?.current || 0;
+      if (current + question.marks > matched.totalMarks) {
+        return false;
+      }
+      return true;
+    }
+
+    // Single Subject (SS) Check: Strictly preserved
     if (question.type === 'CQ') {
       if (selectedCQQuestions.length >= exam.cqTotalQuestions) return false;
     } else if (question.type === 'SQ') {
@@ -670,7 +791,7 @@ export default function ExamBuilderPage() {
     }
 
     return true;
-  }, [exam, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
+  }, [exam, isMS, configuredSubjects, findConfiguredSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
 
   // Helper function to get selection reason for tooltip
   const getSelectionReason = useCallback((question: Question) => {
@@ -678,6 +799,21 @@ export default function ExamBuilderPage() {
 
     if (selectedQuestionIds.has(question.id)) return 'Already Added';
 
+    // Multiple Subject (MS) Tooltip
+    if (isMS && configuredSubjects.length > 0) {
+      const matched = findConfiguredSubject(question);
+      if (!matched) {
+        return `Subject "${question.subject || 'Unknown'}" is not in configured exam subjects`;
+      }
+      const entry = subjectMarksBreakdown.get(matched.name);
+      const current = entry?.current || 0;
+      if (current + question.marks > matched.totalMarks) {
+        return `Subject "${matched.name}" quota full (${current}/${matched.totalMarks} M)`;
+      }
+      return `Add to ${matched.name} (${current}/${matched.totalMarks} M)`;
+    }
+
+    // Single Subject (SS) Tooltip: Strictly preserved
     if (question.type === 'CQ') {
       if (selectedCQQuestions.length >= exam.cqTotalQuestions) return 'CQ Limit Reached';
       return 'Add CQ Question';
@@ -690,7 +826,7 @@ export default function ExamBuilderPage() {
     }
 
     return 'Add Question';
-  }, [exam, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
+  }, [exam, isMS, configuredSubjects, findConfiguredSubject, subjectMarksBreakdown, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
 
   // Event Handlers
   const handleAddQuestion = (question: Question) => {
@@ -717,6 +853,19 @@ export default function ExamBuilderPage() {
 
   const handleSubmitSet = async () => {
     if (!isSelectionValid) {
+      if (isMS) {
+        const incomplete = configuredSubjects
+          .map(s => {
+            const entry = subjectMarksBreakdown.get(s.name);
+            const curr = entry?.current || 0;
+            if (curr !== s.totalMarks) return `${s.name}: ${curr}/${s.totalMarks} Marks`;
+            return null;
+          })
+          .filter(Boolean)
+          .join(', ');
+        toast.error(`MS Validation failed. Incomplete subjects: ${incomplete}`);
+        return;
+      }
       let errorMessage = "Validation failed: ";
       if (!isCQValid) errorMessage += `CQ questions must be ${exam?.cqRequiredQuestions}-${exam?.cqTotalQuestions}. `;
       if (!isSQValid) errorMessage += `SQ questions must be ${exam?.sqRequiredQuestions}-${exam?.sqTotalQuestions}. `;
@@ -767,19 +916,22 @@ export default function ExamBuilderPage() {
     }
   };
 
-  // Helper function to shuffle array
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    const shuffledArray = [...array];
-    for (let i = shuffledArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
-    }
-    return shuffledArray;
-  };
-
   // On generate, create N sets with shuffled questions and MCQ options
   const handleGenerateSets = async () => {
     if (!isSelectionValid) {
+      if (isMS) {
+        const incomplete = configuredSubjects
+          .map(s => {
+            const entry = subjectMarksBreakdown.get(s.name);
+            const curr = entry?.current || 0;
+            if (curr !== s.totalMarks) return `${s.name}: ${curr}/${s.totalMarks} Marks`;
+            return null;
+          })
+          .filter(Boolean)
+          .join(', ');
+        toast.error(`MS Validation failed. Incomplete subjects: ${incomplete}`);
+        return;
+      }
       let errorMessage = "Validation failed: ";
       if (!isCQValid) errorMessage += `CQ questions must be ${exam?.cqRequiredQuestions}-${exam?.cqTotalQuestions}. `;
       if (!isSQValid) errorMessage += `SQ questions must be ${exam?.sqRequiredQuestions}-${exam?.sqTotalQuestions}. `;
@@ -793,33 +945,37 @@ export default function ExamBuilderPage() {
     }
     setIsSubmitting(true);
     try {
-      const isMS = exam?.subjectType === 'MS' || (exam?.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0);
-
       const setsToSave = Array.from({ length: numSets }).map((_, i) => {
         let orderedQuestionsRaw: any[] = [];
 
         if (isMS) {
           // Multiple Subject (MS): Shuffling happens strictly WITHIN each subject.
-          const subjectsConfigList: string[] = ((exam?.subjectsConfig as any)?.subjects || []).map((s: any) => s.name);
+          const subjectsConfigList: string[] = configuredSubjects.map(s => s.name);
           const distinctQuestionSubjects = Array.from(new Set(selectedQuestions.map(q => q.subject).filter(Boolean)));
           const subjectOrder = Array.from(new Set([...subjectsConfigList, ...distinctQuestionSubjects]));
 
-          // Group and shuffle questions within each subject group
+          // Group and shuffle questions strictly within each subject section
           subjectOrder.forEach(subjectName => {
             const subjectQuestions = selectedQuestions.filter(q =>
-              (q.subject || '').trim().toLowerCase() === subjectName.trim().toLowerCase()
+              matchSubject(q.subject, subjectName)
             );
             if (subjectQuestions.length > 0) {
               const cqInSubject = subjectQuestions.filter(q => q.type === 'CQ');
               const otherInSubject = subjectQuestions.filter(q => q.type !== 'CQ');
+              // Shuffle non-CQ within this subject
               const shuffledOthersInSubject = shuffleArray(otherInSubject);
-              orderedQuestionsRaw.push(...cqInSubject, ...shuffledOthersInSubject);
+              // Canonicalize subject name
+              const canonicalized = [...cqInSubject, ...shuffledOthersInSubject].map(q => ({
+                ...q,
+                subject: subjectName
+              }));
+              orderedQuestionsRaw.push(...canonicalized);
             }
           });
 
-          // Any questions without explicit matching subject
+          // Any unassigned questions (fallback)
           const unassignedQuestions = selectedQuestions.filter(q =>
-            !subjectOrder.some(s => s.trim().toLowerCase() === (q.subject || '').trim().toLowerCase())
+            !subjectOrder.some(s => matchSubject(q.subject, s))
           );
           if (unassignedQuestions.length > 0) {
             const cqUnassigned = unassignedQuestions.filter(q => q.type === 'CQ');
@@ -827,7 +983,7 @@ export default function ExamBuilderPage() {
             orderedQuestionsRaw.push(...cqUnassigned, ...shuffleArray(otherUnassigned));
           }
         } else {
-          // Single Subject (SS): Global CQ first, then shuffled others
+          // Single Subject (SS): Global CQ first, then shuffled others (Strictly preserved)
           const cqQuestions = selectedQuestions.filter(q => q.type === 'CQ');
           const otherQuestions = selectedQuestions.filter(q => q.type !== 'CQ');
           const shuffledOthers = shuffleArray(otherQuestions);
@@ -837,9 +993,13 @@ export default function ExamBuilderPage() {
         const orderedQuestions = orderedQuestionsRaw.map(q => {
           let processedQuestion = { ...q };
 
-          // Shuffle MCQ/MC options
+          // Shuffle MCQ/MC options while preserving originalIndex and updating correctAnswer
           if ((q.type === 'MCQ' || q.type === 'MC') && Array.isArray(q.options)) {
-            const shuffledOptions = shuffleArray(q.options);
+            const optionsWithOriginal = q.options.map((opt: any, idx: number) => {
+              if (typeof opt === 'string') return { text: opt, originalIndex: idx };
+              return { ...opt, originalIndex: opt.originalIndex !== undefined ? opt.originalIndex : idx };
+            });
+            const shuffledOptions = shuffleArray(optionsWithOriginal);
             processedQuestion = { ...processedQuestion, options: shuffledOptions };
 
             // Recalculate correctAnswer based on the new position of correct options
@@ -1100,14 +1260,50 @@ export default function ExamBuilderPage() {
             <Card>
               <CardContent className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{exam.name}</h1>
-                  <p className="text-sm text-muted-foreground">Exam Builder | Total Marks: {exam.totalMarks}</p>
-                  <div className="flex gap-4 mt-2 text-xs">
-                    <span>CQ: {exam.cqRequiredQuestions}-{exam.cqTotalQuestions} questions (marks count from first {exam.cqRequiredQuestions})</span>
-                    <span>SQ: {exam.sqRequiredQuestions}-{exam.sqTotalQuestions} questions (marks count from first {exam.sqRequiredQuestions})</span>
-                    <span>MCQ: Remaining questions{exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 ? ` (${exam.mcqNegativeMarking}% negative marking)` : ''}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{exam.name}</h1>
+                    {isMS ? (
+                      <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-2.5 py-0.5 shadow-sm">
+                        Multiple Subject (MS)
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs font-semibold">
+                        Single Subject (SS)
+                      </Badge>
+                    )}
                   </div>
-
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Exam Builder | Total Marks: <span className="font-bold text-foreground">{exam.totalMarks}</span>
+                    {isMS && configuredSubjects.length > 0 && ` | ${configuredSubjects.length} Subjects (${exam.subjectsConfig?.mandatoryCount || 0} Mandatory, ${exam.subjectsConfig?.optionalCount || 0} Optional)`}
+                  </p>
+                  {isMS && configuredSubjects.length > 0 ? (
+                    <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
+                      <span className="font-semibold text-muted-foreground">Subjects:</span>
+                      {configuredSubjects.map(subj => {
+                        const stats = subjectMarksBreakdown.get(subj.name);
+                        const isDone = stats && stats.current === subj.totalMarks;
+                        return (
+                          <Badge
+                            key={subj.name}
+                            variant={isDone ? "default" : "outline"}
+                            className={`text-[11px] px-2 py-0.5 font-semibold ${
+                              isDone
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : 'border-slate-300 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {subj.name}: {stats?.current || 0}/{subj.totalMarks}M {subj.isMandatory ? '★' : '○'}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex gap-4 mt-2 text-xs">
+                      <span>CQ: {exam.cqRequiredQuestions}-{exam.cqTotalQuestions} questions (marks count from first {exam.cqRequiredQuestions})</span>
+                      <span>SQ: {exam.sqRequiredQuestions}-{exam.sqTotalQuestions} questions (marks count from first {exam.sqRequiredQuestions})</span>
+                      <span>MCQ: Remaining questions{exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 ? ` (${exam.mcqNegativeMarking}% negative marking)` : ''}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" size="sm" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
@@ -1138,7 +1334,7 @@ export default function ExamBuilderPage() {
                   </Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
-                    <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Exam Preview: {newSetName || "Untitled Set"}</DialogTitle></DialogHeader><ScrollArea className="h-[70vh] p-4">{selectedQuestions.length > 0 ? selectedQuestions.map((q, index) => (<div key={q.id} className="mb-4"><h3 className="font-bold mb-2">Question {index + 1}</h3><QuestionCard question={q} isAdded={true} isSelectable={false} /></div>)) : <p className="text-center text-muted-foreground">No questions selected.</p>}</ScrollArea></DialogContent>
+                    <DialogContent className="max-w-4xl"><DialogHeader><DialogTitle>Exam Preview: {newSetName || "Untitled Set"}</DialogTitle></DialogHeader><ScrollArea className="h-[70vh] p-4">{selectedQuestions.length > 0 ? selectedQuestions.map((q, index) => (<div key={q.id} className="mb-4"><h3 className="font-bold mb-2">Question {index + 1} {q.subject && <span className="ml-2 text-xs font-normal text-muted-foreground">[{q.subject}]</span>}</h3><QuestionCard question={q} isAdded={true} isSelectable={false} /></div>)) : <p className="text-center text-muted-foreground">No questions selected.</p>}</ScrollArea></DialogContent>
                   </Dialog>
                   <Dialog>
                     <DialogTrigger asChild><Button variant="secondary"><Wand2 className="mr-2 h-4 w-4" />Auto-Generate Set</Button></DialogTrigger>
@@ -1170,8 +1366,57 @@ export default function ExamBuilderPage() {
                     </div>
                   </div>
                   <CardDescription>Filter and select questions for the exam.</CardDescription>
+
+                  {/* Interactive Subject Filter Tabs for MS Exams */}
+                  {isMS && configuredSubjects.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pt-3 pb-1 no-scrollbar border-b pb-2">
+                      <span className="text-xs font-bold text-muted-foreground shrink-0 flex items-center gap-1">
+                        <Filter className="w-3.5 h-3.5" /> Subject:
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={filters.subject === '' ? 'default' : 'outline'}
+                        onClick={() => handleFilterChange('subject', '')}
+                        className="text-xs h-7 px-3 rounded-full font-bold transition-all"
+                      >
+                        All ({questionsData?.meta.total ?? 0})
+                      </Button>
+                      {configuredSubjects.map(subj => {
+                        const stats = subjectMarksBreakdown.get(subj.name);
+                        const curr = stats?.current || 0;
+                        const target = subj.totalMarks;
+                        const isDone = curr === target;
+                        const isActive = filters.subject.trim().toLowerCase() === subj.name.trim().toLowerCase();
+
+                        return (
+                          <Button
+                            key={subj.name}
+                            type="button"
+                            size="sm"
+                            variant={isActive ? 'default' : 'outline'}
+                            onClick={() => handleFilterChange('subject', subj.name)}
+                            className={`text-xs h-7 px-3 rounded-full font-bold flex items-center gap-1.5 transition-all ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground shadow-sm scale-105'
+                                : isDone
+                                ? 'border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 dark:text-emerald-400 hover:bg-emerald-100'
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            <span>{subj.name}</span>
+                            <span className="text-[10px] opacity-80">
+                              ({curr}/{target}M)
+                            </span>
+                            {isDone && <Check className="w-3 h-3 text-emerald-600" />}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
-                    <Input placeholder="Search by subject..." onChange={(e) => handleFilterChange('subject', e.target.value)} />
+                    <Input placeholder="Search by subject..." value={filters.subject} onChange={(e) => handleFilterChange('subject', e.target.value)} />
                     <Input placeholder="Search by topic..." onChange={(e) => handleFilterChange('topic', e.target.value)} />
                     <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
                       <SelectTrigger><SelectValue placeholder="Filter by Type" /></SelectTrigger>
@@ -1253,24 +1498,99 @@ export default function ExamBuilderPage() {
                       {currentMarks} / {exam.totalMarks}
                     </span>
                   </div>
-                  {/* Question Type Breakdown */}
-                  <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
-                    <div className={`p-2 rounded ${isCQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-                      <div className="font-medium">CQ</div>
-                      <div>{selectedCQQuestions.length} / {exam.cqRequiredQuestions}-{exam.cqTotalQuestions}</div>
-                      <div>{cqMarks} marks (first {exam.cqRequiredQuestions})</div>
+
+                  {/* Multiple Subject (MS): Subject Quota Tracker */}
+                  {isMS && configuredSubjects.length > 0 ? (
+                    <div className="space-y-2 mt-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        <span>Subject Quotas</span>
+                        <Badge variant={isMSValid ? "default" : "outline"} className={isMSValid ? "bg-emerald-600 text-white font-bold text-[10px]" : "text-amber-600 border-amber-400 font-bold text-[10px]"}>
+                          {isMSValid ? "All Subjects Complete ✓" : "Incomplete Quotas"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {configuredSubjects.map(subj => {
+                          const stats = subjectMarksBreakdown.get(subj.name);
+                          const curr = stats?.current || 0;
+                          const target = subj.totalMarks;
+                          const pct = Math.min(100, Math.round((curr / target) * 100));
+                          const isComplete = curr === target;
+                          const isOver = curr > target;
+
+                          return (
+                            <div
+                              key={subj.name}
+                              className={`p-2 rounded-lg border transition-all ${
+                                isComplete
+                                  ? 'bg-emerald-50/80 dark:bg-emerald-950/25 border-emerald-300 dark:border-emerald-800'
+                                  : isOver
+                                  ? 'bg-red-50/80 dark:bg-red-950/25 border-red-300 dark:border-red-800'
+                                  : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs font-bold">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-foreground">{subj.name}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[9px] px-1 py-0 ${
+                                      subj.isMandatory
+                                        ? 'border-indigo-300 text-indigo-700 bg-indigo-50/50 dark:text-indigo-300'
+                                        : 'border-amber-300 text-amber-700 bg-amber-50/50 dark:text-amber-300'
+                                    }`}
+                                  >
+                                    {subj.isMandatory ? 'Mandatory' : 'Optional'}
+                                  </Badge>
+                                </div>
+                                <span className={isComplete ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' : isOver ? 'text-red-600 font-extrabold' : 'text-foreground'}>
+                                  {curr} / {target} M
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1.5">
+                                <div
+                                  className={`h-full transition-all duration-300 ${
+                                    isComplete ? 'bg-emerald-500' : isOver ? 'bg-red-500' : 'bg-amber-500'
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between items-center mt-1 text-[10px]">
+                                <span className={isComplete ? 'text-emerald-600 font-medium' : isOver ? 'text-red-600 font-semibold' : 'text-muted-foreground'}>
+                                  {isComplete ? 'Quota Complete ✓' : isOver ? `${curr - target}M over limit` : `${target - curr}M needed`}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleFilterChange('subject', subj.name)}
+                                  className="text-primary hover:underline font-bold"
+                                >
+                                  Filter {subj.name} →
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className={`p-2 rounded ${isSQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-                      <div className="font-medium">SQ</div>
-                      <div>{selectedSQQuestions.length} / {exam.sqRequiredQuestions}-{exam.sqTotalQuestions}</div>
-                      <div>{sqMarks} marks (first {exam.sqRequiredQuestions})</div>
+                  ) : (
+                    /* Single Subject (SS): Strictly Preserved CQ/SQ/MCQ Breakdown */
+                    <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                      <div className={`p-2 rounded ${isCQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                        <div className="font-medium">CQ</div>
+                        <div>{selectedCQQuestions.length} / {exam.cqRequiredQuestions}-{exam.cqTotalQuestions}</div>
+                        <div>{cqMarks} marks (first {exam.cqRequiredQuestions})</div>
+                      </div>
+                      <div className={`p-2 rounded ${isSQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                        <div className="font-medium">SQ</div>
+                        <div>{selectedSQQuestions.length} / {exam.sqRequiredQuestions}-{exam.sqTotalQuestions}</div>
+                        <div>{sqMarks} marks (first {exam.sqRequiredQuestions})</div>
+                      </div>
+                      <div className="p-2 rounded bg-blue-100 dark:bg-blue-900/30">
+                        <div className="font-medium">MCQ</div>
+                        <div>{selectedMCQQuestions.length} questions</div>
+                        <div>{mcqMarks} marks</div>
+                      </div>
                     </div>
-                    <div className="p-2 rounded bg-blue-100 dark:bg-blue-900/30">
-                      <div className="font-medium">MCQ</div>
-                      <div>{selectedMCQQuestions.length} questions</div>
-                      <div>{mcqMarks} marks</div>
-                    </div>
-                  </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
@@ -1296,7 +1616,20 @@ export default function ExamBuilderPage() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild><div className="mt-4"><Button className="w-full" onClick={handleGenerateSets} disabled={!isSelectionValid || isSubmitting || !newSetName.trim()}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}Generate & Save Sets</Button></div></TooltipTrigger>
-                      {!isSelectionValid && <TooltipContent><p>All validation criteria must be met: CQ ({exam.cqRequiredQuestions}-{exam.cqTotalQuestions}), SQ ({exam.sqRequiredQuestions}-{exam.sqTotalQuestions}), and total marks ({exam.totalMarks}).</p></TooltipContent>}
+                      {!isSelectionValid && (
+                        <TooltipContent>
+                          {isMS ? (
+                            <p>
+                              All configured subjects must reach their exact marks quota:{' '}
+                              {configuredSubjects.map(s => `${s.name} (${s.totalMarks}M)`).join(', ')}
+                            </p>
+                          ) : (
+                            <p>
+                              All validation criteria must be met: CQ ({exam.cqRequiredQuestions}-{exam.cqTotalQuestions}), SQ ({exam.sqRequiredQuestions}-{exam.sqTotalQuestions}), and total marks ({exam.totalMarks}).
+                            </p>
+                          )}
+                        </TooltipContent>
+                      )}
                     </Tooltip>
                   </TooltipProvider>
                 </CardContent>
