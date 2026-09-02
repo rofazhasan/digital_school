@@ -52,7 +52,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     setAnswers,
     isMS,
     msSubjects,
-    matchSubject
+    matchSubject,
+    fontSize
   } = useExamContext();
 
   const questions = exam.questions || [];
