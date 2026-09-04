@@ -54,6 +54,59 @@ export function shuffleArrayWithSeed<T>(array: T[], seedStr: string): T[] {
   return arr;
 }
 
+export const matchSubject = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
+  if (!questionSubject || !targetSubjectName) return false;
+  const qClean = questionSubject.trim().toLowerCase();
+  const tClean = targetSubjectName.trim().toLowerCase();
+  if (qClean === tClean) return true;
+  if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+  const aliases: Record<string, string[]> = {
+    'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
+    'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
+    'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths', 'সাধারণ গণিত', 'general math', 'math 1st', 'math 2nd'],
+    'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
+    'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
+    'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
+    'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
+    'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
+  };
+
+  for (const [key, list] of Object.entries(aliases)) {
+    const isTarget = tClean === key || list.some(a => tClean.includes(a));
+    const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+    if (isTarget && isQuestion) return true;
+  }
+
+  return false;
+};
+
+export const parseSubjectsConfig = (raw: any) => {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  return raw;
+};
+
+export const detectIsMS = (exam: any) => {
+  const parsed = parseSubjectsConfig(exam?.subjectsConfig);
+  const rawSubjects = (exam?.questions || [])
+    .map((q: any) => (q.subject || q.subjectName || '').trim())
+    .filter(Boolean);
+  const canonical: string[] = [];
+  rawSubjects.forEach((rs: string) => {
+    if (!canonical.some(c => matchSubject(rs, c))) {
+      canonical.push(rs);
+    }
+  });
+  return Boolean(
+    exam?.subjectType === 'MS' ||
+    (parsed && Array.isArray(parsed.subjects) && parsed.subjects.length > 0) ||
+    canonical.length > 1
+  );
+};
+
 export function ExamContextProvider({
   exam: examProp,
   children
@@ -65,13 +118,72 @@ export function ExamContextProvider({
   const [exam, setExamState] = useState<any>(() => {
     const origQuestions = examProp.questions || [];
     const seed = examProp.studentId || examProp.submissionId || examProp.id || 'default_seed';
-    const shuffledQuestions = examProp.shuffleQuestions !== false 
-      ? shuffleArrayWithSeed(origQuestions, seed) 
-      : origQuestions;
+    const isPropMS = detectIsMS(examProp);
+
+    let preparedQuestions: any[];
+
+    if (!isPropMS) {
+      // 100% UNTOUCHED FOR SS EXAMS AND OTHERS
+      preparedQuestions = examProp.shuffleQuestions !== false 
+        ? shuffleArrayWithSeed(origQuestions, seed) 
+        : origQuestions;
+    } else {
+      // FOR MS EXAMS:
+      // Keep questions strictly grouped by subject. If shuffling is enabled, shuffle WITHIN each subject.
+      const parsedCfg = parseSubjectsConfig(examProp.subjectsConfig);
+      const configuredSubs: any[] = Array.isArray(parsedCfg?.subjects) && parsedCfg.subjects.length > 0
+        ? parsedCfg.subjects
+        : [];
+      
+      const distinctSubNames: string[] = [];
+      if (configuredSubs.length > 0) {
+        configuredSubs.forEach((s: any) => {
+          if (s?.name && !distinctSubNames.some(d => matchSubject(s.name, d))) {
+            distinctSubNames.push(s.name);
+          }
+        });
+      } else {
+        const rawSubs = origQuestions.map((q: any) => (q.subject || q.subjectName || '').trim()).filter(Boolean);
+        rawSubs.forEach((rs: string) => {
+          if (!distinctSubNames.some(d => matchSubject(rs, d))) {
+            distinctSubNames.push(rs);
+          }
+        });
+      }
+
+      const groupedResult: any[] = [];
+      const matchedIds = new Set<string>();
+
+      distinctSubNames.forEach((subName, subIdx) => {
+        const subQuestions = origQuestions.filter((q: any) => {
+          const qSub = q.subject || q.subjectName || '';
+          const matches = matchSubject(qSub, subName);
+          if (matches && q.id) matchedIds.add(q.id);
+          return matches;
+        });
+
+        if (subQuestions.length > 0) {
+          const subShuffled = examProp.shuffleQuestions !== false
+            ? shuffleArrayWithSeed(subQuestions, `${seed}_sub_${subIdx}_${subName}`)
+            : subQuestions;
+          groupedResult.push(...subShuffled);
+        }
+      });
+
+      const remainingQuestions = origQuestions.filter((q: any) => q.id && !matchedIds.has(q.id));
+      if (remainingQuestions.length > 0) {
+        const remShuffled = examProp.shuffleQuestions !== false
+          ? shuffleArrayWithSeed(remainingQuestions, `${seed}_sub_rem`)
+          : remainingQuestions;
+        groupedResult.push(...remShuffled);
+      }
+
+      preparedQuestions = groupedResult;
+    }
 
     return {
       ...examProp,
-      questions: shuffledQuestions,
+      questions: preparedQuestions,
     };
   });
 
@@ -215,37 +327,135 @@ export function ExamContextProvider({
     localStorage.setItem(warningsKey, warnings.toString());
   }, [warnings, warningsKey]);
 
+  // Safely parse subjectsConfig whether delivered as string or object
+  const parsedSubjectsConfig = useMemo(() => {
+    return parseSubjectsConfig(exam?.subjectsConfig);
+  }, [exam?.subjectsConfig]);
+
+  // Check if questions themselves contain multiple distinct subjects
+  const hasMultipleQuestionSubjects = useMemo(() => {
+    const rawSubjects = (exam?.questions || [])
+      .map((q: any) => (q.subject || q.subjectName || '').trim())
+      .filter(Boolean);
+    const canonical: string[] = [];
+    rawSubjects.forEach((rs: string) => {
+      if (!canonical.some(c => matchSubject(rs, c))) {
+        canonical.push(rs);
+      }
+    });
+    return canonical.length > 1;
+  }, [exam?.questions]);
+
+  const isMS = Boolean(
+    exam?.subjectType ? exam?.subjectType === 'MS' : (
+      (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0) ||
+      hasMultipleQuestionSubjects
+    )
+  );
+
+  const msSubjects = useMemo(() => {
+    if (!isMS) return [];
+    const configured: any[] = parsedSubjectsConfig?.subjects || [];
+    if (configured.length > 0) {
+      return configured.map((s: any) => ({
+        ...s,
+        name: s.name,
+        isMandatory: s.isMandatory !== false && s.isOptional !== true,
+        totalMarks: Number(s.totalMarks) || 0
+      }));
+    }
+    
+    // Discover distinct canonical subjects from questions using aliases
+    const rawSubjects = (exam?.questions || []).map((q: any) => q.subject || q.subjectName).filter(Boolean);
+    const canonical: string[] = [];
+    rawSubjects.forEach((rs: string) => {
+      if (!canonical.some(c => matchSubject(rs, c))) {
+        canonical.push(rs);
+      }
+    });
+    return canonical.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
+  }, [isMS, parsedSubjectsConfig, exam?.questions]);
+
   // CONSISTENT QUESTION SORTING
   const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], other: [] };
+    if (!isMS) {
+      // 100% UNTOUCHED ORIGINAL LOGIC FOR SS EXAMS AND OTHERS
+      const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc'];
+      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], other: [] };
 
-    exam.questions.forEach((q: any) => {
-      let type = (q.type || q.questionType || '').toLowerCase();
-      if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
-      if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
-      if (grouped[type]) grouped[type].push(q);
-      else grouped.other.push(q);
+      exam.questions.forEach((q: any) => {
+        let type = (q.type || q.questionType || '').toLowerCase();
+        if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
+        if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
+        if (grouped[type]) grouped[type].push(q);
+        else grouped.other.push(q);
+      });
+
+      return [
+        ...grouped.mcq,
+        ...grouped.mc,
+        ...grouped.ar,
+        ...grouped.mtf,
+        ...grouped.smcq,
+        ...grouped.cma,
+        ...grouped.mpc,
+        ...grouped.cq,
+        ...grouped.sq,
+        ...grouped.int,
+        ...grouped.numeric,
+        ...grouped.descriptive,
+        ...grouped.other
+      ];
+    }
+
+    // FOR MS EXAMS: Group questions by SUBJECT first in configured subject order!
+    // Within each subject, order by type so objective is before subjective
+    const result: any[] = [];
+    const matchedQIds = new Set<string>();
+
+    msSubjects.forEach((sub: any) => {
+      const subQuestions = exam.questions.filter((q: any) => {
+        const qSub = q.subject || q.subjectName || '';
+        const matches = matchSubject(qSub, sub.name);
+        if (matches && q.id) matchedQIds.add(q.id);
+        return matches;
+      });
+
+      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], smcq: [], cma: [], mpc: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], other: [] };
+      subQuestions.forEach((q: any) => {
+        let type = (q.type || q.questionType || '').toLowerCase();
+        if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
+        if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
+        if (grouped[type]) grouped[type].push(q);
+        else grouped.other.push(q);
+      });
+
+      result.push(
+        ...grouped.mcq,
+        ...grouped.mc,
+        ...grouped.ar,
+        ...grouped.mtf,
+        ...grouped.smcq,
+        ...grouped.cma,
+        ...grouped.mpc,
+        ...grouped.cq,
+        ...grouped.sq,
+        ...grouped.int,
+        ...grouped.numeric,
+        ...grouped.descriptive,
+        ...grouped.other
+      );
     });
 
-    return [
-      ...grouped.mcq,
-      ...grouped.mc,
-      ...grouped.ar,
-      ...grouped.mtf,
-      ...grouped.smcq,
-      ...grouped.cma,
-      ...grouped.mpc,
-      ...grouped.cq,
-      ...grouped.sq,
-      ...grouped.int,
-      ...grouped.numeric,
-      ...grouped.descriptive,
-      ...grouped.other
-    ];
-  }, [exam.questions]);
+    const remaining = exam.questions.filter((q: any) => q.id && !matchedQIds.has(q.id));
+    if (remaining.length > 0) {
+      result.push(...remaining);
+    }
+
+    return result;
+  }, [exam.questions, isMS, msSubjects]);
 
   const sortedQuestions = useMemo(() => {
     if (activeSection === 'objective') {
@@ -390,91 +600,6 @@ export function ExamContextProvider({
       objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.cma, ...g.mpc, ...g.dr, ...g.other]
     };
   }, [exam.questions]);
-
-  // --- Multiple Subject (MS) Logic ---
-  const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
-    if (!questionSubject || !targetSubjectName) return false;
-    const qClean = questionSubject.trim().toLowerCase();
-    const tClean = targetSubjectName.trim().toLowerCase();
-    if (qClean === tClean) return true;
-    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
-
-    const aliases: Record<string, string[]> = {
-      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
-      'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
-      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths', 'সাধারণ গণিত', 'general math', 'math 1st', 'math 2nd'],
-      'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
-      'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
-      'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
-      'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
-      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
-    };
-
-    for (const [key, list] of Object.entries(aliases)) {
-      const isTarget = tClean === key || list.some(a => tClean.includes(a));
-      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
-      if (isTarget && isQuestion) return true;
-    }
-
-    return false;
-  }, []);
-
-  // Safely parse subjectsConfig whether delivered as string or object
-  const parsedSubjectsConfig = useMemo(() => {
-    if (!exam?.subjectsConfig) return null;
-    if (typeof exam.subjectsConfig === 'string') {
-      try {
-        return JSON.parse(exam.subjectsConfig);
-      } catch {
-        return null;
-      }
-    }
-    return exam.subjectsConfig;
-  }, [exam?.subjectsConfig]);
-
-  // Check if questions themselves contain multiple distinct subjects
-  const hasMultipleQuestionSubjects = useMemo(() => {
-    const rawSubjects = (exam?.questions || [])
-      .map((q: any) => (q.subject || q.subjectName || '').trim())
-      .filter(Boolean);
-    const canonical: string[] = [];
-    rawSubjects.forEach((rs: string) => {
-      if (!canonical.some(c => matchSubject(rs, c))) {
-        canonical.push(rs);
-      }
-    });
-    return canonical.length > 1;
-  }, [exam?.questions, matchSubject]);
-
-  const isMS = Boolean(
-    exam?.subjectType ? exam?.subjectType === 'MS' : (
-      (parsedSubjectsConfig && Array.isArray(parsedSubjectsConfig.subjects) && parsedSubjectsConfig.subjects.length > 0) ||
-      hasMultipleQuestionSubjects
-    )
-  );
-
-  const msSubjects = useMemo(() => {
-    if (!isMS) return [];
-    const configured: any[] = parsedSubjectsConfig?.subjects || [];
-    if (configured.length > 0) {
-      return configured.map((s: any) => ({
-        ...s,
-        name: s.name,
-        isMandatory: s.isMandatory !== false && s.isOptional !== true,
-        totalMarks: Number(s.totalMarks) || 0
-      }));
-    }
-    
-    // Discover distinct canonical subjects from questions using aliases
-    const rawSubjects = (exam?.questions || []).map((q: any) => q.subject || q.subjectName).filter(Boolean);
-    const canonical: string[] = [];
-    rawSubjects.forEach((rs: string) => {
-      if (!canonical.some(c => matchSubject(rs, c))) {
-        canonical.push(rs);
-      }
-    });
-    return canonical.map(s => ({ name: s, isMandatory: true, totalMarks: 0 }));
-  }, [isMS, parsedSubjectsConfig, exam?.questions, matchSubject]);
 
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
 
