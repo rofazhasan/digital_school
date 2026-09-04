@@ -370,7 +370,7 @@ export default function OnlineExamsPage() {
     loadData(false);
   }, [loadData]);
 
-  const userClassId = user?.studentProfile?.class?.id;
+  const userClassId = user?.studentProfile?.class?.id || (user?.studentProfile as any)?.classId;
   const studentProfileId = user?.studentProfile?.id;
 
   const hasSubmitted = useCallback((examId: string) =>

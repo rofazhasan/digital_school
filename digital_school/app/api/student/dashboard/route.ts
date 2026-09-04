@@ -19,14 +19,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Access denied: Students only" }, { status: 403 });
     }
 
-    const studentId = user.studentProfile?.id;
-    const classId = user.studentProfile?.classId;
+    let studentId = user.studentProfile?.id;
+    let classId = user.studentProfile?.classId;
+
+    // Fetch verified dbStudent to ensure we have the correct classId and profile details
+    let dbStudent: any = null;
+    if (studentId) {
+      dbStudent = await prisma.studentProfile.findUnique({
+        where: { id: studentId },
+        select: {
+          id: true,
+          roll: true,
+          classId: true,
+          class: { select: { id: true, name: true, section: true } },
+          badges: {
+            select: { id: true, title: true, type: true, description: true, issuedDate: true }
+          }
+        }
+      }).catch(() => null);
+    }
+
+    if (!dbStudent && user.id) {
+      dbStudent = await prisma.studentProfile.findFirst({
+        where: { userId: user.id },
+        select: {
+          id: true,
+          roll: true,
+          classId: true,
+          class: { select: { id: true, name: true, section: true } },
+          badges: {
+            select: { id: true, title: true, type: true, description: true, issuedDate: true }
+          }
+        }
+      }).catch(() => null);
+      if (dbStudent) {
+        studentId = dbStudent.id;
+      }
+    }
 
     if (!studentId) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
 
-    const cacheKey = `student_dashboard:${studentId}:${classId || 'noclass'}`;
+    const effectiveClassId = dbStudent?.classId || classId || dbStudent?.class?.id;
+
+    const cacheKey = `student_dashboard:${studentId}:${effectiveClassId || 'noclass'}`;
     const cached = dashboardCache.get(cacheKey);
 
     if (cached && Date.now() < cached.expiresAt) {
@@ -40,7 +77,6 @@ export async function GET(req: NextRequest) {
 
     // Parallel DB fetches with safe error-handling per promise
     const [
-      dbStudent,
       dbExams,
       dbResults,
       dbSubmissions,
@@ -49,57 +85,44 @@ export async function GET(req: NextRequest) {
       dbNotices,
       dbSettings
     ] = await Promise.all([
-      // 1. Student Profile & Class
-      prisma.studentProfile.findUnique({
-        where: { id: studentId },
-        select: {
-          id: true,
-          roll: true,
-          classId: true,
-          class: { select: { id: true, name: true, section: true } },
-          badges: {
-            select: { id: true, title: true, type: true, description: true, issuedDate: true }
-          }
-        }
-      }).catch(() => null),
-
-      // 2. Class Exams (Scheduled, Live & Upcoming)
-      prisma.exam.findMany({
-        where: {
-          OR: [
-            { isActive: true },
-            ...(classId ? [{ classId }] : [])
-          ]
-        },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          date: true,
-          startTime: true,
-          endTime: true,
-          duration: true,
-          type: true,
-          totalMarks: true,
-          passMarks: true,
-          isActive: true,
-          mcqNegativeMarking: true,
-          class: { select: { id: true, name: true, section: true } },
-          examSets: {
-            take: 1,
+      // 1. Class Exams (Scheduled, Live & Upcoming for this student's class only)
+      effectiveClassId
+        ? prisma.exam.findMany({
+            where: {
+              classId: effectiveClassId,
+              isActive: true
+            },
             select: {
               id: true,
-              questionsJson: true,
-              questions: {
+              name: true,
+              description: true,
+              date: true,
+              startTime: true,
+              endTime: true,
+              duration: true,
+              type: true,
+              totalMarks: true,
+              passMarks: true,
+              isActive: true,
+              classId: true,
+              mcqNegativeMarking: true,
+              class: { select: { id: true, name: true, section: true } },
+              examSets: {
                 take: 1,
-                select: { subject: true }
+                select: {
+                  id: true,
+                  questionsJson: true,
+                  questions: {
+                    take: 1,
+                    select: { subject: true }
+                  }
+                }
               }
-            }
-          }
-        },
-        orderBy: { date: "asc" },
-        take: 30
-      }).catch(() => []),
+            },
+            orderBy: { date: "asc" },
+            take: 50
+          }).catch(() => [])
+        : Promise.resolve([]),
 
       // 3. Official Published Results
       prisma.result.findMany({
@@ -152,9 +175,9 @@ export async function GET(req: NextRequest) {
       }).catch(() => []),
 
       // 5. Attendance Records for this class
-      classId
+      effectiveClassId
         ? prisma.attendance.findMany({
-            where: { classId },
+            where: { classId: effectiveClassId },
             select: { id: true, date: true, present: true, absent: true, late: true },
             take: 30,
             orderBy: { date: "desc" }
@@ -162,8 +185,8 @@ export async function GET(req: NextRequest) {
         : Promise.resolve([]),
 
       // 6. Total students count in class
-      classId
-        ? prisma.studentProfile.count({ where: { classId } }).catch(() => 30)
+      effectiveClassId
+        ? prisma.studentProfile.count({ where: { classId: effectiveClassId } }).catch(() => 30)
         : Promise.resolve(30),
 
       // 7. Targeted Notices
@@ -173,7 +196,7 @@ export async function GET(req: NextRequest) {
           OR: [
             { targetType: "ALL" },
             { targetType: "STUDENTS" },
-            ...(classId ? [{ targetType: "CLASS", targetClassIds: { has: classId } }] : [])
+            ...(effectiveClassId ? [{ targetType: "CLASS", targetClassIds: { has: effectiveClassId } }] : [])
           ]
         },
         select: {
@@ -215,8 +238,8 @@ export async function GET(req: NextRequest) {
       })()
     ]);
 
-    // Format Scheduled & Live Exams
-    let formattedExams = (dbExams || []).map((exam: any) => {
+    // Format Scheduled & Live Exams (Strictly this student's class)
+    const formattedExams = (dbExams || []).map((exam: any) => {
       let subject = "General";
       if (exam.examSets?.[0]?.questions?.[0]?.subject) {
         subject = exam.examSets[0].questions[0].subject;
@@ -238,47 +261,10 @@ export async function GET(req: NextRequest) {
         passMarks: exam.passMarks,
         subject,
         isActive: exam.isActive,
-        classId: exam.classId,
-        className: exam.class?.name || "General"
+        classId: exam.classId || effectiveClassId,
+        className: exam.class?.name || dbStudent?.class?.name || "General"
       };
     });
-
-    if (formattedExams.length === 0) {
-      formattedExams = [
-        {
-          id: "live-math-eval",
-          name: "Mathematics Term Evaluation",
-          description: "Online objective and problem-solving examination.",
-          date: new Date().toISOString(),
-          startTime: new Date(Date.now() - 15 * 60000).toISOString(),
-          endTime: new Date(Date.now() + 45 * 60000).toISOString(),
-          duration: 60,
-          type: "ONLINE",
-          totalMarks: 100,
-          passMarks: 40,
-          subject: "Mathematics",
-          isActive: true,
-          classId: classId || "general-class",
-          className: dbStudent?.class?.name || "Class 10"
-        },
-        {
-          id: "upcoming-sci-eval",
-          name: "General Science Model Assessment",
-          description: "Physics, Chemistry, and Biology combined chapter review.",
-          date: new Date(Date.now() + 86400000).toISOString(),
-          startTime: new Date(Date.now() + 86400000).toISOString(),
-          endTime: new Date(Date.now() + 86400000 + 45 * 60000).toISOString(),
-          duration: 45,
-          type: "ONLINE",
-          totalMarks: 50,
-          passMarks: 20,
-          subject: "Science",
-          isActive: true,
-          classId: classId || "general-class",
-          className: dbStudent?.class?.name || "Class 10"
-        }
-      ];
-    }
 
     // Merge Results & Submissions into a Single Source of Truth
     const resultMap = new Map<string, any>();
@@ -460,8 +446,10 @@ export async function GET(req: NextRequest) {
         ...user,
         studentProfile: {
           ...user.studentProfile,
+          id: studentId,
           roll: dbStudent?.roll || user.studentProfile?.roll || "N/A",
-          class: dbStudent?.class || user.studentProfile?.class || { name: "General", section: "A" }
+          classId: effectiveClassId,
+          class: dbStudent?.class || user.studentProfile?.class || { id: effectiveClassId, name: "General", section: "A" }
         }
       },
       exams: formattedExams,

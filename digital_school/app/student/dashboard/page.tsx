@@ -517,9 +517,12 @@ export default function StudentDashboardPage() {
     return { list, topSubject, focusSubject, radarChart };
   }, [results, analytics]);
 
-  // Filtered Scheduled & Live Exams
+  // Filtered Scheduled & Live Exams (Strictly filtered by student class)
   const filteredScheduledExams = useMemo(() => {
+    const studentClassId = user?.studentProfile?.classId || (user?.studentProfile as any)?.class?.id;
     return exams.filter(exam => {
+      // Exclude exams not belonging to this student's class
+      if (studentClassId && exam.classId && exam.classId !== studentClassId) return false;
       if (examTypeFilter !== 'all' && exam.type !== examTypeFilter) return false;
       if (examSearchQuery.trim()) {
         const q = examSearchQuery.toLowerCase();
@@ -533,7 +536,7 @@ export default function StudentDashboardPage() {
       const tB = b.startTime ? new Date(b.startTime).getTime() : new Date(b.date).getTime();
       return tA - tB;
     });
-  }, [exams, examTypeFilter, examSearchQuery]);
+  }, [exams, examTypeFilter, examSearchQuery, user]);
 
   // Filtered Completed Exam Results
   const filteredExamResults = useMemo(() => {
@@ -816,10 +819,10 @@ export default function StudentDashboardPage() {
                     </div>
                     <div className="mt-2 sm:mt-3">
                       <span className="text-sm sm:text-lg font-black text-foreground line-clamp-1">
-                        {exams[0]?.name || "None"}
+                        {filteredScheduledExams[0]?.name || "None"}
                       </span>
                       <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium mt-0.5 truncate">
-                        {exams[0]?.date ? new Date(exams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "Caught up"}
+                        {filteredScheduledExams[0]?.date ? new Date(filteredScheduledExams[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "Caught up"}
                       </p>
                     </div>
                   </CardContent>
