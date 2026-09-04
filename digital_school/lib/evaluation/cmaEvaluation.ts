@@ -251,8 +251,14 @@ export function evaluateCMAQuestion(
         };
     }
 
-    const finalScore = Math.round(totalEarned * 100) / 100;
-    const isCorrect = finalScore >= maxMarks * 0.99;
+    let finalScore = Math.round(totalEarned * 100) / 100;
+    const allPartsCorrect = parts.length > 0 && Object.values(partResults).every(p => p.isCorrect);
+    const isCorrect = allPartsCorrect || (maxMarks > 0 && (finalScore >= maxMarks * 0.99 || Math.abs(finalScore - maxMarks) <= 0.02));
+
+    // If all sub-questions are answered correctly or reached .99, award full marks
+    if (isCorrect) {
+        finalScore = maxMarks;
+    }
 
     return {
         score: finalScore,

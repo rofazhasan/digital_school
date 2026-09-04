@@ -1,7 +1,7 @@
 import { evaluateCMAQuestion } from '../lib/evaluation/cmaEvaluation';
 import { evaluateMPCQuestion } from '../lib/evaluation/mpcEvaluation';
 import { evaluateMCQuestion } from '../lib/evaluation/mcEvaluation';
-import { evaluateQuestionResultStatus } from '../lib/exam-result-utils';
+import { evaluateQuestionResultStatus, isAnswerCorrect } from '../lib/exam-result-utils';
 
 // Complete 9-Question Type Sample Exam Payload
 export const SAMPLE_9_TYPE_EXAM = {
@@ -328,6 +328,50 @@ function auditCompleteLifecycle() {
     stageResults: mpcEPH.stageResults
   });
   testAssert(mpcEPHStatus === "PARTIAL", `MPC Result Mapping: Error propagation method credit maps to PARTIAL on result page`);
+
+  // 13. 3-PART QUESTION AUDIT: 0.33 * 3 = 0.99 OUT OF 1.0 MUST BE FULL MARKS & CORRECT
+  // Direct isAnswerCorrect check
+  testAssert(isAnswerCorrect(0.99, 1) === true, `Precision Audit: isAnswerCorrect(0.99, 1) must return true`);
+  testAssert(isAnswerCorrect(0.66, 1) === false, `Precision Audit: isAnswerCorrect(0.66, 1) must return false (partial)`);
+  testAssert(isAnswerCorrect(0.33, 1) === false, `Precision Audit: isAnswerCorrect(0.33, 1) must return false (partial)`);
+
+  // CMA 3-part evaluation
+  const cma3Part = {
+    id: "cma_3part_q1",
+    marks: 1,
+    parts: [
+      { id: "p1", marks: 0.33, expectedAnswer: "5" },
+      { id: "p2", marks: 0.33, expectedAnswer: "10" },
+      { id: "p3", marks: 0.33, expectedAnswer: "15" }
+    ]
+  };
+  const cma3PartEval = evaluateCMAQuestion(cma3Part as any, { p1: "5", p2: "10", p3: "15" });
+  testAssert(cma3PartEval.score === 1, `CMA 3-Part: All 3 parts answered correctly gives full 1 mark, got ${cma3PartEval.score}`);
+  testAssert(cma3PartEval.isCorrect === true, `CMA 3-Part: isCorrect is true`);
+
+  // evaluateQuestionResultStatus when awardedMarks is 0.99 for a 1 mark question
+  const statusPoint99 = evaluateQuestionResultStatus({
+    type: "CMA",
+    marks: 1,
+    awardedMarks: 0.99,
+    studentAnswer: { p1: "5", p2: "10", p3: "15" },
+    parts: cma3Part.parts
+  });
+  testAssert(statusPoint99 === "CORRECT", `Status Audit: 0.99 on 1-mark question maps to CORRECT (not PARTIAL), got ${statusPoint99}`);
+
+  // SMCQ 3-part with all sub-questions answered correctly
+  const smcq3PartStatus = evaluateQuestionResultStatus({
+    type: "SMCQ",
+    marks: 1,
+    awardedMarks: 0.99,
+    studentAnswer: { 0: "A", 1: "B", 2: "C" },
+    subQuestions: [
+      { id: "sq1", marks: 0.33, isCorrect: true },
+      { id: "sq2", marks: 0.33, isCorrect: true },
+      { id: "sq3", marks: 0.33, isCorrect: true }
+    ]
+  });
+  testAssert(smcq3PartStatus === "CORRECT", `Status Audit: SMCQ with all 3 sub-questions correct maps to CORRECT (not PARTIAL), got ${smcq3PartStatus}`);
 
   console.log("--------------------------------------------------------------------------");
   console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT CHECKS PASSED CLEANLY!`);

@@ -389,9 +389,13 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             const subQs = Array.isArray(rawSubQs) ? rawSubQs : [];
             if (subQs.length === 0) return 0;
             let totalObtained = 0;
+            let allCorrect = true;
             subQs.forEach((sub: any, idx: number) => {
                 const subAns = submission.answers?.[`${q.id}_sub_${idx}`] ?? submission.answers?.[`${q.id}_${idx}`] ?? studentAnswer?.[idx] ?? (typeof studentAnswer === 'object' ? studentAnswer?.[sub.id] : null);
-                if (!subAns || subAns === 'No answer provided') return;
+                if (!subAns || subAns === 'No answer provided') {
+                    allCorrect = false;
+                    return;
+                }
                 const correctText = sub.correct || sub.correctAnswer || sub.options?.find((opt: any) => opt.isCorrect)?.text;
                 const subMarks = sub.marks || 1;
                 let isCorrect = false;
@@ -405,9 +409,14 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 if (isCorrect) {
                     totalObtained += subMarks;
                 } else {
+                    allCorrect = false;
                     totalObtained -= (subMarks * negativeRate);
                 }
             });
+            const qMax = Number(q.marks) || subQs.reduce((s: number, sq: any) => s + (sq.marks || 1), 0);
+            if (allCorrect || (qMax > 0 && (totalObtained >= qMax * 0.99 || Math.abs(totalObtained - qMax) <= 0.02))) {
+                return qMax;
+            }
             return Number(totalObtained.toFixed(2));
         };
 
@@ -1522,16 +1531,17 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 ? Number(submission.answers[`${q.id}_marks`])
                                                 : getCMAMark(q, ans);
                                             const maxM = evalRes.maxScore || q.marks || 1;
-                                            const isFull = earnedMark >= maxM * 0.99;
+                                            const isFull = earnedMark >= maxM * 0.99 || Math.abs(earnedMark - maxM) <= 0.02;
                                             const isPartial = earnedMark > 0 && !isFull;
                                             const isMinus = earnedMark < 0;
+                                            const displayMark = isFull ? maxM : earnedMark;
 
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
                                                         <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
-                                                            [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
+                                                            [{displayMark > 0 ? `+${displayMark}` : displayMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 mt-2">
@@ -1566,16 +1576,17 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 ? Number(submission.answers[`${q.id}_marks`])
                                                 : getMPCMark(q, ans);
                                             const maxM = evalRes.maxScore || q.marks || 1;
-                                            const isFull = earnedMark >= maxM * 0.99;
+                                            const isFull = earnedMark >= maxM * 0.99 || Math.abs(earnedMark - maxM) <= 0.02;
                                             const isPartial = earnedMark > 0 && !isFull;
                                             const isMinus = earnedMark < 0;
+                                            const displayMark = isFull ? maxM : earnedMark;
 
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
                                                         <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.scenario || 'Multi-Step Problem Chain'}</UniversalMathJax></span>
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
-                                                            [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
+                                                            [{displayMark > 0 ? `+${displayMark}` : displayMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 mt-2">

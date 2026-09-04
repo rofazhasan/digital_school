@@ -91,10 +91,17 @@ export function evaluateMCQuestion(
     // Apply negative marking for wrong selections
     const wrongPenalty = wrongSelected * (settings.negativeMarking / 100) * question.marks;
 
-    const finalScore = partialMarks - wrongPenalty;
+    let finalScore = partialMarks - wrongPenalty;
 
     // Round to 2 decimal places
-    return Math.round(finalScore * 100) / 100;
+    finalScore = Math.round(finalScore * 100) / 100;
+
+    // If score is at least 99% of total marks or within 0.02, award full marks
+    if (question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= 0.02)) {
+        finalScore = question.marks;
+    }
+
+    return finalScore;
 }
 
 /**
@@ -138,8 +145,8 @@ export function getMCFeedback(
     const missedCorrect = correctIndices.filter(idx => !selectedSet.has(idx));
     const wronglySelected = answer.selectedOptions.filter(idx => !correctSet.has(idx));
 
-    const isFullyCorrect = score === question.marks;
-    const isPartiallyCorrect = score > 0 && score < question.marks;
+    const isFullyCorrect = score === question.marks || (question.marks > 0 && (score >= question.marks * 0.99 || Math.abs(score - question.marks) <= 0.02));
+    const isPartiallyCorrect = score > 0 && !isFullyCorrect;
 
     let feedback = '';
     if (isFullyCorrect) {

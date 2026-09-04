@@ -119,9 +119,13 @@ function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
     const partialEarned = correctSelected * marksPerCorrect;
     const wrongPenalty = negPct > 0 ? (wrongSelected * (negPct / 100) * totalMarks) : 0;
     score = Math.max(0, Math.round((partialEarned - wrongPenalty) * 100) / 100);
+    if (totalMarks > 0 && (score >= totalMarks * 0.99 || Math.abs(score - totalMarks) <= 0.02)) {
+      score = totalMarks;
+    }
   }
 
-  const isPartial = !isFullCorrect && (score > 0 || correctSelected > 0);
+  const isFull = isFullCorrect || (totalMarks > 0 && (score >= totalMarks * 0.99 || Math.abs(score - totalMarks) <= 0.02));
+  const isPartial = !isFull && (score > 0 || correctSelected > 0);
   const hasAttempted = selectedIndices.length > 0;
 
   return {
@@ -131,7 +135,7 @@ function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0) {
     totalCorrect,
     correctSelected,
     wrongSelected,
-    isFullCorrect,
+    isFullCorrect: isFull,
     isPartial,
     hasAttempted,
     score
@@ -3136,28 +3140,42 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        {isCorrect ? (
-                                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
-                                            <CheckCircle className="w-3.5 h-3.5" />
-                                            <span>Correct (+{Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
-                                          </Badge>
-                                        ) : isPartial ? (
-                                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
-                                            <AlertCircle className="w-3.5 h-3.5" />
-                                            <span>Partial Credit (+{Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
-                                          </Badge>
-                                        ) : hasAns ? (
-                                          <Badge className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
-                                            <XCircle className="w-3.5 h-3.5" />
-                                            <span>
-                                              Wrong ({Number(question.awardedMarks) < 0 ? `${Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')} penalty` : `0`}/{question.marks})
-                                            </span>
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold text-xs px-3.5 py-1 rounded-full border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
-                                            Unanswered (0/{question.marks})
-                                          </Badge>
-                                        )}
+                                        {(() => {
+                                          const isFullScore = isCorrect || (question.marks > 0 && (Number(question.awardedMarks) >= Number(question.marks) * 0.99 || Math.abs(Number(question.awardedMarks) - Number(question.marks)) <= 0.02));
+                                          const displayAwarded = isFullScore ? question.marks : question.awardedMarks;
+
+                                          if (isCorrect) {
+                                            return (
+                                              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                                <CheckCircle className="w-3.5 h-3.5" />
+                                                <span>Correct (+{Number(displayAwarded).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
+                                              </Badge>
+                                            );
+                                          }
+                                          if (isPartial) {
+                                            return (
+                                              <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                <span>Partial Credit (+{Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks})</span>
+                                              </Badge>
+                                            );
+                                          }
+                                          if (hasAns) {
+                                            return (
+                                              <Badge className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3.5 py-1 rounded-full shadow-sm flex items-center gap-1.5">
+                                                <XCircle className="w-3.5 h-3.5" />
+                                                <span>
+                                                  Wrong ({Number(question.awardedMarks) < 0 ? `${Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')} penalty` : `0`}/{question.marks})
+                                                </span>
+                                              </Badge>
+                                            );
+                                          }
+                                          return (
+                                            <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold text-xs px-3.5 py-1 rounded-full border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40">
+                                              Unanswered (0/{question.marks})
+                                            </Badge>
+                                          );
+                                        })()}
                                       </div>
                                     </div>
 

@@ -456,10 +456,12 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
                 let smcqScore = 0;
                 let subAttemptCount = 0;
+                let allSubCorrect = subQs.length > 0;
                 subQs.forEach((subQ: SubQuestion, sIdx: number) => {
                     const subAnswer = answers[`${question.id}_sub_${sIdx}`] as any;
                     if (subAnswer === undefined || subAnswer === null || subAnswer === '') {
                         answers[`${question.id}_sub_${sIdx}_marks`] = 0;
+                        allSubCorrect = false;
                         return;
                     }
 
@@ -470,17 +472,25 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                         const sMark = Number(subQ.marks) || 1;
                         smcqScore += sMark;
                         answers[`${question.id}_sub_${sIdx}_marks`] = sMark;
-                    } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                        const negMark = -((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
-                        smcqScore += negMark;
-                        answers[`${question.id}_sub_${sIdx}_marks`] = negMark;
                     } else {
-                        answers[`${question.id}_sub_${sIdx}_marks`] = 0;
+                        allSubCorrect = false;
+                        if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                            const negMark = -((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+                            smcqScore += negMark;
+                            answers[`${question.id}_sub_${sIdx}_marks`] = negMark;
+                        } else {
+                            answers[`${question.id}_sub_${sIdx}_marks`] = 0;
+                        }
                     }
                 });
+                const qMaxMarks = Number(question.marks) || smcqScore || 1;
+                // If all sub-questions are answered correctly or reached .99 of max marks, make it full
+                if (allSubCorrect || (qMaxMarks > 0 && (smcqScore >= qMaxMarks * 0.99 || Math.abs(smcqScore - qMaxMarks) <= 0.02))) {
+                    smcqScore = qMaxMarks;
+                }
                 questionScore = smcqScore;
                 const allSubAttempted = subAttemptCount > 0;
-                res = { score: questionScore, type, attempted: allSubAttempted };
+                res = { score: questionScore, type, attempted: allSubAttempted, isCorrect: questionScore >= qMaxMarks };
             } else if (type === 'MTF') {
                 const hasMatchSet = studentAnswer && (Array.isArray((studentAnswer as any).matches) ? (studentAnswer as any).matches.length > 0 : Object.keys(studentAnswer as any).length > 0);
                 if (!hasMatchSet) {
@@ -503,6 +513,12 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             }
 
             if (res) {
+                const qMax = Number(question.marks) || 0;
+                if (qMax > 0 && (questionScore >= qMax * 0.99 || Math.abs(questionScore - qMax) <= 0.02)) {
+                    questionScore = qMax;
+                    res.score = qMax;
+                    res.isCorrect = true;
+                }
                 mcqMarks += questionScore;
                 totalScore += questionScore;
                 evaluationResult[question.id] = { ...res, type };

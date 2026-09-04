@@ -402,13 +402,14 @@ export async function GET(
           }
 
           const subTotalMarks = Number(subQ.marks) || 0;
+          const isSubCorrect = (Number(subAwarded) >= subTotalMarks || (subTotalMarks > 0 && (Number(subAwarded) >= subTotalMarks * 0.99 || Math.abs(Number(subAwarded) - subTotalMarks) <= 0.02))) && subTotalMarks > 0;
           return {
             ...subQ,
             studentAnswer: subAns,
             studentImages: subImages, // Properly mapped now!
             allDrawings: subDrawingsForPart, // For annotations on sub-questions
             awardedMarks: Number(subAwarded) || 0,
-            isCorrect: Number(subAwarded) >= subTotalMarks && subTotalMarks > 0
+            isCorrect: isSubCorrect
           };
         });
       }
@@ -441,6 +442,10 @@ export async function GET(
           }
         } else if (type === 'SMCQ') {
           calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
+          const allSubsCorrect = processedSubQuestions.length > 0 && processedSubQuestions.every((sq: any) => sq.isCorrect);
+          if (allSubsCorrect || (maxMarks > 0 && (calculatedMarks >= maxMarks * 0.99 || Math.abs(calculatedMarks - maxMarks) <= 0.02))) {
+            calculatedMarks = maxMarks;
+          }
         } else if (type === 'INT' || type === 'NUMERIC') {
           const intResult = evaluateINTQuestion(question, studentAnswer);
           if (!intResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '' && studentAnswer !== 'No answer provided') {
@@ -489,6 +494,10 @@ export async function GET(
       }
 
       awardedMarks = Number(calculatedMarks) || 0;
+      const allSubsAnsweredCorrectly = processedSubQuestions && processedSubQuestions.length > 0 && processedSubQuestions.every((sq: any) => sq.isCorrect);
+      if (maxMarks > 0 && (allSubsAnsweredCorrectly || awardedMarks >= maxMarks * 0.99 || Math.abs(awardedMarks - maxMarks) <= 0.02)) {
+        awardedMarks = maxMarks;
+      }
       // --- BUTTERY FALLBACK EVALUATION END ---
 
       let parsedOptions = question.options;
@@ -521,7 +530,7 @@ export async function GET(
         questionText: question.questionText || question.text || "",
         marks: maxMarks,
         awardedMarks,
-        isCorrect: awardedMarks >= maxMarks && maxMarks > 0,
+        isCorrect: (awardedMarks >= maxMarks || (maxMarks > 0 && (awardedMarks >= maxMarks * 0.99 || Math.abs(awardedMarks - maxMarks) <= 0.02)) || allSubsAnsweredCorrectly) && maxMarks > 0,
         studentAnswer,
         studentAnswerImages,
         drawingData,

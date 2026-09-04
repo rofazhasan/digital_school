@@ -77,8 +77,18 @@ export const isAnswerCorrect = (awardedMarks: any, totalMarks: any): boolean => 
     const total = Number(totalMarks);
 
     if (isNaN(awarded) || isNaN(total)) return false;
+    if (total <= 0) return false;
 
-    return awarded === total && total > 0;
+    // Exact match
+    if (awarded === total) return true;
+
+    // Handle floating point rounding and multi-part questions (e.g. 3 parts * 0.33 = 0.99 out of 1.0)
+    // If awarded marks are >= 99% of total or within 0.02 of total marks, consider it full marks / correct
+    if (awarded >= total * 0.99 || Math.abs(awarded - total) <= 0.02) {
+        return true;
+    }
+
+    return false;
 };
 
 /**
@@ -100,6 +110,54 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
 
     const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
     if (isCorrect) return 'CORRECT';
+
+    // If all sub-questions / parts / stages are answered correctly, classify as CORRECT (full)
+    if (type === 'SMCQ') {
+        const sqs = subQuestions || [];
+        if (sqs.length > 0 && sqs.every((sq: any) => sq.isCorrect || isAnswerCorrect(sq.awardedMarks, sq.marks))) {
+            return 'CORRECT';
+        }
+    } else if (type === 'CMA') {
+        const parts = question.parts || question.cmaParts || question.subQuestions || question.sub_questions || [];
+        if (question.partResults && typeof question.partResults === 'object') {
+            const pVals = Object.values(question.partResults);
+            if (pVals.length > 0 && pVals.every((p: any) => Boolean(p?.isCorrect))) {
+                return 'CORRECT';
+            }
+        } else if (parts.length > 0 && studentAnswer && typeof studentAnswer === 'object') {
+            const allPartsOk = parts.every((p: any) => {
+                const pId = p.id || p.key || p.name || p.label;
+                const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
+                const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
+                if (!sVal || !eVal) return false;
+                const tol = Number(p.tolerance) || 0.01;
+                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
+            });
+            if (allPartsOk) return 'CORRECT';
+        }
+    } else if (type === 'MPC') {
+        const stages = question.stages || question.mpcStages || question.subQuestions || question.sub_questions || [];
+        if (question.stageResults && typeof question.stageResults === 'object') {
+            const sVals = Object.values(question.stageResults);
+            if (sVals.length > 0 && sVals.every((s: any) => Boolean(s?.isCorrectDirectly || s?.isCorrectWithPropagatedError))) {
+                return 'CORRECT';
+            }
+        } else if (stages.length > 0 && studentAnswer && typeof studentAnswer === 'object') {
+            const allStagesOk = stages.every((s: any) => {
+                const sId = s.id || s.key || s.name || s.stageTitle;
+                const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
+                const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
+                if (!sVal || !eVal) return false;
+                const tol = Number(s.tolerance) || 0.01;
+                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
+            });
+            if (allStagesOk) return 'CORRECT';
+        }
+    } else if (subQuestions && Array.isArray(subQuestions) && subQuestions.length > 0) {
+        if (subQuestions.every((sq: any) => sq.isCorrect || isAnswerCorrect(sq.awardedMarks, sq.marks))) {
+            return 'CORRECT';
+        }
+    }
 
     // Check if at least 1 component/part/option is correct for partial credit classification
     let hasAtLeastOneCorrect = false;

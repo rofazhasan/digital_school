@@ -313,8 +313,14 @@ export function evaluateMPCQuestion(
         };
     }
 
-    const finalScore = Math.round(totalEarned * 100) / 100;
-    const isCorrect = finalScore >= maxMarks * 0.99;
+    let finalScore = Math.round(totalEarned * 100) / 100;
+    const allStagesCorrect = stages.length > 0 && Object.values(stageResults).every(s => s.isCorrectDirectly || s.isCorrectWithPropagatedError);
+    const isCorrect = allStagesCorrect || (maxMarks > 0 && (finalScore >= maxMarks * 0.99 || Math.abs(finalScore - maxMarks) <= 0.02));
+
+    // If all sub-questions/stages are answered correctly or reached .99, award full marks
+    if (isCorrect) {
+        finalScore = maxMarks;
+    }
 
     return {
         score: finalScore,
