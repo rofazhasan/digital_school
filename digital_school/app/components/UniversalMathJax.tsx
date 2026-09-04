@@ -157,7 +157,14 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9));
     const [cacheVersion, setCacheVersion] = useState(0);
 
-    const rawText = typeof children === "string" ? children : "";
+    let rawText = "";
+    if (typeof children === "string") {
+        rawText = children;
+    } else if (typeof children === "number") {
+        rawText = String(children);
+    } else if (Array.isArray(children)) {
+        rawText = children.map(c => (typeof c === "string" || typeof c === "number") ? c : "").join("");
+    }
     const cleanText = cleanupMath(rawText);
 
     const { text: processedText, hasChemfig, formulaMap } = useMemo(() => 
@@ -285,7 +292,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         return (
             <span 
                 ref={containerRef as any}
-                className="inline-block" 
+                className="inline-block whitespace-pre-line" 
                 dangerouslySetInnerHTML={{ __html: renderedText }} 
             />
         );
@@ -294,7 +301,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     return (
         <div 
             ref={containerRef}
-            className="block" 
+            className="block whitespace-pre-line" 
             dangerouslySetInnerHTML={{ __html: renderedText }} 
         />
     );

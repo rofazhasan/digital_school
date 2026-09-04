@@ -2522,7 +2522,7 @@ const QuestionCard: React.FC<{
                   <p className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">Correct Answer</p>
                 </div>
                 <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                  {question.modelAnswer || question.explanation}
+                  <UniversalMathJax inline dynamic>{cleanupMath(String(question.modelAnswer || question.explanation || ''))}</UniversalMathJax>
                 </div>
               </div>
             </div>
@@ -6009,7 +6009,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                {q.hasMath ? <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax> : q.questionText}
+                                <UniversalMathJax inline dynamic>{cleanupMath(sq.question || sq.questionText || sq.text || '')}</UniversalMathJax>
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (

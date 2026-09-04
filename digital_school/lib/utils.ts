@@ -130,10 +130,15 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
   return Math.round((earnedMarks / totalMarks) * 100);
 }
 
+// Standard LaTeX commands starting with \n that should not be converted to a newline
+const LATEX_N_COMMANDS = '(?:abla|atural|earrow|eq(?![a-zA-Z])|e(?![a-zA-Z])|eg(?![a-zA-Z])|ewcommand|ewenvironment|i(?![a-zA-Z])|eftarrow|Leftarrow|mid|obreak|ocite|oexpand|oindent|olimits|onstopmode|opagebreak|ormalsize|otin(?![a-zA-Z])|ot(?![a-zA-Z])|parallel|rightarrow|Rightarrow|sim|subset|subseteq|supset|supseteq|u(?![a-zA-Z])|ull|umber|warrow)';
+const LITERAL_N_REGEX = new RegExp(`\\\\+n(?!${LATEX_N_COMMANDS})`, 'g');
+
 /**
  * Processes custom formatting markers from the Excel template
  * Handles:
  * - || -> <br /> (Line break / Poetry)
+ * - \n / \r\n / literal \n -> <br /> (Newlines)
  * - **text** -> <strong>text</strong> (Bold)
  * - ___ -> underlined gap (Fill in the blanks)
  */
@@ -145,10 +150,18 @@ export function applyFormatting(text: string | null | undefined): string {
   // 1. Line Breaks (||)
   processed = processed.replace(/\|\|/g, '<br />');
 
-  // 2. Bold (**text**)
+  // 2. CRLF and LF newlines (both literal \\r\\n and real \r\n, \r, \n)
+  processed = processed.replace(/\\+r\\+n/g, '<br />');
+  processed = processed.replace(/\r\n/g, '<br />');
+  processed = processed.replace(/[\r\n]/g, '<br />');
+
+  // 3. Literal \n (one or more backslashes followed by 'n') when not a recognized LaTeX command
+  processed = processed.replace(LITERAL_N_REGEX, '<br />');
+
+  // 4. Bold (**text**)
   processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-  // 3. Fill in the blanks (___)
+  // 5. Fill in the blanks (___)
   processed = processed.replace(/___/g, '<span class="inline-block border-b-2 border-current min-w-[60px] mx-1" style="vertical-align: baseline;">&nbsp;</span>');
 
   return processed;
@@ -167,7 +180,8 @@ export function cleanupMath(text: string | null | undefined): string {
   let raw = text.trim();
 
   // Auto-delimit raw math/chemical expressions missing $...$
-  if (!raw.includes('$')) {
+  // BUT only if it is a single-line expression without newlines or pipes
+  if (!raw.includes('$') && !/[\r\n]|\\n|\|\|/.test(raw)) {
     const hasMathTokens = /\\(frac|sqrt|cdot|times|pm|pi|alpha|beta|theta|gamma|Delta|omega|sigma|partial|int|sum|infty|text|mathrm|mathbf)|(\^[0-9a-zA-Z+-]+)|(\^\{[^{}]+\})|(_[0-9a-zA-Z+-]+)|(_{0,1}\{[^{}]+\})/i.test(raw);
     if (hasMathTokens) {
       // Format ion charges & simple powers before wrapping: e.g. D^2+ -> D^{2+}

@@ -2047,7 +2047,7 @@ export default function ExamBuilderPage() {
                       <tr key={q.id}>
                         <td className="border px-2 py-1">{qIdx + 1}</td>
                         <td className="border px-2 py-1">
-                          {q.hasMath ? <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax> : q.questionText}
+                          <UniversalMathJax inline dynamic>{cleanupMath(q.questionText)}</UniversalMathJax>
                         </td>
                         {sets.map((set, sIdx) => {
                           const setQ = Array.isArray(set.questionsJson) ? set.questionsJson[qIdx] : undefined;
@@ -2055,7 +2055,7 @@ export default function ExamBuilderPage() {
                             <td key={set.name} className="border px-2 py-1">
                               {setQ ? (
                                 <div>
-                                  {setQ.hasMath ? <UniversalMathJax inline>{cleanupMath(setQ.questionText)}</UniversalMathJax> : setQ.questionText}
+                                  <UniversalMathJax inline dynamic>{cleanupMath(setQ.questionText)}</UniversalMathJax>
                                   {((setQ.type === 'MCQ' || setQ.type === 'AR') && Array.isArray(setQ.options)) && (
                                     <ul className="list-disc pl-4 mt-1">
                                       {setQ.options.map((opt: any, i: number) => {
@@ -2067,7 +2067,7 @@ export default function ExamBuilderPage() {
                                         }
                                         return (
                                           <li key={i} className={isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                                            {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
+                                            <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                           </li>
                                         );
                                       })}
@@ -2089,13 +2089,13 @@ export default function ExamBuilderPage() {
                                       {(setQ.subQuestions || setQ.sub_questions || []).map((sq: any, i: number) => (
                                         <div key={i} className="pl-2 border-l border-blue-200">
                                           <div className="font-medium">
-                                            {i + 1}. {sq.hasMath || /\\\(|\\\[|\\\]|\\\)/.test(sq.question || '') ? <UniversalMathJax inline>{cleanupMath(sq.question || sq.text || '')}</UniversalMathJax> : (sq.question || sq.text)}
+                                            {i + 1}. <UniversalMathJax inline dynamic>{cleanupMath(sq.question || sq.text || '')}</UniversalMathJax>
                                           </div>
                                           {Array.isArray(sq.options) && (
                                             <ul className="list-disc pl-4 mt-0.5 opacity-80">
                                               {sq.options.map((opt: any, oi: number) => (
                                                 <li key={oi} className={opt.isCorrect || String(opt.isCorrect) === 'true' ? 'text-green-600 font-bold' : ''}>
-                                                  {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                   {sq.negativeMarks && opt.isCorrect === false && (
                                                     <span className="text-[8px] text-red-400 ml-1">(-{sq.negativeMarks})</span>
                                                   )}
@@ -2129,7 +2129,7 @@ export default function ExamBuilderPage() {
                         <div key={q.id || idx} className="mb-6">
                           <div className="font-bold mb-1">Q{idx + 1}.</div>
                           <div className="mb-2">
-                            {q.hasMath ? <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax> : q.questionText}
+                            <UniversalMathJax inline dynamic>{cleanupMath(q.questionText)}</UniversalMathJax>
                           </div>
                           {((q.type === 'MCQ' || q.type === 'AR') && Array.isArray(q.options)) && (
                             <ul className="list-disc pl-6 mt-1">
@@ -2141,7 +2141,7 @@ export default function ExamBuilderPage() {
                                 }
                                 return (
                                   <li key={i} className={isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                                    {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <MathJax>{opt.text}</MathJax> : opt.text}
+                                    <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                   </li>
                                 );
                               })}
@@ -2158,14 +2158,14 @@ export default function ExamBuilderPage() {
                               {q.subQuestions.map((sq: any, i: number) => (
                                 <div key={i} className="text-sm">
                                   <span className="font-bold mr-1">{String.fromCharCode(97 + i)}.</span>
-                                  <UniversalMathJax inline>{cleanupMath(sq.question || sq.text || sq || '')}</UniversalMathJax>
+                                  <UniversalMathJax inline dynamic>{cleanupMath(sq.question || sq.text || sq || '')}</UniversalMathJax>
                                   {sq.marks && <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>}
                                 </div>
                               ))}
                             </div>
                           )}
                           {q.type === 'SQ' && (q.modelAnswer || q.explanation) && (
-                            <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> {q.modelAnswer || q.explanation}</div>
+                            <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath(q.modelAnswer || q.explanation)}</UniversalMathJax></div>
                           )}
                           {q.type === 'SMCQ' && (q.subQuestions || q.sub_questions) && (
                             <div className="mt-3 space-y-4 ml-6 border-l-2 border-blue-100 dark:border-blue-900 pl-4">
