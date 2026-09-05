@@ -6,6 +6,7 @@ import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluat
 import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
 import { evaluateCMAQuestion } from "./evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "./evaluation/mpcEvaluation";
+import { isMCQAnswerCorrect } from "./evaluation/mcqEvaluation";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
@@ -332,86 +333,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             let res: any = null;
 
             const isOptionAnswerMatching = (options: any[], userAns: any, qObj: any): boolean => {
-                if (userAns === undefined || userAns === null || userAns === '' || userAns === 'No answer provided') return false;
-                const clean = (s: any) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
-                
-                let rawVal = userAns;
-                if (typeof rawVal === 'object' && rawVal !== null) {
-                    rawVal = rawVal.selectedOption ?? rawVal.answer ?? rawVal.value ?? rawVal.text ?? rawVal.option;
-                }
-                const cleanU = clean(rawVal);
-                if (!cleanU) return false;
-
-                const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ'];
-                const MCQ_LABELS_EN = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
-
-                const directlyCorrectIndices = new Set<number>();
-                const directlyCorrectTexts: string[] = [];
-
-                if (Array.isArray(options)) {
-                    options.forEach((opt: any, idx: number) => {
-                        const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
-                        const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
-                        const isMatchingCorrect = (
-                            (qObj?.correct !== undefined && qObj?.correct !== null && (
-                                clean(qObj.correct) === optText ||
-                                (typeof qObj.correct === 'number' && qObj.correct === idx) ||
-                                (typeof qObj.correct === 'string' && qObj.correct.trim() === String(idx)) ||
-                                (typeof qObj.correct === 'string' && MCQ_LABELS_BN[idx] && qObj.correct.trim() === MCQ_LABELS_BN[idx]) ||
-                                (typeof qObj.correct === 'string' && MCQ_LABELS_EN[idx] && qObj.correct.trim().toLowerCase() === MCQ_LABELS_EN[idx])
-                            )) ||
-                            (qObj?.correctAnswer !== undefined && qObj?.correctAnswer !== null && (
-                                clean(qObj.correctAnswer) === optText ||
-                                (typeof qObj.correctAnswer === 'number' && qObj.correctAnswer === idx) ||
-                                (typeof qObj.correctAnswer === 'string' && qObj.correctAnswer.trim() === String(idx))
-                            )) ||
-                            (qObj?.correctOption !== undefined && qObj?.correctOption !== null && (
-                                qObj.correctOption === idx ||
-                                String(qObj.correctOption) === String(idx)
-                            )) ||
-                            (qObj?.modelAnswer !== undefined && qObj?.modelAnswer !== null && (
-                                clean(qObj.modelAnswer) === optText
-                            ))
-                        );
-
-                        if (isOptionMarkedCorrect || isMatchingCorrect) {
-                            directlyCorrectIndices.add(idx);
-                            if (optText) directlyCorrectTexts.push(optText);
-                        }
-                    });
-                }
-
-                // IDENTICAL OPTIONS EXPANSION:
-                const finalCorrectIndices = new Set<number>(directlyCorrectIndices);
-                const finalCorrectTexts = [...directlyCorrectTexts];
-                if (Array.isArray(options)) {
-                    options.forEach((opt: any, idx: number) => {
-                        const optText = clean(typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt));
-                        if (optText && directlyCorrectTexts.includes(optText)) {
-                            finalCorrectIndices.add(idx);
-                            if (!finalCorrectTexts.includes(optText)) finalCorrectTexts.push(optText);
-                        }
-                    });
-                }
-
-                if (finalCorrectTexts.includes(cleanU)) return true;
-
-                if (Array.isArray(options)) {
-                    for (const cIdx of Array.from(finalCorrectIndices)) {
-                        if (cleanU === String(cIdx)) return true;
-                        if (MCQ_LABELS_BN[cIdx] && cleanU === MCQ_LABELS_BN[cIdx]) return true;
-                        if (MCQ_LABELS_EN[cIdx] && cleanU === MCQ_LABELS_EN[cIdx].toLowerCase()) return true;
-                    }
-
-                    const uNum = parseInt(cleanU, 10);
-                    if (!isNaN(uNum) && uNum >= 0 && uNum < options.length) {
-                        if (finalCorrectIndices.has(uNum)) return true;
-                        const selText = clean(typeof options[uNum] === 'object' ? (options[uNum]?.text ?? options[uNum]?.value) : options[uNum]);
-                        if (selText && finalCorrectTexts.includes(selText)) return true;
-                    }
-                }
-
-                return false;
+                return isMCQAnswerCorrect(options, userAns, qObj);
             };
 
             if (type === 'MCQ') {

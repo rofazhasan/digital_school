@@ -79,6 +79,7 @@ import { scanDocument } from "@/lib/native/scanner";
 import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { findSelectedOptionIndex, getMCQCorrectIndices, isMCQAnswerCorrect } from "@/lib/evaluation/mcqEvaluation";
 
 // --- Constants & Utilities ---
 const MCQ_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
@@ -2170,25 +2171,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
       if (type === 'mcq') {
         const userAnswer = answer;
-        let isCorrect = false;
-        if (question?.options && Array.isArray(question?.options)) {
-          const correctOptIndex = (question?.options?.findIndex((opt: any) => opt?.isCorrect) ?? -1);
-          if (correctOptIndex !== -1 && question?.options?.[correctOptIndex]) {
-            const correctOpt = question?.options?.[correctOptIndex];
-            if (userAnswer === correctOpt?.text || userAnswer === correctOpt?.value || (typeof userAnswer === 'number' && userAnswer === correctOptIndex)) {
-              isCorrect = true;
-            }
-          }
+        if (userAnswer === undefined || userAnswer === null || userAnswer === '' || userAnswer === 'No answer provided') {
+          return 0;
         }
-        if (!isCorrect) {
-          const correctAnswer = question?.correct;
-          if (correctAnswer !== undefined) {
-            isCorrect = String(userAnswer || "").trim() === String(correctAnswer || "").trim();
-          }
+        let rawOpts = question?.options;
+        if (typeof rawOpts === 'string') {
+          try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; }
         }
+        const options: any[] = Array.isArray(rawOpts) ? rawOpts : [];
+        const isCorrect = isMCQAnswerCorrect(options, userAnswer, question);
         if (isCorrect) return Number(question?.marks) || 1;
         const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0 && userAnswer !== undefined && userAnswer !== null && userAnswer !== '' && userAnswer !== 'No answer provided') {
+        if (negPct && negPct > 0) {
           return -Math.round((((Number(question?.marks) || 1) * negPct) / 100) * 100) / 100;
         }
         return 0;
@@ -2205,28 +2199,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             const subAnswer = safeAnswers[subKey];
             if (subAnswer === undefined || subAnswer === null || subAnswer === '' || subAnswer === 'No answer provided') return;
 
-            const normalize = (s: any) => String(s || "").trim().toLowerCase();
-            const userAns = normalize(subAnswer);
-            let isCorrect = false;
-
-            if (subQ.options && Array.isArray(subQ.options)) {
-              const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
-              if (correctOpt) {
-                const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
-                isCorrect = userAns === correctText;
-              }
+            let rawSubOpts = subQ.options;
+            if (typeof rawSubOpts === 'string') {
+              try { rawSubOpts = JSON.parse(rawSubOpts); } catch { rawSubOpts = []; }
             }
-
-            if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
-              const correctIndex = Number(subQ.correctAnswer);
-              if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
-                const opt = subQ.options[correctIndex];
-                const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
-                isCorrect = userAns === correctText;
-              } else {
-                isCorrect = userAns === normalize(subQ.correctAnswer);
-              }
-            }
+            const isCorrect = isMCQAnswerCorrect(rawSubOpts || [], subAnswer, subQ);
 
             if (isCorrect) {
               smcqScore += Number(subQ.marks) || 1;
@@ -4147,16 +4124,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   )}
 
                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                                    {options.map((opt: any, idx: number) => {
-                                                      const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
-
-                                                      const isSelected = hasAnswered && (
-                                                        String(rawAns).trim().toLowerCase() === String(optText).trim().toLowerCase() ||
-                                                        (typeof rawAns === 'number' && rawAns === idx) ||
-                                                        (typeof rawAns === 'string' && rawAns.trim() === String(idx)) ||
-                                                        (typeof rawAns === 'string' && MCQ_LABELS_BN[idx] && rawAns.trim() === MCQ_LABELS_BN[idx]) ||
-                                                        (typeof rawAns === 'string' && MCQ_LABELS_EN[idx] && rawAns.trim().toUpperCase() === MCQ_LABELS_EN[idx])
-                                                      );
+                                                    {(() => {
+                                                      const selectedOptIdx = hasAnswered ? findSelectedOptionIndex(options, rawAns) : -1;
+                                                      return options.map((opt: any, idx: number) => {
+                                                        const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
+                                                        const isSelected = selectedOptIdx === idx;
 
                                                       const isOptionMarkedCorrect = typeof opt === 'object' && opt?.isCorrect === true;
                                                       const isMatchingCorrect = (
@@ -4231,7 +4203,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                           <div className="shrink-0">{badge}</div>
                                                         </div>
                                                       );
-                                                    })}
+                                                    });
+                                                  })()}
                                                   </div>
                                                 </div>
                                               );
@@ -4378,10 +4351,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   }
                                                 });
 
-                                                const isSubCorrect = hasSubAns && (
-                                                  subCorrectTexts.includes(userAns) ||
-                                                  (!isNaN(Number(userAns)) && (subCorrectIndices.has(Number(userAns)) || subCorrectIndices.has(Number(userAns) - 1)))
-                                                );
+                                                const subSelectedIdx = hasSubAns ? findSelectedOptionIndex(options, subAns) : -1;
+                                                const isSubCorrect = isMCQAnswerCorrect(options, subAns, subQ);
 
                                                 const subMarks = Number(subQ.marks) || 1;
 
@@ -4419,12 +4390,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                                                       {options.map((opt: any, optIdx: number) => {
                                                         const optText = typeof opt === 'object' ? (opt.text ?? opt.value ?? opt.label) : opt;
-                                                        const optNorm = clean(optText);
-                                                        const isSelected = hasSubAns && (
-                                                          userAns === optNorm ||
-                                                          (typeof subAns === 'number' && subAns === optIdx) ||
-                                                          (typeof subAns === 'string' && !isNaN(Number(subAns.trim())) && Number(subAns.trim()) === optIdx)
-                                                        );
+                                                        const isSelected = subSelectedIdx === optIdx;
                                                         const isCorrect = subCorrectIndices.has(optIdx);
 
                                                         let optionBorder = "border-border bg-background/50 hover:bg-accent/30 text-foreground";
@@ -4708,29 +4674,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <div className="space-y-3">
                                                 {(() => {
                                                   const rawAns = currentAnswer;
-                                                  let selectedOption = 0;
-                                                  let hasAnswered = false;
-
-                                                  if (rawAns !== undefined && rawAns !== null && rawAns !== '' && rawAns !== 'No answer provided') {
-                                                    if (typeof rawAns === 'number') {
-                                                      selectedOption = rawAns;
-                                                      hasAnswered = selectedOption > 0;
-                                                    } else if (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim()))) {
-                                                      selectedOption = Number(rawAns.trim());
-                                                      hasAnswered = selectedOption > 0;
-                                                    } else if (typeof rawAns === 'object') {
-                                                      const rawVal = rawAns.selectedOption ?? rawAns.answer ?? rawAns.option ?? rawAns.value;
-                                                      if (rawVal !== undefined && rawVal !== null && rawVal !== '' && !isNaN(Number(rawVal))) {
-                                                        selectedOption = Number(rawVal);
-                                                        hasAnswered = selectedOption > 0;
-                                                      }
-                                                    }
-                                                  }
-
-                                                  const rawCorrect = currentQuestion?.correctOption ?? currentQuestion?.correct ?? (currentQuestion as any)?.correctAnswer ?? 0;
-                                                  const correctOption = typeof rawCorrect === 'string' && !isNaN(Number(rawCorrect.trim()))
-                                                    ? Number(rawCorrect.trim())
-                                                    : (typeof rawCorrect === 'number' ? rawCorrect : 0);
                                                   const arOptions = [
                                                     "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
                                                     "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
@@ -4738,37 +4681,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                     "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
                                                   ];
-                                                  const clean = (s: any) => String(s ?? '').trim().toLowerCase();
-
-                                                  // 1. Collect baseline correct indices and texts
-                                                  const correctIndices = new Set<number>();
-                                                  const correctTexts: string[] = [];
-
-                                                  const rawC = currentQuestion?.correctOption ?? currentQuestion?.correct ?? currentQuestion?.correctAnswer ?? currentQuestion?.modelAnswer;
-                                                  if (rawC !== undefined && rawC !== null && clean(rawC) !== '') {
-                                                    const cStr = clean(rawC);
-                                                    correctTexts.push(cStr);
-                                                    const cNum = parseInt(cStr, 10);
-                                                    if (!isNaN(cNum)) {
-                                                      if (cNum >= 0 && cNum < arOptions.length) correctIndices.add(cNum);
-                                                      if (cNum >= 1 && cNum <= arOptions.length) correctIndices.add(cNum - 1);
-                                                    }
-                                                  }
-
-                                                  // 2. IDENTICAL OPTIONS EXPANSION:
-                                                  arOptions.forEach((optText: string, oi: number) => {
-                                                    const oText = clean(optText);
-                                                    if (oText && correctTexts.includes(oText)) {
-                                                      correctIndices.add(oi);
-                                                    }
-                                                    for (const cIdx of Array.from(correctIndices)) {
-                                                      const cOptText = clean(arOptions[cIdx]);
-                                                      if (oText && cOptText && oText === cOptText) {
-                                                        correctIndices.add(oi);
-                                                        if (!correctTexts.includes(oText)) correctTexts.push(oText);
-                                                      }
-                                                    }
-                                                  });
+                                                  const options = arOptions.map((text, i) => ({ text, id: i + 1 }));
+                                                  const hasAnswered = rawAns !== undefined && rawAns !== null && rawAns !== '' && rawAns !== 'No answer provided';
+                                                  
+                                                  const correctIndices = getMCQCorrectIndices(options, currentQuestion);
+                                                  const selectedOptIdx = hasAnswered ? findSelectedOptionIndex(options, rawAns) : -1;
 
                                                   return (
                                                     <div className="space-y-3">
@@ -4782,7 +4699,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       <div className="grid grid-cols-1 gap-2.5">
                                                         {arOptions.map((optText, oidx) => {
                                                           const optNum = oidx + 1;
-                                                          const isSelected = hasAnswered && selectedOption === optNum;
+                                                          const isSelected = selectedOptIdx === oidx;
                                                           const isOptionCorrect = correctIndices.has(oidx);
 
                                                           let style = "bg-card/50 border-border text-muted-foreground opacity-60";

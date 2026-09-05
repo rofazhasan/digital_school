@@ -68,6 +68,7 @@ import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { findSelectedOptionIndex } from "@/lib/evaluation/mcqEvaluation";
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
 const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E'];
@@ -3290,17 +3291,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       }
                                                     });
 
+                                                    const subSelectedIdx = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null ? findSelectedOptionIndex(subOpts, subQ.studentAnswer) : -1;
+
                                                     return (
                                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {subOpts.map((opt: any, oi: number) => {
                                                           const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? String(opt)) : String(opt);
-                                                          const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && (
-                                                            clean(subQ.studentAnswer) === clean(optText) ||
-                                                            (typeof subQ.studentAnswer === 'number' && subQ.studentAnswer === oi) ||
-                                                            (typeof subQ.studentAnswer === 'string' && !isNaN(Number(subQ.studentAnswer.trim())) && Number(subQ.studentAnswer.trim()) === oi) ||
-                                                            (typeof subQ.studentAnswer === 'string' && MCQ_LABELS_BN[oi] && subQ.studentAnswer.trim() === MCQ_LABELS_BN[oi]) ||
-                                                            (typeof subQ.studentAnswer === 'string' && MCQ_LABELS_EN[oi] && subQ.studentAnswer.trim().toUpperCase() === MCQ_LABELS_EN[oi])
-                                                          );
+                                                          const isSel = subSelectedIdx === oi;
                                                           const isCorOpt = subCorrectIndices.has(oi);
 
                                                           let optStyle = "border-border/80 dark:border-slate-800 bg-card text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
@@ -3421,6 +3418,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               correctIndices.add(idx);
                                             }
                                           });
+                                          
+                                          const selectedOptIdx = hasAnswered ? findSelectedOptionIndex(options, rawAns) : -1;
 
                                           return (
                                             <div className="space-y-3">
@@ -3435,14 +3434,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 {options.map((opt: any, idx: number) => {
                                                   const optText = typeof opt === 'object' ? (opt?.text ?? opt?.value ?? opt?.label ?? String(opt)) : String(opt);
 
-                                                  const isSelected = hasAnswered && (
-                                                    clean(rawAns) === clean(optText) ||
-                                                    (typeof rawAns === 'number' && rawAns === idx) ||
-                                                    (typeof rawAns === 'string' && !isNaN(Number(rawAns.trim())) && Number(rawAns.trim()) === idx) ||
-                                                    (typeof rawAns === 'string' && MCQ_LABELS_BN[idx] && rawAns.trim() === MCQ_LABELS_BN[idx]) ||
-                                                    (typeof rawAns === 'string' && MCQ_LABELS_EN[idx] && rawAns.trim().toUpperCase() === MCQ_LABELS_EN[idx])
-                                                  );
-
+                                                  const isSelected = selectedOptIdx === idx;
                                                   const isCorrectOpt = correctIndices.has(idx);
 
                                                   let style = "bg-card border-border/80 text-foreground hover:border-slate-300 dark:hover:border-slate-700 shadow-xs";
