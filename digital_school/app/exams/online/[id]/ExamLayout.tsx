@@ -208,6 +208,28 @@ export default function ExamLayout() {
     });
   }, [currentQuestion?.id, setAnswers]);
 
+  const subjectStats = useMemo(() => {
+    if (!isMS || !msSubjects || msSubjects.length === 0) return {};
+    const stats: Record<string, { answeredCount: number; totalCount: number; firstQIndex: number }> = {};
+    
+    msSubjects.forEach((sub: any) => {
+      const subjectQuestions = sortedQuestions.filter((q: any) => 
+        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+      );
+      const firstQIndex = sortedQuestions.findIndex((q: any) => 
+        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
+      );
+      const answeredCount = subjectQuestions.filter((q: any) => {
+        const val = answers[q.id];
+        const hasDirect = val !== undefined && val !== null && val !== '' && val !== 'No answer provided' && (typeof val !== 'object' || Object.keys(val).length > 0);
+        const hasSub = Object.keys(answers).some(k => k.startsWith(`${q.id}_`) && !k.endsWith('_marks') && answers[k] !== undefined && answers[k] !== null && answers[k] !== '');
+        return hasDirect || hasSub;
+      }).length;
+      stats[sub.name] = { answeredCount, totalCount: subjectQuestions.length, firstQIndex };
+    });
+    return stats;
+  }, [isMS, msSubjects, sortedQuestions, answers, matchSubject]);
+
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transitionState, setTransitionState] = useState<'objective_submitted' | 'cqsq_starting' | null>(null);
@@ -1054,20 +1076,10 @@ export default function ExamLayout() {
                       const isCurrentSubject = matchSubject
                         ? matchSubject(currentQuestion?.subject, sub.name)
                         : (currentQuestion?.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim();
-                      const firstQIndex = sortedQuestions.findIndex((q: any) => 
-                        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
-                      );
-                      
-                      // Count answered vs total questions for this subject
-                      const subjectQuestions = sortedQuestions.filter((q: any) => 
-                        matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
-                      );
-                      const answeredCount = subjectQuestions.filter((q: any) => {
-                        const val = answers[q.id];
-                        const hasDirect = val !== undefined && val !== null && val !== '' && val !== 'No answer provided' && (typeof val !== 'object' || Object.keys(val).length > 0);
-                        const hasSub = Object.keys(answers).some(k => k.startsWith(`${q.id}_`) && !k.endsWith('_marks') && answers[k] !== undefined && answers[k] !== null && answers[k] !== '');
-                        return hasDirect || hasSub;
-                      }).length;
+                      const stat = subjectStats[sub.name] || { answeredCount: 0, totalCount: 0, firstQIndex: -1 };
+                      const firstQIndex = stat.firstQIndex;
+                      const answeredCount = stat.answeredCount;
+                      const totalSubCount = stat.totalCount;
 
                       return (
                         <button
@@ -1089,7 +1101,7 @@ export default function ExamLayout() {
                         >
                           <span>{sub.name}</span>
                           <span className="text-[10px] font-semibold opacity-90">
-                            ({answeredCount}/{subjectQuestions.length})
+                            ({answeredCount}/{totalSubCount})
                           </span>
                           <span className={cn(
                             "text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wider",

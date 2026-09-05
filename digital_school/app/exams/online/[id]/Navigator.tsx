@@ -12,43 +12,25 @@ interface NavigatorProps {
 }
 
 interface NavButtonProps {
-  questionId: string;
-  type: string;
+  questionId?: string;
+  type?: string;
   localIdx: number;
   globalIdx: number;
   currentIdx: number;
   marked: boolean;
   onNavigate: (index: number) => void;
-  answers: any;
+  isAnswered: boolean;
 }
 
 const NavButton = memo(({
-  questionId,
-  type,
   localIdx,
   globalIdx,
   currentIdx,
   marked,
   onNavigate,
-  answers
+  isAnswered
 }: NavButtonProps) => {
   const isCurrent = currentIdx === globalIdx;
-
-  const isAnswered = useMemo(() => {
-    const val = answers[questionId];
-    if (val !== undefined && val !== null && val !== '') {
-      if (Array.isArray(val)) return val.length > 0;
-      if (typeof val === 'object') {
-        return Object.values(val).some(v => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).trim() !== ''));
-      }
-      return true;
-    }
-    const t = (type || "").toLowerCase();
-    if (['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc'].includes(t)) {
-      return Object.keys(answers).some(key => key.startsWith(`${questionId}_`) && answers[key] !== undefined && answers[key] !== null && String(answers[key]).trim() !== '');
-    }
-    return false;
-  }, [answers, questionId, type]);
 
   return (
     <button
@@ -131,17 +113,20 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
             const globalIdx = sortedQuestions.findIndex((sq: any) => sq.id === q.id);
             if (globalIdx === -1) return null;
 
+            const val = answers[q.id];
+            const hasDirect = val !== undefined && val !== null && val !== '' && (Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.values(val).some(v => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).trim() !== '')) : true));
+            const t = (q.type || "").toLowerCase();
+            const hasSub = !hasDirect && ['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc'].includes(t) && Object.keys(answers).some(key => key.startsWith(`${q.id}_`) && answers[key] !== undefined && answers[key] !== null && String(answers[key]).trim() !== '');
+
             return (
               <NavButton
                 key={q.id}
-                questionId={q.id}
-                type={q.type}
                 localIdx={localIdx}
                 globalIdx={globalIdx}
                 currentIdx={navigation.current || 0}
                 marked={!!navigation.marked[q.id]}
                 onNavigate={navigateToQuestion}
-                answers={answers}
+                isAnswered={hasDirect || hasSub}
               />
             );
           })}

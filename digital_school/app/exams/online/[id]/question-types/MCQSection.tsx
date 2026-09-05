@@ -30,7 +30,9 @@ export const MCQOption = memo(({
     onSelect: (label: string) => void;
     fontSize?: 'md' | 'lg' | 'xl';
 }) => {
-    const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
+    const label = typeof option === "object" && option !== null 
+        ? (option.text ?? option.value ?? option.label ?? (option.image ? String(index) : String(option))) 
+        : String(option);
     const textSizeClass = fontSize === 'xl' ? 'text-xl md:text-2xl' : fontSize === 'lg' ? 'text-lg md:text-xl' : 'text-base md:text-lg';
 
     const getStyles = () => {
@@ -50,7 +52,7 @@ export const MCQOption = memo(({
     return (
         <button
             onClick={() => onSelect(label)}
-            disabled={disabled || submitted || !!userAnswer}
+            disabled={disabled || submitted}
             className={getStyles()}
         >
             <div className={`

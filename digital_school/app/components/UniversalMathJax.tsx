@@ -246,6 +246,9 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     // Pre-render standard math with KaTeX for Instant performance on mobile/low-ram
     const renderedText = useMemo(() => {
         let text = processedText;
+        if (!text || (!text.includes('$') && !text.includes('\\') && !text.includes('{'))) {
+            return text;
+        }
         
         // 1. Render Display Math $$...$$ or \[...\]
         text = text.replace(/(\$\$|\\\[)([\s\S]*?)(?:\$\$|\\\])/g, (_, __, math) => {

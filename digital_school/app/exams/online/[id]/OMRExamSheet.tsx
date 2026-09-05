@@ -40,6 +40,7 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Timer from "./Timer";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { toast } from "sonner";
+import { findSelectedOptionIndex } from "@/lib/evaluation/mcqEvaluation";
 
 const OMR_BENGALI_OPTIONS = ["ক", "খ", "গ", "ঘ", "ঙ", "চ"];
 const OMR_ENGLISH_OPTIONS = ["A", "B", "C", "D", "E", "F"];
@@ -1396,31 +1397,35 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
 
         {/* 4 or 5 OMR Bubbles */}
         <div className="flex-1 flex justify-around items-center px-0.5 sm:px-1">
-          {Array.from({ length: Math.min(optionsCount, 5) }).map((_, optIdx) => {
-            const rawOpt = question.options?.[optIdx];
-            const label = typeof rawOpt === "object" && rawOpt !== null
-              ? (rawOpt.text || String(rawOpt))
-              : (rawOpt !== undefined ? String(rawOpt) : OMR_BENGALI_OPTIONS[optIdx] || String(optIdx + 1));
+          {(() => {
+            const selectedOptIdx = (userAnswer !== undefined && userAnswer !== null && userAnswer !== '' && userAnswer !== 'No answer provided')
+              ? findSelectedOptionIndex(question.options || [], userAnswer)
+              : -1;
 
-            const isSelected = typeof userAnswer === "object" && userAnswer !== null
-              ? (userAnswer.selectedOption === label || userAnswer.text === label)
-              : String(userAnswer || "").trim() === label.trim();
+            return Array.from({ length: Math.min(optionsCount, 5) }).map((_, optIdx) => {
+              const rawOpt = question.options?.[optIdx];
+              const label = typeof rawOpt === "object" && rawOpt !== null
+                ? (rawOpt.text || String(rawOpt))
+                : (rawOpt !== undefined ? String(rawOpt) : OMR_BENGALI_OPTIONS[optIdx] || String(optIdx + 1));
 
-            const banglaLabel = OMR_BENGALI_OPTIONS[optIdx] || String(optIdx + 1);
-            const englishLabel = OMR_ENGLISH_OPTIONS[optIdx] || String.fromCharCode(65 + optIdx);
+              const isSelected = selectedOptIdx >= 0 && selectedOptIdx === optIdx;
 
-            return (
-              <OMRBubble
-                key={optIdx}
-                label={banglaLabel}
-                subLabel={englishLabel}
-                isSelected={isSelected}
-                onClick={() => onMCQSelect(qId, label, optIdx)}
-                disabled={disabled}
-                isLarge={bubbleSizeScale === "large"}
-              />
-            );
-          })}
+              const banglaLabel = OMR_BENGALI_OPTIONS[optIdx] || String(optIdx + 1);
+              const englishLabel = OMR_ENGLISH_OPTIONS[optIdx] || String.fromCharCode(65 + optIdx);
+
+              return (
+                <OMRBubble
+                  key={optIdx}
+                  label={banglaLabel}
+                  subLabel={englishLabel}
+                  isSelected={isSelected}
+                  onClick={() => onMCQSelect(qId, label, optIdx)}
+                  disabled={disabled}
+                  isLarge={bubbleSizeScale === "large"}
+                />
+              );
+            });
+          })()}
         </div>
 
         {/* Status Lock Icon in place of Clear button */}
@@ -1501,26 +1506,32 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
                 {toBengaliNumerals(index + 1)}.{toBengaliNumerals(subIdx + 1)}
               </div>
               <div className="flex-1 flex justify-around items-center px-0.5">
-                {Array.from({ length: Math.min(subOptCount, 4) }).map((_, oi) => {
-                  const rawOpt = subQ.options?.[oi];
-                  const label = typeof rawOpt === "object" && rawOpt !== null
-                    ? (rawOpt.text || String(rawOpt))
-                    : (rawOpt !== undefined ? String(rawOpt) : OMR_BENGALI_OPTIONS[oi] || String(oi + 1));
+                {(() => {
+                  const selectedSubIdx = (subAnswer !== undefined && subAnswer !== null && subAnswer !== '' && subAnswer !== 'No answer provided')
+                    ? findSelectedOptionIndex(subQ.options || [], subAnswer)
+                    : -1;
 
-                  const isSelected = String(subAnswer || "").trim() === label.trim();
+                  return Array.from({ length: Math.min(subOptCount, 4) }).map((_, oi) => {
+                    const rawOpt = subQ.options?.[oi];
+                    const label = typeof rawOpt === "object" && rawOpt !== null
+                      ? (rawOpt.text || String(rawOpt))
+                      : (rawOpt !== undefined ? String(rawOpt) : OMR_BENGALI_OPTIONS[oi] || String(oi + 1));
 
-                  return (
-                    <OMRBubble
-                      key={oi}
-                      label={OMR_BENGALI_OPTIONS[oi]}
-                      subLabel={OMR_ENGLISH_OPTIONS[oi]}
-                      isSelected={isSelected}
-                      onClick={() => onSMCQSelect(qId, subIdx, label)}
-                      disabled={disabled}
-                      isLarge={bubbleSizeScale === "large"}
-                    />
-                  );
-                })}
+                    const isSelected = selectedSubIdx >= 0 && selectedSubIdx === oi;
+
+                    return (
+                      <OMRBubble
+                        key={oi}
+                        label={OMR_BENGALI_OPTIONS[oi]}
+                        subLabel={OMR_ENGLISH_OPTIONS[oi]}
+                        isSelected={isSelected}
+                        onClick={() => onSMCQSelect(qId, subIdx, label)}
+                        disabled={disabled}
+                        isLarge={bubbleSizeScale === "large"}
+                      />
+                    );
+                  });
+                })()}
               </div>
             </div>
           );

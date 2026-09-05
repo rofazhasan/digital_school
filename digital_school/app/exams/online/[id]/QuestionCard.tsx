@@ -16,6 +16,7 @@ import { useExamContext } from "./ExamContext";
 import { toBengaliAlphabets } from '@/utils/numeralConverter';
 import { cn } from "@/lib/utils";
 import { compressImage } from "./performance-utils";
+import { findSelectedOptionIndex } from "@/lib/evaluation/mcqEvaluation";
 
 // Sub-components
 import { ZoomableImage, QuestionImageGallery } from "./question-types/shared";
@@ -102,6 +103,18 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     markQuestion(question.id, !navigation.marked[question.id]);
   }, [question?.id, navigation.marked, markQuestion]);
 
+  const [localAnswer, setLocalAnswer] = useState(answer);
+  useEffect(() => {
+    setLocalAnswer(answer);
+  }, [answer]);
+
+  const handleMCQSelect = useCallback((val: any) => {
+    setLocalAnswer(val);
+    onAnswerChange(val);
+  }, [onAnswerChange]);
+
+  const effectiveAnswer = localAnswer !== undefined ? localAnswer : answer;
+
   // Keyboard Shortcuts for MCQ
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -119,13 +132,13 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
       if (selectedIndex >= 0 && selectedIndex < options.length) {
         const opt = options[selectedIndex];
         const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-        onAnswerChange(label);
+        handleMCQSelect(label);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [disabled, submitted, question, onAnswerChange]);
+  }, [disabled, submitted, question, handleMCQSelect]);
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
@@ -133,7 +146,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
   if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
   if (type === 'multi_step_chain' || type === 'multi-step-chain' || type === 'multi_step_problem_chain') type = 'mpc';
   const text = question.text || question.questionText || question.question || question.q || question.scenario || "";
-  const userAnswer = answer;
+  const userAnswer = effectiveAnswer;
   const showResult = submitted && result;
 
   const getTextSize = (base: string) => {
@@ -212,29 +225,35 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
           {/* Answer Section */}
           <div className="space-y-6">
-            {type === "mcq" && (
-              <div className="grid grid-cols-1 gap-3">
-                {(question.options || []).map((opt: any, i: number) => {
-                  const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-                  const correctVal = question.correctAnswer || question.correct;
-                  const isCorrect = opt.originalIndex !== undefined
-                    ? Number(correctVal) === opt.originalIndex
-                    : (correctVal === i || String(correctVal) === String(i) || (typeof opt === 'object' && opt.isCorrect));
-                  
-                  // Fix: Handle both string answers and object-based answers for robustness
-                  const isSelected = typeof userAnswer === 'object' 
-                    ? (userAnswer?.selectedOption === label || userAnswer?.text === label)
-                    : String(userAnswer || "").trim() === label.trim();
-                  return (
-                    <MCQOption
-                      key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
-                      showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
-                      submitted={!!submitted} onSelect={onAnswerChange} fontSize={fontSize}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            {type === "mcq" && (() => {
+              const selectedOptIdx = (effectiveAnswer !== undefined && effectiveAnswer !== null && effectiveAnswer !== '' && effectiveAnswer !== 'No answer provided')
+                ? findSelectedOptionIndex(question.options || [], effectiveAnswer)
+                : -1;
+
+              return (
+                <div className="grid grid-cols-1 gap-3">
+                  {(question.options || []).map((opt: any, i: number) => {
+                    const label = typeof opt === "object" && opt !== null 
+                      ? (opt.text ?? opt.value ?? opt.label ?? (opt.image ? String(i) : String(opt))) 
+                      : String(opt);
+                    const correctVal = question.correctAnswer || question.correct;
+                    const isCorrect = opt.originalIndex !== undefined
+                      ? Number(correctVal) === opt.originalIndex
+                      : (correctVal === i || String(correctVal) === String(i) || (typeof opt === 'object' && opt.isCorrect));
+                    
+                    const isSelected = selectedOptIdx >= 0 && selectedOptIdx === i;
+
+                    return (
+                      <MCQOption
+                        key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
+                        showResult={showResult} userAnswer={effectiveAnswer} disabled={!!disabled}
+                        submitted={!!submitted} onSelect={handleMCQSelect} fontSize={fontSize}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {type === "mc" && (
               <div className="grid grid-cols-1 gap-3">
@@ -362,6 +381,10 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
               <div className="space-y-10 mt-6">
                 {(question.subQuestions || []).map((subQ: any, idx: number) => {
                   const subUserAnswer = answers[`${question.id}_sub_${idx}`];
+                  const selectedSubIdx = (subUserAnswer !== undefined && subUserAnswer !== null && subUserAnswer !== '' && subUserAnswer !== 'No answer provided')
+                    ? findSelectedOptionIndex(subQ.options || [], subUserAnswer)
+                    : -1;
+
                   return (
                     <div key={idx} className="space-y-6 text-left">
                       <div className="flex items-start gap-4">
@@ -379,7 +402,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                       <div className="grid grid-cols-1 gap-2 ml-0 md:ml-12">
                         {(subQ.options || []).map((opt: any, oi: number) => {
                           const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-                          const isSelected = String(subUserAnswer).trim() === label.trim();
+                          const isSelected = selectedSubIdx >= 0 && selectedSubIdx === oi;
                           let isCorrect = false;
                           if (showResult) {
                             if (typeof opt === 'object' && opt.isCorrect !== undefined) isCorrect = opt.isCorrect;
