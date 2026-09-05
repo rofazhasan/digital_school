@@ -220,18 +220,20 @@ export default function ExamLayout() {
     : (exam.cqSqStatus !== 'PENDING' || !!exam.cqSqStartedAt);
   const hasCurrentSectionStarted = hasServerSectionStarted;
 
-  const [showInstructions, setShowInstructions] = useState(!hasServerSectionStarted);
+  // On initial load or device switch, show instructions/resume card so the user can enter fullscreen
+  // cleanly with a user gesture without immediate proctoring blockades.
+  const [showInstructions, setShowInstructions] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Safe client-side check after hydration to dismiss instructions if started offline
+  // Safe client-side check after hydration to dismiss instructions only if ALREADY in fullscreen
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const hasLocal = !!localStorage.getItem(activeSection === 'objective' ? `exam-start-objective-${exam.id}-${submissionId}` : `exam-start-cqsq-${exam.id}-${submissionId}`);
-    if (hasLocal && showInstructions) {
+    const isFull = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    if (hasCurrentSectionStarted && isFull && showInstructions) {
       setShowInstructions(false);
       setIsExamActive(true);
     }
-  }, [activeSection, exam.id, submissionId, showInstructions]);
+  }, [hasCurrentSectionStarted, showInstructions]);
 
   const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
   const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
@@ -277,7 +279,7 @@ export default function ExamLayout() {
   }, [activeSection, examViewMode, setExamViewMode]);
 
   // ------------ PROCTORING INTEGRATION ------------
-  const [isExamActive, setIsExamActive] = useState(hasCurrentSectionStarted && !showInstructions);
+  const [isExamActive, setIsExamActive] = useState(false);
   const [instituteSettings, setInstituteSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -315,7 +317,13 @@ export default function ExamLayout() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            answers: answers,
+            answers: {
+              ...answers,
+              _manualSubmit: !forced,
+              _forcedSubmit: forced
+            },
+            isManual: !forced,
+            forced: forced,
             section: isPractice ? undefined : activeSection
           }),
         });
@@ -364,13 +372,20 @@ export default function ExamLayout() {
   }, [exam, answers, activeSection, hasCqSq, isPractice]);
 
 
-  // Combined Violation Handler
+  // Combined Violation Handler - auto-submits upon reaching 4 warnings
   const onViolation = useCallback((count: number) => {
-    // 4 warnings limit for auto-submit
+    // Record violation count in answers
+    setAnswers((prev: any) => ({
+      ...prev,
+      _violations: count
+    }));
+
+    // Auto-submit when student reaches 4 violations
     if (count >= 4) {
+      toast.error("You have reached 4 security violations. Exam is being auto-submitted.");
       handleSubmit(true);
     }
-  }, [handleSubmit]);
+  }, [handleSubmit, setAnswers]);
 
   // Check if exam has CQ or SQ questions (disable proctoring for these)
   const hasCQorSQ = questions.some((q: any) => {
@@ -475,10 +490,10 @@ export default function ExamLayout() {
       setKeepAwake(true);
       setBrightness(1.0);
 
-      toast.success("Exam Started Successfully", { position: "top-center" });
+      toast.success(hasCurrentSectionStarted ? "পরীক্ষা পুনরায় চালু হয়েছে (Exam Resumed)" : "Exam Started Successfully", { position: "top-center" });
 
-      // Disable grace period after 3 seconds (enough time for fullscreen to settle)
-      setTimeout(() => setGracePeriod(false), 3000);
+      // Disable grace period after 6 seconds (enough time for fullscreen to settle on any device)
+      setTimeout(() => setGracePeriod(false), 6000);
 
 
     } catch (error) {
@@ -579,6 +594,21 @@ export default function ExamLayout() {
             </div>
             <h1 className="text-xl md:text-3xl font-bold text-foreground mb-1 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
             <p className="text-sm md:text-lg text-muted-foreground">শ্রেণি (Class): {exam.className || 'N/A'}</p>
+            {hasCurrentSectionStarted && (
+              <div className="mt-4 p-4 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Play className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-indigo-950 dark:text-indigo-200">
+                    চলমান পরীক্ষা সেশন পাওয়া গেছে (Active Exam Session)
+                  </h4>
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                    আপনার পূর্ববর্তী ডিভাইসের সংরক্ষিত উত্তরসমূহ এবং অবশিষ্ট সময় অক্ষুণ্ণ রয়েছে। পুনরায় পরীক্ষা চালু করতে নিচে ক্লিক করুন।
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -663,11 +693,15 @@ export default function ExamLayout() {
               <ul className="space-y-2 text-xs font-medium text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>ফুলস্ক্রিন মোড বজায় রাখো। অবজেক্টিভ অংশে ট্যাব পরিবর্তন করলে বা অন্য উইন্ডোতে গেলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
+                  <span>ফুলস্ক্রিন মোড বাধ্যতামূলক। ট্যাব পরিবর্তন, ফুলস্ক্রিন ত্যাগ, কপি-পেস্ট বা স্ক্রিনশট নেওয়ার চেষ্টা করলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-3 h-3 text-rose-500 mt-0.5 shrink-0" />
+                  <span className="text-rose-600 dark:text-rose-400 font-bold">অবজেক্টিভ অংশে ৪ বার সিকিউরিটি ওয়ার্নিং দিলে পরীক্ষা স্বয়ংক্রিয়ভাবে জমা (auto-submit) হয়ে যাবে।</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>অবজেক্টিভ অংশে ৪ বার সিকিউরিটি ওয়ার্নিং দিলে পরীক্ষা অটো-সাবমিট হয়ে যাবে।</span>
+                  <span>নির্ধারিত সময় শেষ হলে পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</span>
                 </li>
                 <li className="flex items-start gap-2">
                   {exam.mcqNegativeMarking > 0 ? (
@@ -684,7 +718,7 @@ export default function ExamLayout() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>অটো-সেভ সফল হওয়ার জন্য স্থিতিশীল ইন্টারনেট সংযোগ নিশ্চিত করো।</span>
+                  <span>উত্তর স্বয়ংক্রিয়ভাবে ডাটাবেজে সেভ হতে থাকবে। কোনো কারণে ডিভাইস বন্ধ হলে সময় থাকাকালীন অন্য ডিভাইস থেকে লগইন করে পরীক্ষা পুনরায় চালু করতে পারবেন।</span>
                 </li>
               </ul>
             </div>
@@ -711,7 +745,7 @@ export default function ExamLayout() {
                     </div>
                     <div>
                       <div className="font-black text-xl text-white flex items-center gap-2 group-hover:text-indigo-200 transition-colors">
-                        <span>শুধুমাত্র ওএমআর (Only OMR)</span>
+                        <span>{hasCurrentSectionStarted ? "ওএমআর মোডে পুনরায় শুরু করুন (Resume OMR)" : "শুধুমাত্র ওএমআর (Only OMR)"}</span>
                         <ChevronRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
                       </div>
                       <p className="text-xs text-slate-300 mt-2 leading-relaxed">
@@ -737,7 +771,7 @@ export default function ExamLayout() {
                     </div>
                     <div>
                       <div className="font-black text-xl text-white flex items-center gap-2 group-hover:text-indigo-100 transition-colors">
-                        <span>সম্পূর্ণ পরীক্ষা (Full Exam)</span>
+                        <span>{hasCurrentSectionStarted ? "পরীক্ষা পুনরায় শুরু করুন (Resume Full Exam)" : "সম্পূর্ণ পরীক্ষা (Full Exam)"}</span>
                         <ChevronRight className="w-5 h-5 text-indigo-200 group-hover:translate-x-1 transition-transform" />
                       </div>
                       <p className="text-xs text-indigo-100 mt-2 leading-relaxed">

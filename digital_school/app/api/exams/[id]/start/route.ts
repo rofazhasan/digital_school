@@ -74,13 +74,48 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { autoSubmitExpiredSections } = await import("@/lib/exam-logic");
       existingSubmission = await autoSubmitExpiredSections(existingSubmission, exam);
       if (existingSubmission.status === 'SUBMITTED' && !exam.allowRetake) {
-        console.log(`[Exam Start] Student ${studentId} attempt for exam ${examId} is already finalized/expired.`);
-        return NextResponse.json({
-          success: false,
-          isFinished: true,
-          message: "Exam time has expired and submission is finalized.",
-          redirect: `/exams/results/${examId}`
-        });
+        const answersObj = (typeof existingSubmission.answers === 'object' && existingSubmission.answers !== null)
+          ? (existingSubmission.answers as any)
+          : {};
+        const isManual = answersObj._manualSubmit === true;
+        const now = Date.now();
+
+        const firstStartTime = existingSubmission.objectiveStartedAt
+          ? new Date(existingSubmission.objectiveStartedAt).getTime()
+          : existingSubmission.cqSqStartedAt
+            ? new Date(existingSubmission.cqSqStartedAt).getTime()
+            : null;
+
+        const effectiveTotalMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
+          ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
+          : (Number(exam.duration) || 0);
+
+        const isOverallTimeValid = firstStartTime && effectiveTotalMinutes > 0
+          ? (now < firstStartTime + effectiveTotalMinutes * 60 * 1000)
+          : true;
+
+        const isEndTimeValid = exam.endTime
+          ? (now < new Date(exam.endTime).getTime())
+          : true;
+
+        if (!isManual && isOverallTimeValid && isEndTimeValid) {
+          console.log(`[Exam Start] Interrupted session detected for student ${studentId} on exam ${examId}. Recovering to IN_PROGRESS...`);
+          existingSubmission = await prisma.examSubmission.update({
+            where: { id: existingSubmission.id },
+            data: { status: 'IN_PROGRESS' }
+          });
+          await prisma.result.deleteMany({
+            where: { studentId, examId, isPublished: false }
+          });
+        } else {
+          console.log(`[Exam Start] Student ${studentId} attempt for exam ${examId} is already finalized/expired.`);
+          return NextResponse.json({
+            success: false,
+            isFinished: true,
+            message: "Exam time has expired and submission is finalized.",
+            redirect: `/exams/results/${examId}`
+          });
+        }
       }
     }
 

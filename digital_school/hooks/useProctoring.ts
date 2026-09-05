@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
 interface UseProctoringProps {
@@ -25,9 +25,32 @@ export const useProctoring = ({
     const setWarnings = setExternalWarnings || setInternalWarnings;
     const [isTabActive, setIsTabActive] = useState(true);
 
-    // Trigger violation handler
+    const lastViolationTimeRef = useRef<number>(0);
+    const isUnloadingRef = useRef<boolean>(false);
+
+    // Suppress violations during intentional page unloads or navigations
+    useEffect(() => {
+        const handleUnload = () => {
+            isUnloadingRef.current = true;
+        };
+        window.addEventListener('beforeunload', handleUnload);
+        window.addEventListener('pagehide', handleUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleUnload);
+            window.removeEventListener('pagehide', handleUnload);
+        };
+    }, []);
+
+    // Trigger violation handler with cooldown/debounce
     const triggerViolation = useCallback((reason: string) => {
-        if (!isExamActive) return;
+        if (!isExamActive || isUnloadingRef.current) return;
+
+        const now = Date.now();
+        // Cooldown: at least 2.5s between warnings to prevent simultaneous blur + visibilitychange double counts
+        if (now - lastViolationTimeRef.current < 2500) {
+            return;
+        }
+        lastViolationTimeRef.current = now;
 
         setWarnings(prev => {
             const newCount = prev + 1;
@@ -45,17 +68,12 @@ export const useProctoring = ({
 
             return newCount;
         });
-    }, [isExamActive, maxWarnings, onViolation]);
-
-    // We can auto-reset after a timeout just in case focus never returns properly,
-    // although the blur/focus events usually handle it.
-    // Logic moved to context consumption layer if needed.
+    }, [isExamActive, maxWarnings, onViolation, setWarnings]);
 
     // Handle Visibility Change (Tab Switching)
     useEffect(() => {
         const handleVisibilityChange = () => {
-            // IGNORE warnings if exam is not fully active or during init
-            if (!isExamActive) return;
+            if (!isExamActive || isUnloadingRef.current) return;
 
             if (document.hidden) {
                 // Ignore if uploading (file picker dialog)
@@ -75,8 +93,8 @@ export const useProctoring = ({
     // Handle Window Blur (Alt+Tab or clicking outside)
     useEffect(() => {
         const handleBlur = () => {
-            // IGNORE warnings if isUploading is true (system dialogs)
-            // AND ensure isExamActive is true before warning
+            // If page is unloading or already hidden, visibilitychange handles it
+            if (document.hidden || isUnloadingRef.current) return;
             if (isExamActive && !isUploading) {
                 triggerViolation('Focus lost. Please stay on the exam window.');
             }
@@ -98,9 +116,8 @@ export const useProctoring = ({
             const isFull = !!getFullscreenElement();
             setIsFullscreen(isFull);
 
-            if (!isFull && isExamActive) {
-                // We don't necessarily trigger a warning here immediately to avoid double counting with blur,
-                // but the UI will block them until they re-enter.
+            if (!isFull && isExamActive && !isUploading) {
+                triggerViolation('You exited fullscreen mode. Fullscreen is mandatory during the exam.');
             }
         };
 
@@ -117,7 +134,7 @@ export const useProctoring = ({
         setIsFullscreen(!!getFullscreenElement());
 
         return () => events.forEach(event => document.removeEventListener(event, handleFullscreenChange));
-    }, [isExamActive]);
+    }, [isExamActive, triggerViolation, isUploading]);
 
     // Enter Fullscreen Helper
     const enterFullscreen = async () => {
@@ -134,13 +151,10 @@ export const useProctoring = ({
             }
         } catch (err) {
             console.error('Error attempting to enable fullscreen:', err);
-            // Don't toast error here, just let it fail silently or log.
-            // Toasting might confuse user if they are on a device that simply doesn't support it (like iOS).
-            // toast.error('Could not enter fullscreen mode. Please manually enable it.');
         }
     };
 
-    // Prevent Copy/Paste/Context Menu
+    // Prevent & Detect Copy/Paste/Cut/Screenshot/Context Menu
     useEffect(() => {
         if (!isExamActive) return;
 
@@ -151,28 +165,82 @@ export const useProctoring = ({
 
         const handleCopy = (e: ClipboardEvent) => {
             e.preventDefault();
-            toast.error('Copying content is disabled during the exam.');
+            triggerViolation('Copying exam content is strictly prohibited.');
         };
 
         const handlePaste = (e: ClipboardEvent) => {
-            e.preventDefault(); // Optional: allow pasting if needed, but blocking is safer
-            toast.error('Pasting is disabled during the exam.');
+            e.preventDefault();
+            triggerViolation('Pasting content into the exam is strictly prohibited.');
+        };
+
+        const handleCut = (e: ClipboardEvent) => {
+            e.preventDefault();
+            triggerViolation('Cutting exam content is strictly prohibited.');
+        };
+
+        // Detect Screenshot Shortcuts
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // PrintScreen key
+            if (e.key === 'PrintScreen' || (e as any).keyCode === 44) {
+                e.preventDefault();
+                triggerViolation('Screenshot attempt detected. Screenshots are strictly prohibited.');
+                return;
+            }
+
+            // Windows / Chrome Snipping Tool: Win+Shift+S or Ctrl+Shift+S
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                triggerViolation('Screenshot attempt detected. Screenshots are strictly prohibited.');
+                return;
+            }
+
+            // Mac Screenshot shortcuts: Cmd+Shift+3, Cmd+Shift+4, Cmd+Shift+5
+            if (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key)) {
+                e.preventDefault();
+                triggerViolation('Screenshot attempt detected. Screenshots are strictly prohibited.');
+                return;
+            }
+
+            // Prevent Developer Tools & Source Inspect: F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+            if (
+                e.key === 'F12' ||
+                ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) ||
+                ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U'))
+            ) {
+                e.preventDefault();
+                triggerViolation('Developer inspect shortcut blocked.');
+                return;
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'PrintScreen' || (e as any).keyCode === 44) {
+                // Clear clipboard if possible to prevent image leak
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText('').catch(() => {});
+                }
+                triggerViolation('Screenshot attempt detected. Screenshots are strictly prohibited.');
+            }
         };
 
         document.addEventListener('contextmenu', preventDefault);
         document.addEventListener('copy', handleCopy);
         document.addEventListener('paste', handlePaste);
-        document.addEventListener('cut', handleCopy);
-        document.addEventListener('selectstart', preventDefault); // Disable selection
+        document.addEventListener('cut', handleCut);
+        document.addEventListener('selectstart', preventDefault);
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
 
         return () => {
             document.removeEventListener('contextmenu', preventDefault);
             document.removeEventListener('copy', handleCopy);
             document.removeEventListener('paste', handlePaste);
-            document.removeEventListener('cut', handleCopy);
+            document.removeEventListener('cut', handleCut);
             document.removeEventListener('selectstart', preventDefault);
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isExamActive]);
+    }, [isExamActive, triggerViolation]);
 
     return {
         isFullscreen,

@@ -70,7 +70,67 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       existingSubmission = await autoSubmitExpiredSections(existingSubmission, exam);
     }
 
-    // Check for existing result
+    // ACCIDENTAL / PROCTORING AUTO-SUBMIT RECOVERY:
+    // If submission is SUBMITTED, but NOT manually confirmed by the student,
+    // AND the exam's duration and scheduled end time have not passed,
+    // recover the session to IN_PROGRESS so student can resume from another device.
+    if (existingSubmission && existingSubmission.status === 'SUBMITTED' && !exam.allowRetake) {
+      const answersObj = (typeof existingSubmission.answers === 'object' && existingSubmission.answers !== null)
+        ? (existingSubmission.answers as any)
+        : {};
+      const isManual = answersObj._manualSubmit === true;
+      const now = Date.now();
+
+      const firstStartTime = existingSubmission.objectiveStartedAt
+        ? new Date(existingSubmission.objectiveStartedAt).getTime()
+        : existingSubmission.cqSqStartedAt
+          ? new Date(existingSubmission.cqSqStartedAt).getTime()
+          : null;
+
+      const effectiveTotalMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
+        ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
+        : (Number(exam.duration) || 0);
+
+      const isOverallTimeValid = firstStartTime && effectiveTotalMinutes > 0
+        ? (now < firstStartTime + effectiveTotalMinutes * 60 * 1000)
+        : true;
+
+      const isEndTimeValid = exam.endTime
+        ? (now < new Date(exam.endTime).getTime())
+        : true;
+
+      if (!isManual && isOverallTimeValid && isEndTimeValid) {
+        console.log(`[OnlineExamAPI] Interrupted session detected for student ${studentId} on exam ${examId}. Recovering to IN_PROGRESS...`);
+
+        // Check if objective section was active and still valid
+        const objStart = existingSubmission.objectiveStartedAt ? new Date(existingSubmission.objectiveStartedAt).getTime() : null;
+        const objDurationMin = Number(exam.objectiveTime) > 0 ? Number(exam.objectiveTime) : (Number(exam.duration) || 0);
+        const isObjValid = objStart && objDurationMin > 0 ? (now < objStart + objDurationMin * 60 * 1000) : true;
+
+        const recoveredData: any = {
+          status: 'IN_PROGRESS'
+        };
+        if (isObjValid && existingSubmission.objectiveStatus === 'SUBMITTED') {
+          recoveredData.objectiveStatus = 'IN_PROGRESS';
+        }
+
+        existingSubmission = await prisma.examSubmission.update({
+          where: { id: existingSubmission.id },
+          data: recoveredData
+        });
+
+        // Delete unfinalized result so student can resume seamlessly
+        await prisma.result.deleteMany({
+          where: {
+            studentId: studentId,
+            examId: examId,
+            isPublished: false
+          }
+        });
+      }
+    }
+
+    // Check for existing result (queried after potential recovery cleanup)
     const existingResult = await prisma.result.findUnique({
       where: {
         studentId_examId: { studentId: studentId, examId: examId }
@@ -79,7 +139,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Check if the latest submission is finished
     // @ts-ignore
-    const isFinished = (existingSubmission && existingSubmission.status === SUBMITTED) || !!existingResult;
+    const isFinished = (existingSubmission && existingSubmission.status === 'SUBMITTED') || !!existingResult;
 
     // Check for 'action' param
     const searchParams = req.nextUrl.searchParams;
@@ -284,6 +344,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       title: exam.name,
       type: exam.type,
       duration: exam.duration,
+      startTime: exam.startTime,
+      endTime: exam.endTime,
       totalMarks: exam.totalMarks,
       allowRetake: exam.allowRetake,
       className: exam.class?.name || studentProfile?.class?.name || '',

@@ -118,10 +118,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let sqAnswered = 0;
 
     // Process answers - merge existing answers if any
+    const isManual = data.isManual !== false && data.answers?._manualSubmit !== false && !data.forced;
     const existingAnswers = typeof existingSubmission?.answers === 'object' && existingSubmission?.answers !== null
       ? existingSubmission.answers
       : {};
-    const processedAnswers = { ...existingAnswers, ...data.answers, _status: 'submitted' };
+    const processedAnswers = { 
+      ...existingAnswers, 
+      ...data.answers, 
+      _status: 'submitted',
+      _manualSubmit: isManual
+    };
 
     // Optimize: Pre-map question types for O(1) lookup
     const questionTypeMap = new Map<string, string>();

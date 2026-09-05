@@ -47,7 +47,14 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
     const startTime = new Date(sectionStartedAt).getTime();
     const now = Date.now();
     const elapsedSeconds = Math.floor((now - startTime) / 1000);
-    const remaining = Math.max(0, durationSeconds - elapsedSeconds);
+    let remaining = Math.max(0, durationSeconds - elapsedSeconds);
+
+    // If exam has a scheduled absolute end time, ensure remaining never exceeds it
+    if (exam.endTime) {
+      const examEndTime = new Date(exam.endTime).getTime();
+      const secondsUntilEnd = Math.max(0, Math.floor((examEndTime - now) / 1000));
+      remaining = Math.min(remaining, secondsUntilEnd);
+    }
 
     setSecondsLeft(remaining);
 

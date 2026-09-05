@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const isSummary = url.searchParams.get('summary') === 'true';
+    const now = Date.now();
 
     if (isSummary) {
       const summarySubs = await db.examSubmission.findMany({
@@ -35,13 +36,53 @@ export async function GET(request: NextRequest) {
           studentId: true,
           status: true,
           score: true,
+          answers: true,
+          objectiveStartedAt: true,
+          cqSqStartedAt: true,
+          exam: {
+            select: {
+              duration: true,
+              objectiveTime: true,
+              cqSqTime: true,
+              endTime: true
+            }
+          }
         },
         orderBy: {
           id: 'desc',
         },
       });
+
+      const sanitizedSubs = summarySubs.map(s => {
+        let status = s.status;
+        if (status === 'SUBMITTED') {
+          const ans = (typeof s.answers === 'object' && s.answers !== null) ? (s.answers as any) : {};
+          const isManual = ans._manualSubmit === true;
+          const firstStart = s.objectiveStartedAt
+            ? new Date(s.objectiveStartedAt).getTime()
+            : s.cqSqStartedAt
+              ? new Date(s.cqSqStartedAt).getTime()
+              : null;
+          const totalMin = (Number(s.exam?.objectiveTime || 0) > 0 && Number(s.exam?.cqSqTime || 0) > 0)
+            ? Number(s.exam?.objectiveTime) + Number(s.exam?.cqSqTime)
+            : (Number(s.exam?.duration) || 0);
+          const isTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
+          const isEndValid = s.exam?.endTime ? (now < new Date(s.exam.endTime).getTime()) : true;
+
+          if (!isManual && isTimeValid && isEndValid) {
+            status = 'IN_PROGRESS';
+          }
+        }
+        return {
+          examId: s.examId,
+          studentId: s.studentId,
+          status,
+          score: s.score
+        };
+      });
+
       return NextResponse.json({
-        submissions: summarySubs,
+        submissions: sanitizedSubs,
       });
     }
 
@@ -77,6 +118,27 @@ export async function GET(request: NextRequest) {
             status: updated.status
           };
         }
+
+        let status = sub.status;
+        if (status === 'SUBMITTED' && sub.exam) {
+          const ans = (typeof sub.answers === 'object' && sub.answers !== null) ? (sub.answers as any) : {};
+          const isManual = ans._manualSubmit === true;
+          const firstStart = sub.objectiveStartedAt
+            ? new Date(sub.objectiveStartedAt).getTime()
+            : sub.cqSqStartedAt
+              ? new Date(sub.cqSqStartedAt).getTime()
+              : null;
+          const totalMin = (Number(sub.exam.objectiveTime || 0) > 0 && Number(sub.exam.cqSqTime || 0) > 0)
+            ? Number(sub.exam.objectiveTime) + Number(sub.exam.cqSqTime)
+            : (Number(sub.exam.duration) || 0);
+          const isTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
+          const isEndValid = sub.exam.endTime ? (now < new Date(sub.exam.endTime).getTime()) : true;
+
+          if (!isManual && isTimeValid && isEndValid) {
+            status = 'IN_PROGRESS';
+          }
+        }
+
         return {
           examId: sub.examId,
           studentId: sub.studentId,
@@ -84,7 +146,7 @@ export async function GET(request: NextRequest) {
           cqSqSubmittedAt: sub.cqSqSubmittedAt,
           score: sub.score,
           answers: sub.answers,
-          status: sub.status
+          status: status
         };
       })
     );

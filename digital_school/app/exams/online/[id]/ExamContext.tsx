@@ -543,10 +543,10 @@ export function ExamContextProvider({
     }
   }, [exam.id, exam.status]);
 
-  // Autosave answers to API (debounced)
+  // Autosave answers to API (debounced to 2.5s for fast persistence before battery or device loss)
   useDebouncedEffect(() => {
     saveAnswers(answers);
-  }, [answers, saveAnswers], 10000); // 10s debounce for API to handle scale
+  }, [answers, saveAnswers], 2500);
 
   // Stable navigation handler
   const navigateToQuestion = useCallback((index: number) => {
