@@ -98,7 +98,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const overallStartTime = existingSubmission?.objectiveStartedAt || existingSubmission?.cqSqStartedAt;
     if (overallStartTime) {
       const startTime = new Date(overallStartTime).getTime();
-      const durationMs = (Number(exam.duration) || 0) * 60 * 1000;
+      const effectiveTotalMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
+        ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
+        : (Number(exam.duration) || 0);
+      const durationMs = effectiveTotalMinutes * 60 * 1000;
 
       if (durationMs > 0 && now > startTime + durationMs) {
         console.log(`[Submit] Overall Time Limit reached for user ${studentId}. Auto-finalizing exam.`);
@@ -122,11 +125,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const existingAnswers = typeof existingSubmission?.answers === 'object' && existingSubmission?.answers !== null
       ? existingSubmission.answers
       : {};
-    const processedAnswers = { 
+    const processedAnswers: any = { 
       ...existingAnswers, 
       ...data.answers, 
       _status: 'submitted',
-      _manualSubmit: isManual
     };
 
     // Optimize: Pre-map question types for O(1) lookup
@@ -219,6 +221,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (exam.sqTotalQuestions || 0) > 0 ||
       Array.from(questionTypeMap.values()).some(t => ['cq', 'sq', 'descriptive'].includes(t));
     const isFinalSubmission = isCqSq || (!hasCqSqSection && isObjective) || isOverallTimeExceeded;
+
+    if (isObjective) {
+      processedAnswers._manualObjectiveSubmit = isManual;
+    }
+    if (isCqSq) {
+      processedAnswers._manualCqSqSubmit = isManual;
+    }
+    processedAnswers._manualSubmit = isManual && isFinalSubmission;
 
     const updateData: any = {
       answers: processedAnswers,

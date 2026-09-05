@@ -70,15 +70,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       existingSubmission = await autoSubmitExpiredSections(existingSubmission, exam);
     }
 
+    const hasCqSq = (Number(exam.cqSqTime) > 0) || 
+      (exam.examSets && exam.examSets.some((s: any) => {
+        try {
+          const qs = typeof s.questionsJson === 'string' ? JSON.parse(s.questionsJson) : s.questionsJson;
+          return Array.isArray(qs) && qs.some((q: any) => ['cq', 'sq', 'descriptive'].includes((q.type || q.questionType || '').toLowerCase()));
+        } catch { return false; }
+      })) || (Number(exam.cqTotalQuestions || 0) > 0) || (Number(exam.sqTotalQuestions || 0) > 0);
+
     // ACCIDENTAL / PROCTORING AUTO-SUBMIT RECOVERY:
     // If submission is SUBMITTED, but NOT manually confirmed by the student,
     // AND the exam's duration and scheduled end time have not passed,
     // recover the session to IN_PROGRESS so student can resume from another device.
-    if (existingSubmission && existingSubmission.status === 'SUBMITTED' && !exam.allowRetake) {
+    if (existingSubmission && !exam.allowRetake) {
       const answersObj = (typeof existingSubmission.answers === 'object' && existingSubmission.answers !== null)
         ? (existingSubmission.answers as any)
         : {};
-      const isManual = answersObj._manualSubmit === true;
       const now = Date.now();
 
       const firstStartTime = existingSubmission.objectiveStartedAt
@@ -99,19 +106,45 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ? (now < new Date(exam.endTime).getTime())
         : true;
 
-      if (!isManual && isOverallTimeValid && isEndTimeValid) {
-        console.log(`[OnlineExamAPI] Interrupted session detected for student ${studentId} on exam ${examId}. Recovering to IN_PROGRESS...`);
+      // Check CQ/SQ validity
+      const cqStart = existingSubmission.cqSqStartedAt ? new Date(existingSubmission.cqSqStartedAt).getTime() : null;
+      const cqDurationMin = Number(exam.cqSqTime) > 0 
+        ? Number(exam.cqSqTime) 
+        : (Number(exam.duration) > Number(exam.objectiveTime || 0) ? Number(exam.duration) - Number(exam.objectiveTime || 0) : Number(exam.duration));
+      const isCqValid = cqStart && cqDurationMin > 0 ? (now < cqStart + cqDurationMin * 60 * 1000) : true;
 
-        // Check if objective section was active and still valid
-        const objStart = existingSubmission.objectiveStartedAt ? new Date(existingSubmission.objectiveStartedAt).getTime() : null;
-        const objDurationMin = Number(exam.objectiveTime) > 0 ? Number(exam.objectiveTime) : (Number(exam.duration) || 0);
-        const isObjValid = objStart && objDurationMin > 0 ? (now < objStart + objDurationMin * 60 * 1000) : true;
+      // Is CQ/SQ manually finalized?
+      const isCqManuallyFinalized = answersObj._manualCqSqSubmit === true || (answersObj._manualSubmit === true && existingSubmission.cqSqStatus === 'SUBMITTED');
+
+      // Check if CQ/SQ is pending or can be resumed
+      const canResumeCqSq = hasCqSq && !isCqManuallyFinalized && isEndTimeValid && isOverallTimeValid && (
+        existingSubmission.cqSqStatus === 'PENDING' || 
+        (existingSubmission.cqSqStatus === 'IN_PROGRESS' && isCqValid) ||
+        (existingSubmission.cqSqStatus === 'SUBMITTED' && isCqValid && !answersObj._manualCqSqSubmit)
+      );
+
+      // Objective recovery
+      const objStart = existingSubmission.objectiveStartedAt ? new Date(existingSubmission.objectiveStartedAt).getTime() : null;
+      const objDurationMin = Number(exam.objectiveTime) > 0 ? Number(exam.objectiveTime) : (Number(exam.duration) || 0);
+      const isObjValid = objStart && objDurationMin > 0 ? (now < objStart + objDurationMin * 60 * 1000) : true;
+      const isObjManuallyFinalized = answersObj._manualObjectiveSubmit === true || (answersObj._manualSubmit === true && !hasCqSq);
+
+      const canResumeObjective = !isObjManuallyFinalized && isObjValid && isOverallTimeValid && isEndTimeValid && (
+        existingSubmission.objectiveStatus === 'IN_PROGRESS' || 
+        (existingSubmission.objectiveStatus === 'SUBMITTED' && !answersObj._manualObjectiveSubmit)
+      );
+
+      if (canResumeCqSq || canResumeObjective) {
+        console.log(`[OnlineExamAPI] Interrupted session detected for student ${studentId} on exam ${examId}. Recovering to IN_PROGRESS...`);
 
         const recoveredData: any = {
           status: 'IN_PROGRESS'
         };
-        if (isObjValid && existingSubmission.objectiveStatus === 'SUBMITTED') {
+        if (canResumeObjective && existingSubmission.objectiveStatus === 'SUBMITTED') {
           recoveredData.objectiveStatus = 'IN_PROGRESS';
+        }
+        if (canResumeCqSq && existingSubmission.cqSqStatus === 'SUBMITTED') {
+          recoveredData.cqSqStatus = existingSubmission.cqSqStartedAt ? 'IN_PROGRESS' : 'PENDING';
         }
 
         existingSubmission = await prisma.examSubmission.update({
@@ -138,8 +171,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     // Check if the latest submission is finished
-    // @ts-ignore
-    const isFinished = (existingSubmission && existingSubmission.status === 'SUBMITTED') || !!existingResult;
+    // An exam with CQ/SQ is only finished if CQ/SQ is submitted (or time expired)
+    const isCqSqStillPending = hasCqSq && (existingSubmission?.cqSqStatus === 'PENDING' || existingSubmission?.cqSqStatus === 'IN_PROGRESS');
+    const isFinished = !isCqSqStillPending && (((existingSubmission && existingSubmission.status === 'SUBMITTED') || !!existingResult));
 
     // Check for 'action' param
     const searchParams = req.nextUrl.searchParams;

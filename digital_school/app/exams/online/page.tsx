@@ -58,6 +58,12 @@ interface ExamSubmission {
   submittedAt?: string;
   score?: number;
   status?: "IN_PROGRESS" | "SUBMITTED";
+  objectiveStatus?: string;
+  cqSqStatus?: string;
+  objectiveStartedAt?: string | Date | null;
+  cqSqStartedAt?: string | Date | null;
+  objectiveSubmittedAt?: string | Date | null;
+  cqSqSubmittedAt?: string | Date | null;
 }
 
 type StatusFilter = "all" | "active" | "not_taken" | "upcoming" | "in_progress" | "completed" | "expired_not_taken";
@@ -373,16 +379,23 @@ export default function OnlineExamsPage() {
   const userClassId = user?.studentProfile?.class?.id || (user?.studentProfile as any)?.classId;
   const studentProfileId = user?.studentProfile?.id;
 
-  const hasSubmitted = useCallback((examId: string) =>
-    submissions.some((s) => s.examId === examId && s.studentId === studentProfileId && s.status === "SUBMITTED") ||
-    results.some((r) => r.examId === examId),
-    [submissions, results, studentProfileId]
-  );
+  const hasInProgress = useCallback((examId: string) => {
+    const sub = submissions.find((s) => s.examId === examId && s.studentId === studentProfileId);
+    if (!sub) return false;
+    if (sub.status === "IN_PROGRESS") return true;
+    if (sub.cqSqStatus === "IN_PROGRESS" || sub.objectiveStatus === "IN_PROGRESS") return true;
+    // If objective is submitted but CQ/SQ has not been submitted yet:
+    if (sub.objectiveStatus === "SUBMITTED" && sub.cqSqStatus !== "SUBMITTED") return true;
+    return false;
+  }, [submissions, studentProfileId]);
 
-  const hasInProgress = useCallback((examId: string) =>
-    submissions.some((s) => s.examId === examId && s.studentId === studentProfileId && s.status === "IN_PROGRESS"),
-    [submissions, studentProfileId]
-  );
+  const hasSubmitted = useCallback((examId: string) => {
+    if (hasInProgress(examId)) return false;
+    const sub = submissions.find((s) => s.examId === examId && s.studentId === studentProfileId);
+    if (sub && sub.status === "SUBMITTED") return true;
+    if (results.some((r) => r.examId === examId)) return true;
+    return false;
+  }, [submissions, results, studentProfileId, hasInProgress]);
 
   const getResult = useCallback((examId: string) => results.find((r) => r.examId === examId), [results]);
 
@@ -1187,7 +1200,7 @@ function ExamCard({
                 </Link>
               )}
             </div>
-          ) : (status === "active" || inProgress) && status !== "finished" ? (
+          ) : (inProgress || status === "active") ? (
             <div className="flex gap-2">
               <a href={`/exams/online/${exam.id}`} className="flex-1">
                 <Button className="w-full rounded-xl h-10 text-sm font-semibold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/25 gap-2 transition-transform active:scale-[0.98]">

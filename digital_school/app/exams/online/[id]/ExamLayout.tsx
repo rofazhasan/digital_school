@@ -725,7 +725,7 @@ export default function ExamLayout() {
           </div>
 
           <div className="mt-6 space-y-3">
-            {hasObjective && (exam.objectiveStatus === 'PENDING' || exam.objectiveStatus === 'IN_PROGRESS') ? (
+            {activeSection === 'objective' && hasObjective && (exam.objectiveStatus === 'PENDING' || exam.objectiveStatus === 'IN_PROGRESS') ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* OPTION 1: ONLY OMR MODE */}

@@ -39,12 +39,18 @@ export async function GET(request: NextRequest) {
           answers: true,
           objectiveStartedAt: true,
           cqSqStartedAt: true,
+          objectiveStatus: true,
+          cqSqStatus: true,
+          objectiveSubmittedAt: true,
+          cqSqSubmittedAt: true,
           exam: {
             select: {
               duration: true,
               objectiveTime: true,
               cqSqTime: true,
-              endTime: true
+              endTime: true,
+              cqTotalQuestions: true,
+              sqTotalQuestions: true
             }
           }
         },
@@ -55,29 +61,54 @@ export async function GET(request: NextRequest) {
 
       const sanitizedSubs = summarySubs.map(s => {
         let status = s.status;
-        if (status === 'SUBMITTED') {
-          const ans = (typeof s.answers === 'object' && s.answers !== null) ? (s.answers as any) : {};
-          const isManual = ans._manualSubmit === true;
-          const firstStart = s.objectiveStartedAt
-            ? new Date(s.objectiveStartedAt).getTime()
-            : s.cqSqStartedAt
-              ? new Date(s.cqSqStartedAt).getTime()
-              : null;
-          const totalMin = (Number(s.exam?.objectiveTime || 0) > 0 && Number(s.exam?.cqSqTime || 0) > 0)
-            ? Number(s.exam?.objectiveTime) + Number(s.exam?.cqSqTime)
-            : (Number(s.exam?.duration) || 0);
-          const isTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
-          const isEndValid = s.exam?.endTime ? (now < new Date(s.exam.endTime).getTime()) : true;
+        const ans = (typeof s.answers === 'object' && s.answers !== null) ? (s.answers as any) : {};
+        const isEndValid = s.exam?.endTime ? (now < new Date(s.exam.endTime).getTime()) : true;
 
-          if (!isManual && isTimeValid && isEndValid) {
+        const hasCqSq = (Number(s.exam?.cqSqTime || 0) > 0) || (Number(s.exam?.cqTotalQuestions || 0) > 0) || (Number(s.exam?.sqTotalQuestions || 0) > 0);
+
+        // Check CQ/SQ validity
+        const cqStart = s.cqSqStartedAt ? new Date(s.cqSqStartedAt).getTime() : null;
+        const cqDurationMin = Number(s.exam?.cqSqTime) > 0
+          ? Number(s.exam?.cqSqTime)
+          : (Number(s.exam?.duration || 0) > Number(s.exam?.objectiveTime || 0)
+              ? Number(s.exam?.duration || 0) - Number(s.exam?.objectiveTime || 0)
+              : Number(s.exam?.duration || 0));
+        const isCqTimeValid = cqStart && cqDurationMin > 0 ? (now < cqStart + cqDurationMin * 60 * 1000) : true;
+
+        // Check overall time validity
+        const firstStart = s.objectiveStartedAt
+          ? new Date(s.objectiveStartedAt).getTime()
+          : s.cqSqStartedAt
+            ? new Date(s.cqSqStartedAt).getTime()
+            : null;
+        const totalMin = (Number(s.exam?.objectiveTime || 0) > 0 && Number(s.exam?.cqSqTime || 0) > 0)
+          ? Number(s.exam?.objectiveTime) + Number(s.exam?.cqSqTime)
+          : (Number(s.exam?.duration) || 0);
+        const isOverallTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
+
+        if (hasCqSq) {
+          const isCqSubmitted = s.cqSqStatus === 'SUBMITTED' && (ans._manualCqSqSubmit === true || !isCqTimeValid || !isEndValid || !isOverallTimeValid);
+          if (!isCqSubmitted && isEndValid && isOverallTimeValid) {
+            status = 'IN_PROGRESS';
+          }
+        } else if (status === 'SUBMITTED') {
+          const isManual = ans._manualSubmit === true || ans._manualObjectiveSubmit === true;
+          if (!isManual && isOverallTimeValid && isEndValid) {
             status = 'IN_PROGRESS';
           }
         }
+
         return {
           examId: s.examId,
           studentId: s.studentId,
           status,
-          score: s.score
+          score: s.score,
+          objectiveStatus: s.objectiveStatus,
+          cqSqStatus: s.cqSqStatus,
+          objectiveStartedAt: s.objectiveStartedAt,
+          cqSqStartedAt: s.cqSqStartedAt,
+          objectiveSubmittedAt: s.objectiveSubmittedAt,
+          cqSqSubmittedAt: s.cqSqSubmittedAt
         };
       });
 
@@ -106,46 +137,58 @@ export async function GET(request: NextRequest) {
     const { autoSubmitExpiredSections } = await import('@/lib/exam-logic');
     const processedSubmissions = await Promise.all(
       submissions.map(async (sub) => {
+        let currentSub = sub;
         if (sub.status === 'IN_PROGRESS' && sub.exam) {
-          const updated = await autoSubmitExpiredSections(sub, sub.exam);
-          return {
-            examId: updated.examId,
-            studentId: updated.studentId,
-            objectiveSubmittedAt: updated.objectiveSubmittedAt,
-            cqSqSubmittedAt: updated.cqSqSubmittedAt,
-            score: updated.score,
-            answers: updated.answers,
-            status: updated.status
-          };
+          currentSub = await autoSubmitExpiredSections(sub, sub.exam);
         }
 
-        let status = sub.status;
-        if (status === 'SUBMITTED' && sub.exam) {
-          const ans = (typeof sub.answers === 'object' && sub.answers !== null) ? (sub.answers as any) : {};
-          const isManual = ans._manualSubmit === true;
-          const firstStart = sub.objectiveStartedAt
-            ? new Date(sub.objectiveStartedAt).getTime()
-            : sub.cqSqStartedAt
-              ? new Date(sub.cqSqStartedAt).getTime()
-              : null;
-          const totalMin = (Number(sub.exam.objectiveTime || 0) > 0 && Number(sub.exam.cqSqTime || 0) > 0)
-            ? Number(sub.exam.objectiveTime) + Number(sub.exam.cqSqTime)
-            : (Number(sub.exam.duration) || 0);
-          const isTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
-          const isEndValid = sub.exam.endTime ? (now < new Date(sub.exam.endTime).getTime()) : true;
+        let status = currentSub.status;
+        const ans = (typeof currentSub.answers === 'object' && currentSub.answers !== null) ? (currentSub.answers as any) : {};
+        const isEndValid = currentSub.exam?.endTime ? (now < new Date(currentSub.exam.endTime).getTime()) : true;
 
-          if (!isManual && isTimeValid && isEndValid) {
+        const hasCqSq = (Number(currentSub.exam?.cqSqTime || 0) > 0) || (Number(currentSub.exam?.cqTotalQuestions || 0) > 0) || (Number(currentSub.exam?.sqTotalQuestions || 0) > 0);
+
+        const cqStart = currentSub.cqSqStartedAt ? new Date(currentSub.cqSqStartedAt).getTime() : null;
+        const cqDurationMin = Number(currentSub.exam?.cqSqTime) > 0
+          ? Number(currentSub.exam?.cqSqTime)
+          : (Number(currentSub.exam?.duration || 0) > Number(currentSub.exam?.objectiveTime || 0)
+              ? Number(currentSub.exam?.duration || 0) - Number(currentSub.exam?.objectiveTime || 0)
+              : Number(currentSub.exam?.duration || 0));
+        const isCqTimeValid = cqStart && cqDurationMin > 0 ? (now < cqStart + cqDurationMin * 60 * 1000) : true;
+
+        const firstStart = currentSub.objectiveStartedAt
+          ? new Date(currentSub.objectiveStartedAt).getTime()
+          : currentSub.cqSqStartedAt
+            ? new Date(currentSub.cqSqStartedAt).getTime()
+            : null;
+        const totalMin = (Number(currentSub.exam?.objectiveTime || 0) > 0 && Number(currentSub.exam?.cqSqTime || 0) > 0)
+          ? Number(currentSub.exam?.objectiveTime) + Number(currentSub.exam?.cqSqTime)
+          : (Number(currentSub.exam?.duration) || 0);
+        const isOverallTimeValid = firstStart && totalMin > 0 ? (now < firstStart + totalMin * 60 * 1000) : true;
+
+        if (hasCqSq) {
+          const isCqSubmitted = currentSub.cqSqStatus === 'SUBMITTED' && (ans._manualCqSqSubmit === true || !isCqTimeValid || !isEndValid || !isOverallTimeValid);
+          if (!isCqSubmitted && isEndValid && isOverallTimeValid) {
+            status = 'IN_PROGRESS';
+          }
+        } else if (status === 'SUBMITTED') {
+          const isManual = ans._manualSubmit === true || ans._manualObjectiveSubmit === true;
+          if (!isManual && isOverallTimeValid && isEndValid) {
             status = 'IN_PROGRESS';
           }
         }
 
         return {
-          examId: sub.examId,
-          studentId: sub.studentId,
-          objectiveSubmittedAt: sub.objectiveSubmittedAt,
-          cqSqSubmittedAt: sub.cqSqSubmittedAt,
-          score: sub.score,
-          answers: sub.answers,
+          examId: currentSub.examId,
+          studentId: currentSub.studentId,
+          objectiveStartedAt: currentSub.objectiveStartedAt,
+          cqSqStartedAt: currentSub.cqSqStartedAt,
+          objectiveStatus: currentSub.objectiveStatus,
+          cqSqStatus: currentSub.cqSqStatus,
+          objectiveSubmittedAt: currentSub.objectiveSubmittedAt,
+          cqSqSubmittedAt: currentSub.cqSqSubmittedAt,
+          score: currentSub.score,
+          answers: currentSub.answers,
           status: status
         };
       })

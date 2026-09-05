@@ -77,7 +77,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const answersObj = (typeof existingSubmission.answers === 'object' && existingSubmission.answers !== null)
           ? (existingSubmission.answers as any)
           : {};
-        const isManual = answersObj._manualSubmit === true;
         const now = Date.now();
 
         const firstStartTime = existingSubmission.objectiveStartedAt
@@ -98,8 +97,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           ? (now < new Date(exam.endTime).getTime())
           : true;
 
-        if (!isManual && isOverallTimeValid && isEndTimeValid) {
-          console.log(`[Exam Start] Interrupted session detected for student ${studentId} on exam ${examId}. Recovering to IN_PROGRESS...`);
+        const isCqSection = section === 'cqsq';
+        const isCqManuallyFinalized = answersObj._manualCqSqSubmit === true;
+        const isObjManuallyFinalized = answersObj._manualObjectiveSubmit === true || (answersObj._manualSubmit === true && !isCqSection);
+
+        const isAllowedToResume = isCqSection
+          ? (!isCqManuallyFinalized && isEndTimeValid && isOverallTimeValid)
+          : (!isObjManuallyFinalized && isEndTimeValid && isOverallTimeValid);
+
+        if (isAllowedToResume) {
+          console.log(`[Exam Start] Interrupted session detected for student ${studentId} on exam ${examId} (Section: ${section}). Recovering to IN_PROGRESS...`);
           existingSubmission = await prisma.examSubmission.update({
             where: { id: existingSubmission.id },
             data: { status: 'IN_PROGRESS' }
@@ -119,6 +126,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
+    dataToUpdate.status = 'IN_PROGRESS';
     if (section === 'objective') {
       dataToUpdate.objectiveStatus = 'IN_PROGRESS';
       // Only set startedAt if not already set — preserves timer when resuming
