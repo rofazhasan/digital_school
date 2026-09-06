@@ -133,8 +133,17 @@ function computeDynamicTarget(
 
     for (const depId of depIds) {
         const rawVal = studentAnswer ? studentAnswer[depId] : undefined;
-        const normVal = normalizeBengaliNumeralsAndText(String(rawVal ?? '')).replace(/[^0-9.-]/g, '');
-        const numVal = parseFloat(normVal);
+        let numVal = NaN;
+        if (rawVal !== undefined && rawVal !== null) {
+            const strVal = String(rawVal).trim();
+            const evaluated = evaluateExpressionAtSample(strVal);
+            if (evaluated !== null && !isNaN(evaluated)) {
+                numVal = evaluated;
+            } else {
+                const normVal = normalizeBengaliNumeralsAndText(strVal).replace(/[^0-9.-]/g, '');
+                numVal = parseFloat(normVal);
+            }
+        }
         if (!isNaN(numVal)) {
             sampleVars[depId] = numVal;
             sampleVars[`stage_${depId}`] = numVal;
@@ -274,11 +283,14 @@ export function evaluateMPCQuestion(
             if (!isCorrectDirectly && gradingMode !== 'EXACT' && depIds.length > 0) {
                 const dynamicTarget = computeDynamicTarget(stage, studentAnswer, depIds);
                 if (dynamicTarget !== null && !isNaN(dynamicTarget)) {
-                    const studentNum = parseFloat(studentStr);
-                    if (!isNaN(studentNum)) {
-                        isCorrectWithPropagatedError = Math.abs(studentNum - dynamicTarget) <= tol + 1e-9;
-                    } else {
-                        isCorrectWithPropagatedError = areExpressionsEquivalent(studentStr, String(dynamicTarget), tol);
+                    isCorrectWithPropagatedError = areExpressionsEquivalent(studentStr, String(dynamicTarget), tol);
+                    if (!isCorrectWithPropagatedError) {
+                        const studentNum = parseFloat(studentStr);
+                        if (!isNaN(studentNum)) {
+                            const diff = Math.abs(studentNum - dynamicTarget);
+                            isCorrectWithPropagatedError = diff <= tol + 1e-6 ||
+                                (Math.abs(dynamicTarget) > 1e-9 && diff / Math.abs(dynamicTarget) <= Math.max(tol, 0.02) + 1e-6);
+                        }
                     }
                 }
             }

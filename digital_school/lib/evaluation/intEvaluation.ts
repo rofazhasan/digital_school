@@ -44,8 +44,14 @@ export function evaluateINTQuestion(
 
     const marks = Number(question.marks) || 0;
 
-    // Check if answer is correct (exact numeric integer match or algebraic expression equivalence)
-    const isCorrect = studentAns === correctAnswer || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.001);
+    // Check if answer is correct (exact numeric integer match or close float rounding or algebraic expression equivalence)
+    const studentFloat = parseFloat(cleanStudent);
+    const correctFloat = parseFloat(cleanCorrect);
+    const isCloseFloat = !isNaN(studentFloat) && !isNaN(correctFloat) && (
+        Math.abs(studentFloat - correctFloat) <= 0.02 + 1e-6 ||
+        (Math.round(studentFloat) === Math.round(correctFloat) && Math.abs(studentFloat - correctFloat) <= 0.05)
+    );
+    const isCorrect = studentAns === correctAnswer || isCloseFloat || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.02);
     const score = isCorrect ? marks : 0;
 
     const feedback = isCorrect
@@ -90,7 +96,13 @@ export function getINTFeedback(
     const cleanStudent = normStudent.replace(/[^0-9.-]/g, '');
     const studentAns = parseInt(cleanStudent) || (parseInt(normStudent) || 0);
 
-    const isCorrect = studentAns === correctAnswer || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.001);
+    const studentFloat = parseFloat(cleanStudent);
+    const correctFloat = parseFloat(cleanCorrect);
+    const isCloseFloat = !isNaN(studentFloat) && !isNaN(correctFloat) && (
+        Math.abs(studentFloat - correctFloat) <= 0.02 + 1e-6 ||
+        (Math.round(studentFloat) === Math.round(correctFloat) && Math.abs(studentFloat - correctFloat) <= 0.05)
+    );
+    const isCorrect = studentAns === correctAnswer || isCloseFloat || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.02);
 
     return {
         isCorrect,

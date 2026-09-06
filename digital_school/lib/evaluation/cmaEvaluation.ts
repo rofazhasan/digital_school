@@ -68,10 +68,12 @@ export function evaluateCMAChildPart(
         return { isCorrect: false, isAttempted: false, status: 'UNANSWERED', earnedRatio: 0 };
     }
 
-    const childType = String(part.type || (part as any).questionType || (part as any).subType || 'numeric').toUpperCase();
+    const childType = String(part.type || (part as any).fieldType || (part as any).questionType || (part as any).subType || 'numeric').toUpperCase();
     const studentStr = String(rawStudentVal).trim();
     const expectedStr = String(part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? '').trim();
-    const tol = Number(part.tolerance) || 0.01;
+    const tol = typeof part.tolerance === 'number' && !isNaN(part.tolerance) && part.tolerance > 0
+        ? part.tolerance
+        : (Number(part.tolerance) > 0 ? Number(part.tolerance) : 0.05);
 
     // 1. MCQ Child
     if (childType === 'MCQ') {

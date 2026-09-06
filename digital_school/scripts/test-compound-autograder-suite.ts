@@ -177,6 +177,45 @@ const cycleRes = validateMPCDependencies(cycleStages);
 assert(cycleRes.isValid === false, 'DAG Validation: Cycle s1 -> s2 -> s3 -> s1 is REJECTED as INVALID');
 assert(!!cycleRes.error?.includes('Circular dependency detected'), 'DAG Validation: Returns clean cycle error message');
 
+// --------------------------------------------------------------------------
+// 4. CMA & MPC NUMERICAL APPROXIMATIONS (1.99 vs 2, 1.26 vs 2Pi/5)
+// --------------------------------------------------------------------------
+const cmaApproxQuestion = {
+  id: 'cma_approx',
+  marks: 4,
+  parts: [
+    { id: 'p1', type: 'numeric', marks: 2, expectedAnswer: '2' },
+    { id: 'p2', type: 'expression', marks: 2, expectedAnswer: '2Pi/5' }
+  ]
+};
+
+const cmaApproxRes = evaluateCMAQuestion(cmaApproxQuestion as any, {
+  p1: '1.99',
+  p2: '1.26'
+});
+assert(cmaApproxRes.score === 4, `CMA Approx: 1.99 for 2 and 1.26 for 2Pi/5 gets full 4 marks (got ${cmaApproxRes.score})`);
+assert(cmaApproxRes.isCorrect === true, 'CMA Approx: Overall question status is true');
+assert(cmaApproxRes.partResults['p1'].isCorrect === true, 'CMA Approx: Part 1 (1.99 vs 2) is CORRECT');
+assert(cmaApproxRes.partResults['p2'].isCorrect === true, 'CMA Approx: Part 2 (1.26 vs 2Pi/5) is CORRECT');
+
+const mpcApproxQuestion = {
+  id: 'mpc_approx',
+  marks: 4,
+  stages: [
+    { id: 's1', marks: 2, expectedAnswer: '2' },
+    { id: 's2', marks: 2, expectedAnswer: '2Pi/5', dependsOnStageId: 's1' }
+  ]
+};
+
+const mpcApproxRes = evaluateMPCQuestion(mpcApproxQuestion as any, {
+  s1: '1.99',
+  s2: '1.26'
+});
+assert(mpcApproxRes.score === 4, `MPC Approx: 1.99 for 2 and 1.26 for 2Pi/5 gets full 4 marks (got ${mpcApproxRes.score})`);
+assert(mpcApproxRes.isCorrect === true, 'MPC Approx: Overall question status is true');
+assert(mpcApproxRes.stageResults['s1'].status === 'CORRECT', 'MPC Approx: Stage 1 (1.99 vs 2) is CORRECT');
+assert(mpcApproxRes.stageResults['s2'].status === 'CORRECT', 'MPC Approx: Stage 2 (1.26 vs 2Pi/5) is CORRECT');
+
 console.log("--------------------------------------------------------------------------");
 console.log("SUMMARY: ALL COMPOUND CMA + MPC AUTOGRADER TESTS PASSED CLEANLY!");
 console.log("--------------------------------------------------------------------------");

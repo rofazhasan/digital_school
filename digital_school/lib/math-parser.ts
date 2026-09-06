@@ -609,6 +609,11 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
 
   // Tokenize string to preserve multi-letter functions and add explicit multiplication between variables/tokens
   // e.g. "2pir" -> "2 * pi * r", "GMm" -> "G * M * m", "2 pi r" -> "2 * pi * r", "2x" -> "2 * x", "3v/2" -> "(3*v)/2"
+  const getLastNonSpace = (str: string) => {
+    const trimmed = str.trimEnd();
+    return trimmed.length > 0 ? trimmed[trimmed.length - 1] : '';
+  };
+
   let formatted = '';
   let i = 0;
   while (i < expr.length) {
@@ -624,8 +629,9 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
     }
 
     if (matchedKw) {
-      if (formatted.length > 0 && /[a-zA-Z0-9_\)]/.test(formatted[formatted.length - 1])) {
-        formatted += '*';
+      const lastChar = getLastNonSpace(formatted);
+      if (lastChar && /[a-zA-Z0-9_\)]/.test(lastChar)) {
+        formatted = formatted.trimEnd() + '*';
       }
       formatted += matchedKw;
       i += matchedKw.length;
@@ -638,8 +644,9 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
     }
 
     if (/[a-zA-Z]/.test(ch)) {
-      if (formatted.length > 0 && /[a-zA-Z0-9_\)]/.test(formatted[formatted.length - 1])) {
-        formatted += '*';
+      const lastChar = getLastNonSpace(formatted);
+      if (lastChar && /[a-zA-Z0-9_\)]/.test(lastChar)) {
+        formatted = formatted.trimEnd() + '*';
       }
       formatted += ch;
       i++;
@@ -647,8 +654,9 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
     }
 
     if (/\d/.test(ch)) {
-      if (formatted.length > 0 && formatted[formatted.length - 1] === ')') {
-        formatted += '*';
+      const lastChar = getLastNonSpace(formatted);
+      if (lastChar === ')') {
+        formatted = formatted.trimEnd() + '*';
       }
       formatted += ch;
       i++;
@@ -656,11 +664,12 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
     }
 
     if (ch === '(') {
-      if (formatted.length > 0 && /[a-zA-Z0-9_\)]/.test(formatted[formatted.length - 1])) {
+      const lastChar = getLastNonSpace(formatted);
+      if (lastChar && /[a-zA-Z0-9_\)]/.test(lastChar)) {
         // Check if preceding token was a function keyword
-        const isPrecededByFunc = funcKeywords.some(fn => formatted.endsWith(fn));
+        const isPrecededByFunc = funcKeywords.some(fn => formatted.trimEnd().endsWith(fn));
         if (!isPrecededByFunc) {
-          formatted += '*';
+          formatted = formatted.trimEnd() + '*';
         }
       }
       formatted += ch;
@@ -676,6 +685,8 @@ export function normalizeExpression(rawExpr: string | number | undefined | null)
   formatted = formatted.replace(/\*+/g, '*');
   formatted = formatted.replace(/\(\*/g, '(').replace(/\*\)/g, ')');
   formatted = formatted.replace(/\^\*/g, '^');
+  formatted = formatted.replace(/\/\*/g, '/');
+  formatted = formatted.replace(/\*\//g, '/');
   formatted = formatted.replace(/\s+/g, '');
 
   return formatted;
@@ -794,8 +805,17 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
       text = text.replace(regex, valStr);
     }
 
+    // Ensure explicit multiplication around pi and parentheses
+    text = text.replace(/(\d+)\s*pi\b/gi, '$1 * pi');
+    text = text.replace(/\)\s*pi\b/gi, ') * pi');
+    text = text.replace(/\bpi\s*\(?/gi, (m) => m.endsWith('(') ? 'pi * (' : m);
+    text = text.replace(/\bpi\s*(\d+)/gi, 'pi * $1');
+    text = text.replace(/\)\s*\(/g, ') * (');
+    text = text.replace(/(\d+)\s*\(/g, '$1 * (');
+    text = text.replace(/\)\s*(\d+)/g, ') * $1');
+
     // Substitute pi constant
-    text = text.replace(/(?<![a-zA-Z0-9_])pi(?![a-zA-Z0-9_])/gi, `(${Math.PI})`);
+    text = text.replace(/(?<![a-zA-Z_])pi(?![a-zA-Z_])/gi, `(${Math.PI})`);
 
     // Degree angle conversion in trigonometric / algebraic formulas: e.g. sin(30 deg) -> sin(30 * Math.PI / 180)
     text = text.replace(/(\d+(?:\.\d+)?)\s*(?:deg|degree|degrees|\^?\\circ|\\circ|°|ডিগ্রি)\b/gi, '($1 * Math.PI / 180)');
@@ -1089,23 +1109,54 @@ export function areExpressionsEquivalent(
     return null;
   };
 
+  const isNumericEquivalent = (v1: number, v2: number, tol: number = 0.01): boolean => {
+    if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) return false;
+    const diff = Math.abs(v1 - v2);
+    const effTol = (tol !== undefined && !isNaN(tol) && tol >= 0) ? tol : 0.01;
+
+    // 1. Absolute difference within tolerance (including floating-point epsilon cushion)
+    if (diff <= effTol + 1e-6) return true;
+
+    // 2. Relative difference within tolerance (e.g. 1.99 vs 2 is 0.5% error, 1.26 vs 2Pi/5 is 0.27% error)
+    const maxVal = Math.max(Math.abs(v1), Math.abs(v2));
+    if (maxVal > 1e-9) {
+      const relDiff = diff / maxVal;
+      if (relDiff <= effTol + 1e-6) return true;
+    }
+
+    // 3. Rounding check for fractional/irrational values (e.g. 2Pi/5 ~ 1.26, sqrt(2) ~ 1.41)
+    for (const d of [1, 2, 3, 4]) {
+      const factor = Math.pow(10, d);
+      if (Math.round(v1 * factor) / factor === Math.round(v2 * factor) / factor) {
+        if (diff <= (0.5 / factor) + 1e-6) return true;
+      }
+    }
+
+    // 4. Integer rounding (e.g. 1.99 for 2, 2.01 for 2)
+    if ((Math.abs(v1 - Math.round(v1)) < 1e-9 || Math.abs(v2 - Math.round(v2)) < 1e-9) && Math.round(v1) === Math.round(v2)) {
+      if (diff <= Math.max(effTol, 0.02) + 1e-6) return true;
+    }
+
+    return false;
+  };
+
   const pStu = parsePercentOrNumber(cleanStu);
   const pExp = parsePercentOrNumber(cleanExp);
   if (pStu !== null && pExp !== null) {
-    if (Math.abs(pStu - pExp) <= (tolerance || 0.01)) return true;
+    if (isNumericEquivalent(pStu, pExp, tolerance)) return true;
   }
 
   // 9. Direct numeric comparison (with tolerance) for purely numeric values or evaluated formulas (e.g. 5C2 == 10, 5P2 == 20)
-  const evalStuDirect = evaluateExpressionAtSample(stuStr);
-  const evalExpDirect = evaluateExpressionAtSample(expStr);
+  const evalStuDirect = evaluateExpressionAtSample(stuStr) ?? evaluateExpressionAtSample(bnStu) ?? evaluateExpressionAtSample(cleanStu);
+  const evalExpDirect = evaluateExpressionAtSample(expStr) ?? evaluateExpressionAtSample(bnExp) ?? evaluateExpressionAtSample(cleanExp);
   if (evalStuDirect !== null && evalExpDirect !== null) {
-    if (Math.abs(evalStuDirect - evalExpDirect) <= (tolerance || 0.01)) return true;
+    if (isNumericEquivalent(evalStuDirect, evalExpDirect, tolerance)) return true;
   }
 
   const numStu = parseFloat(cleanStu.replace(/[$,]/g, ''));
   const numExp = parseFloat(cleanExp.replace(/[$,]/g, ''));
   if (!isNaN(numStu) && !isNaN(numExp) && String(numStu) === cleanStu.trim() && String(numExp) === cleanExp.trim()) {
-    if (Math.abs(numStu - numExp) <= tolerance) return true;
+    if (isNumericEquivalent(numStu, numExp, tolerance)) return true;
   }
 
   // 10. Normalized algebraic string comparison

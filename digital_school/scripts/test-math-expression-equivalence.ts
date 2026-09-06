@@ -224,6 +224,41 @@ assert(cmaRes_spaces.isCorrect && cmaRes_spaces.earnedRatio === 1, 'CMA: Student
 const cmaRes_unicode = evaluateCMAChildPart(cmaPart as any, "D²⁺");
 assert(cmaRes_unicode.isCorrect && cmaRes_unicode.earnedRatio === 1, 'CMA: Student enters unicode "D²⁺" -> CORRECT (Score 2/2)', cmaRes_unicode);
 
+// 5. Numerical and Pi Rounding Approximations (1.99 vs 2 and 1.26 vs 2Pi/5)
+console.log('\n--- 5. Numerical & Pi Rounding Approximations ---');
+assert(areExpressionsEquivalent("1.99", "2"), 'Approximation: 1.99 == 2');
+assert(areExpressionsEquivalent("2", "1.99"), 'Approximation: 2 == 1.99');
+assert(areExpressionsEquivalent("2.01", "2"), 'Approximation: 2.01 == 2');
+assert(areExpressionsEquivalent("1.26", "2Pi/5"), 'Pi Approximation: 1.26 == 2Pi/5');
+assert(areExpressionsEquivalent("1.26", "2pi/5"), 'Pi Approximation: 1.26 == 2pi/5');
+assert(areExpressionsEquivalent("1.26", "2 Pi / 5"), 'Pi Approximation with spaces: 1.26 == 2 Pi / 5');
+assert(areExpressionsEquivalent("1.26", "2 \\pi / 5"), 'Pi Approximation with LaTeX & spaces: 1.26 == 2 \\pi / 5');
+assert(areExpressionsEquivalent("1.26", "\\frac{2\\pi}{5}"), 'Pi Approximation with \\frac: 1.26 == \\frac{2\\pi}{5}');
+assert(areExpressionsEquivalent("1.26", "\\frac{2}{5} \\pi"), 'Pi Approximation with split \\frac: 1.26 == \\frac{2}{5} \\pi');
+assert(areExpressionsEquivalent("1.26", "(2/5) pi"), 'Pi Approximation with paren fraction: 1.26 == (2/5) pi');
+assert(areExpressionsEquivalent("1.26", "2/5 pi"), 'Pi Approximation with slash fraction: 1.26 == 2/5 pi');
+assert(areExpressionsEquivalent("2Pi/5", "1.26"), 'Pi Approximation reversed: 2Pi/5 == 1.26');
+
+const cmaPart_num = {
+  id: 'p_num',
+  label: 'Calculate value',
+  type: 'numeric',
+  expectedAnswer: '2',
+  marks: 2
+};
+const cmaRes_num = evaluateCMAChildPart(cmaPart_num as any, "1.99");
+assert(cmaRes_num.isCorrect && cmaRes_num.earnedRatio === 1, 'CMA: Student enters "1.99" for expected "2" -> CORRECT', cmaRes_num);
+
+const cmaPart_pi = {
+  id: 'p_pi',
+  label: 'Calculate angle in radians',
+  type: 'expression',
+  expectedAnswer: '2Pi/5',
+  marks: 2
+};
+const cmaRes_pi = evaluateCMAChildPart(cmaPart_pi as any, "1.26");
+assert(cmaRes_pi.isCorrect && cmaRes_pi.earnedRatio === 1, 'CMA: Student enters "1.26" for expected "2Pi/5" -> CORRECT', cmaRes_pi);
+
 console.log('\n==========================================================================');
 console.log(`SUMMARY: ${passedTests} / ${totalTests} AUDIT TESTS PASSED CLEANLY!`);
 console.log('==========================================================================\n');

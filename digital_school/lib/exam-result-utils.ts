@@ -130,7 +130,7 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
                 const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
                 if (!sVal || !eVal) return false;
-                const tol = Number(p.tolerance) || 0.01;
+                const tol = Number(p.tolerance) || 0.05;
                 return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
             if (allPartsOk) return 'CORRECT';
@@ -148,7 +148,7 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
                 const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
                 if (!sVal || !eVal) return false;
-                const tol = Number(s.tolerance) || 0.01;
+                const tol = Number(s.tolerance) || 0.05;
                 return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
             if (allStagesOk) return 'CORRECT';
@@ -179,7 +179,7 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
                 const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
                 if (!sVal || !eVal) return false;
-                const tol = Number(p.tolerance) || 0.01;
+                const tol = Number(p.tolerance) || 0.05;
                 return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
         }
@@ -193,7 +193,7 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
                 const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
                 const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
                 if (!sVal || !eVal) return false;
-                const tol = Number(s.tolerance) || 0.01;
+                const tol = Number(s.tolerance) || 0.05;
                 return areExpressionsEquivalent(String(sVal), String(eVal), tol);
             });
         }
