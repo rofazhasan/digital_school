@@ -203,32 +203,81 @@ export function evaluateMPCQuestion(
         };
     }
 
+    // Safely normalize studentAnswer if it is a JSON string or wrapped object
+    let parsedStudentAnswer: any = studentAnswer;
+    if (typeof parsedStudentAnswer === 'string') {
+        const trimmed = parsedStudentAnswer.trim();
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (parsed && typeof parsed === 'object') {
+                    parsedStudentAnswer = parsed;
+                }
+            } catch {}
+        }
+    }
+
+    if (parsedStudentAnswer && typeof parsedStudentAnswer === 'object') {
+        const qId = question.id;
+        if (qId && parsedStudentAnswer[qId] !== undefined) {
+            const inner = parsedStudentAnswer[qId];
+            if (typeof inner === 'object' && inner !== null) {
+                parsedStudentAnswer = { ...parsedStudentAnswer, ...inner };
+            }
+        }
+    }
+
     let totalEarned = 0;
     const stageResults: Record<string, MPCStageResult> = {};
     const totalWeight = stages.reduce((acc, s) => acc + (Number(s.marks) || 1), 0);
 
     for (let i = 0; i < stages.length; i++) {
         const stage = stages[i];
-        const stageId = stage.id || `s${i + 1}`;
+        const stageId = stage.id || (stage as any).key || (stage as any).name || `s${i + 1}`;
         const stageMax = (Number(stage.marks) || 1) / totalWeight * maxMarks;
         
         let studentValRaw: any = undefined;
-        if (studentAnswer && typeof studentAnswer === 'object') {
-            studentValRaw = studentAnswer[stageId] ??
-                studentAnswer[stage.id || ''] ??
-                studentAnswer[stage.stageTitle || ''] ??
-                studentAnswer[stage.text || ''] ??
-                studentAnswer[`stage_${i}`] ??
-                studentAnswer[`stage_${i + 1}`] ??
-                studentAnswer[`s${i + 1}`] ??
-                studentAnswer[`s_${i + 1}`] ??
-                studentAnswer[String(i)] ??
-                studentAnswer[String(i + 1)] ??
-                studentAnswer[`Stage ${i + 1}`] ??
-                studentAnswer[`stage ${i + 1}`] ??
-                studentAnswer[['ধাপ ১', 'ধাপ ২', 'ধাপ ৩', 'ধাপ ৪', 'ধাপ ৫'][i]];
-        } else if (typeof studentAnswer === 'string' && stages.length === 1) {
-            studentValRaw = studentAnswer;
+        if (parsedStudentAnswer && typeof parsedStudentAnswer === 'object') {
+            studentValRaw = parsedStudentAnswer[stageId] ??
+                parsedStudentAnswer[stage.id || ''] ??
+                parsedStudentAnswer[(stage as any).key || ''] ??
+                parsedStudentAnswer[(stage as any).name || ''] ??
+                parsedStudentAnswer[stage.stageTitle || ''] ??
+                parsedStudentAnswer[(stage.stageTitle || '').toLowerCase()] ??
+                parsedStudentAnswer[(stage.stageTitle || '').toUpperCase()] ??
+                parsedStudentAnswer[(stage as any).prompt || ''] ??
+                parsedStudentAnswer[(stage as any).text || ''] ??
+                parsedStudentAnswer[(stage as any).question || ''] ??
+                parsedStudentAnswer[(stage as any).questionText || ''] ??
+                parsedStudentAnswer[`stage_${i}`] ??
+                parsedStudentAnswer[`stage_${i + 1}`] ??
+                parsedStudentAnswer[`s${i + 1}`] ??
+                parsedStudentAnswer[`s_${i + 1}`] ??
+                parsedStudentAnswer[String(i)] ??
+                parsedStudentAnswer[String(i + 1)] ??
+                parsedStudentAnswer[`Stage ${i + 1}`] ??
+                parsedStudentAnswer[`stage ${i + 1}`] ??
+                parsedStudentAnswer[['ধাপ ১', 'ধাপ ২', 'ধাপ ৩', 'ধাপ ৪', 'ধাপ ৫'][i]] ??
+                parsedStudentAnswer[`${question.id}_${stageId}`] ??
+                parsedStudentAnswer[`${question.id}_stage_${i}`] ??
+                parsedStudentAnswer[`${question.id}_s${i + 1}`] ??
+                parsedStudentAnswer[`${question.id}_${i}`];
+
+            if (studentValRaw === undefined && stages.length === 1) {
+                studentValRaw = parsedStudentAnswer[question.id] ??
+                    parsedStudentAnswer.answer ??
+                    parsedStudentAnswer.value ??
+                    parsedStudentAnswer.text ??
+                    (Object.keys(parsedStudentAnswer).length === 1 ? Object.values(parsedStudentAnswer)[0] : undefined);
+            }
+        } else if (typeof parsedStudentAnswer === 'string' || typeof parsedStudentAnswer === 'number') {
+            if (stages.length === 1 || i === 0) {
+                studentValRaw = parsedStudentAnswer;
+            }
+        }
+
+        if (studentValRaw && typeof studentValRaw === 'object') {
+            studentValRaw = studentValRaw.answer ?? studentValRaw.value ?? studentValRaw.text ?? studentValRaw;
         }
 
         const isAttempted = studentValRaw !== undefined &&
@@ -238,7 +287,9 @@ export function evaluateMPCQuestion(
 
         const expectedStr = String(stage.expectedAnswer ?? '').trim();
         const studentStr = String(studentValRaw ?? '').trim();
-        const tol = Number(stage.tolerance) || 0.05;
+        const tol = typeof stage.tolerance === 'number' && !isNaN(stage.tolerance) && stage.tolerance > 0
+            ? stage.tolerance
+            : (Number(stage.tolerance) > 0 ? Number(stage.tolerance) : 0.05);
 
         let isCorrectDirectly = false;
         let isCorrectWithPropagatedError = false;
@@ -263,7 +314,7 @@ export function evaluateMPCQuestion(
                         'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
                         'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
                         'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
-                        'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad',
+                        'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'radians', 'radian', 'rads', 'rad',
                         'ডিগ্রি', 'degree', 'degrees', 'deg', '°', '^\\circ', '\\circ'
                     ];
                     for (const unitStr of commonUnits) {
@@ -281,7 +332,7 @@ export function evaluateMPCQuestion(
 
             // 2. Follow-Through Evaluation if direct check failed and gradingMode allows follow-through
             if (!isCorrectDirectly && gradingMode !== 'EXACT' && depIds.length > 0) {
-                const dynamicTarget = computeDynamicTarget(stage, studentAnswer, depIds);
+                const dynamicTarget = computeDynamicTarget(stage, parsedStudentAnswer, depIds);
                 if (dynamicTarget !== null && !isNaN(dynamicTarget)) {
                     isCorrectWithPropagatedError = areExpressionsEquivalent(studentStr, String(dynamicTarget), tol);
                     if (!isCorrectWithPropagatedError) {
@@ -289,7 +340,7 @@ export function evaluateMPCQuestion(
                         if (!isNaN(studentNum)) {
                             const diff = Math.abs(studentNum - dynamicTarget);
                             isCorrectWithPropagatedError = diff <= tol + 1e-6 ||
-                                (Math.abs(dynamicTarget) > 1e-9 && diff / Math.abs(dynamicTarget) <= Math.max(tol, 0.02) + 1e-6);
+                                (Math.abs(dynamicTarget) > 1e-9 && diff / Math.abs(dynamicTarget) <= Math.max(tol, 0.05) + 1e-6);
                         }
                     }
                 }
@@ -311,7 +362,7 @@ export function evaluateMPCQuestion(
             status = 'INCORRECT';
         }
 
-        stageResults[stageId] = {
+        const stageRes: MPCStageResult = {
             isCorrectDirectly,
             isCorrectWithPropagatedError,
             isAttempted,
@@ -323,6 +374,12 @@ export function evaluateMPCQuestion(
             dependsOn: depIds,
             gradingMode
         };
+
+        stageResults[stageId] = stageRes;
+        if (stage.id && stage.id !== stageId) stageResults[stage.id] = stageRes;
+        if (stage.stageTitle && stage.stageTitle !== stageId) stageResults[stage.stageTitle] = stageRes;
+        if (!stageResults[`stage_${i}`]) stageResults[`stage_${i}`] = stageRes;
+        if (!stageResults[`s${i + 1}`]) stageResults[`s${i + 1}`] = stageRes;
     }
 
     let finalScore = Math.round(totalEarned * 100) / 100;

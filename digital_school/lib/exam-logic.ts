@@ -203,7 +203,18 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
         for (const question of (questions as QuestionData[])) {
             const type = question.type?.toUpperCase();
-            const studentAnswer = answers[question.id] as any;
+            let studentAnswer = answers[question.id] as any;
+            if (studentAnswer === undefined && (type === 'CMA' || type === 'MPC')) {
+                const prefix = `${question.id}_`;
+                const subKeys = Object.keys(answers).filter(k => k.startsWith(prefix) && !k.endsWith('_marks'));
+                if (subKeys.length > 0) {
+                    const aggregated: Record<string, any> = {};
+                    subKeys.forEach(k => {
+                        aggregated[k.replace(prefix, '')] = (answers as any)[k];
+                    });
+                    studentAnswer = aggregated;
+                }
+            }
             const manualMark = answers[`${question.id}_marks`];
 
             // A. Handle Manual Grading (CQ/SQ/DESCRIPTIVE) — with auto-scoring for structured sub-types
@@ -447,6 +458,8 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
                 // PERSIST MARKS in answers JSON for results view
                 answers[`${question.id}_marks`] = questionScore;
+                if (type === 'CMA' && res.partResults) answers[`${question.id}_partResults`] = res.partResults;
+                if (type === 'MPC' && res.stageResults) answers[`${question.id}_stageResults`] = res.stageResults;
             }
         }
     }

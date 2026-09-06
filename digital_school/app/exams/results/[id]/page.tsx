@@ -3808,7 +3808,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                             <td className="p-3 text-emerald-700 dark:text-emerald-300 font-medium">
                                                               <div className="flex items-center gap-2">
                                                                 {row.vCorrectRight && <span className="font-bold shrink-0">{row.vCorrectRight}.</span>}
-                                                                <div className="flex-1">
+                                                  <div className="flex-1">
                                                                   <UniversalMathJax inline dynamic>{cleanupMath(row.correctRightText)}</UniversalMathJax>
                                                                 </div>
                                                               </div>
@@ -3830,10 +3830,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {type === 'CMA' && (
                                       <div className="p-4 bg-card rounded-2xl border border-border space-y-3">
                                         {(() => {
-                                          let parsedVal = typeof question.studentAnswer === 'string'
-                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
-                                            : (question.studentAnswer || {});
-                                          parsedVal = parsedVal || {};
+                                          let parsedVal = question.studentAnswer;
+                                          if (typeof parsedVal === 'string') {
+                                            const trimmed = parsedVal.trim();
+                                            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                                              try { parsedVal = JSON.parse(trimmed); } catch {}
+                                            }
+                                          }
 
                                           let rawParts = (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || (question as any).sub_questions || [];
                                           if (typeof rawParts === 'string') {
@@ -3847,10 +3850,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             marks: question.marks || 1,
                                             parts: parts
                                           };
+                                          const rendererValue = typeof parsedVal === 'object' && parsedVal !== null
+                                            ? parsedVal
+                                            : { [question.id]: parsedVal };
                                           return (
                                             <CMARenderer
                                               question={cmaQ}
-                                              value={parsedVal}
+                                              value={rendererValue}
                                               disabled={true}
                                               showFeedback={true}
                                               evalResult={evaluateCMAQuestion(cmaQ as any, parsedVal)}
@@ -3864,10 +3870,16 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {type === 'MPC' && (
                                       <div className="p-4 bg-card rounded-2xl border border-border space-y-3">
                                         {(() => {
-                                          let parsedVal = typeof question.studentAnswer === 'string'
-                                            ? (() => { try { return JSON.parse(question.studentAnswer); } catch { return { [question.id]: question.studentAnswer }; } })()
-                                            : (question.studentAnswer || {});
-                                          parsedVal = parsedVal || {};
+                                          let parsedVal = question.studentAnswer;
+                                          if (typeof parsedVal === 'string') {
+                                            const trimmed = parsedVal.trim();
+                                            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                                              try { parsedVal = JSON.parse(trimmed); } catch {}
+                                            }
+                                          }
+                                          const rendererValue = typeof parsedVal === 'object' && parsedVal !== null
+                                            ? parsedVal
+                                            : { [question.id]: parsedVal };
 
                                           let rawStages = (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || (question as any).sub_questions || [];
                                           if (typeof rawStages === 'string') {
@@ -3884,7 +3896,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           return (
                                             <MPCRenderer
                                               question={mpcQ}
-                                              value={parsedVal}
+                                              value={rendererValue}
                                               disabled={true}
                                               showFeedback={true}
                                               evalResult={evaluateMPCQuestion(mpcQ as any, parsedVal)}

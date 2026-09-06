@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { UniversalMathJax } from '@/app/components/UniversalMathJax';
 import { cleanupMath } from '@/lib/utils';
 import { Sparkles, CheckCircle, XCircle, AlertCircle, Calculator, BookOpen, Lightbulb } from 'lucide-react';
-import { formatExpressionToLatex } from '@/lib/math-parser';
+import { formatExpressionToLatex, areExpressionsEquivalent } from '@/lib/math-parser';
+import { evaluateCMAChildPart } from '@/lib/evaluation/cmaEvaluation';
 
 // ==========================================
 // 0. Live Expression Input with LaTeX Preview
@@ -163,16 +164,48 @@ export function CMARenderer({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {parts.map((part, idx) => {
             const partId = part.id || part.key || part.name || `part_${idx}`;
-            const partVal = value?.[partId] ?? value?.[part.label] ?? value?.[`part_${idx}`] ?? value?.[idx] ?? '';
-            const res = evalResult?.partResults?.[partId] || evalResult?.partResults?.[part.label] || evalResult?.partResults?.[`part_${idx}`];
+            let partVal = value?.[partId] ?? value?.[part.id] ?? value?.[part.key] ?? value?.[part.name] ?? value?.[part.label] ?? value?.[`part_${idx}`] ?? value?.[`p${idx + 1}`] ?? value?.[idx];
+            if ((partVal === undefined || partVal === null || partVal === '') && parts.length === 1) {
+              if (typeof value === 'string' || typeof value === 'number') {
+                partVal = value;
+              } else if (value && typeof value === 'object') {
+                partVal = value[question?.id] ?? value.answer ?? value.value ?? (Object.keys(value).length === 1 ? Object.values(value)[0] : '');
+              }
+            }
+            if (partVal && typeof partVal === 'object') {
+              partVal = partVal.answer ?? partVal.value ?? partVal.text ?? partVal;
+            }
+            partVal = partVal ?? '';
+
+            let res = evalResult?.partResults?.[partId] ??
+              evalResult?.partResults?.[part.id] ??
+              evalResult?.partResults?.[part.key] ??
+              evalResult?.partResults?.[part.label] ??
+              evalResult?.partResults?.[`part_${idx}`] ??
+              evalResult?.partResults?.[`p${idx + 1}`] ??
+              evalResult?.partResults?.[idx];
+
             const partLabel = part.label || part.prompt || part.text || part.question || part.questionText || `Part ${idx + 1}`;
             const expectedAns = part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? part.correct ?? part.answer ?? '';
             const partMarks = part.marks || (part as any)?.mark || 1;
             const explanation = part.explanation || part.solution || (part as any)?.hint || '';
 
+            if (!res && showFeedback) {
+              const fallbackEval = evaluateCMAChildPart(part, partVal);
+              res = {
+                isCorrect: fallbackEval.isCorrect,
+                isAttempted: fallbackEval.isAttempted,
+                status: fallbackEval.status,
+                earned: fallbackEval.isCorrect ? partMarks : (fallbackEval.earnedRatio * partMarks),
+                max: partMarks,
+                studentVal: partVal,
+                expectedVal: expectedAns
+              };
+            }
+
             const isCorrect = res ? res.isCorrect : false;
             const isPartial = res ? res.status === 'PARTIAL' : false;
-            const isAttempted = res ? res.isAttempted : Boolean(partVal);
+            const isAttempted = res ? res.isAttempted : Boolean(partVal && String(partVal).trim() !== '');
 
             return (
               <div
@@ -358,17 +391,48 @@ export function MPCRenderer({
         <div className="space-y-4">
           {stages.map((stage, idx) => {
             const stageId = stage.id || stage.key || stage.name || `stage_${idx}`;
-            const stageVal = value?.[stageId] ?? value?.[stage.stageTitle] ?? value?.[`stage_${idx}`] ?? value?.[idx] ?? '';
-            const res = evalResult?.stageResults?.[stageId] || evalResult?.stageResults?.[stage.stageTitle] || evalResult?.stageResults?.[`stage_${idx}`];
+            let stageVal = value?.[stageId] ?? value?.[stage.id] ?? value?.[stage.key] ?? value?.[stage.name] ?? value?.[stage.stageTitle] ?? value?.[`stage_${idx}`] ?? value?.[`s${idx + 1}`] ?? value?.[idx];
+            if ((stageVal === undefined || stageVal === null || stageVal === '') && stages.length === 1) {
+              if (typeof value === 'string' || typeof value === 'number') {
+                stageVal = value;
+              } else if (value && typeof value === 'object') {
+                stageVal = value[question?.id] ?? value.answer ?? value.value ?? (Object.keys(value).length === 1 ? Object.values(value)[0] : '');
+              }
+            }
+            if (stageVal && typeof stageVal === 'object') {
+              stageVal = stageVal.answer ?? stageVal.value ?? stageVal.text ?? stageVal;
+            }
+            stageVal = stageVal ?? '';
+
+            let res = evalResult?.stageResults?.[stageId] ??
+              evalResult?.stageResults?.[stage.id] ??
+              evalResult?.stageResults?.[stage.key] ??
+              evalResult?.stageResults?.[stage.stageTitle] ??
+              evalResult?.stageResults?.[`stage_${idx}`] ??
+              evalResult?.stageResults?.[`s${idx + 1}`] ??
+              evalResult?.stageResults?.[idx];
+
             const stageTitle = stage.stageTitle || stage.prompt || stage.text || stage.question || stage.questionText || `Stage ${idx + 1}`;
             const expectedAns = stage.expectedAnswer ?? stage.modelAnswer ?? stage.correctAnswer ?? stage.correct ?? stage.answer ?? '';
             const stageMarks = stage.marks || (stage as any)?.mark || 1;
             const formula = stage.formula || stage.equation || '';
             const explanation = stage.explanation || stage.solution || '';
 
+            if (!res && showFeedback) {
+              const isDirect = areExpressionsEquivalent(String(stageVal), String(expectedAns), Number(stage.tolerance) || 0.05);
+              res = {
+                isCorrectDirectly: isDirect,
+                isCorrectWithPropagatedError: false,
+                isAttempted: Boolean(stageVal && String(stageVal).trim() !== ''),
+                status: isDirect ? 'CORRECT' : 'INCORRECT',
+                earned: isDirect ? stageMarks : 0,
+                max: stageMarks
+              };
+            }
+
             const isDirect = res ? res.isCorrectDirectly : false;
             const isPropagated = res ? res.isCorrectWithPropagatedError : false;
-            const isAttempted = res ? res.isAttempted : Boolean(stageVal);
+            const isAttempted = res ? res.isAttempted : Boolean(stageVal && String(stageVal).trim() !== '');
 
             return (
               <div

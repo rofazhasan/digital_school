@@ -151,7 +151,7 @@ export function evaluateCMAChildPart(
                 'মিটার/সেকেন্ড^২', 'মি/সে^২', 'মি/সে২', 'মিটার/সেকেন্ড', 'মি/সে',
                 'm/s^2', 'ms^-2', 'ms^{-2}', 'm/s', 'ms^-1', 'ms^{-1}',
                 'কিলোগ্রাম', 'কেজি', 'গ্রাম', 'নিউটন', 'প্যাসকেল', 'ওয়াট', 'ওয়াট', 'ভোল্ট', 'অ্যাম্পিয়ার', 'কুলম্ব', 'জুল',
-                'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'rad',
+                'kg', 'gm', 'g', 'N', 'Pa', 'W', 'V', 'A', 'C', 'J', 'ohm', 'rad/s', 'radians', 'radian', 'rads', 'rad',
                 'ডিগ্রি', 'degree', 'degrees', 'deg', '°', '^\\circ', '\\circ'
             ];
             for (const unitStr of commonUnits) {
@@ -207,40 +207,86 @@ export function evaluateCMAQuestion(
         };
     }
 
+    // Safely normalize studentAnswer if it is a JSON string or wrapped object
+    let parsedStudentAnswer: any = studentAnswer;
+    if (typeof parsedStudentAnswer === 'string') {
+        const trimmed = parsedStudentAnswer.trim();
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (parsed && typeof parsed === 'object') {
+                    parsedStudentAnswer = parsed;
+                }
+            } catch {}
+        }
+    }
+
+    if (parsedStudentAnswer && typeof parsedStudentAnswer === 'object') {
+        const qId = question.id;
+        if (qId && parsedStudentAnswer[qId] !== undefined) {
+            const inner = parsedStudentAnswer[qId];
+            if (typeof inner === 'object' && inner !== null) {
+                parsedStudentAnswer = { ...parsedStudentAnswer, ...inner };
+            }
+        }
+    }
+
     let totalEarned = 0;
     const partResults: Record<string, CMAPartResult> = {};
     const totalPartsWeight = parts.reduce((acc, p) => acc + (Number(p.marks) || 1), 0);
 
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        const partId = part.id || `part_${i}`;
+        const partId = part.id || (part as any).key || (part as any).name || `part_${i}`;
         const partMax = (Number(part.marks) || 1) / totalPartsWeight * maxMarks;
         
         let rawStudentVal: any = undefined;
-        if (studentAnswer && typeof studentAnswer === 'object') {
-            rawStudentVal = studentAnswer[partId] ??
-                studentAnswer[part.id || ''] ??
-                studentAnswer[part.label || ''] ??
-                studentAnswer[(part.label || '').toLowerCase()] ??
-                studentAnswer[(part.label || '').toUpperCase()] ??
-                studentAnswer[(part as any).prompt || ''] ??
-                studentAnswer[(part as any).text || ''] ??
-                studentAnswer[`part_${i}`] ??
-                studentAnswer[`part_${i + 1}`] ??
-                studentAnswer[`p${i + 1}`] ??
-                studentAnswer[`p_${i + 1}`] ??
-                studentAnswer[String(i)] ??
-                studentAnswer[String(i + 1)] ??
-                studentAnswer[['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i]];
-        } else if (typeof studentAnswer === 'string' && parts.length === 1) {
-            rawStudentVal = studentAnswer;
+        if (parsedStudentAnswer && typeof parsedStudentAnswer === 'object') {
+            rawStudentVal = parsedStudentAnswer[partId] ??
+                parsedStudentAnswer[part.id || ''] ??
+                parsedStudentAnswer[(part as any).key || ''] ??
+                parsedStudentAnswer[(part as any).name || ''] ??
+                parsedStudentAnswer[part.label || ''] ??
+                parsedStudentAnswer[(part.label || '').toLowerCase()] ??
+                parsedStudentAnswer[(part.label || '').toUpperCase()] ??
+                parsedStudentAnswer[(part as any).prompt || ''] ??
+                parsedStudentAnswer[(part as any).text || ''] ??
+                parsedStudentAnswer[(part as any).question || ''] ??
+                parsedStudentAnswer[(part as any).questionText || ''] ??
+                parsedStudentAnswer[`part_${i}`] ??
+                parsedStudentAnswer[`part_${i + 1}`] ??
+                parsedStudentAnswer[`p${i + 1}`] ??
+                parsedStudentAnswer[`p_${i + 1}`] ??
+                parsedStudentAnswer[String(i)] ??
+                parsedStudentAnswer[String(i + 1)] ??
+                parsedStudentAnswer[['ক', 'খ', 'গ', 'ঘ', 'ঙ'][i]] ??
+                parsedStudentAnswer[`${question.id}_${partId}`] ??
+                parsedStudentAnswer[`${question.id}_part_${i}`] ??
+                parsedStudentAnswer[`${question.id}_sub_${i}`] ??
+                parsedStudentAnswer[`${question.id}_${i}`];
+
+            if (rawStudentVal === undefined && parts.length === 1) {
+                rawStudentVal = parsedStudentAnswer[question.id] ??
+                    parsedStudentAnswer.answer ??
+                    parsedStudentAnswer.value ??
+                    parsedStudentAnswer.text ??
+                    (Object.keys(parsedStudentAnswer).length === 1 ? Object.values(parsedStudentAnswer)[0] : undefined);
+            }
+        } else if (typeof parsedStudentAnswer === 'string' || typeof parsedStudentAnswer === 'number') {
+            if (parts.length === 1 || i === 0) {
+                rawStudentVal = parsedStudentAnswer;
+            }
+        }
+
+        if (rawStudentVal && typeof rawStudentVal === 'object') {
+            rawStudentVal = rawStudentVal.answer ?? rawStudentVal.value ?? rawStudentVal.text ?? rawStudentVal;
         }
 
         const evalRes = evaluateCMAChildPart(part, rawStudentVal);
         const earned = Math.round((evalRes.earnedRatio * partMax) * 100) / 100;
         totalEarned += earned;
 
-        partResults[partId] = {
+        const partRes: CMAPartResult = {
             isCorrect: evalRes.isCorrect,
             isAttempted: evalRes.isAttempted,
             status: evalRes.status,
@@ -249,8 +295,13 @@ export function evaluateCMAQuestion(
             studentVal: rawStudentVal ?? 'N/A',
             expectedVal: part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? 'N/A',
             matchedBy: evalRes.matchedBy,
-            childType: String(part.type || 'numeric').toUpperCase()
+            childType: String(part.type || (part as any).fieldType || 'numeric').toUpperCase()
         };
+
+        partResults[partId] = partRes;
+        if (part.id && part.id !== partId) partResults[part.id] = partRes;
+        if (part.label && part.label !== partId) partResults[part.label] = partRes;
+        if (!partResults[`part_${i}`]) partResults[`part_${i}`] = partRes;
     }
 
     let finalScore = Math.round(totalEarned * 100) / 100;

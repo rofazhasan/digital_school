@@ -446,7 +446,19 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             {type === "cma" && (
               <CMARenderer
                 question={question}
-                value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
+                value={(() => {
+                  if (typeof userAnswer === 'string') {
+                    const trimmed = userAnswer.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                      try {
+                        const parsed = JSON.parse(trimmed);
+                        if (parsed && typeof parsed === 'object') return parsed;
+                      } catch {}
+                    }
+                    return { [question.id]: userAnswer };
+                  }
+                  return userAnswer || {};
+                })()}
                 onChange={onAnswerChange}
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}
@@ -457,7 +469,19 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             {type === "mpc" && (
               <MPCRenderer
                 question={question}
-                value={typeof userAnswer === 'string' ? (() => { try { return JSON.parse(userAnswer); } catch { return {}; } })() : (userAnswer || {})}
+                value={(() => {
+                  if (typeof userAnswer === 'string') {
+                    const trimmed = userAnswer.trim();
+                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                      try {
+                        const parsed = JSON.parse(trimmed);
+                        if (parsed && typeof parsed === 'object') return parsed;
+                      } catch {}
+                    }
+                    return { [question.id]: userAnswer };
+                  }
+                  return userAnswer || {};
+                })()}
                 onChange={onAnswerChange}
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}

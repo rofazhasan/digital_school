@@ -392,6 +392,11 @@ export function stripLatexAndMathFormatting(str: string | number | undefined | n
   s = s.replace(/\\+(cdot|times)/g, '*');
   s = s.replace(/\\+(div)/g, '/');
 
+  // Convert middle dot, bullet, times, and multiplication dots between tokens
+  s = s.replace(/([0-9a-zA-Z\)])\s*[·•×]\s*([0-9a-zA-Z\(])/g, '$1*$2');
+  s = s.replace(/(\d)\s*\.\s*([a-zA-Z\(])/g, '$1*$2');
+  s = s.replace(/([a-zA-Z\)])\s*\.\s*(\d|[a-zA-Z\(])/g, '$1*$2');
+
   // Convert LaTeX mixed fractions: 2\frac{1}{2} -> ((2)+(1)/(2))
   s = s.replace(/(\d+)\s*\\+(frac|dfrac|tfrac)\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)+($3)/($4))');
 
@@ -889,7 +894,7 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
 export function areExpressionsEquivalent(
   studentExpr: string | number | undefined | null,
   expectedExpr: string | number | undefined | null,
-  tolerance: number = 0.01
+  tolerance: number = 0.05
 ): boolean {
   if (studentExpr === undefined || studentExpr === null || expectedExpr === undefined || expectedExpr === null) {
     return false;
@@ -934,7 +939,7 @@ export function areExpressionsEquivalent(
   if (areConceptsEquivalent(cleanStu, cleanExp)) return true;
 
   // 6.1 Physical Units Stripping & Dimensional Comparison (e.g. 9.8 m/s^2 == 9.8 ms^-2 == 9.8 \text{ m/s}^2 == 9.8, 90 deg == 90° == 90 degree == 90)
-  const UNIT_REGEX = /\s*(?:\\text\{)?(?:\\mathrm\{)?(m\/s\^2|ms\^-2|ms\^\{-2\}|m\/s|ms\^-1|ms\^\{-1\}|km\/h|km\/hr|m\^3|m\^2|cm\^3|cm\^2|mm|cm|km|m|kg\/m\^3|g\/cm\^3|kg|gm|g|mg|N\/m\^2|N\/m|N\*m|Nm|Newton|N|Joule|J\/s|J|kW|MW|Watt|W|kPa|Pascal|Pa|atm|bar|mmHg|Kelvin|K|deg\s*C|deg\s*F|deg(?:ree)?s?|\^?\\circ|°|ডিগ্রি|mA|Ampere|Amp|A|kV|mV|Volt|V|k\\Omega|M\\Omega|\\Omega|ohm|Ohm|\\mu\s*C|nC|Coulomb|C|\\mu\s*F|nF|pF|Farad|F|mH|Henry|H|Tesla|T|Weber|Wb|kHz|MHz|GHz|Hertz|Hz|mole|mol|rad\/s|rpm|radian|rad|keV|MeV|eV|মিটার\/সেকেন্ড(?:\^[২2])?|মিটার\/সেকেন্ড|মিটার|সেমি|কিমি|কিলোমিটার|কেজি|গ্রাম|নিউটন|জুল|ওয়াট|ভোল্ট|অ্যাম্পিয়ার|ওহম|প্যাসকেল|হার্টজ|কেলভিন|কুলম্ব|ফ্যারাড)(?:\})?$/i;
+  const UNIT_REGEX = /\s*(?:\\text\{)?(?:\\mathrm\{)?(m\/s\^2|ms\^-2|ms\^\{-2\}|m\/s|ms\^-1|ms\^\{-1\}|km\/h|km\/hr|m\^3|m\^2|cm\^3|cm\^2|mm|cm|km|m|kg\/m\^3|g\/cm\^3|kg|gm|g|mg|N\/m\^2|N\/m|N\*m|Nm|Newton|N|Joule|J\/s|J|kW|MW|Watt|W|kPa|Pascal|Pa|atm|bar|mmHg|Kelvin|K|deg\s*C|deg\s*F|deg(?:ree)?s?|\^?\\circ|°|ডিগ্রি|mA|Ampere|Amp|A|kV|mV|Volt|V|k\\Omega|M\\Omega|\\Omega|ohm|Ohm|\\mu\s*C|nC|Coulomb|C|\\mu\s*F|nF|pF|Farad|F|mH|Henry|H|Tesla|T|Weber|Wb|kHz|MHz|GHz|Hertz|Hz|mole|mol|rad\/s|rpm|radians?|rads?|rad|keV|MeV|eV|মিটার\/সেকেন্ড(?:\^[২2])?|মিটার\/সেকেন্ড|মিটার|সেমি|কিমি|কিলোমিটার|কেজি|গ্রাম|নিউটন|জুল|ওয়াট|ভোল্ট|অ্যাম্পিয়ার|ওহম|প্যাসকেল|হার্টজ|কেলভিন|কুলম্ব|ফ্যারাড)(?:\})?$/i;
 
   const stripUnit = (s: string) => {
     const trimmed = s.trim();
@@ -1109,32 +1114,32 @@ export function areExpressionsEquivalent(
     return null;
   };
 
-  const isNumericEquivalent = (v1: number, v2: number, tol: number = 0.01): boolean => {
+  const isNumericEquivalent = (v1: number, v2: number, tol: number = 0.05): boolean => {
     if (isNaN(v1) || isNaN(v2) || !isFinite(v1) || !isFinite(v2)) return false;
     const diff = Math.abs(v1 - v2);
-    const effTol = (tol !== undefined && !isNaN(tol) && tol >= 0) ? tol : 0.01;
+    const effTol = (tol !== undefined && !isNaN(tol) && tol > 0) ? tol : 0.05;
 
     // 1. Absolute difference within tolerance (including floating-point epsilon cushion)
-    if (diff <= effTol + 1e-6) return true;
+    if (diff <= effTol + 1e-5) return true;
 
     // 2. Relative difference within tolerance (e.g. 1.99 vs 2 is 0.5% error, 1.26 vs 2Pi/5 is 0.27% error)
     const maxVal = Math.max(Math.abs(v1), Math.abs(v2));
     if (maxVal > 1e-9) {
       const relDiff = diff / maxVal;
-      if (relDiff <= effTol + 1e-6) return true;
+      if (relDiff <= effTol + 1e-5) return true;
     }
 
     // 3. Rounding check for fractional/irrational values (e.g. 2Pi/5 ~ 1.26, sqrt(2) ~ 1.41)
     for (const d of [1, 2, 3, 4]) {
       const factor = Math.pow(10, d);
       if (Math.round(v1 * factor) / factor === Math.round(v2 * factor) / factor) {
-        if (diff <= (0.5 / factor) + 1e-6) return true;
+        if (diff <= Math.max(effTol, 0.5 / factor) + 1e-5) return true;
       }
     }
 
     // 4. Integer rounding (e.g. 1.99 for 2, 2.01 for 2)
     if ((Math.abs(v1 - Math.round(v1)) < 1e-9 || Math.abs(v2 - Math.round(v2)) < 1e-9) && Math.round(v1) === Math.round(v2)) {
-      if (diff <= Math.max(effTol, 0.02) + 1e-6) return true;
+      if (diff <= Math.max(effTol, 0.02) + 1e-5) return true;
     }
 
     return false;

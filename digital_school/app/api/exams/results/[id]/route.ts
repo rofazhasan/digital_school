@@ -199,7 +199,19 @@ export async function GET(
     // 7. Process questions (Full View)
     const processedQuestions = (questions as any[]).map((question: any) => {
       const questionId = question.id;
-      const studentAnswer = (studentAnswers as any)[questionId];
+      const type = (question.type || '').toUpperCase();
+      let studentAnswer = (studentAnswers as any)[questionId];
+      if (studentAnswer === undefined && (type === 'CMA' || type === 'MPC')) {
+        const prefix = `${questionId}_`;
+        const subKeys = Object.keys(studentAnswers as any).filter(k => k.startsWith(prefix) && !k.endsWith('_marks'));
+        if (subKeys.length > 0) {
+          const aggregated: Record<string, any> = {};
+          subKeys.forEach(k => {
+            aggregated[k.replace(prefix, '')] = (studentAnswers as any)[k];
+          });
+          studentAnswer = aggregated;
+        }
+      }
 
       // Extract images efficiently
       const studentAnswerImages: string[] = [];
@@ -343,6 +355,8 @@ export async function GET(
       const preSavedMarks = (studentAnswers as any)[`${questionId}_marks`];
       const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'CMA', 'MPC'].includes(type);
       let calculatedMarks: number | undefined = isObjectiveType ? undefined : preSavedMarks;
+      let cmaResObj: any = (studentAnswers as any)[`${questionId}_partResults`] || null;
+      let mpcResObj: any = (studentAnswers as any)[`${questionId}_stageResults`] || null;
 
       if (calculatedMarks === undefined || calculatedMarks === null) {
         if (type === 'MCQ') {
@@ -391,25 +405,35 @@ export async function GET(
         } else if (type === 'CMA') {
           let parsedAns = studentAnswer;
           if (typeof parsedAns === 'string') {
-            try { parsedAns = JSON.parse(parsedAns); } catch {}
+            const trimmed = parsedAns.trim();
+            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+              try { parsedAns = JSON.parse(trimmed); } catch {}
+            }
           }
-          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
+          const hasAttempt = parsedAns !== undefined && parsedAns !== null &&
+            (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : String(parsedAns).trim() !== '');
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const cmaRes = evaluateCMAQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
+            const cmaRes = evaluateCMAQuestion(question as any, parsedAns as any);
+            cmaResObj = cmaRes;
             calculatedMarks = cmaRes.score;
           }
         } else if (type === 'MPC') {
           let parsedAns = studentAnswer;
           if (typeof parsedAns === 'string') {
-            try { parsedAns = JSON.parse(parsedAns); } catch {}
+            const trimmed = parsedAns.trim();
+            if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+              try { parsedAns = JSON.parse(trimmed); } catch {}
+            }
           }
-          const hasAttempt = parsedAns !== undefined && parsedAns !== null && (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : parsedAns !== '');
+          const hasAttempt = parsedAns !== undefined && parsedAns !== null &&
+            (typeof parsedAns === 'object' ? Object.values(parsedAns).some(v => v !== undefined && v !== null && v !== '') : String(parsedAns).trim() !== '');
           if (!hasAttempt) {
             calculatedMarks = 0;
           } else {
-            const mpcRes = evaluateMPCQuestion(question as any, (typeof parsedAns === 'object' ? parsedAns : {}) as any);
+            const mpcRes = evaluateMPCQuestion(question as any, parsedAns as any);
+            mpcResObj = mpcRes;
             calculatedMarks = mpcRes.score;
           }
         }
@@ -472,8 +496,10 @@ export async function GET(
         correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : (resolvedCorrectOption !== null ? resolvedCorrectOption : question.modelAnswer),
         correctOption: resolvedCorrectOption,
         correct: resolvedCorrectOption,
-        parts: question.parts || question.cmaParts || null,
-        stages: question.stages || question.mpcStages || null,
+        parts: question.parts || question.cmaParts || question.subQuestions || question.sub_questions || null,
+        stages: question.stages || question.mpcStages || question.subQuestions || question.sub_questions || null,
+        partResults: cmaResObj?.partResults || null,
+        stageResults: mpcResObj?.stageResults || null,
         scenario: question.scenario || null,
       };
     });

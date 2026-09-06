@@ -4460,9 +4460,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 {(() => {
                                                   let parsedVal = currentAnswer;
                                                   if (typeof parsedVal === 'string') {
-                                                    try { parsedVal = JSON.parse(parsedVal); } catch { parsedVal = { [currentQuestion?.id]: parsedVal }; }
+                                                    const trimmed = parsedVal.trim();
+                                                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                                                      try { parsedVal = JSON.parse(trimmed); } catch {}
+                                                    }
                                                   }
-                                                  parsedVal = parsedVal || {};
                                                   const cmaQ = {
                                                     ...currentQuestion,
                                                     id: currentQuestion?.id,
@@ -4470,10 +4472,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     parts: currentQuestion?.parts || (currentQuestion as any)?.cmaParts || currentQuestion?.subQuestions || (currentQuestion as any)?.sub_questions || []
                                                   };
                                                   const evalRes = evaluateCMAQuestion(cmaQ as any, parsedVal);
+                                                  const rendererValue = typeof parsedVal === 'object' && parsedVal !== null
+                                                    ? parsedVal
+                                                    : { [currentQuestion?.id]: parsedVal };
                                                   return (
                                                     <CMARenderer
                                                       question={cmaQ as any}
-                                                      value={parsedVal}
+                                                      value={rendererValue}
                                                       disabled={true}
                                                       showFeedback={true}
                                                       evalResult={evalRes}
@@ -4489,9 +4494,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 {(() => {
                                                   let parsedVal = currentAnswer;
                                                   if (typeof parsedVal === 'string') {
-                                                    try { parsedVal = JSON.parse(parsedVal); } catch { parsedVal = { [currentQuestion?.id]: parsedVal }; }
+                                                    const trimmed = parsedVal.trim();
+                                                    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+                                                      try { parsedVal = JSON.parse(trimmed); } catch {}
+                                                    }
                                                   }
-                                                  parsedVal = parsedVal || {};
                                                   const mpcQ = {
                                                     ...currentQuestion,
                                                     id: currentQuestion?.id,
@@ -4500,10 +4507,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     stages: currentQuestion?.stages || (currentQuestion as any)?.mpcStages || currentQuestion?.subQuestions || (currentQuestion as any)?.sub_questions || []
                                                   };
                                                   const evalRes = evaluateMPCQuestion(mpcQ as any, parsedVal);
+                                                  const rendererValue = typeof parsedVal === 'object' && parsedVal !== null
+                                                    ? parsedVal
+                                                    : { [currentQuestion?.id]: parsedVal };
                                                   return (
                                                     <MPCRenderer
                                                       question={mpcQ as any}
-                                                      value={parsedVal}
+                                                      value={rendererValue}
                                                       disabled={true}
                                                       showFeedback={true}
                                                       evalResult={evalRes}

@@ -1526,7 +1526,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                         if (q.type === 'CMA') {
                                             const evalRes = evaluateCMAQuestion(q as any, ans || {});
-                                            const partsMap = Object.entries(evalRes.partResults || {});
+                                            const seenParts = new Set<any>();
+                                            const partsMap = Object.entries(evalRes.partResults || {}).filter(([, pRes]) => {
+                                                if (seenParts.has(pRes)) return false;
+                                                seenParts.add(pRes);
+                                                return true;
+                                            });
                                             const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
                                                 ? Number(submission.answers[`${q.id}_marks`])
                                                 : getCMAMark(q, ans);
@@ -1571,7 +1576,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                         if (q.type === 'MPC') {
                                             const evalRes = evaluateMPCQuestion(q as any, ans || {});
-                                            const stagesMap = Object.entries(evalRes.stageResults || {});
+                                            const seenStages = new Set<any>();
+                                            const stagesMap = Object.entries(evalRes.stageResults || {}).filter(([, sRes]) => {
+                                                if (seenStages.has(sRes)) return false;
+                                                seenStages.add(sRes);
+                                                return true;
+                                            });
                                             const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
                                                 ? Number(submission.answers[`${q.id}_marks`])
                                                 : getMPCMark(q, ans);

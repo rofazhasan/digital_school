@@ -11,6 +11,8 @@
  * the core auto-evaluation engine.
  */
 import { areExpressionsEquivalent } from './math-parser';
+import { evaluateCMAQuestion } from './evaluation/cmaEvaluation';
+import { evaluateMPCQuestion } from './evaluation/mpcEvaluation';
 
 /**
  * Safely checks if a generic answer is considered "answered"
@@ -118,41 +120,23 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
             return 'CORRECT';
         }
     } else if (type === 'CMA') {
-        const parts = question.parts || question.cmaParts || question.subQuestions || question.sub_questions || [];
         if (question.partResults && typeof question.partResults === 'object') {
             const pVals = Object.values(question.partResults);
             if (pVals.length > 0 && pVals.every((p: any) => Boolean(p?.isCorrect))) {
                 return 'CORRECT';
             }
-        } else if (parts.length > 0 && studentAnswer && typeof studentAnswer === 'object') {
-            const allPartsOk = parts.every((p: any) => {
-                const pId = p.id || p.key || p.name || p.label;
-                const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
-                const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
-                if (!sVal || !eVal) return false;
-                const tol = Number(p.tolerance) || 0.05;
-                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
-            });
-            if (allPartsOk) return 'CORRECT';
         }
+        const cmaRes = evaluateCMAQuestion(question, studentAnswer);
+        if (cmaRes.isCorrect) return 'CORRECT';
     } else if (type === 'MPC') {
-        const stages = question.stages || question.mpcStages || question.subQuestions || question.sub_questions || [];
         if (question.stageResults && typeof question.stageResults === 'object') {
             const sVals = Object.values(question.stageResults);
             if (sVals.length > 0 && sVals.every((s: any) => Boolean(s?.isCorrectDirectly || s?.isCorrectWithPropagatedError))) {
                 return 'CORRECT';
             }
-        } else if (stages.length > 0 && studentAnswer && typeof studentAnswer === 'object') {
-            const allStagesOk = stages.every((s: any) => {
-                const sId = s.id || s.key || s.name || s.stageTitle;
-                const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
-                const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
-                if (!sVal || !eVal) return false;
-                const tol = Number(s.tolerance) || 0.05;
-                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
-            });
-            if (allStagesOk) return 'CORRECT';
         }
+        const mpcRes = evaluateMPCQuestion(question, studentAnswer);
+        if (mpcRes.isCorrect) return 'CORRECT';
     } else if (subQuestions && Array.isArray(subQuestions) && subQuestions.length > 0) {
         if (subQuestions.every((sq: any) => sq.isCorrect || isAnswerCorrect(sq.awardedMarks, sq.marks))) {
             return 'CORRECT';
@@ -170,32 +154,20 @@ export const evaluateQuestionResultStatus = (question: any): 'CORRECT' | 'PARTIA
 
         hasAtLeastOneCorrect = selected.some((idx: number) => Boolean(options[idx]?.isCorrect));
     } else if (type === 'CMA') {
-        const parts = question.parts || question.cmaParts || question.subQuestions || question.sub_questions || [];
         if (question.partResults && typeof question.partResults === 'object') {
             hasAtLeastOneCorrect = Object.values(question.partResults).some((p: any) => Boolean(p?.isCorrect));
-        } else if (studentAnswer && typeof studentAnswer === 'object') {
-            hasAtLeastOneCorrect = parts.some((p: any) => {
-                const pId = p.id || p.key || p.name || p.label;
-                const sVal = studentAnswer[pId] ?? studentAnswer[p.label] ?? '';
-                const eVal = p.expectedAnswer ?? p.modelAnswer ?? p.correctAnswer ?? '';
-                if (!sVal || !eVal) return false;
-                const tol = Number(p.tolerance) || 0.05;
-                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
-            });
+        }
+        if (!hasAtLeastOneCorrect) {
+            const cmaRes = evaluateCMAQuestion(question, studentAnswer);
+            hasAtLeastOneCorrect = cmaRes.score > 0;
         }
     } else if (type === 'MPC') {
-        const stages = question.stages || question.mpcStages || question.subQuestions || question.sub_questions || [];
         if (question.stageResults && typeof question.stageResults === 'object') {
             hasAtLeastOneCorrect = Object.values(question.stageResults).some((s: any) => Boolean(s?.isCorrectDirectly || s?.isCorrectWithPropagatedError));
-        } else if (studentAnswer && typeof studentAnswer === 'object') {
-            hasAtLeastOneCorrect = stages.some((s: any) => {
-                const sId = s.id || s.key || s.name || s.stageTitle;
-                const sVal = studentAnswer[sId] ?? studentAnswer[s.stageTitle] ?? '';
-                const eVal = s.expectedAnswer ?? s.modelAnswer ?? s.correctAnswer ?? '';
-                if (!sVal || !eVal) return false;
-                const tol = Number(s.tolerance) || 0.05;
-                return areExpressionsEquivalent(String(sVal), String(eVal), tol);
-            });
+        }
+        if (!hasAtLeastOneCorrect) {
+            const mpcRes = evaluateMPCQuestion(question, studentAnswer);
+            hasAtLeastOneCorrect = mpcRes.score > 0;
         }
     } else if (type === 'SMCQ') {
         const sqs = subQuestions || [];
