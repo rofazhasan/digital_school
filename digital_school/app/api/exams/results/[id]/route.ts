@@ -220,8 +220,6 @@ export async function GET(
 
       const allDrawings = submission.drawings.filter((d: any) => d.questionId === questionId);
       const drawingData = allDrawings.find((d: any) => d.imageIndex === 0) || null;
-
-      const type = (question.type || '').toUpperCase();
       let awardedMarks = 0;
       const maxMarks = Number(question.marks) || 0;
 
