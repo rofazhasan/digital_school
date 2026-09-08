@@ -1123,10 +1123,15 @@ export function areExpressionsEquivalent(
     if (diff <= effTol + 1e-5) return true;
 
     // 2. Relative difference within tolerance (e.g. 1.99 vs 2 is 0.5% error, 1.26 vs 2Pi/5 is 0.27% error)
-    const maxVal = Math.max(Math.abs(v1), Math.abs(v2));
-    if (maxVal > 1e-9) {
-      const relDiff = diff / maxVal;
-      if (relDiff <= effTol + 1e-5) return true;
+    // Guard: discrete integers differing by >= 0.5 should NEVER match via percentage relative tolerance unless tolerance >= 1 was explicitly specified
+    const isV1Integer = Math.abs(v1 - Math.round(v1)) < 1e-7;
+    const isV2Integer = Math.abs(v2 - Math.round(v2)) < 1e-7;
+    if (!(isV1Integer && isV2Integer && diff >= 0.5 && effTol < 1)) {
+      const maxVal = Math.max(Math.abs(v1), Math.abs(v2));
+      if (maxVal > 1e-9) {
+        const relDiff = diff / maxVal;
+        if (relDiff <= effTol + 1e-5) return true;
+      }
     }
 
     // 3. Rounding check for fractional/irrational values (e.g. 2Pi/5 ~ 1.26, sqrt(2) ~ 1.41)

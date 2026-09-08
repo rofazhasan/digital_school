@@ -201,12 +201,22 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             ? JSON.parse(targetSet.questionsJson)
             : targetSet.questionsJson;
 
+        const seenQuestionIds = new Set<string>();
+
         for (const question of (questions as QuestionData[])) {
+            if (question.id) {
+                const qIdStr = String(question.id);
+                if (seenQuestionIds.has(qIdStr)) {
+                    continue; // Skip duplicate question in set to prevent ghost marks
+                }
+                seenQuestionIds.add(qIdStr);
+            }
+
             const type = question.type?.toUpperCase();
             let studentAnswer = answers[question.id] as any;
             if (studentAnswer === undefined && (type === 'CMA' || type === 'MPC')) {
                 const prefix = `${question.id}_`;
-                const subKeys = Object.keys(answers).filter(k => k.startsWith(prefix) && !k.endsWith('_marks'));
+                const subKeys = Object.keys(answers).filter(k => k.startsWith(prefix) && !k.endsWith('_marks') && !k.endsWith('_partResults') && !k.endsWith('_stageResults'));
                 if (subKeys.length > 0) {
                     const aggregated: Record<string, any> = {};
                     subKeys.forEach(k => {
@@ -472,7 +482,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
     cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqRequired).reduce((sum, s) => sum + s, 0);
     sqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqRequired).reduce((sum, s) => sum + s, 0);
 
-    totalScore += cqMarks + sqMarks;
+    mcqMarks = Math.round(mcqMarks * 100) / 100;
+    cqMarks = Math.round(cqMarks * 100) / 100;
+    sqMarks = Math.round(sqMarks * 100) / 100;
+    totalScore = Math.round((mcqMarks + cqMarks + sqMarks) * 100) / 100;
 
     // --- Multiple Subject (MS) Evaluation & Disqualification check ---
     const isMS = (exam as any).subjectType === 'MS' || ((exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0);
@@ -612,10 +625,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             else msMcqMarks += mark;
         });
 
-        totalScore = msTotalScore;
-        mcqMarks = msMcqMarks;
-        cqMarks = msCqMarks;
-        sqMarks = msSqMarks;
+        totalScore = Math.round(msTotalScore * 100) / 100;
+        mcqMarks = Math.round(msMcqMarks * 100) / 100;
+        cqMarks = Math.round(msCqMarks * 100) / 100;
+        sqMarks = Math.round(msSqMarks * 100) / 100;
     }
 
     if (isDisqualified) {

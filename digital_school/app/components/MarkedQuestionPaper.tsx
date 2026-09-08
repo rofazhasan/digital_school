@@ -202,19 +202,6 @@ const Text = ({ children }: { children: React.ReactNode }) => {
 
 const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>(
     ({ examInfo, questions, submission, rank, totalStudents, qrData }, ref) => {
-        // Calculate totals for all objective types
-        const mcqs = questions.mcq || [];
-        const mcs = questions.mc || [];
-        const ars = questions.ar || [];
-        const ints = questions.int || [];
-        const mtfs = questions.mtf || [];
-        const cmas = questions.cma || [];
-        const mpcs = questions.mpc || [];
-
-        const objectiveTotal = [
-            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs, ...cmas, ...mpcs
-        ].reduce((sum, q) => sum + (q.marks || 1), 0);
-
         const cqs = questions.cq || [];
         const sqs = questions.sq || [];
         const smcqs = questions.smcq || [];
@@ -964,22 +951,114 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             return evalRes.score;
         };
 
+        const rawObjective = questions.rawList && questions.rawList.length > 0
+            ? questions.rawList.filter((q: any) => {
+                const t = (q.type || '').toUpperCase();
+                return ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'CMA', 'MPC'].includes(t) && !['CQ', 'SQ', 'DESCRIPTIVE', 'SMCQ'].includes(t);
+            })
+            : [
+                ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
+                ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
+                ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
+                ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
+                ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
+                ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
+                ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' }))
+            ];
+
+        // Deduplicate objective questions by ID if any questions repeat
+        const seenObjectiveIds = new Set<string>();
+        const allObjective = rawObjective.filter((q: any) => {
+            const qKey = q.id ? String(q.id) : null;
+            if (qKey) {
+                if (seenObjectiveIds.has(qKey)) return false;
+                seenObjectiveIds.add(qKey);
+            }
+            return true;
+        });
+
+        const objectiveTotal = allObjective.reduce((sum, q) => sum + (q.marks || 1), 0);
+
+        const getQuestionEarnedMark = (q: any): number => {
+            const ans = submission.answers?.[q.id || ''];
+            const type = (q.type || '').toUpperCase();
+            if (type === 'MCQ') return getMCQMark(q, ans);
+            if (type === 'MC') return getMCMark(q, ans);
+            if (type === 'AR') return getARMark(q, ans);
+            if (type === 'INT' || type === 'NUMERIC') return getINTMark(q, ans);
+            if (type === 'MTF') return getMTFMark(q, ans);
+            if (type === 'CMA') {
+                const evalRes = evaluateCMAQuestion(q as any, ans || {});
+                const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
+                    ? Number(submission.answers[`${q.id}_marks`])
+                    : getCMAMark(q, ans);
+                const maxM = evalRes.maxScore || q.marks || 1;
+                const isFull = earnedMark >= maxM * 0.99 || Math.abs(earnedMark - maxM) <= 0.02;
+                return isFull ? maxM : earnedMark;
+            }
+            if (type === 'MPC') {
+                const evalRes = evaluateMPCQuestion(q as any, ans || {});
+                const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
+                    ? Number(submission.answers[`${q.id}_marks`])
+                    : getMPCMark(q, ans);
+                const maxM = evalRes.maxScore || q.marks || 1;
+                const isFull = earnedMark >= maxM * 0.99 || Math.abs(earnedMark - maxM) <= 0.02;
+                return isFull ? maxM : earnedMark;
+            }
+            if (type === 'SMCQ') {
+                return getSMCQMark(q, ans);
+            }
+            return 0;
+        };
+
         // Calculate total deducted marks for header display
         let totalDeducted = 0;
-        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || []), ...(questions.cma || []), ...(questions.mpc || [])].forEach(q => {
-            const ans = submission.answers[q.id || ''];
-            let m = 0;
-            const type = (q as any).type?.toUpperCase();
-            if (type === 'MCQ') m = getMCQMark(q as MCQ, ans);
-            else if (type === 'MC') m = getMCMark(q as MCQ, ans);
-            else if (type === 'AR') m = getARMark(q as AR, ans);
-            else if (type === 'INT') m = getINTMark(q as INT, ans);
-            else if (type === 'MTF') m = getMTFMark(q as MTF, ans);
-            else if (type === 'CMA') m = getCMAMark(q, ans);
-            else if (type === 'MPC') m = getMPCMark(q, ans);
-
+        allObjective.forEach(q => {
+            const m = getQuestionEarnedMark(q);
             if (m < 0) totalDeducted += Math.abs(m);
         });
+        smcqs.forEach(q => {
+            const m = getSMCQMark(q, submission.answers?.[q.id]);
+            if (m < 0) totalDeducted += Math.abs(m);
+        });
+
+        // Exact mathematical sum of all rendered questions
+        const calculatedObjectiveEarned = [
+            ...allObjective.map(q => getQuestionEarnedMark(q)),
+            ...smcqs.map(q => getSMCQMark(q, submission.answers?.[q.id]))
+        ].reduce((sum, m) => sum + m, 0);
+
+        const cqScores = cqs.map(q => {
+            const m = submission.answers[`${q.id}_marks`];
+            return typeof m === 'number' ? m : 0;
+        });
+        const sortedCqScores = [...cqScores].sort((a, b) => b - a);
+        const calculatedCqEarned = sortedCqScores.slice(0, cqRequired || sortedCqScores.length).reduce((sum, s) => sum + s, 0);
+
+        const sqScores = sqs.map(q => {
+            const m = submission.answers[`${q.id || ''}_marks`];
+            return typeof m === 'number' ? m : 0;
+        });
+        const sortedSqScores = [...sqScores].sort((a, b) => b - a);
+        const calculatedSqEarned = sortedSqScores.slice(0, sqRequired || sortedSqScores.length).reduce((sum, s) => sum + s, 0);
+
+        const hasRenderedQuestions = (allObjective.length > 0 || smcqs.length > 0 || cqs.length > 0 || sqs.length > 0);
+
+        const displayObjectiveEarned = (allObjective.length > 0 || smcqs.length > 0)
+            ? Math.round(calculatedObjectiveEarned * 100) / 100
+            : Number(submission.result?.mcqMarks || 0);
+
+        const displayCqEarned = cqs.length > 0
+            ? Math.round(calculatedCqEarned * 100) / 100
+            : Number(submission.result?.cqMarks || 0);
+
+        const displaySqEarned = sqs.length > 0
+            ? Math.round(calculatedSqEarned * 100) / 100
+            : Number(submission.result?.sqMarks || 0);
+
+        const displayTotalEarned = hasRenderedQuestions
+            ? Math.round((displayObjectiveEarned + displayCqEarned + displaySqEarned) * 100) / 100
+            : Number(submission.result?.total || 0);
 
         // Safe Date Parsing
         const formatDate = (dateStr: string) => {
@@ -1030,7 +1109,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         <div className="flex flex-col items-center py-2">
                             <div className="relative">
                                 <div className="text-2xl md:text-4xl font-black border-[4px] md:border-[6px] border-slate-900 rounded-full w-20 h-20 md:w-28 md:h-28 flex items-center justify-center bg-white shadow-xl z-10 relative">
-                                    {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}
+                                    {Number(displayTotalEarned).toFixed(2).replace(/\.00$/, '')}
                                 </div>
                                 <div className="absolute -bottom-2 bg-slate-900 text-white px-3 md:px-4 py-0.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest z-20 whitespace-nowrap">
                                     Total Score
@@ -1042,7 +1121,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <div className="flex flex-col items-center md:items-end">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Performance Summary</label>
                                 <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-xl md:text-2xl font-black text-slate-900">{Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}</span>
+                                    <span className="text-xl md:text-2xl font-black text-slate-900">{Number(displayTotalEarned).toFixed(2).replace(/\.00$/, '')}</span>
                                     <span className="text-slate-400 font-bold">/</span>
                                     <span className="text-base md:text-lg font-bold text-slate-500">{examInfo.totalMarks}</span>
                                 </div>
@@ -1059,7 +1138,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 </div>
                                 <div className="text-right">
                                     <label className="text-[8px] font-bold uppercase tracking-widest text-slate-400 block">Class Highest</label>
-                                    <p className="font-black text-slate-900">{examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
+                                    <p className="font-black text-slate-900">{examInfo.highestMark ? Number(rank === 1 && Number(examInfo.highestMark) > displayTotalEarned ? displayTotalEarned : examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
                                 </div>
                             </div>
                         </div>
@@ -1076,32 +1155,14 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 {/* Main Content */}
                 <main>
                     {/* Objective Questions Section */}
-                    {(() => {
-                        const allObjective = questions.rawList && questions.rawList.length > 0
-                            ? questions.rawList.filter((q: any) => {
-                                const t = (q.type || '').toUpperCase();
-                                return ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'CMA', 'MPC'].includes(t) && !['CQ', 'SQ', 'DESCRIPTIVE', 'SMCQ'].includes(t);
-                            })
-                            : [
-                                ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
-                                ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
-                                ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
-                                ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
-                                ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
-                                ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
-                                ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' }))
-                            ];
-
-                        if (allObjective.length === 0) return null;
-
-                        return (
-                            <>
-                                <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
-                                    <h3>বহুনির্বাচনি/অবজেক্টিভ প্রশ্ন (Objective Questions)</h3>
-                                    <div className="text-right">
-                                        <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {objectiveTotal}</span>
-                                    </div>
+                    {allObjective.length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                <h3>বহুনির্বাচনি/অবজেক্টিভ প্রশ্ন (Objective Questions)</h3>
+                                <div className="text-right">
+                                    <span>Marks: {Number(displayObjectiveEarned).toFixed(2).replace(/\.00$/, '')} / {objectiveTotal}</span>
                                 </div>
+                            </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                                     {allObjective.map((q: any, idx) => {
@@ -1626,8 +1687,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                     })}
                                 </div>
                             </>
-                        );
-                    })()}
+                    )}
 
                     {/* CQ Section */}
                     {cqs.length > 0 && (
@@ -1635,7 +1695,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
                                 <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
                                 <div className="text-right">
-                                    <span>Marks: {submission.result?.cqMarks || 0} / {cqRequiredMarks}</span>
+                                    <span>Marks: {Number(displayCqEarned).toFixed(2).replace(/\.00$/, '')} / {cqRequiredMarks}</span>
                                 </div>
                             </div>
 
@@ -1808,7 +1868,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
                                 <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
                                 <div className="text-right">
-                                    <span>Marks: {submission.result?.sqMarks || 0} / {sqRequiredMarks}</span>
+                                    <span>Marks: {Number(displaySqEarned).toFixed(2).replace(/\.00$/, '')} / {sqRequiredMarks}</span>
                                 </div>
                             </div>
 
