@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { LiveExpressionInput } from "@/components/ui/QuestionRenderers";
+import { detectAnswerFormat } from "@/utils/banglaConverter";
 
 interface IntNumericSectionProps {
     question: any;
@@ -25,6 +26,7 @@ export const IntNumericSection = ({
     const showResult = submitted;
     const currentVal = typeof userAnswer === 'object' && userAnswer !== null ? (userAnswer.answer ?? '') : (userAnswer ?? "");
     const correctVal = question.correctAnswer || question.modelAnswer || question.correct || question.answer;
+    const formatHint = detectAnswerFormat(correctVal, question.type || 'numeric');
 
     return (
         <div className="space-y-4 text-left">
@@ -33,6 +35,7 @@ export const IntNumericSection = ({
                 onChange={(val) => onAnswerChange({ answer: val })}
                 disabled={disabled || submitted}
                 placeholder="Enter answer or math expression..."
+                formatHint={formatHint}
             />
             {showResult && (
                 <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-left">

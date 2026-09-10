@@ -67,3 +67,15 @@ export const toRoman = (num: number): string => {
     }
     return result;
 };
+
+export {
+    toEnglishNumerals,
+    toggleNumerals,
+    detectAnswerFormat,
+    smartConvert,
+    convertEnglishToBanglaPhonetic,
+    convertBanglaToEnglishPhonetic,
+    FORMAT_HINT_CONFIGS
+} from './banglaConverter';
+export type { AnswerFormatHint, FormatHintConfig, ConversionMode } from './banglaConverter';
+

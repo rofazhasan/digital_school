@@ -1,36 +1,94 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { UniversalMathJax } from '@/app/components/UniversalMathJax';
 import { cleanupMath } from '@/lib/utils';
-import { Sparkles, CheckCircle, XCircle, AlertCircle, Calculator, BookOpen, Lightbulb } from 'lucide-react';
+import {
+  Sparkles,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Calculator,
+  BookOpen,
+  Lightbulb,
+  Hash,
+  Languages,
+  Type,
+  ArrowLeftRight,
+  ChevronDown,
+  Wand2
+} from 'lucide-react';
 import { formatExpressionToLatex, areExpressionsEquivalent } from '@/lib/math-parser';
 import { evaluateCMAChildPart } from '@/lib/evaluation/cmaEvaluation';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel
+} from '@/components/ui/dropdown-menu';
+import {
+  detectAnswerFormat,
+  toggleNumerals,
+  toBengaliNumerals,
+  toEnglishNumerals,
+  convertEnglishToBanglaPhonetic,
+  convertBanglaToEnglishPhonetic,
+  smartConvert,
+  FORMAT_HINT_CONFIGS,
+  type AnswerFormatHint
+} from '@/utils/banglaConverter';
 
 // ==========================================
-// 0. Live Expression Input with LaTeX Preview
+// 0. Live Expression Input with LaTeX Preview & Bangla Converter
 // ==========================================
 export function LiveExpressionInput({
   value,
   onChange,
-  placeholder = "Enter answer or math expression...",
+  placeholder,
   disabled = false,
-  className = ""
+  className = "",
+  formatHint
 }: {
   value: string | number;
   onChange: (val: string) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  formatHint?: AnswerFormatHint;
 }) {
   const strVal = String(value ?? '');
+  const [livePhonetic, setLivePhonetic] = useState(false);
 
   const insertSymbol = (sym: string) => {
     if (disabled) return;
     onChange(strVal + sym);
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    if (livePhonetic) {
+      const converted = convertEnglishToBanglaPhonetic(rawVal);
+      onChange(converted);
+    } else {
+      onChange(rawVal);
+    }
+  };
+
+  const defaultPlaceholder = formatHint === 'numeric'
+    ? 'সংখ্যা বা সমীকরণ লিখুন (e.g. 123, 3.14, 10^5)...'
+    : formatHint === 'bangla'
+    ? 'বাংলায় উত্তর লিখুন (যেমন: নেফ্রন, মাইটোকন্ড্রিয়া)...'
+    : formatHint === 'english'
+    ? 'Enter answer in English (e.g. Nephron, Mitochondria)...'
+    : formatHint === 'mix'
+    ? 'Enter answer or expression (e.g. 20 N, 2x+1, H2O)...'
+    : 'Enter answer or math expression...';
+
+  const effectivePlaceholder = placeholder || defaultPlaceholder;
 
   return (
     <div className="space-y-2">
@@ -38,49 +96,152 @@ export function LiveExpressionInput({
         <>
           <Input
             type="text"
-            placeholder={placeholder}
+            placeholder={effectivePlaceholder}
             value={strVal}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={handleInputChange}
             disabled={disabled}
             className={`bg-white dark:bg-slate-950 text-sm font-mono ${className}`}
           />
 
-          {/* Quick Math Toolbar & Live LaTeX Preview */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 max-w-full">
-              <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0 flex items-center gap-1">
-                <Calculator className="w-3 h-3" /> Quick Math:
-              </span>
-              {[
-                { label: 'x²', insert: '^2' },
-                { label: 'a/b', insert: '/' },
-                { label: 'ⁿCᵣ', insert: '\\binom{n}{r}' },
-                { label: 'ⁿPᵣ', insert: 'P(n, r)' },
-                { label: 'n!', insert: '!' },
-                { label: '√x', insert: 'sqrt()' },
-                { label: '10ⁿ', insert: '10^' },
-                { label: 'π', insert: '\\pi' },
-                { label: '±', insert: '\\pm' },
-                { label: 'sin', insert: 'sin()' },
-                { label: 'cos', insert: 'cos()' },
-              ].map((btn) => (
+          {/* Quick Math & Bangla-English Converter Toolbar */}
+          <div className="flex flex-col gap-2 p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+            {/* Top row: Toolbar buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              {/* Math symbols */}
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 max-w-full">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0 flex items-center gap-1">
+                  <Calculator className="w-3 h-3" /> Math:
+                </span>
+                {[
+                  { label: 'x²', insert: '^2' },
+                  { label: 'a/b', insert: '/' },
+                  { label: 'ⁿCᵣ', insert: '\\binom{n}{r}' },
+                  { label: 'ⁿPᵣ', insert: 'P(n, r)' },
+                  { label: 'n!', insert: '!' },
+                  { label: '√x', insert: 'sqrt()' },
+                  { label: '10ⁿ', insert: '10^' },
+                  { label: 'π', insert: '\\pi' },
+                  { label: '±', insert: '\\pm' },
+                  { label: 'sin', insert: 'sin()' },
+                  { label: 'cos', insert: 'cos()' },
+                ].map((btn) => (
+                  <button
+                    key={btn.label}
+                    type="button"
+                    onClick={() => insertSymbol(btn.insert)}
+                    className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border text-[11px] font-mono text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Converter buttons */}
+              <div className="flex items-center gap-1 shrink-0 py-0.5">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mr-1 shrink-0 flex items-center gap-1">
+                  <Languages className="w-3 h-3" /> Convert:
+                </span>
+
+                {/* 1-Click Numeral Toggle: ১২৩ ⇄ 123 */}
                 <button
-                  key={btn.label}
                   type="button"
-                  onClick={() => insertSymbol(btn.insert)}
-                  className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border text-[11px] font-mono text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                  onClick={() => onChange(toggleNumerals(strVal))}
+                  title="সংখ্যা রূপান্তর (English ⇄ বাংলা সংখ্যা)"
+                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-300 dark:border-slate-700 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 flex items-center gap-1 transition-colors shrink-0 shadow-2xs cursor-pointer"
                 >
-                  {btn.label}
+                  <ArrowLeftRight className="w-2.5 h-2.5" />
+                  <span>১২৩ ⇄ 123</span>
                 </button>
-              ))}
+
+                {/* 1-Click Smart Text / Phonetic Toggle: বাং ⇄ EN */}
+                <button
+                  type="button"
+                  onClick={() => onChange(smartConvert(strVal, 'smart_toggle'))}
+                  title="স্মার্ট রূপান্তর (বাংলা ⇄ English)"
+                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/60 border border-slate-300 dark:border-slate-700 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                >
+                  <Wand2 className="w-2.5 h-2.5" />
+                  <span>বাং ⇄ EN</span>
+                </button>
+
+                {/* Dropdown for explicit conversion modes & live typing */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-colors shrink-0 flex items-center cursor-pointer"
+                      title="More conversion options"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60 text-xs font-sans">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      সংখ্যা রূপান্তর (Numerals)
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onChange(toBengaliNumerals(strVal))}>
+                      123 → ১২৩৪৫ (English to বাংলা)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onChange(toEnglishNumerals(strVal))}>
+                      ১২৩ → 12345 (বাংলা to English)
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      উচ্চারণগত রূপান্তর (Phonetic)
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onChange(convertEnglishToBanglaPhonetic(strVal))}>
+                      EN → বাংলা (e.g. nephron → নেফ্রন)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onChange(convertBanglaToEnglishPhonetic(strVal))}>
+                      বাংলা → EN (e.g. নেফ্রন → nephron)
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+
+                    <DropdownMenuItem
+                      onClick={() => setLivePhonetic(!livePhonetic)}
+                      className="flex items-center justify-between font-semibold cursor-pointer"
+                    >
+                      <span>বাং টাইপ (Live Phonetic)</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${livePhonetic ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                        {livePhonetic ? 'ON' : 'OFF'}
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
-            {strVal && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-950 dark:text-indigo-200 shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">LaTeX Output:</span>
-                <span className="font-semibold text-xs"><UniversalMathJax inline dynamic>{cleanupMath(formatExpressionToLatex(strVal))}</UniversalMathJax></span>
-              </div>
-            )}
+            {/* Bottom row: Active format badge or LaTeX output */}
+            <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+              {formatHint ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${FORMAT_HINT_CONFIGS[formatHint].badgeClass}`}>
+                    {formatHint === 'numeric' && <Hash className="w-2.5 h-2.5" />}
+                    {formatHint === 'bangla' && <Languages className="w-2.5 h-2.5" />}
+                    {formatHint === 'english' && <Type className="w-2.5 h-2.5" />}
+                    {formatHint === 'mix' && <Sparkles className="w-2.5 h-2.5" />}
+                    <span>প্রত্যাশিত উত্তর: {FORMAT_HINT_CONFIGS[formatHint].labelBn} ({FORMAT_HINT_CONFIGS[formatHint].labelEn})</span>
+                  </span>
+                  {livePhonetic && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200 border border-purple-300 dark:border-purple-800 animate-pulse">
+                      বাং টাইপ সক্রিয় (Live)
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div />
+              )}
+
+              {strVal && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-950 dark:text-indigo-200 shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">LaTeX:</span>
+                  <span className="font-semibold text-xs"><UniversalMathJax inline dynamic>{cleanupMath(formatExpressionToLatex(strVal))}</UniversalMathJax></span>
+                </div>
+              )}
+            </div>
           </div>
         </>
       ) : (
@@ -189,6 +350,8 @@ export function CMARenderer({
             const expectedAns = part.expectedAnswer ?? part.modelAnswer ?? part.correctAnswer ?? part.correct ?? part.answer ?? '';
             const partMarks = part.marks || (part as any)?.mark || 1;
             const explanation = part.explanation || part.solution || (part as any)?.hint || '';
+            const formatHint = detectAnswerFormat(expectedAns, part.type);
+            const formatConfig = FORMAT_HINT_CONFIGS[formatHint];
 
             if (!res && showFeedback) {
               const fallbackEval = evaluateCMAChildPart(part, partVal);
@@ -232,7 +395,19 @@ export function CMARenderer({
                       <UniversalMathJax inline dynamic>{cleanupMath(partLabel)}</UniversalMathJax>
                     </Label>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    {!showFeedback && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${formatConfig.badgeClass}`}
+                        title={`উত্তর ফরম্যাট: ${formatConfig.labelBn} (${formatConfig.labelEn}) - ${formatConfig.example}`}
+                      >
+                        {formatHint === 'numeric' && <Hash className="w-2.5 h-2.5" />}
+                        {formatHint === 'bangla' && <Languages className="w-2.5 h-2.5" />}
+                        {formatHint === 'english' && <Type className="w-2.5 h-2.5" />}
+                        {formatHint === 'mix' && <Sparkles className="w-2.5 h-2.5" />}
+                        <span>{formatConfig.labelBn}</span>
+                      </span>
+                    )}
                     {part.unit && (
                       <span className="text-xs text-muted-foreground font-mono">({part.unit})</span>
                     )}
@@ -244,10 +419,11 @@ export function CMARenderer({
 
                 {/* Input / Display */}
                 <LiveExpressionInput
-                  placeholder={part.type === 'expression' ? 'e.g. (2x+1)/(x^2+3)' : 'Enter value...'}
+                  placeholder={part.type === 'expression' ? 'e.g. (2x+1)/(x^2+3)' : undefined}
                   value={partVal}
                   onChange={(val) => handlePartChange(partId, val)}
                   disabled={disabled}
+                  formatHint={formatHint}
                 />
 
                 {/* Feedback / Model Answer Display */}
@@ -417,6 +593,8 @@ export function MPCRenderer({
             const stageMarks = stage.marks || (stage as any)?.mark || 1;
             const formula = stage.formula || stage.equation || '';
             const explanation = stage.explanation || stage.solution || '';
+            const formatHint = detectAnswerFormat(expectedAns, stage.stageType);
+            const formatConfig = FORMAT_HINT_CONFIGS[formatHint];
 
             if (!res && showFeedback) {
               const isDirect = areExpressionsEquivalent(String(stageVal), String(expectedAns), Number(stage.tolerance) || 0.05);
@@ -459,7 +637,19 @@ export function MPCRenderer({
                       <UniversalMathJax inline dynamic>{cleanupMath(stageTitle)}</UniversalMathJax>
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    {!showFeedback && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${formatConfig.badgeClass}`}
+                        title={`উত্তর ফরম্যাট: ${formatConfig.labelBn} (${formatConfig.labelEn}) - ${formatConfig.example}`}
+                      >
+                        {formatHint === 'numeric' && <Hash className="w-2.5 h-2.5" />}
+                        {formatHint === 'bangla' && <Languages className="w-2.5 h-2.5" />}
+                        {formatHint === 'english' && <Type className="w-2.5 h-2.5" />}
+                        {formatHint === 'mix' && <Sparkles className="w-2.5 h-2.5" />}
+                        <span>{formatConfig.labelBn}</span>
+                      </span>
+                    )}
                     <Badge variant="outline" className="text-xs font-bold">
                       {stageMarks} Mark{stageMarks > 1 ? 's' : ''}
                     </Badge>
@@ -472,6 +662,7 @@ export function MPCRenderer({
                   value={stageVal}
                   onChange={(val) => handleStageChange(stageId, val)}
                   disabled={disabled}
+                  formatHint={formatHint}
                 />
 
                 {/* Feedback / Model Answer Display */}
