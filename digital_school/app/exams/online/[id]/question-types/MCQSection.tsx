@@ -35,6 +35,13 @@ export const MCQOption = memo(({
         : String(option);
     const textSizeClass = fontSize === 'xl' ? 'text-xl md:text-2xl' : fontSize === 'lg' ? 'text-lg md:text-xl' : 'text-base md:text-lg';
 
+    const hasAnswer = Boolean(
+        userAnswer !== undefined &&
+        userAnswer !== null &&
+        userAnswer !== '' &&
+        userAnswer !== 'No answer provided'
+    );
+
     const getStyles = () => {
         const base = "w-full text-left p-4 md:p-5 rounded-2xl border flex items-start gap-4 md:gap-5 transition-all duration-300 group relative overflow-hidden backdrop-blur-sm";
 
@@ -44,15 +51,22 @@ export const MCQOption = memo(({
             return `${base} bg-muted/30 border-border text-muted-foreground opacity-60 grayscale`;
         }
 
-        if (isSelected) return `${base} bg-primary/10 border-primary shadow-lg shadow-primary/20 ring-1 ring-primary transform scale-[1.01] z-10 dark:bg-primary/20 dark:ring-primary/40`;
+        if (isSelected) return `${base} bg-primary/10 border-primary shadow-lg shadow-primary/20 ring-1 ring-primary transform scale-[1.01] z-10 dark:bg-primary/20 dark:ring-primary/40 cursor-default`;
 
-        return `${base} bg-card border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5`;
+        if (disabled || submitted || hasAnswer) {
+            return `${base} bg-card/60 border-border/70 text-muted-foreground/70 opacity-70 cursor-not-allowed`;
+        }
+
+        return `${base} bg-card border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 cursor-pointer`;
     };
 
     return (
         <button
-            onClick={() => onSelect(label)}
-            disabled={disabled || submitted}
+            onClick={() => {
+                if (disabled || submitted || hasAnswer) return;
+                onSelect(label);
+            }}
+            disabled={disabled || submitted || hasAnswer}
             className={getStyles()}
         >
             <div className={`

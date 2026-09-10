@@ -18,7 +18,8 @@ import {
   Type,
   ArrowLeftRight,
   ChevronDown,
-  Wand2
+  Wand2,
+  Loader2
 } from 'lucide-react';
 import { formatExpressionToLatex, areExpressionsEquivalent } from '@/lib/math-parser';
 import { evaluateCMAChildPart } from '@/lib/evaluation/cmaEvaluation';
@@ -35,11 +36,16 @@ import {
   toggleNumerals,
   toBengaliNumerals,
   toEnglishNumerals,
+  translateEnglishToBangla,
+  translateBanglaToEnglish,
   convertEnglishToBanglaPhonetic,
   convertBanglaToEnglishPhonetic,
   smartConvert,
+  smartConvertAsync,
+  translateOnline,
   FORMAT_HINT_CONFIGS,
-  type AnswerFormatHint
+  type AnswerFormatHint,
+  type ConversionMode
 } from '@/utils/banglaConverter';
 
 // ==========================================
@@ -62,6 +68,7 @@ export function LiveExpressionInput({
 }) {
   const strVal = String(value ?? '');
   const [livePhonetic, setLivePhonetic] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const insertSymbol = (sym: string) => {
     if (disabled) return;
@@ -75,6 +82,31 @@ export function LiveExpressionInput({
       onChange(converted);
     } else {
       onChange(rawVal);
+    }
+  };
+
+  const handleSmartTranslate = async (mode: ConversionMode = 'smart_toggle') => {
+    if (disabled || !strVal.trim()) return;
+
+    // Fast path: pure numerals short-circuit (0ms instant)
+    const trimmed = strVal.trim();
+    const hasBnDigits = /^[\u09E6-\u09EF\s\.\,\+\-\*\/\^\(\)]+$/.test(trimmed);
+    const hasEnDigits = /^[0-9\s\.\,\+\-\*\/\^\(\)]+$/.test(trimmed);
+    if (hasBnDigits || hasEnDigits || mode === 'toggle_numerals' || mode === 'en_to_bn_digits' || mode === 'bn_to_en_digits') {
+      onChange(smartConvert(strVal, mode));
+      return;
+    }
+
+    try {
+      setIsTranslating(true);
+      const translated = await smartConvertAsync(strVal, mode);
+      if (translated) {
+        onChange(translated);
+      }
+    } catch (err) {
+      onChange(smartConvert(strVal, mode));
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -153,15 +185,20 @@ export function LiveExpressionInput({
                   <span>১২৩ ⇄ 123</span>
                 </button>
 
-                {/* 1-Click Smart Text / Phonetic Toggle: বাং ⇄ EN */}
+                {/* 1-Click Smart Text / Neural Translate Toggle: বাং ⇄ EN */}
                 <button
                   type="button"
-                  onClick={() => onChange(smartConvert(strVal, 'smart_toggle'))}
-                  title="স্মার্ট রূপান্তর (বাংলা ⇄ English)"
-                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/60 border border-slate-300 dark:border-slate-700 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                  onClick={() => handleSmartTranslate('smart_toggle')}
+                  disabled={isTranslating}
+                  title="স্মার্ট অনুবাদ (বাংলা ⇄ English)"
+                  className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/60 border border-slate-300 dark:border-slate-700 text-[11px] font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1 transition-colors shrink-0 shadow-2xs cursor-pointer disabled:opacity-60"
                 >
-                  <Wand2 className="w-2.5 h-2.5" />
-                  <span>বাং ⇄ EN</span>
+                  {isTranslating ? (
+                    <Loader2 className="w-2.5 h-2.5 animate-spin text-purple-600" />
+                  ) : (
+                    <Wand2 className="w-2.5 h-2.5" />
+                  )}
+                  <span>{isTranslating ? 'অনুবাদ...' : 'বাং ⇄ EN'}</span>
                 </button>
 
                 {/* Dropdown for explicit conversion modes & live typing */}
@@ -175,7 +212,19 @@ export function LiveExpressionInput({
                       <ChevronDown className="w-3 h-3" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-60 text-xs font-sans">
+                  <DropdownMenuContent align="end" className="w-64 text-xs font-sans">
+                    <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      অনুবাদ (Neural Translation)
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => handleSmartTranslate('en_to_bn_translate')}>
+                      English → বাংলা অনুবাদ (Smart Neural)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSmartTranslate('bn_to_en_translate')}>
+                      বাংলা → English অনুবাদ (Smart Neural)
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator />
+
                     <DropdownMenuLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       সংখ্যা রূপান্তর (Numerals)
                     </DropdownMenuLabel>

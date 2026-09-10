@@ -73,6 +73,10 @@ export {
     toggleNumerals,
     detectAnswerFormat,
     smartConvert,
+    smartConvertAsync,
+    translateOnline,
+    translateEnglishToBangla,
+    translateBanglaToEnglish,
     convertEnglishToBanglaPhonetic,
     convertBanglaToEnglishPhonetic,
     FORMAT_HINT_CONFIGS

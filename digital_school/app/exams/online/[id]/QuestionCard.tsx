@@ -108,18 +108,28 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     setLocalAnswer(answer);
   }, [answer]);
 
+  const effectiveAnswer = localAnswer !== undefined ? localAnswer : answer;
+  const hasMCQAnswer = Boolean(
+    effectiveAnswer !== undefined && 
+    effectiveAnswer !== null && 
+    effectiveAnswer !== '' && 
+    effectiveAnswer !== 'No answer provided'
+  );
+
   const handleMCQSelect = useCallback((val: any) => {
+    if (hasMCQAnswer || disabled || submitted) {
+      toast.info("নিয়ম: একবার উত্তর নির্বাচন করলে তা আর পরিবর্তন করা যাবে না।", { id: 'mcq-locked-toast' });
+      return;
+    }
     setLocalAnswer(val);
     onAnswerChange(val);
-  }, [onAnswerChange]);
-
-  const effectiveAnswer = localAnswer !== undefined ? localAnswer : answer;
+  }, [hasMCQAnswer, disabled, submitted, onAnswerChange]);
 
   // Keyboard Shortcuts for MCQ
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const type = (question?.type || "").toLowerCase();
-      if (disabled || submitted || !question || type !== 'mcq') return;
+      if (disabled || submitted || !question || type !== 'mcq' || hasMCQAnswer) return;
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
 
       const key = e.key.toUpperCase();
@@ -138,7 +148,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [disabled, submitted, question, handleMCQSelect]);
+  }, [disabled, submitted, question, hasMCQAnswer, handleMCQSelect]);
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
@@ -246,7 +256,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                     return (
                       <MCQOption
                         key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
-                        showResult={showResult} userAnswer={effectiveAnswer} disabled={!!disabled}
+                        showResult={showResult} userAnswer={effectiveAnswer} disabled={!!disabled || hasMCQAnswer}
                         submitted={!!submitted} onSelect={handleMCQSelect} fontSize={fontSize}
                       />
                     );
@@ -307,6 +317,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                   const rawCorrect = question.correctOption ?? question.correct ?? question.correctAnswer;
                   const correctVal = typeof rawCorrect === 'number' ? rawCorrect : Number(rawCorrect || 0);
 
+                  const hasArAnswer = selNum > 0;
+
                   return arOptions.map((lbl: string, i: number) => {
                     const val = i + 1;
                     const isCorrect = correctVal === val;
@@ -314,8 +326,14 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                     return (
                       <MCQOption
                         key={i} index={i} option={lbl} isSelected={isSelected} isCorrect={isCorrect}
-                        showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
-                        submitted={!!submitted} onSelect={() => onAnswerChange({ selectedOption: val })}
+                        showResult={showResult} userAnswer={hasArAnswer ? selNum : undefined} disabled={!!disabled || hasArAnswer}
+                        submitted={!!submitted} onSelect={() => {
+                          if (hasArAnswer || disabled || submitted) {
+                            toast.info("নিয়ম: একবার উত্তর নির্বাচন করলে তা আর পরিবর্তন করা যাবে না।", { id: 'ar-locked-toast' });
+                            return;
+                          }
+                          onAnswerChange({ selectedOption: val });
+                        }}
                         fontSize={fontSize}
                       />
                     );
@@ -385,6 +403,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                     ? findSelectedOptionIndex(subQ.options || [], subUserAnswer)
                     : -1;
 
+                  const hasSubAnswer = selectedSubIdx >= 0 || (subUserAnswer !== undefined && subUserAnswer !== null && subUserAnswer !== '' && subUserAnswer !== 'No answer provided');
+
                   return (
                     <div key={idx} className="space-y-6 text-left">
                       <div className="flex items-start gap-4">
@@ -414,8 +434,14 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                           return (
                             <MCQOption
                               key={oi} index={oi} option={opt} isSelected={isSelected} isCorrect={isCorrect}
-                              showResult={showResult} userAnswer={subUserAnswer} disabled={!!disabled}
-                              submitted={!!submitted} onSelect={(val) => onSubAnswerChange(idx, val)} fontSize={fontSize}
+                              showResult={showResult} userAnswer={subUserAnswer} disabled={!!disabled || hasSubAnswer}
+                              submitted={!!submitted} onSelect={(val) => {
+                                if (hasSubAnswer || disabled || submitted) {
+                                  toast.info("নিয়ম: একবার উত্তর নির্বাচন করলে তা আর পরিবর্তন করা যাবে না।", { id: 'smcq-locked-toast' });
+                                  return;
+                                }
+                                onSubAnswerChange(idx, val);
+                              }} fontSize={fontSize}
                             />
                           );
                         })}
