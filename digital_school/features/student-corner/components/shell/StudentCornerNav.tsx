@@ -22,6 +22,11 @@ import {
   Compass,
   Award,
   Command,
+  Brain,
+  Layers,
+  AlertTriangle,
+  GraduationCap,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuickAddChallengeModal } from './QuickAddChallengeModal';
@@ -48,10 +53,14 @@ export function StudentCornerNav({ currentStreak = 0, studentName }: StudentCorn
     { label: 'Today', href: '/student/student-corner', icon: Sparkles },
     { label: 'My Arena', href: '/student/student-corner/arena', icon: Target },
     { label: 'Focus', href: '/student/student-corner/focus', icon: Flame },
+    { label: 'Revision', href: '/student/student-corner/revision', icon: Brain },
+    { label: 'Syllabus', href: '/student/student-corner/syllabus', icon: Layers },
+    { label: 'Mistake Lab', href: '/student/student-corner/mistakes', icon: AlertTriangle },
+    { label: 'Exams', href: '/student/student-corner/exams', icon: BookOpen },
+    { label: 'Admission', href: '/student/student-corner/admission', icon: GraduationCap },
     { label: 'Goals', href: '/student/student-corner/goals', icon: Award },
     { label: 'Calendar', href: '/student/student-corner/calendar', icon: Calendar },
     { label: 'Analytics', href: '/student/student-corner/analytics', icon: BarChart3 },
-    { label: 'Exams', href: '/student/student-corner/exams', icon: BookOpen },
     { label: 'Reflection', href: '/student/student-corner/reflection', icon: Compass },
     { label: 'Export', href: '/student/student-corner/export', icon: FileDown },
     { label: 'Import', href: '/student/student-corner/import', icon: Upload },
@@ -123,7 +132,18 @@ export function StudentCornerNav({ currentStreak = 0, studentName }: StudentCorn
             </nav>
 
             {/* Quick Actions & Streak */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              {/* Universal Command Palette Trigger */}
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+                title="Search Student Corner (Cmd+K / Ctrl+K)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-500 hover:text-slate-900 dark:hover:text-white text-xs transition-colors"
+              >
+                <Search className="h-3.5 w-3.5 text-indigo-500" />
+                <span className="hidden lg:inline text-[10px] font-mono text-slate-400">⌘K</span>
+              </button>
+
               {/* Interactive Streak Badge */}
               <button
                 type="button"

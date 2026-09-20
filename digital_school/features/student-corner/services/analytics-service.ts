@@ -184,7 +184,7 @@ export async function calculateTodayScore(studentProfileId: string): Promise<Tod
       },
       include: {
         challenges: {
-          select: { priority: true, status: true },
+          select: { priority: true, status: true, category: true, source: true },
         },
       },
     }),
@@ -224,6 +224,27 @@ export async function calculateTodayScore(studentProfileId: string): Promise<Tod
 
   const score = Math.min(100, completionComponent + focusComponent + criticalComponent);
 
+  // 4-Pillar Daily Core Standard (1.00 Point win rate from 105D Challenge & Golden Pillars)
+  const completedList = arena?.challenges?.filter((c) => c.status === 'COMPLETED') || [];
+  const hasStudy = completedList.some((c) =>
+    ['STUDY', 'CODING', 'ASSIGNMENT'].includes(c.category)
+  );
+  const hasRecall = completedList.some((c) =>
+    c.category === 'REVISION' || c.source === 'REVISION'
+  );
+  const hasExam = completedList.some((c) =>
+    c.category === 'EXAM_PREP' || c.category === 'MISTAKE_RETEST' || c.source === 'MISTAKE_RETEST'
+  );
+  const hasLifestyle = completedList.some((c) =>
+    ['SALAT', 'HABIT', 'DIET', 'QURAN', 'EXERCISE'].includes(c.category)
+  );
+
+  let corePoints = 0;
+  if (hasStudy) corePoints += 0.25;
+  if (hasRecall) corePoints += 0.25;
+  if (hasExam) corePoints += 0.25;
+  if (hasLifestyle) corePoints += 0.25;
+
   return {
     score,
     totalChallenges,
@@ -237,6 +258,13 @@ export async function calculateTodayScore(studentProfileId: string): Promise<Tod
       completionComponent,
       focusComponent,
       criticalComponent,
+    },
+    coreStandardScore: Number(corePoints.toFixed(2)),
+    coreStandardPillars: {
+      study: hasStudy,
+      recall: hasRecall,
+      exam: hasExam,
+      lifestyle: hasLifestyle,
     },
   };
 }
@@ -529,5 +557,173 @@ export async function calculateDaySummary(arenaId: string): Promise<DaySummaryCa
     needsAttention: needsAttention === strongestArea ? 'Balanced' : needsAttention,
     consistencyPercentage: completionRate,
     dayMode: arena.mode as DayMode,
+  };
+}
+
+/**
+ * Cross-feature ecosystem correlation analytics:
+ * Connects Study Hours ↔ Mistakes, Mistakes ↔ Revisions, and Exam ↔ Syllabus readiness.
+ */
+export async function getCrossFeatureEcosystemAnalytics(studentProfileId: string) {
+  const thirtyDaysAgo = subDays(startOfDay(new Date()), 30);
+  const today = startOfDay(new Date());
+
+  const [subjects, mistakes, revisions, exams, goals] = await Promise.all([
+    db.studentCornerSubject.findMany({
+      where: { studentProfileId },
+      include: {
+        topics: true,
+        challenges: {
+          include: {
+            challenge: {
+              select: { status: true, durationMinutes: true, actualMinutesSpent: true, category: true, createdAt: true },
+            },
+          },
+        },
+      },
+    }),
+    db.mistakeRecord.findMany({
+      where: { studentProfileId },
+    }),
+    db.spacedRevisionItem.findMany({
+      where: { studentProfileId, isArchived: false },
+    }),
+    db.personalExam.findMany({
+      where: { studentProfileId, isCompleted: false, examDate: { gte: today } },
+      orderBy: { examDate: 'asc' },
+    }),
+    db.studentGoal.findMany({
+      where: { studentProfileId, status: 'ACTIVE' },
+    }),
+  ]);
+
+  // Subject Study ↔ Mistake Correlation
+  const subjectCorrelations = subjects.map((subj) => {
+    const studyChallenges = subj.challenges.filter((c) =>
+      ['STUDY', 'REVISION', 'EXAM_PREP'].includes(c.challenge.category) && c.challenge.status === 'COMPLETED'
+    );
+    const totalStudyMinutes = studyChallenges.reduce((acc, c) => acc + c.challenge.actualMinutesSpent, 0);
+
+    const relatedMistakes = mistakes.filter((m) =>
+      m.subjectName.toLowerCase().includes(subj.name.toLowerCase())
+    );
+    const resolvedMistakes = relatedMistakes.filter((m) => m.isResolved).length;
+
+    const totalTopics = subj.topics.length;
+    const masteredTopics = subj.topics.filter((t) => t.masteryStatus === 'MASTERED' || t.masteryStatus === 'SOLID').length;
+    const weakTopics = subj.topics.filter((t) => t.confidenceLevel <= 2).length;
+
+    return {
+      subjectId: subj.id,
+      subjectName: subj.name,
+      color: subj.color,
+      studyHours: Math.round((totalStudyMinutes / 60) * 10) / 10,
+      mistakesTotal: relatedMistakes.length,
+      mistakesResolved: resolvedMistakes,
+      mistakeResolutionRate: relatedMistakes.length > 0 ? Math.round((resolvedMistakes / relatedMistakes.length) * 100) : 100,
+      syllabusCoverageRate: totalTopics > 0 ? Math.round((masteredTopics / totalTopics) * 100) : 0,
+      weakTopicsCount: weakTopics,
+    };
+  });
+
+  // Mistakes ↔ Revision Loop Effectiveness
+  const totalMistakes = mistakes.length;
+  const resolvedMistakesCount = mistakes.filter((m) => m.isResolved).length;
+  const mistakeRetentionRate = totalMistakes > 0 ? Math.round((resolvedMistakesCount / totalMistakes) * 100) : 100;
+
+  // Spaced Revision Mastery Progress
+  const totalRevisions = revisions.length;
+  const highBoxCount = revisions.filter((r) => r.leitnerBox >= 4).length;
+  const revisionMasteryRate = totalRevisions > 0 ? Math.round((highBoxCount / totalRevisions) * 100) : 0;
+
+  // Upcoming Exam Readiness
+  const examReadiness = exams.slice(0, 3).map((exam) => {
+    const matchedSubject = subjects.find((s) => s.name.toLowerCase().includes(exam.subject.toLowerCase()));
+    const totalChapters = matchedSubject?.topics.length || 0;
+    const coveredChapters = matchedSubject?.topics.filter((t) => t.theoryCompleted && t.qbSolved).length || 0;
+    const readinessPercent = totalChapters > 0 ? Math.round((coveredChapters / totalChapters) * 100) : 50;
+
+    return {
+      examId: exam.id,
+      title: exam.title,
+      subject: exam.subject,
+      examDate: exam.examDate,
+      readinessPercent,
+      totalChapters,
+      coveredChapters,
+    };
+  });
+
+  return {
+    subjectCorrelations,
+    mistakeLoop: {
+      totalMistakes,
+      resolvedMistakesCount,
+      mistakeRetentionRate,
+    },
+    revisionLoop: {
+      totalRevisions,
+      highBoxCount,
+      revisionMasteryRate,
+    },
+    examReadiness,
+  };
+}
+
+/**
+ * Weekly Ecosystem Review (7-Day connected student activity report)
+ */
+export async function getWeeklyEcosystemReview(studentProfileId: string) {
+  const sevenDaysAgo = subDays(startOfDay(new Date()), 7);
+  const now = new Date();
+
+  const [recentChallenges, recentMistakes, activeGoals, profile] = await Promise.all([
+    db.arenaChallenge.findMany({
+      where: {
+        studentProfileId,
+        status: 'COMPLETED',
+        completedAt: { gte: sevenDaysAgo },
+      },
+      select: {
+        category: true,
+        source: true,
+        actualMinutesSpent: true,
+        completedAt: true,
+      },
+    }),
+    db.mistakeRecord.findMany({
+      where: {
+        studentProfileId,
+        retestedAt: { gte: sevenDaysAgo },
+        isResolved: true,
+      },
+    }),
+    db.studentGoal.findMany({
+      where: { studentProfileId },
+    }),
+    db.studentCornerProfile.findUnique({
+      where: { studentProfileId },
+      select: { currentStreak: true, longestStreak: true },
+    }),
+  ]);
+
+  const totalFocusMinutes = recentChallenges.reduce((acc, c) => acc + c.actualMinutesSpent, 0);
+  const focusHours = Math.round((totalFocusMinutes / 60) * 10) / 10;
+  const revisionsCount = recentChallenges.filter((c) => c.category === 'REVISION' || c.source === 'REVISION').length;
+  const codingCount = recentChallenges.filter((c) => c.category === 'CODING').length;
+  const mistakesResolvedCount = recentMistakes.length;
+
+  const completedGoalsCount = activeGoals.filter((g) => g.status === 'COMPLETED').length;
+
+  return {
+    period: `${format(sevenDaysAgo, 'MMM d')} – ${format(now, 'MMM d, yyyy')}`,
+    focusHours,
+    revisionsCount,
+    mistakesResolvedCount,
+    codingCount,
+    totalChallengesCompleted: recentChallenges.length,
+    activeGoalsCount: activeGoals.length,
+    completedGoalsCount,
+    currentStreak: profile?.currentStreak || 0,
   };
 }

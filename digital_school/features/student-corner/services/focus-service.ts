@@ -1,6 +1,7 @@
 import db from '@/lib/db';
 import { FocusSessionStatus, ChallengeStatus } from '@prisma/client';
 import { addMinutes, addSeconds } from 'date-fns';
+import { dispatchChallengeCompleted } from './cross-feature-service';
 
 export interface StartFocusInput {
   arenaId: string;
@@ -168,6 +169,9 @@ export async function completeFocusSession(studentProfileId: string, sessionId: 
         completedCount: { increment: 1 },
       },
     });
+
+    // Cascade to central cross-feature engine (Mistakes, Revisions, Topics, Goals, Exams, Streaks)
+    await dispatchChallengeCompleted(studentProfileId, session.challengeId, focusMinutes);
   }
 
   return updated;

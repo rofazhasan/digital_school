@@ -9,6 +9,8 @@ import { DayBuilderModal } from './DayBuilderModal';
 import { TodayScoreRing } from './TodayScoreRing';
 import { DailyTimelineView } from './DailyTimelineView';
 import { RecoveryModeDialog } from './RecoveryModeDialog';
+import { ManageCompletedModal } from './ManageCompletedModal';
+import { ResetArenaModal } from './ResetArenaModal';
 import { Button } from '@/components/ui/button';
 import {
   Plus,
@@ -23,7 +25,12 @@ import {
   CalendarDays,
   LifeBuoy,
   Copy,
+  Archive,
+  RotateCcw,
+  AlertTriangle,
+  Brain,
 } from 'lucide-react';
+import Link from 'next/link';
 import { format, subDays } from 'date-fns';
 import { duplicateDayAction, getRecoveryBacklogAction } from '../../actions/arena-actions';
 import { toast } from 'sonner';
@@ -33,6 +40,10 @@ interface TodayArenaViewProps {
   studentName: string;
   currentStreak: number;
   scoreDetails?: TodayScoreDetails;
+  dueRevisions?: any[];
+  dueMistakes?: any[];
+  isExamDay?: boolean;
+  examTodayTitle?: string | null;
   onRefresh?: () => void;
 }
 
@@ -41,6 +52,10 @@ export function TodayArenaView({
   studentName,
   currentStreak,
   scoreDetails,
+  dueRevisions = [],
+  dueMistakes = [],
+  isExamDay = false,
+  examTodayTitle = null,
   onRefresh,
 }: TodayArenaViewProps) {
   const [arena, setArena] = useState<DailyArenaWithChallenges>(initialArena);
@@ -50,6 +65,8 @@ export function TodayArenaView({
 
   // Recovery dialog
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [manageCompletedOpen, setManageCompletedOpen] = useState(false);
+  const [resetArenaOpen, setResetArenaOpen] = useState(false);
   const [backlogItems, setBacklogItems] = useState<any[]>([]);
   const [isDuplicating, setIsDuplicating] = useState(false);
 
@@ -120,6 +137,99 @@ export function TodayArenaView({
 
   return (
     <div className="space-y-6">
+      {/* Exam Day Mode Banner */}
+      {isExamDay && (
+        <div className="rounded-3xl p-5 bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-transparent border border-amber-500/40 shadow-lg shadow-amber-500/5 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <span className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <Target className="w-6 h-6" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                  Exam Day Mode Active
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px]">
+                  Priority Execution
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-foreground mt-0.5">
+                {examTodayTitle || 'Exam Scheduled Today'}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Today&apos;s Arena is adapted for peak exam performance: Rest, light active recall, exam sprint, and calm recovery.
+              </p>
+            </div>
+          </div>
+          <Link href="/student/student-corner/exams">
+            <Button size="sm" variant="outline" className="border-amber-500/40 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold whitespace-nowrap">
+              View Exam Details →
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* High Workload Overload Warning Banner */}
+      {arena.totalPlannedMinutes >= 480 && (
+        <div className="rounded-2xl p-3.5 bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs text-amber-200">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>
+            <strong>High Workload Alert:</strong> You have planned <strong>{totalPlannedHours} hours</strong> today. Factor in recovery, nutrition, and 5 prayer intervals to maintain sustainable mental endurance.
+          </span>
+        </div>
+      )}
+
+      {/* Due Spaced Revisions & Retests Alert Strip */}
+      {((dueRevisions && dueRevisions.length > 0) || (dueMistakes && dueMistakes.length > 0)) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {dueRevisions && dueRevisions.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                  <Brain className="w-4 h-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-indigo-300">
+                    {dueRevisions.length} Spaced Revisions Due
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                    {dueRevisions.map((r) => r.title).join(', ')}
+                  </p>
+                </div>
+              </div>
+              <Link href="/student/student-corner/revision">
+                <Button size="sm" className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3">
+                  Recall Vault →
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {dueMistakes && dueMistakes.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+                  <AlertTriangle className="w-4 h-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-rose-300">
+                    {dueMistakes.length} Error Retests Due
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                    {dueMistakes.map((m) => m.errorNumber).join(', ')} in Mistake Lab
+                  </p>
+                </div>
+              </div>
+              <Link href="/student/student-corner/mistakes">
+                <Button size="sm" className="h-7 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold px-3">
+                  Retest Lab →
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Above the Fold Header */}
       <div className="relative overflow-hidden rounded-3xl bg-linear-to-b from-indigo-900/10 via-slate-900/5 to-transparent p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xs">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -310,32 +420,46 @@ export function TodayArenaView({
           })}
         </div>
 
-        {/* View Mode Toggle (List vs Chronological Timeline) */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-full text-xs font-semibold self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-              viewMode === 'list'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <List className="w-3.5 h-3.5" />
-            <span>List</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('timeline')}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
-              viewMode === 'timeline'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>Timeline</span>
-          </button>
+        {/* View Mode Toggle (List vs Chronological Timeline) & Completed Cleanup */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {completedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setManageCompletedOpen(true)}
+              className="rounded-full text-xs font-bold border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 h-8 px-3"
+            >
+              <Archive className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+              <span>Clean Completed ({completedCount})</span>
+            </Button>
+          )}
+
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-full text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all ${
+                viewMode === 'timeline'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Timeline</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -359,15 +483,15 @@ export function TodayArenaView({
             ))
           ) : (
             /* Empty State */
-            <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
-              <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
-                <Sparkles className="w-6 h-6" />
+            <div className="text-center py-16 px-4 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 select-none">
+              <div className="font-arabic text-3xl text-indigo-400 font-bold mb-1">
+                اللَّه
               </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Your arena is empty today
+              <h3 className="text-base font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                NEW DAY • NEW MISSION
               </h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                Design today’s challenges with study goals, coding practice, prayers, and habits in under two minutes.
+                Your Arena is clear. Today is yours to design with study goals, coding practice, prayers, and habits.
               </p>
               {!arena.isLocked && (
                 <Button
@@ -380,6 +504,25 @@ export function TodayArenaView({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Danger Zone: Reset Arena Trigger */}
+      {!arena.isLocked && arena.mode !== 'LOCKED' && totalCount > 0 && (
+        <div className="pt-8 mt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+          <div>
+            <p className="font-bold text-slate-600 dark:text-slate-400">Want a clean slate for today?</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">Restart planning from zero without affecting your streak or historical achievement.</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setResetArenaOpen(true)}
+            className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl"
+          >
+            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+            <span>Reset Arena</span>
+          </Button>
         </div>
       )}
 
@@ -400,6 +543,24 @@ export function TodayArenaView({
           setRecoveryOpen(false);
           onRefresh?.();
         }}
+      />
+
+      {/* Manage Completed Modal */}
+      <ManageCompletedModal
+        open={manageCompletedOpen}
+        onOpenChange={setManageCompletedOpen}
+        arenaId={arena.id}
+        completedChallenges={arena.challenges.filter((c) => c.status === ChallengeStatus.COMPLETED)}
+        activeCount={arena.challenges.filter((c) => c.status !== ChallengeStatus.COMPLETED).length}
+        onSuccess={onRefresh}
+      />
+
+      {/* Reset Arena Modal */}
+      <ResetArenaModal
+        open={resetArenaOpen}
+        onOpenChange={setResetArenaOpen}
+        arenaId={arena.id}
+        onSuccess={onRefresh}
       />
     </div>
   );

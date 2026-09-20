@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { CombinedExamItem } from '../../types';
 import { AddPersonalExamModal } from './AddPersonalExamModal';
+import { ExamPrepGeneratorModal } from './ExamPrepGeneratorModal';
 import { Button } from '@/components/ui/button';
 import {
   Calendar,
@@ -39,13 +40,15 @@ const DEFAULT_CHECKLIST: ChecklistItem[] = [
 
 interface ExamAwarenessViewProps {
   initialExams: CombinedExamItem[];
+  availableTopics?: any[];
   onRefresh?: () => void;
 }
 
-export function ExamAwarenessView({ initialExams, onRefresh }: ExamAwarenessViewProps) {
+export function ExamAwarenessView({ initialExams, availableTopics = [], onRefresh }: ExamAwarenessViewProps) {
   const [exams, setExams] = useState<CombinedExamItem[]>(initialExams);
   const [addExamOpen, setAddExamOpen] = useState(false);
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
+  const [prepExam, setPrepExam] = useState<any | null>(null);
 
   // Map of examId -> checklist
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
@@ -196,24 +199,34 @@ export function ExamAwarenessView({ initialExams, onRefresh }: ExamAwarenessView
                     )}
                   </div>
 
-                  {/* Readiness Progress Bar (Item 40-41) */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-indigo-500" /> Prep Readiness
-                      </span>
-                      <span className={readiness === 100 ? 'text-emerald-600' : 'text-indigo-600'}>
-                        {readiness}%
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          readiness === 100 ? 'bg-emerald-500' : 'bg-indigo-600'
-                        }`}
-                        style={{ width: `${readiness}%` }}
-                      />
-                    </div>
+                    {/* Readiness Progress Bar (Item 40-41) */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-indigo-500" /> Prep Readiness
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPrepExam(exam)}
+                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                            title="Generate Arena preparation tasks for this exam"
+                          >
+                            <span>+ Prep in Arena</span>
+                          </button>
+                          <span className={readiness === 100 ? 'text-emerald-600' : 'text-indigo-600'}>
+                            {readiness}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            readiness === 100 ? 'bg-emerald-500' : 'bg-indigo-600'
+                          }`}
+                          style={{ width: `${readiness}%` }}
+                        />
+                      </div>
 
                     {/* Toggle Checklist */}
                     <button
@@ -294,10 +307,22 @@ export function ExamAwarenessView({ initialExams, onRefresh }: ExamAwarenessView
         )}
       </div>
 
+      {/* Add Exam Modal */}
       <AddPersonalExamModal
         open={addExamOpen}
-        onOpenChange={setAddExamOpen}
-        onExamAdded={onRefresh}
+        onClose={() => setAddExamOpen(false)}
+        onCreated={() => {
+          onRefresh?.();
+          toast.success('Personal exam scheduled');
+        }}
+      />
+
+      {/* Exam Prep Generator Modal */}
+      <ExamPrepGeneratorModal
+        exam={prepExam}
+        availableTopics={availableTopics}
+        open={!!prepExam}
+        onClose={() => setPrepExam(null)}
       />
     </div>
   );

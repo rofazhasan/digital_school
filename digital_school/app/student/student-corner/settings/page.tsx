@@ -5,6 +5,8 @@ import { StudentCornerShell } from '@/features/student-corner/components/shell/S
 import { StudentCornerSettingsView } from '@/features/student-corner/components/settings/StudentCornerSettingsView';
 import db from '@/lib/db';
 
+import { getOrCreateDailyArena } from '@/features/student-corner/services/arena-service';
+
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
@@ -14,18 +16,20 @@ export const metadata = {
 
 export default async function SettingsPage() {
   const student = await requireStudentAuth();
-  const streakInfo = await calculateStudentStreaks(student.studentProfileId);
-
-  const profile = await db.studentCornerProfile.findUnique({
-    where: { studentProfileId: student.studentProfileId },
-  });
+  const [streakInfo, profile, arena] = await Promise.all([
+    calculateStudentStreaks(student.studentProfileId),
+    db.studentCornerProfile.findUnique({
+      where: { studentProfileId: student.studentProfileId },
+    }),
+    getOrCreateDailyArena(student.studentProfileId, new Date()),
+  ]);
 
   return (
     <StudentCornerShell
       currentStreak={streakInfo.currentStreak}
       studentName={student.name}
     >
-      <StudentCornerSettingsView initialSettings={profile} />
+      <StudentCornerSettingsView initialSettings={profile} todayArenaId={arena.id} />
     </StudentCornerShell>
   );
 }

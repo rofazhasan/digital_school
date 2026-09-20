@@ -1,7 +1,11 @@
 import React from 'react';
 import { requireStudentAuth } from '@/features/student-corner/actions/auth-helper';
-import { getOrCreateDailyArena } from '@/features/student-corner/services/arena-service';
+import {
+  getOrCreateDailyArena,
+  getArenaDueItemsAndExamDay,
+} from '@/features/student-corner/services/arena-service';
 import { calculateStudentStreaks } from '@/features/student-corner/services/streak-service';
+import { calculateTodayScore } from '@/features/student-corner/services/analytics-service';
 import { StudentCornerShell } from '@/features/student-corner/components/shell/StudentCornerShell';
 import { TodayArenaView } from '@/features/student-corner/components/arena/TodayArenaView';
 
@@ -19,8 +23,12 @@ export const metadata = {
 export default async function ArenaPage({ searchParams }: ArenaPageProps) {
   const { date } = await searchParams;
   const student = await requireStudentAuth();
-  const arena = await getOrCreateDailyArena(student.studentProfileId, date || new Date());
-  const streakInfo = await calculateStudentStreaks(student.studentProfileId);
+  const [arena, streakInfo, scoreDetails, dueItemsAndExam] = await Promise.all([
+    getOrCreateDailyArena(student.studentProfileId, date || new Date()),
+    calculateStudentStreaks(student.studentProfileId),
+    calculateTodayScore(student.studentProfileId),
+    getArenaDueItemsAndExamDay(student.studentProfileId),
+  ]);
 
   return (
     <StudentCornerShell
@@ -31,6 +39,11 @@ export default async function ArenaPage({ searchParams }: ArenaPageProps) {
         initialArena={arena as any}
         studentName={student.name}
         currentStreak={streakInfo.currentStreak}
+        scoreDetails={scoreDetails}
+        dueRevisions={dueItemsAndExam.dueRevisions}
+        dueMistakes={dueItemsAndExam.dueMistakes}
+        isExamDay={dueItemsAndExam.isExamDay}
+        examTodayTitle={dueItemsAndExam.examTodayTitle}
       />
     </StudentCornerShell>
   );

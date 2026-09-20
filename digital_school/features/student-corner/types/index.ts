@@ -204,6 +204,13 @@ export interface TodayScoreDetails {
     focusComponent: number; // 30%
     criticalComponent: number; // 20%
   };
+  coreStandardScore: number; // 0.00 - 1.00
+  coreStandardPillars: {
+    study: boolean;     // Morning / Subject study
+    recall: boolean;    // Active recall / Spaced revision
+    exam: boolean;      // Exam practice / Question Bank / Retest
+    lifestyle: boolean; // Salat / Hydration / Habit
+  };
 }
 
 export interface StreakHistoryDetails {

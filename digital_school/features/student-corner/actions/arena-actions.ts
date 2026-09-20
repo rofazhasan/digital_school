@@ -6,11 +6,15 @@ import {
   createChallenge,
   updateChallenge,
   deleteChallenge,
+  archiveChallenge,
+  bulkArchiveCompletedChallenges,
+  resetDailyArena,
   toggleChallengeCompletion,
   reorderChallenges,
   setDayMode,
   CreateChallengeInput,
   UpdateChallengeInput,
+  getArenaDueItemsAndExamDay,
 } from '../services/arena-service';
 import { calculateStudentStreaks } from '../services/streak-service';
 import { getLiveHijriDate } from '../services/ummah-api-service';
@@ -22,10 +26,11 @@ export async function getTodayArenaAction(dateStr?: string) {
     const student = await requireStudentAuth();
     const targetDate = dateStr || new Date();
 
-    const [arena, streakInfo, hijriDate] = await Promise.all([
+    const [arena, streakInfo, hijriDate, dueItemsAndExam] = await Promise.all([
       getOrCreateDailyArena(student.studentProfileId, targetDate),
       calculateStudentStreaks(student.studentProfileId),
       getLiveHijriDate(),
+      getArenaDueItemsAndExamDay(student.studentProfileId),
     ]);
 
     return {
@@ -34,6 +39,11 @@ export async function getTodayArenaAction(dateStr?: string) {
       studentName: student.name,
       streakInfo,
       hijriDate,
+      dueRevisions: dueItemsAndExam.dueRevisions,
+      dueMistakes: dueItemsAndExam.dueMistakes,
+      isExamDay: dueItemsAndExam.isExamDay,
+      examTodayTitle: dueItemsAndExam.examTodayTitle,
+      todayPersonalExams: dueItemsAndExam.todayPersonalExams,
     };
   } catch (err: any) {
     return {
@@ -114,6 +124,64 @@ export async function deleteChallengeAction(challengeId: string, emergencyReason
     return {
       success: false,
       error: err.message || 'Failed to delete challenge',
+    };
+  }
+}
+
+export async function archiveChallengeAction(challengeId: string) {
+  try {
+    const student = await requireStudentAuth();
+    await archiveChallenge(student.studentProfileId, challengeId);
+    revalidatePath('/student/student-corner');
+    revalidatePath('/student/student-corner/arena');
+    revalidatePath('/student/student-corner/focus/display');
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Failed to remove challenge from arena',
+    };
+  }
+}
+
+export async function bulkArchiveCompletedChallengesAction(arenaId?: string, challengeIds?: string[]) {
+  try {
+    const student = await requireStudentAuth();
+    const res = await bulkArchiveCompletedChallenges(student.studentProfileId, arenaId, challengeIds);
+    revalidatePath('/student/student-corner');
+    revalidatePath('/student/student-corner/arena');
+    revalidatePath('/student/student-corner/focus/display');
+
+    return { success: true, count: res.count };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Failed to cleanup completed challenges',
+    };
+  }
+}
+
+export async function resetDailyArenaAction(arenaId: string, confirmationText: string) {
+  try {
+    if (confirmationText.trim() !== 'RESET ARENA') {
+      return {
+        success: false,
+        error: 'Confirmation text must be exactly "RESET ARENA"',
+      };
+    }
+
+    const student = await requireStudentAuth();
+    await resetDailyArena(student.studentProfileId, arenaId);
+    revalidatePath('/student/student-corner');
+    revalidatePath('/student/student-corner/arena');
+    revalidatePath('/student/student-corner/focus/display');
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Failed to reset arena',
     };
   }
 }

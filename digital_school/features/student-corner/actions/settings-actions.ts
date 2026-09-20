@@ -13,6 +13,7 @@ export interface UpdateSettingsInput {
   notificationsEnabled?: boolean;
   preferredCategories?: ChallengeCategory[];
   onboardingCompleted?: boolean;
+  widgetConfig?: any;
 }
 
 export async function getStudentCornerSettingsAction() {
@@ -47,6 +48,7 @@ export async function updateStudentCornerSettingsAction(input: UpdateSettingsInp
         notificationsEnabled: input.notificationsEnabled,
         preferredCategories: input.preferredCategories,
         onboardingCompleted: input.onboardingCompleted,
+        widgetConfig: input.widgetConfig !== undefined ? input.widgetConfig : undefined,
       },
     });
 

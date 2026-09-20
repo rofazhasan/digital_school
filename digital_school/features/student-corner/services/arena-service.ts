@@ -1,8 +1,9 @@
 import db from '@/lib/db';
-import { DayMode, ChallengeCategory, ChallengePriority, ChallengeStatus } from '@prisma/client';
-import { startOfDay, format } from 'date-fns';
+import { DayMode, ChallengeCategory, ChallengePriority, ChallengeStatus, ChallengeSource } from '@prisma/client';
+import { startOfDay, format, subDays } from 'date-fns';
 import { logArenaAction } from './audit-service';
 import { calculateStudentStreaks } from './streak-service';
+import { dispatchChallengeCompleted, dispatchChallengeReverted } from './cross-feature-service';
 
 export interface CreateChallengeInput {
   date: string | Date; // YYYY-MM-DD
@@ -15,6 +16,9 @@ export interface CreateChallengeInput {
   notes?: string;
   subjectNames?: string[];
   topicNames?: string[];
+  source?: ChallengeSource;
+  sourceReferenceId?: string;
+  activeRecallMethod?: string;
 }
 
 export interface UpdateChallengeInput {
@@ -48,6 +52,7 @@ export async function getOrCreateDailyArena(studentProfileId: string, dateInput:
     },
     include: {
       challenges: {
+        where: { isArchived: false },
         orderBy: { orderIndex: 'asc' },
         include: {
           subjects: {
@@ -87,6 +92,7 @@ export async function getOrCreateDailyArena(studentProfileId: string, dateInput:
       },
       include: {
         challenges: {
+          where: { isArchived: false },
           orderBy: { orderIndex: 'asc' },
           include: {
             subjects: { include: { subject: true } },
@@ -98,7 +104,49 @@ export async function getOrCreateDailyArena(studentProfileId: string, dateInput:
     });
   }
 
+  // Non-blocking auto-cleanup enforcement based on student preference (Item 9)
+  enforceAutoCleanupPolicy(studentProfileId).catch(() => {});
+
   return arena;
+}
+
+/**
+ * Automatically archives completed challenges past the student's configured retention window.
+ * Keeps the active workspace clean while 100% preserving historical metrics.
+ */
+async function enforceAutoCleanupPolicy(studentProfileId: string) {
+  try {
+    const profile = await db.studentCornerProfile.findUnique({
+      where: { studentProfileId },
+      select: { widgetConfig: true },
+    });
+
+    const policy = (profile?.widgetConfig as any)?.cleanupPolicy;
+    if (!policy || policy === 'KEEP_FOREVER') return;
+
+    let days = 0;
+    if (policy === 'REMOVE_7_DAYS') days = 7;
+    else if (policy === 'REMOVE_30_DAYS') days = 30;
+    else if (policy === 'REMOVE_90_DAYS') days = 90;
+
+    if (days > 0) {
+      const cutoff = subDays(startOfDay(new Date()), days);
+      await db.arenaChallenge.updateMany({
+        where: {
+          studentProfileId,
+          status: ChallengeStatus.COMPLETED,
+          isArchived: false,
+          completedAt: { lte: cutoff },
+        },
+        data: {
+          isArchived: true,
+          archivedAt: new Date(),
+        },
+      });
+    }
+  } catch {
+    // Non-blocking background policy
+  }
 }
 
 /**
@@ -182,6 +230,9 @@ export async function createChallenge(studentProfileId: string, input: CreateCha
       priority: input.priority || ChallengePriority.MEDIUM,
       notes: input.notes ?? null,
       orderIndex: currentCount,
+      source: input.source || ChallengeSource.MANUAL,
+      sourceReferenceId: input.sourceReferenceId ?? null,
+      activeRecallMethod: input.activeRecallMethod ?? null,
       subjects: {
         create: subjectIds.map((sId) => ({ subjectId: sId })),
       },
@@ -281,7 +332,10 @@ export async function updateChallenge(studentProfileId: string, input: UpdateCha
   await updateArenaStats(arena.id);
 
   if (input.status === ChallengeStatus.COMPLETED) {
-    await calculateStudentStreaks(studentProfileId);
+    // Dispatch to central cross-feature engine (Mistakes, Revision, Topics, Goals, Exams, Streaks)
+    await dispatchChallengeCompleted(studentProfileId, updated.id, updated.actualMinutesSpent);
+  } else if (input.status && challenge.status === ChallengeStatus.COMPLETED && input.status !== ChallengeStatus.COMPLETED) {
+    await dispatchChallengeReverted(studentProfileId, updated.id);
   }
 
   return updated;
@@ -328,11 +382,162 @@ export async function deleteChallenge(studentProfileId: string, challengeId: str
     });
   }
 
-  await db.arenaChallenge.delete({
+  if (challenge.status === ChallengeStatus.COMPLETED) {
+    // Preserve historical completion and analytics by archiving rather than dropping records
+    await db.arenaChallenge.update({
+      where: { id: challengeId },
+      data: { isArchived: true, archivedAt: new Date() },
+    });
+  } else {
+    // Uncompleted/unwanted challenge -> hard delete
+    await db.arenaChallenge.delete({
+      where: { id: challengeId },
+    });
+  }
+
+  await updateArenaStats(challenge.arenaId);
+  return { success: true };
+}
+
+/**
+ * Removes a completed challenge from the active Arena workspace while guaranteeing
+ * historical progress, streaks, heatmaps, and study analytics are 100% preserved.
+ */
+export async function archiveChallenge(studentProfileId: string, challengeId: string) {
+  const challenge = await db.arenaChallenge.findFirst({
+    where: {
+      id: challengeId,
+      studentProfileId,
+    },
+    include: { arena: true },
+  });
+
+  if (!challenge) {
+    throw new Error('Challenge not found or unauthorized.');
+  }
+
+  if (challenge.arena.isLocked || challenge.arena.mode === DayMode.LOCKED) {
+    throw new Error('DAY_LOCKED: Cannot modify challenges on a locked day.');
+  }
+
+  await db.arenaChallenge.update({
     where: { id: challengeId },
+    data: {
+      isArchived: true,
+      archivedAt: new Date(),
+    },
   });
 
   await updateArenaStats(challenge.arenaId);
+  return { success: true };
+}
+
+/**
+ * Bulk archives completed challenges to declutter the student's active Arena.
+ */
+export async function bulkArchiveCompletedChallenges(
+  studentProfileId: string,
+  arenaId?: string,
+  challengeIds?: string[]
+) {
+  const whereClause: any = {
+    studentProfileId,
+    status: ChallengeStatus.COMPLETED,
+    isArchived: false,
+  };
+
+  if (arenaId) {
+    whereClause.arenaId = arenaId;
+  }
+  if (challengeIds && challengeIds.length > 0) {
+    whereClause.id = { in: challengeIds };
+  }
+
+  const affected = await db.arenaChallenge.findMany({
+    where: whereClause,
+    select: { arenaId: true },
+  });
+
+  const res = await db.arenaChallenge.updateMany({
+    where: whereClause,
+    data: {
+      isArchived: true,
+      archivedAt: new Date(),
+    },
+  });
+
+  const affectedArenaIds = Array.from(new Set(affected.map((a) => a.arenaId)));
+  for (const aId of affectedArenaIds) {
+    await updateArenaStats(aId);
+  }
+
+  return { success: true, count: res.count };
+}
+
+/**
+ * Fresh Start / Reset Arena:
+ * Atomically clears active challenges from the daily arena while locking in and preserving
+ * historical completions, streaks, and analytics in a database transaction.
+ */
+export async function resetDailyArena(studentProfileId: string, arenaId: string) {
+  const arena = await db.dailyArena.findFirst({
+    where: { id: arenaId, studentProfileId },
+    include: { challenges: true },
+  });
+
+  if (!arena) {
+    throw new Error('Arena not found or unauthorized.');
+  }
+
+  if (arena.isLocked || arena.mode === DayMode.LOCKED) {
+    throw new Error('DAY_LOCKED: Cannot reset arena on a locked day.');
+  }
+
+  await db.$transaction(async (tx) => {
+    // 1. Delete uncompleted challenges (purges unwanted plans)
+    await tx.arenaChallenge.deleteMany({
+      where: {
+        arenaId,
+        studentProfileId,
+        status: { not: ChallengeStatus.COMPLETED },
+      },
+    });
+
+    // 2. Archive completed challenges so they vanish from the active workspace
+    await tx.arenaChallenge.updateMany({
+      where: {
+        arenaId,
+        studentProfileId,
+        status: ChallengeStatus.COMPLETED,
+      },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+
+    // 3. Reset active planned minutes while keeping completedCount & totalCompletedMinutes intact
+    await tx.dailyArena.update({
+      where: { id: arenaId },
+      data: {
+        totalPlannedMinutes: 0,
+        totalCount: arena.completedCount, // Preserves 100% completion ratio for completed items
+      },
+    });
+
+    // 4. Record audit entry
+    await tx.arenaAuditLog.create({
+      data: {
+        arenaId,
+        studentProfileId,
+        action: 'ARENA_FRESH_RESET',
+        reason: 'Student initiated fresh start',
+        oldValue: `${arena.challenges.length} challenges`,
+        newValue: '0 active challenges',
+      },
+    });
+  });
+
   return { success: true };
 }
 
@@ -367,7 +572,12 @@ export async function toggleChallengeCompletion(studentProfileId: string, challe
   });
 
   await updateArenaStats(challenge.arenaId);
-  await calculateStudentStreaks(studentProfileId);
+
+  if (newStatus === ChallengeStatus.COMPLETED) {
+    await dispatchChallengeCompleted(studentProfileId, updated.id, updated.actualMinutesSpent);
+  } else {
+    await dispatchChallengeReverted(studentProfileId, updated.id);
+  }
 
   return updated;
 }
@@ -438,10 +648,12 @@ export async function setDayMode(studentProfileId: string, arenaId: string, mode
 
 /**
  * Helper to update precomputed arena metrics without N+1 queries.
+ * Separates active workspace counts from historical completion aggregates so removing/archiving
+ * completed tasks from the active view NEVER reduces completedCount or destroys streaks/heatmaps.
  */
 async function updateArenaStats(arenaId: string) {
-  const challenges = await db.arenaChallenge.findMany({
-    where: { arenaId },
+  const activeChallenges = await db.arenaChallenge.findMany({
+    where: { arenaId, isArchived: false },
     select: {
       durationMinutes: true,
       actualMinutesSpent: true,
@@ -449,12 +661,20 @@ async function updateArenaStats(arenaId: string) {
     },
   });
 
-  const totalCount = challenges.length;
-  const completedCount = challenges.filter((c) => c.status === ChallengeStatus.COMPLETED).length;
-  const totalPlannedMinutes = challenges.reduce((sum, c) => sum + c.durationMinutes, 0);
-  const totalCompletedMinutes = challenges.reduce((sum, c) => {
-    return c.status === ChallengeStatus.COMPLETED ? sum + (c.actualMinutesSpent || c.durationMinutes) : sum;
+  const allCompleted = await db.arenaChallenge.findMany({
+    where: { arenaId, status: ChallengeStatus.COMPLETED },
+    select: {
+      durationMinutes: true,
+      actualMinutesSpent: true,
+    },
+  });
+
+  const totalPlannedMinutes = activeChallenges.reduce((sum, c) => sum + c.durationMinutes, 0);
+  const completedCount = allCompleted.length;
+  const totalCompletedMinutes = allCompleted.reduce((sum, c) => {
+    return sum + (c.actualMinutesSpent || c.durationMinutes);
   }, 0);
+  const totalCount = Math.max(activeChallenges.length, completedCount);
 
   await db.dailyArena.update({
     where: { id: arenaId },
@@ -640,4 +860,88 @@ export async function getRecoveryBacklog(studentProfileId: string) {
     originalDate: format(new Date(c.arena.date), 'yyyy-MM-dd'),
   }));
 }
+
+/**
+ * Aggregates due revisions, due mistake retests, and detects Exam Day Mode for Today's Arena
+ */
+export async function getArenaDueItemsAndExamDay(studentProfileId: string) {
+  const todayStart = startOfDay(new Date());
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const [dueRevisions, dueMistakes, todayPersonalExams, todayLmsExams] = await Promise.all([
+    db.spacedRevisionItem.findMany({
+      where: {
+        studentProfileId,
+        isArchived: false,
+        nextReviewDate: { lte: todayEnd },
+      },
+      take: 6,
+      select: {
+        id: true,
+        title: true,
+        vaultCategory: true,
+        leitnerBox: true,
+        confidenceLevel: true,
+      },
+    }),
+    db.mistakeRecord.findMany({
+      where: {
+        studentProfileId,
+        isResolved: false,
+        nextRetestDate: { lte: todayEnd },
+      },
+      take: 6,
+      select: {
+        id: true,
+        errorNumber: true,
+        subjectName: true,
+        chapterName: true,
+        fallacyCategory: true,
+        remedialRule: true,
+      },
+    }),
+    db.personalExam.findMany({
+      where: {
+        studentProfileId,
+        examDate: { gte: todayStart, lte: todayEnd },
+        isCompleted: false,
+      },
+      select: {
+        id: true,
+        title: true,
+        subject: true,
+        startTime: true,
+        location: true,
+        priority: true,
+      },
+    }),
+    db.exam.findMany({
+      where: {
+        examDate: { gte: todayStart, lte: todayEnd },
+        status: { in: ['PUBLISHED', 'ONGOING'] },
+      },
+      take: 2,
+      select: {
+        id: true,
+        name: true,
+        totalMarks: true,
+        startTime: true,
+      },
+    }),
+  ]);
+
+  const isExamDay = todayPersonalExams.length > 0 || todayLmsExams.length > 0;
+  const examTodayTitle = todayPersonalExams[0]?.title || todayLmsExams[0]?.name || null;
+
+  return {
+    dueRevisions,
+    dueMistakes,
+    isExamDay,
+    examTodayTitle,
+    todayPersonalExams,
+    todayLmsExams,
+  };
+}
+
 

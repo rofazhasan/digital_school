@@ -1,4 +1,5 @@
 import React from 'react';
+import db from '@/lib/db';
 import { requireStudentAuth } from '@/features/student-corner/actions/auth-helper';
 import { calculateStudentStreaks } from '@/features/student-corner/services/streak-service';
 import { getUpcomingExams } from '@/features/student-corner/services/exam-service';
@@ -14,15 +15,27 @@ export const metadata = {
 
 export default async function ExamsPage() {
   const student = await requireStudentAuth();
-  const streakInfo = await calculateStudentStreaks(student.studentProfileId);
-  const exams = await getUpcomingExams(student.studentProfileId);
+  const [streakInfo, exams, topics] = await Promise.all([
+    calculateStudentStreaks(student.studentProfileId),
+    getUpcomingExams(student.studentProfileId),
+    db.studentCornerTopic.findMany({
+      where: { subject: { studentProfileId: student.studentProfileId } },
+      select: {
+        id: true,
+        name: true,
+        confidenceLevel: true,
+        masteryStatus: true,
+      },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
 
   return (
     <StudentCornerShell
       currentStreak={streakInfo.currentStreak}
       studentName={student.name}
     >
-      <ExamAwarenessView initialExams={exams} />
+      <ExamAwarenessView initialExams={exams} availableTopics={topics} />
     </StudentCornerShell>
   );
 }

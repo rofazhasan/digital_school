@@ -129,6 +129,9 @@ model StudentProfile {
   goals                StudentGoal[]
   savedReflections     SavedReflection[]
   cornerNotifications  StudentCornerNotification[]
+  spacedRevisions      SpacedRevisionItem[]
+  mistakeRecords       MistakeRecord[]
+  admissionTargets     AdmissionTarget[]
 
   @@map("student_profiles")
 }
@@ -1287,7 +1290,19 @@ enum ChallengeCategory {
   ASSIGNMENT
   REVISION
   EXAM_PREP
+  MISTAKE_RETEST
   CUSTOM
+}
+
+enum ChallengeSource {
+  MANUAL
+  REVISION
+  EXAM_PREP
+  MISTAKE_RETEST
+  SALAT
+  HABIT
+  GOAL
+  SPRINT_CHALLENGE
 }
 
 enum ChallengePriority {
@@ -1359,11 +1374,22 @@ model StudentCornerSubject {
 }
 
 model StudentCornerTopic {
-  id         String                @id @default(cuid())
-  subjectId  String
-  name       String
-  createdAt  DateTime              @default(now())
-  updatedAt  DateTime              @updatedAt
+  id              String                @id @default(cuid())
+  subjectId       String
+  name            String
+  paper           String?
+  chapterNumber   Int?
+  theoryCompleted Boolean               @default(false)
+  qbSolved        Boolean               @default(false)
+  leitnerBox      Int                   @default(1)
+  reviewCount     Int                   @default(0)
+  lastReviewedAt  DateTime?
+  nextReviewDate  DateTime?
+  retentionRate   Float                 @default(100.0)
+  confidenceLevel Int                   @default(3)
+  masteryStatus   String                @default("IN_PROGRESS")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   subject    StudentCornerSubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   challenges ChallengeTopicMap[]
@@ -1414,6 +1440,11 @@ model ArenaChallenge {
   notes              String?
   completedAt        DateTime?
   actualMinutesSpent Int                   @default(0)
+  source             ChallengeSource       @default(MANUAL)
+  sourceReferenceId  String?
+  activeRecallMethod String?
+  isArchived         Boolean               @default(false)
+  archivedAt         DateTime?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
@@ -1423,8 +1454,8 @@ model ArenaChallenge {
   topics             ChallengeTopicMap[]
   focusSessions      FocusSession[]
 
-  @@index([arenaId, orderIndex])
-  @@index([studentProfileId, status])
+  @@index([arenaId, isArchived, orderIndex])
+  @@index([studentProfileId, isArchived, status])
   @@map("arena_challenges")
 }
 
@@ -1494,6 +1525,11 @@ model PersonalExam {
   notes                String?
   isCompleted          Boolean           @default(false)
   preparationChecklist Json?
+  examCode             String?
+  examFormat           String?
+  totalMarks           Float?
+  cutoffTarget         Float?
+  syncedTopics         Json?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -1632,4 +1668,78 @@ model StudentCornerNotification {
   @@index([studentProfileId, read])
   @@index([studentProfileId, createdAt])
   @@map("student_corner_notifications")
+}
+
+model SpacedRevisionItem {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  subjectId        String?
+  topicId          String?
+  title            String
+  vaultCategory    String         @default("HIGH_YIELD")
+  content          String?
+  leitnerBox       Int            @default(1)
+  intervalDays     Int            @default(1)
+  reviewCount      Int            @default(0)
+  confidenceLevel  Int            @default(3)
+  retentionRate    Float          @default(100.0)
+  lastReviewedAt   DateTime?
+  nextReviewDate   DateTime       @default(now())
+  isArchived       Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId, nextReviewDate, isArchived])
+  @@index([studentProfileId, leitnerBox])
+  @@map("spaced_revision_items")
+}
+
+model MistakeRecord {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  errorNumber      String
+  examCode         String?
+  subjectName      String
+  chapterName      String
+  questionDetails  String
+  fallacyCategory  String
+  rootCause        String
+  remedialRule     String
+  nextRetestDate   DateTime?
+  isResolved       Boolean        @default(false)
+  retestedAt       DateTime?
+  retestScore      Float?
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId, isResolved, nextRetestDate])
+  @@map("mistake_records")
+}
+
+model AdmissionTarget {
+  id                   String         @id @default(cuid())
+  studentProfileId     String
+  universityName       String
+  clusterName          String?
+  examFormat           String
+  subjectBreakdown     Json?
+  historicalSafeCutoff String
+  targetRank           String?
+  strategyNotes        String?
+  applicationOpens     DateTime?
+  applicationDeadline  DateTime?
+  examDate             DateTime?
+  applicationStatus    String         @default("NOT_STARTED")
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  studentProfile       StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId])
+  @@map("admission_targets")
 }

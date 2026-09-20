@@ -5,6 +5,8 @@ import {
   getHeatmapData,
   getStudentAnalyticsOverview,
   getPlanVsReality,
+  getCrossFeatureEcosystemAnalytics,
+  getWeeklyEcosystemReview,
 } from '@/features/student-corner/services/analytics-service';
 import { StudentCornerShell } from '@/features/student-corner/components/shell/StudentCornerShell';
 import { AnalyticsDashboard } from '@/features/student-corner/components/analytics/AnalyticsDashboard';
@@ -18,10 +20,14 @@ export const metadata = {
 
 export default async function AnalyticsPage() {
   const student = await requireStudentAuth();
-  const streakInfo = await calculateStudentStreaks(student.studentProfileId);
-  const heatmapData = await getHeatmapData(student.studentProfileId);
-  const overview = await getStudentAnalyticsOverview(student.studentProfileId);
-  const planVsReality = await getPlanVsReality(student.studentProfileId, 14);
+  const [streakInfo, heatmapData, overview, planVsReality, ecosystemAnalytics, weeklyReview] = await Promise.all([
+    calculateStudentStreaks(student.studentProfileId),
+    getHeatmapData(student.studentProfileId),
+    getStudentAnalyticsOverview(student.studentProfileId),
+    getPlanVsReality(student.studentProfileId, 14),
+    getCrossFeatureEcosystemAnalytics(student.studentProfileId),
+    getWeeklyEcosystemReview(student.studentProfileId),
+  ]);
 
   return (
     <StudentCornerShell
@@ -33,6 +39,8 @@ export default async function AnalyticsPage() {
         overview={overview}
         streakInfo={streakInfo}
         planVsReality={planVsReality}
+        ecosystemAnalytics={ecosystemAnalytics}
+        weeklyReview={weeklyReview}
       />
     </StudentCornerShell>
   );

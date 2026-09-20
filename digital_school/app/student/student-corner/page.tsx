@@ -1,79 +1,81 @@
 import React from 'react';
 import { requireStudentAuth } from '@/features/student-corner/actions/auth-helper';
-import { getOrCreateDailyArena } from '@/features/student-corner/services/arena-service';
+import { getOrCreateDailyArena, getArenaDueItemsAndExamDay } from '@/features/student-corner/services/arena-service';
 import { calculateStudentStreaks } from '@/features/student-corner/services/streak-service';
 import { getUpcomingExams } from '@/features/student-corner/services/exam-service';
 import { calculateTodayScore } from '@/features/student-corner/services/analytics-service';
+import { getNextBestActions } from '@/features/student-corner/services/cross-feature-service';
+import { getStudentGoals } from '@/features/student-corner/services/goal-service';
 import { getFullSpiritualPackage } from '@/features/student-corner/services/ummah-api-service';
 import { StudentCornerShell } from '@/features/student-corner/components/shell/StudentCornerShell';
 import { TodayArenaView } from '@/features/student-corner/components/arena/TodayArenaView';
 import { ReflectionCard } from '@/features/student-corner/components/reflection/ReflectionCard';
+import { NextBestActionCard } from '@/features/student-corner/components/home/NextBestActionCard';
+import { EcosystemStatusRibbon } from '@/features/student-corner/components/home/EcosystemStatusRibbon';
 import Link from 'next/link';
-import { BookOpen, Flame, ArrowRight, Target, Clock, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getDayOfYear, format } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Student Corner — Personal Daily Arena & Focus OS',
-  description: 'Manage daily challenges, strict focus countdown, Islamic reflection, and exam milestones.',
+  title: 'Student Corner — Unified Learning OS & Personal Arena',
+  description: 'Connected student ecosystem: Daily Arena, Focus Timer, Spaced Revision, Mistake Lab, and Exam Preparation.',
 };
 
 export default async function StudentCornerHomePage() {
   const student = await requireStudentAuth();
-  const arena = await getOrCreateDailyArena(student.studentProfileId, new Date());
-  const streakInfo = await calculateStudentStreaks(student.studentProfileId);
-  const todayScore = await calculateTodayScore(student.studentProfileId);
-  const upcomingExams = await getUpcomingExams(student.studentProfileId);
+  const [arena, streakInfo, todayScore, upcomingExams, dueItemsAndExam, nextBestActions, goals] = await Promise.all([
+    getOrCreateDailyArena(student.studentProfileId, new Date()),
+    calculateStudentStreaks(student.studentProfileId),
+    calculateTodayScore(student.studentProfileId),
+    getUpcomingExams(student.studentProfileId),
+    getArenaDueItemsAndExamDay(student.studentProfileId),
+    getNextBestActions(student.studentProfileId),
+    getStudentGoals(student.studentProfileId),
+  ]);
 
   const dayOfYear = getDayOfYear(new Date());
   const spiritualPackage = await getFullSpiritualPackage(dayOfYear);
 
   const nextExam = upcomingExams[0];
+  const activeChallenges = arena.challenges.filter((c: any) => !c.isArchived);
+  const completedCount = activeChallenges.filter((c: any) => c.status === 'COMPLETED').length;
+  const arenaCompletionRate = activeChallenges.length > 0 ? Math.round((completedCount / activeChallenges.length) * 100) : 0;
 
   return (
     <StudentCornerShell
       currentStreak={streakInfo.currentStreak}
       studentName={student.name}
     >
-      <div className="space-y-8">
-        {/* Next Exam Awareness Banner if any */}
-        {nextExam && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-indigo-600 text-white font-bold">
-                <BookOpen className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-extrabold text-indigo-950 dark:text-indigo-200 block">
-                  Upcoming Exam: {nextExam.title} ({nextExam.subject})
-                </span>
-                <span className="text-slate-500 dark:text-slate-400">
-                  {format(new Date(nextExam.examDate), 'EEEE, MMMM d')} • {nextExam.daysRemaining === 0 ? 'TODAY' : `${nextExam.daysRemaining} days remaining`}
-                </span>
-              </div>
-            </div>
+      <div className="space-y-6">
+        {/* Next Best Action - Intelligent Real-Time Recommendation */}
+        <NextBestActionCard actions={nextBestActions} />
 
-            <Link
-              href="/student/student-corner/exams"
-              className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 self-start sm:self-auto shrink-0"
-            >
-              <span>View Exam Routine</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        )}
+        {/* Interconnected Ecosystem Vitals Ribbon */}
+        <EcosystemStatusRibbon
+          nextExam={nextExam ? { title: nextExam.title, subject: nextExam.subject, daysRemaining: nextExam.daysRemaining } : null}
+          dueRevisionsCount={dueItemsAndExam.dueRevisions.length}
+          dueMistakesCount={dueItemsAndExam.dueMistakes.length}
+          goalsCount={goals.length}
+          arenaCompletionRate={arenaCompletionRate}
+          currentStreak={streakInfo.currentStreak}
+        />
 
-        {/* Centerpiece: Today's Arena with TodayScore & Timeline */}
+        {/* Centerpiece: Today's Arena with TodayScore & Daily Timeline */}
         <TodayArenaView
           initialArena={arena as any}
           studentName={student.name}
           currentStreak={streakInfo.currentStreak}
           scoreDetails={todayScore}
+          dueRevisions={dueItemsAndExam.dueRevisions}
+          dueMistakes={dueItemsAndExam.dueMistakes}
+          isExamDay={dueItemsAndExam.isExamDay}
+          examTodayTitle={dueItemsAndExam.examTodayTitle}
         />
 
-        {/* Bottom Dual Grid: Islamic Reflection & Quick Hub */}
+        {/* Bottom Dual Grid: Islamic Reflection & Focus Cast Hub */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <ReflectionCard
@@ -88,7 +90,7 @@ export default async function StudentCornerHomePage() {
           </div>
 
           <div className="space-y-4">
-            {/* Focus Cast Display Promo */}
+            {/* Focus Cast Display Card */}
             <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-slate-900 to-indigo-950 text-white shadow-md">
               <div className="flex items-center gap-2 text-cyan-400 font-extrabold text-xs uppercase tracking-wider mb-2">
                 <Sparkles className="w-4 h-4" />
@@ -107,7 +109,7 @@ export default async function StudentCornerHomePage() {
               </Link>
             </div>
 
-            {/* Print Progress & Milestone Reports Promo */}
+            {/* Print Progress & Milestone Reports Card */}
             <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
               <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
                 Progress & Consistency Reports

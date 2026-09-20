@@ -165,6 +165,30 @@ export function TodayScoreRing({ scoreDetails }: TodayScoreRingProps) {
               <span>Total Calculated Score</span>
               <span className="text-base font-black">{scoreDetails.score}%</span>
             </div>
+
+            {/* 4-Pillar Core Standard (Workbook 105D Challenge Rule) */}
+            {scoreDetails.coreStandardScore !== undefined && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                <div className="flex items-center justify-between font-bold text-amber-500">
+                  <span>105D Challenge Daily Standard</span>
+                  <span className="font-mono text-sm">{scoreDetails.coreStandardScore.toFixed(2)} / 1.00 pt</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                  <div className={`flex items-center gap-1.5 ${scoreDetails.coreStandardPillars?.study ? 'text-emerald-500 font-semibold' : 'text-slate-400'}`}>
+                    <span>{scoreDetails.coreStandardPillars?.study ? '✓' : '○'}</span> Morning/Subject Study
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${scoreDetails.coreStandardPillars?.recall ? 'text-emerald-500 font-semibold' : 'text-slate-400'}`}>
+                    <span>{scoreDetails.coreStandardPillars?.recall ? '✓' : '○'}</span> Active Recall / Revision
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${scoreDetails.coreStandardPillars?.exam ? 'text-emerald-500 font-semibold' : 'text-slate-400'}`}>
+                    <span>{scoreDetails.coreStandardPillars?.exam ? '✓' : '○'}</span> Exam / QB Practice
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${scoreDetails.coreStandardPillars?.lifestyle ? 'text-emerald-500 font-semibold' : 'text-slate-400'}`}>
+                    <span>{scoreDetails.coreStandardPillars?.lifestyle ? '✓' : '○'}</span> 5 Salat & Lifestyle
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <Button
