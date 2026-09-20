@@ -1,5 +1,7 @@
 import ExcelJS from 'exceljs';
-import { ChallengeCategory, ChallengePriority } from '@prisma/client';
+import { ChallengeCategory, ChallengePriority, DayMode } from '@prisma/client';
+import db from '@/lib/db';
+import { startOfDay } from 'date-fns';
 import { createChallenge } from './arena-service';
 
 export interface ParsedImportRow {
@@ -314,28 +316,225 @@ export async function validateImportedExcel(buffer: Buffer): Promise<ImportValid
 }
 
 /**
- * Commits a list of validated parsed rows into the student's arenas.
+ * Commits a list of validated parsed rows into the student's arenas in a high-performance batch.
+ * Pre-caches arenas, subjects, and topics to avoid sequential roundtrips.
  */
 export async function commitBatchImport(studentProfileId: string, rows: ParsedImportRow[]) {
-  const created: any[] = [];
+  if (!rows || rows.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  // 1. Group rows by canonical date
+  const dateMap = new Map<string, ParsedImportRow[]>();
+  for (const row of rows) {
+    const canonical = startOfDay(new Date(row.date)).toISOString().slice(0, 10);
+    const list = dateMap.get(canonical) || [];
+    list.push(row);
+    dateMap.set(canonical, list);
+  }
+
+  // 2. Fetch or create DailyArena for all unique dates in this batch
+  const canonicalDates = Array.from(dateMap.keys()).map((d) => startOfDay(new Date(d)));
+
+  const existingArenas = await db.dailyArena.findMany({
+    where: {
+      studentProfileId,
+      date: { in: canonicalDates },
+    },
+    select: {
+      id: true,
+      date: true,
+      mode: true,
+      isLocked: true,
+      totalCount: true,
+    },
+  });
+
+  const arenaByDateStr = new Map<string, typeof existingArenas[0]>();
+  for (const a of existingArenas) {
+    arenaByDateStr.set(startOfDay(new Date(a.date)).toISOString().slice(0, 10), a);
+  }
+
+  // Find profile defaultDayMode once
+  let defaultMode = DayMode.NORMAL;
+  const profile = await db.studentCornerProfile.findUnique({
+    where: { studentProfileId },
+    select: { defaultDayMode: true },
+  });
+  if (profile?.defaultDayMode) defaultMode = profile.defaultDayMode;
+
+  // Create any missing arenas
+  for (const dateKey of dateMap.keys()) {
+    if (!arenaByDateStr.has(dateKey)) {
+      const canonicalDate = startOfDay(new Date(dateKey));
+      const newArena = await db.dailyArena.create({
+        data: {
+          studentProfileId,
+          date: canonicalDate,
+          mode: defaultMode,
+          isLocked: defaultMode === DayMode.LOCKED,
+        },
+        select: {
+          id: true,
+          date: true,
+          mode: true,
+          isLocked: true,
+          totalCount: true,
+        },
+      });
+      arenaByDateStr.set(dateKey, newArena);
+    }
+  }
+
+  // 3. Batch cache subjects and topics
+  const allSubjectNames = Array.from(
+    new Set(
+      rows
+        .map((r) => r.subject?.trim())
+        .filter((s): s is string => Boolean(s))
+    )
+  );
+
+  const subjectMap = new Map<string, string>(); // name -> id
+  if (allSubjectNames.length > 0) {
+    const existingSubs = await db.studentCornerSubject.findMany({
+      where: {
+        studentProfileId,
+        name: { in: allSubjectNames },
+      },
+      select: { id: true, name: true },
+    });
+    for (const sub of existingSubs) {
+      subjectMap.set(sub.name, sub.id);
+    }
+
+    // Create missing subjects
+    for (const subName of allSubjectNames) {
+      if (!subjectMap.has(subName)) {
+        const createdSub = await db.studentCornerSubject.create({
+          data: { studentProfileId, name: subName },
+          select: { id: true, name: true },
+        });
+        subjectMap.set(createdSub.name, createdSub.id);
+      }
+    }
+  }
+
+  // Topic cache: "subjectId:topicName" -> topicId
+  const topicCache = new Map<string, string>();
+  const allTopicPairs: { subjectId: string; topicName: string }[] = [];
+  for (const row of rows) {
+    if (row.subject && row.topics && row.topics.length > 0) {
+      const subId = subjectMap.get(row.subject.trim());
+      if (subId) {
+        for (const top of row.topics) {
+          const trimmed = top.trim();
+          if (trimmed) allTopicPairs.push({ subjectId: subId, topicName: trimmed });
+        }
+      }
+    }
+  }
+
+  for (const pair of allTopicPairs) {
+    const key = `${pair.subjectId}:${pair.topicName}`;
+    if (!topicCache.has(key)) {
+      const top = await db.studentCornerTopic.upsert({
+        where: {
+          subjectId_name: {
+            subjectId: pair.subjectId,
+            name: pair.topicName,
+          },
+        },
+        create: {
+          subjectId: pair.subjectId,
+          name: pair.topicName,
+        },
+        update: {},
+        select: { id: true },
+      });
+      topicCache.set(key, top.id);
+    }
+  }
+
+  // 4. Insert Challenges and count per arena
+  let insertedCount = 0;
+  const affectedArenaIds = new Set<string>();
+
+  // Track order index per arena
+  const arenaOrderIndex = new Map<string, number>();
+  for (const [dateKey, arena] of arenaByDateStr.entries()) {
+    arenaOrderIndex.set(arena.id, arena.totalCount || 0);
+  }
 
   for (const row of rows) {
-    const challenge = await createChallenge(studentProfileId, {
-      date: row.date,
-      title: row.title,
-      category: row.category,
-      durationMinutes: row.durationMinutes,
-      scheduledTime: row.scheduledTime,
-      priority: row.priority,
-      notes: row.notes,
-      subjectNames: row.subject ? [row.subject] : [],
-      topicNames: row.topics || [],
+    const canonical = startOfDay(new Date(row.date)).toISOString().slice(0, 10);
+    const arena = arenaByDateStr.get(canonical);
+    if (!arena) continue;
+
+    // Skip if day is locked
+    if (arena.isLocked || arena.mode === DayMode.LOCKED) continue;
+
+    const currentOrder = arenaOrderIndex.get(arena.id) || 0;
+    arenaOrderIndex.set(arena.id, currentOrder + 1);
+    affectedArenaIds.add(arena.id);
+
+    const subId = row.subject ? subjectMap.get(row.subject.trim()) : undefined;
+    const topIds: string[] = [];
+    if (subId && row.topics) {
+      for (const t of row.topics) {
+        const id = topicCache.get(`${subId}:${t.trim()}`);
+        if (id) topIds.push(id);
+      }
+    }
+
+    await db.arenaChallenge.create({
+      data: {
+        arenaId: arena.id,
+        studentProfileId,
+        title: row.title.trim(),
+        category: row.category,
+        durationMinutes: Math.max(1, Math.min(1440, row.durationMinutes || 30)),
+        scheduledTime: row.scheduledTime ?? null,
+        priority: row.priority || ChallengePriority.MEDIUM,
+        notes: row.notes ?? null,
+        orderIndex: currentOrder,
+        subjects: subId ? { create: [{ subjectId: subId }] } : undefined,
+        topics: topIds.length > 0 ? { create: topIds.map((tId) => ({ topicId: tId })) } : undefined,
+      },
+      select: { id: true },
     });
-    created.push(challenge);
+
+    insertedCount++;
+  }
+
+  // 5. Update aggregated stats for all affected arenas in one pass
+  for (const arenaId of affectedArenaIds) {
+    const aggregate = await db.arenaChallenge.aggregate({
+      where: { arenaId },
+      _count: { id: true },
+      _sum: {
+        durationMinutes: true,
+        actualMinutesSpent: true,
+      },
+    });
+
+    const completedCount = await db.arenaChallenge.count({
+      where: { arenaId, status: 'COMPLETED' },
+    });
+
+    await db.dailyArena.update({
+      where: { id: arenaId },
+      data: {
+        totalCount: aggregate._count.id || 0,
+        completedCount,
+        totalPlannedMinutes: aggregate._sum.durationMinutes || 0,
+        totalCompletedMinutes: aggregate._sum.actualMinutesSpent || 0,
+      },
+    });
   }
 
   return {
     success: true,
-    count: created.length,
+    count: insertedCount,
   };
 }

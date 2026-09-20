@@ -27,6 +27,7 @@ export function BulkImportWizard() {
   const [validRows, setValidRows] = useState<ParsedImportRow[]>([]);
   const [errors, setErrors] = useState<ImportErrorItem[]>([]);
   const [importSuccessCount, setImportSuccessCount] = useState<number | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Download template
   const handleDownloadTemplate = async () => {
@@ -54,19 +55,14 @@ export function BulkImportWizard() {
         toast.error(res.error || 'Failed to download template');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error generating template');
+      toast.error(err.message || 'Error downloading template');
     }
   };
 
-  // Handle file drop / change
+  // Upload and parse spreadsheet
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
-    if (!selectedFile.name.endsWith('.xlsx')) {
-      toast.error('Only .xlsx Excel files are supported');
-      return;
-    }
 
     if (selectedFile.size > 5 * 1024 * 1024) {
       toast.error('File size exceeds maximum 5MB limit');
@@ -105,23 +101,38 @@ export function BulkImportWizard() {
     }
   };
 
-  // Commit valid rows
+  // Commit valid rows in safe concurrent chunks to prevent timeouts
+  const CHUNK_SIZE = 50;
   const handleCommit = async () => {
     if (validRows.length === 0) return;
 
     setIsImporting(true);
+    setImportProgress({ current: 0, total: validRows.length });
+    let totalImported = 0;
+
     try {
-      const res = await commitExcelImportAction(validRows);
-      if (res.success) {
-        setImportSuccessCount(res.count || validRows.length);
-        toast.success(`Imported ${res.count} challenges into your arenas!`);
-      } else {
-        toast.error(res.error || 'Failed to commit import');
+      for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+        const chunk = validRows.slice(i, i + CHUNK_SIZE);
+        const res = await commitExcelImportAction(chunk);
+        if (!res.success) {
+          throw new Error(
+            res.error || `Failed while importing challenges ${i + 1} to ${Math.min(validRows.length, i + CHUNK_SIZE)}`
+          );
+        }
+        totalImported += res.count ?? chunk.length;
+        setImportProgress({
+          current: Math.min(validRows.length, i + chunk.length),
+          total: validRows.length,
+        });
       }
+
+      setImportSuccessCount(totalImported);
+      toast.success(`Successfully imported all ${totalImported} challenges!`);
     } catch (err: any) {
       toast.error(err.message || 'Error importing challenges');
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -214,9 +225,35 @@ export function BulkImportWizard() {
               disabled={isImporting}
               className="rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-5 shadow-md shadow-indigo-500/20"
             >
-              {isImporting ? 'Importing...' : 'Confirm & Create Challenges'}
+              {isImporting
+                ? `Importing ${importProgress?.current || 0}/${importProgress?.total || validRows.length}...`
+                : 'Confirm & Create Challenges'}
             </Button>
           </div>
+
+          {/* Real-time batch progress indicator */}
+          {importProgress && (
+            <div className="space-y-1.5 p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+              <div className="flex items-center justify-between text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+                  Writing challenges to database in parallel batches...
+                </span>
+                <span className="font-mono">
+                  {importProgress.current} / {importProgress.total} (
+                  {Math.round((importProgress.current / importProgress.total) * 100)}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${Math.round((importProgress.current / importProgress.total) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="max-h-60 overflow-y-auto space-y-2">
             {validRows.slice(0, 15).map((row, idx) => (
