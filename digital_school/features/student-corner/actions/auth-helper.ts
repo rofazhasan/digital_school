@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
+import { redirect } from 'next/navigation';
 
 export interface AuthenticatedStudentContext {
   userId: string;
@@ -11,12 +12,13 @@ export interface AuthenticatedStudentContext {
 /**
  * Server-side authorization guard for Student Corner.
  * Derives studentProfileId securely from the session token. Never trusts client-sent student IDs.
+ * Automatically redirects unauthenticated/unauthorized users to /login or respective dashboards.
  */
 export async function requireStudentAuth(): Promise<AuthenticatedStudentContext> {
   const user = await getCurrentUser();
 
   if (!user || !user.id) {
-    throw new Error('UNAUTHORIZED: Please sign in to access Student Corner.');
+    redirect('/login');
   }
 
   // Check role or profile
@@ -26,7 +28,12 @@ export async function requireStudentAuth(): Promise<AuthenticatedStudentContext>
   });
 
   if (!studentProfile || !studentProfile.id) {
-    throw new Error('FORBIDDEN: Student Corner is only accessible for active student accounts.');
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      redirect('/admin');
+    } else if (user.role === 'TEACHER') {
+      redirect('/teacher');
+    }
+    redirect('/login');
   }
 
   // Ensure StudentCornerProfile exists

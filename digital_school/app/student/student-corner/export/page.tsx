@@ -19,19 +19,29 @@ export default async function ExportPage() {
   const overview = await getStudentAnalyticsOverview(student.studentProfileId);
 
   // Fetch student profile details for official header
-  const profile = await db.studentProfile.findUnique({
-    where: { id: student.studentProfileId },
-    include: {
-      class: true,
-    },
-  });
+  let profile = null;
+  try {
+    profile = await db.studentProfile.findUnique({
+      where: { id: student.studentProfileId },
+      include: {
+        class: true,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to load student profile for export:', err);
+  }
 
-  const categoryBreakdown = Object.entries(overview.categoryStats).map(([cat, stat]) => ({
-    category: cat,
-    count: stat.total,
-    hours: Math.round((stat.minutes / 60) * 10) / 10,
-    rate: stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0,
+  const categoryBreakdown = (overview.categoryBreakdown || []).map((item) => ({
+    category: item.category,
+    count: item.totalChallenges,
+    hours: item.focusedHours,
+    rate: item.completionRate,
   }));
+
+  const totalChallenges = overview.totalChallenges || 0;
+  const completedChallenges = overview.completedChallenges || 0;
+  const missedChallenges = Math.max(0, totalChallenges - completedChallenges);
+  const focusHours = overview.totalCompletedFocusHours ?? 0;
 
   return (
     <StudentCornerShell
@@ -42,11 +52,11 @@ export default async function ExportPage() {
         studentName={student.name}
         registrationNo={profile?.registrationNo || 'STUDENT-CORNER'}
         className={profile?.class?.name || 'Academic Scholar'}
-        completionRate={overview.overallCompletionRate}
-        totalCompleted={overview.completedChallenges}
-        totalMissed={overview.totalChallenges - overview.completedChallenges}
-        totalPlanned={overview.totalChallenges}
-        totalFocusHours={overview.totalFocusHours}
+        completionRate={overview.overallCompletionRate ?? 0}
+        totalCompleted={completedChallenges}
+        totalMissed={missedChallenges}
+        totalPlanned={totalChallenges}
+        totalFocusHours={focusHours}
         categoryBreakdown={categoryBreakdown.length > 0 ? categoryBreakdown : undefined}
       />
     </StudentCornerShell>
