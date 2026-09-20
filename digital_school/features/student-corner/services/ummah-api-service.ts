@@ -50,12 +50,15 @@ const DUAS_BANGLA_MAP: Record<string, { titleBangla: string; translationBangla: 
   },
 };
 
+// In-memory cache for Hijri Date to prevent repeated external network requests
+let cachedHijri: { data: HijriDateInfo; expiresAt: number } | null = null;
+
 /**
- * Fetch wrapper with timeout and error handling
+ * Fetch wrapper with aggressive timeout and error handling
  */
 async function fetchUmmahApi<T>(endpoint: string, revalidateSeconds = 3600): Promise<T | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s timeout
 
   try {
     const res = await fetch(`${UMMAH_API_BASE}${endpoint}`, {
@@ -169,10 +172,15 @@ export async function getLiveHijriDate(): Promise<HijriDateInfo> {
     hijriYear: 1448,
   };
 
+  // Return cached result immediately (0ms) if valid
+  if (cachedHijri && cachedHijri.expiresAt > Date.now()) {
+    return cachedHijri.data;
+  }
+
   try {
     const data = await fetchUmmahApi<any>('/api/today-hijri', 3600);
     if (data?.hijri) {
-      return {
+      const result: HijriDateInfo = {
         gregorianDate: data.gregorian?.formatted || defaultFallback.gregorianDate,
         hijriFormatted: data.hijri.formatted || defaultFallback.hijriFormatted,
         hijriDay: data.hijri.day || defaultFallback.hijriDay,
@@ -180,10 +188,24 @@ export async function getLiveHijriDate(): Promise<HijriDateInfo> {
         hijriMonthArabic: data.hijri.month_name_arabic || defaultFallback.hijriMonthArabic,
         hijriYear: data.hijri.year || defaultFallback.hijriYear,
       };
+
+      // Cache in memory for 12 hours
+      cachedHijri = {
+        data: result,
+        expiresAt: Date.now() + 12 * 3600 * 1000,
+      };
+
+      return result;
     }
   } catch (err) {
     console.warn('UmmahAPI Hijri fetch error', err);
   }
+
+  // Cache fallback for 1 hour so failure does not repeatedly retry on every click
+  cachedHijri = {
+    data: defaultFallback,
+    expiresAt: Date.now() + 3600 * 1000,
+  };
 
   return defaultFallback;
 }

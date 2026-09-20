@@ -23,34 +23,57 @@ export function StudentCornerWidget() {
   const [arenaData, setArenaData] = useState<DailyArenaWithChallenges | null>(null);
   const [streak, setStreak] = useState(0);
   const [hijriDate, setHijriDate] = useState<{ hijriFormatted: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
+    // 1. Instantly restore from localStorage in 0ms
+    try {
+      const cached = localStorage.getItem('sc_widget_cached_v2');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.arena) {
+          setArenaData(parsed.arena);
+          setStreak(parsed.streak || 0);
+          if (parsed.hijriDate) setHijriDate(parsed.hijriDate);
+        }
+      }
+    } catch {}
+
+    // 2. Refresh silently in background without blocking UI
+    let isMounted = true;
     async function loadArena() {
+      setIsSyncing(true);
       try {
         const res = await getTodayArenaAction();
+        if (!isMounted) return;
         if (res.success && res.arena) {
           setArenaData(res.arena as any);
           setStreak(res.streakInfo?.currentStreak || 0);
           if (res.hijriDate) setHijriDate(res.hijriDate);
+
+          try {
+            localStorage.setItem(
+              'sc_widget_cached_v2',
+              JSON.stringify({
+                arena: res.arena,
+                streak: res.streakInfo?.currentStreak || 0,
+                hijriDate: res.hijriDate,
+              })
+            );
+          } catch {}
         }
       } catch (err) {
         console.error('Failed to load arena summary in dashboard widget', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setIsSyncing(false);
       }
     }
     loadArena();
-  }, []);
 
-  if (loading) {
-    return (
-      <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-6 animate-pulse">
-        <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/3 mb-4" />
-        <div className="h-16 bg-slate-100 dark:bg-slate-800/50 rounded-2xl" />
-      </div>
-    );
-  }
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const total = arenaData?.challenges?.length || 0;
   const completed = arenaData?.challenges?.filter((c) => c.status === 'COMPLETED').length || 0;

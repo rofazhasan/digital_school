@@ -20,9 +20,13 @@ import { revalidatePath } from 'next/cache';
 export async function getTodayArenaAction(dateStr?: string) {
   try {
     const student = await requireStudentAuth();
-    const arena = await getOrCreateDailyArena(student.studentProfileId, dateStr || new Date());
-    const streakInfo = await calculateStudentStreaks(student.studentProfileId);
-    const hijriDate = await getLiveHijriDate();
+    const targetDate = dateStr || new Date();
+
+    const [arena, streakInfo, hijriDate] = await Promise.all([
+      getOrCreateDailyArena(student.studentProfileId, targetDate),
+      calculateStudentStreaks(student.studentProfileId),
+      getLiveHijriDate(),
+    ]);
 
     return {
       success: true,

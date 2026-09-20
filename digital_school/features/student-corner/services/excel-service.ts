@@ -153,7 +153,28 @@ export async function validateImportedExcel(buffer: Buffer): Promise<ImportValid
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
 
-  const worksheet = workbook.worksheets[0];
+  // Intelligently select the target challenge worksheet (handles Apple Numbers and multi-sheet exports)
+  let worksheet = workbook.worksheets.find((ws) => {
+    const name = ws.name.toLowerCase();
+    return name.includes('challenge') || name.includes('daily');
+  });
+
+  if (!worksheet) {
+    worksheet = workbook.worksheets.find((ws) => {
+      const name = ws.name.toLowerCase();
+      if (name.includes('summary') || name.includes('reference')) return false;
+      const r1 = ws.getRow(1);
+      const text = [1, 2, 3, 4, 5, 6].map((c) => r1.getCell(c).text?.toLowerCase() || '').join(' ');
+      return text.includes('challenge') || (text.includes('date') && text.includes('category'));
+    });
+  }
+
+  if (!worksheet) {
+    worksheet = workbook.worksheets.find(
+      (ws) => !ws.name.toLowerCase().includes('summary') && !ws.name.toLowerCase().includes('reference')
+    ) || workbook.worksheets[0];
+  }
+
   if (!worksheet) {
     throw new Error('Spreadsheet does not contain any readable worksheets.');
   }
@@ -178,7 +199,17 @@ export async function validateImportedExcel(buffer: Buffer): Promise<ImportValid
       return;
     }
 
-    const rawDate = row.getCell(1).text?.trim();
+    // Extract cell values with support for Date objects from Numbers / Excel
+    const cellVal1 = row.getCell(1).value;
+    let rawDate = '';
+    if (cellVal1 instanceof Date) {
+      rawDate = cellVal1.toISOString().slice(0, 10);
+    } else if (typeof cellVal1 === 'string') {
+      rawDate = cellVal1.trim();
+    } else if (row.getCell(1).text) {
+      rawDate = row.getCell(1).text.trim();
+    }
+
     const rawTitle = row.getCell(2).text?.trim();
     const rawCategory = row.getCell(3).text?.trim().toUpperCase();
     const rawSubject = row.getCell(4).text?.trim();
@@ -200,6 +231,11 @@ export async function validateImportedExcel(buffer: Buffer): Promise<ImportValid
         value: rawDate,
         message: 'Invalid date format. Expected YYYY-MM-DD.',
       });
+    } else {
+      const parsed = new Date(rawDate);
+      if (!isNaN(parsed.getTime())) {
+        parsedDateStr = parsed.toISOString().slice(0, 10);
+      }
     }
 
     // Validate Title
