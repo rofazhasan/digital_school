@@ -530,17 +530,14 @@ function LoginContent() {
                             Active Exam in Progress
                         </DialogTitle>
                         <DialogDescription className="text-center text-sm text-muted-foreground pt-2 space-y-2">
-                            <span className="block font-medium text-foreground">
-                                The student is currently taking the exam:
-                            </span>
-                            <span className="inline-block font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800">
-                                {examWarning?.examName}
+                            <span className="block font-medium text-foreground text-base">
+                                The student is in <span className="font-bold text-amber-600 dark:text-amber-400 underline decoration-amber-400/50">{examWarning?.examName}</span>.
                             </span>
                             <span className="block text-xs leading-relaxed text-muted-foreground pt-1">
-                                Logging in on this device will automatically log out and disconnect their active exam session on the other device.
+                                If you log in now, the active session and exam on the other device will automatically be logged out.
                             </span>
                             <span className="block font-semibold text-foreground pt-1">
-                                Are you sure you still want to log in?
+                                Are you still want to login?
                             </span>
                         </DialogDescription>
                     </DialogHeader>

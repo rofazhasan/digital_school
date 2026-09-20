@@ -87,14 +87,30 @@ export async function POST(request: NextRequest) {
         // Check if student is actively in an exam session
         // Strictly applies ONLY to student accounts
         if (user.role === 'STUDENT' && !forceLogin) {
-            const studentId = user.studentProfile?.id || user.id;
-            const now = new Date();
-
             try {
+                let studentProfileId = user.studentProfile?.id;
+                if (!studentProfileId) {
+                    const sp = await (prismadb.studentProfile as any).findUnique({
+                        where: { userId: user.id },
+                        select: { id: true }
+                    });
+                    studentProfileId = sp?.id;
+                }
+
+                const candidateStudentIds: string[] = [user.id];
+                if (studentProfileId && studentProfileId !== user.id) {
+                    candidateStudentIds.push(studentProfileId);
+                }
+
+                const now = new Date();
                 const activeSubmission = await prismadb.examSubmission.findFirst({
                     where: {
-                        studentId,
-                        status: 'IN_PROGRESS',
+                        studentId: { in: candidateStudentIds },
+                        OR: [
+                            { status: 'IN_PROGRESS' },
+                            { objectiveStatus: 'IN_PROGRESS' },
+                            { cqSqStatus: 'IN_PROGRESS' }
+                        ],
                         exam: {
                             isActive: true,
                             startTime: { lte: now },
@@ -142,7 +158,7 @@ export async function POST(request: NextRequest) {
                         return NextResponse.json({
                             requiresExamConfirmation: true,
                             examName: exam.name,
-                            message: `The student is in ${exam.name}. Are you sure you still want to log in? Logging in will automatically disconnect their active exam on the other device.`
+                            message: `The student is in ${exam.name}. Are you still want to login? Logging in will automatically disconnect their active exam on the other device.`
                         }, { status: 200 });
                     }
                 }
