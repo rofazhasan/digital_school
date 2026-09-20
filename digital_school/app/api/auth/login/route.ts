@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { createToken, JWTPayload } from '@/lib/auth';
+import { createToken, JWTPayload, verifyToken, validateSession } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { socketService } from '@/lib/socket';
 import { normalizePhone } from '@/lib/utils';
@@ -11,12 +11,13 @@ const loginSchema = z.object({
     identifier: z.string().min(1, 'Email or phone number is required'),
     password: z.string().min(1, 'Password is required'),
     loginMethod: z.enum(['email', 'phone']).optional().default('email'),
+    forceLogin: z.boolean().optional().default(false),
 });
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { identifier, password, loginMethod = 'email' } = loginSchema.parse(body);
+        const { identifier, password, loginMethod = 'email', forceLogin = false } = loginSchema.parse(body);
 
         // Validate identifier based on login method
         if (loginMethod === 'email') {
@@ -83,9 +84,95 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
 
-        // Re-read requirements: "if both of two not meet he wont login if login a page come verify"
-        // This implies they CAN login (enter password) but get a "verify" page.
-        // So we allow token creation even if !isActive or !verified.
+        // Check if student is actively in an exam session
+        // Strictly applies ONLY to student accounts
+        if (user.role === 'STUDENT' && !forceLogin) {
+            const studentId = user.studentProfile?.id || user.id;
+            const now = new Date();
+
+            try {
+                const activeSubmission = await prismadb.examSubmission.findFirst({
+                    where: {
+                        studentId,
+                        status: 'IN_PROGRESS',
+                        exam: {
+                            isActive: true,
+                            startTime: { lte: now },
+                            endTime: { gte: now }
+                        }
+                    },
+                    include: {
+                        exam: {
+                            select: {
+                                id: true,
+                                name: true,
+                                duration: true,
+                                objectiveTime: true,
+                                cqSqTime: true,
+                                endTime: true
+                            }
+                        }
+                    }
+                });
+
+                if (activeSubmission && activeSubmission.exam) {
+                    const exam = activeSubmission.exam;
+                    const nowMs = now.getTime();
+                    const examEndMs = new Date(exam.endTime).getTime();
+
+                    const startedAt = (activeSubmission as any).objectiveStartedAt ||
+                        (activeSubmission as any).cqSqStartedAt ||
+                        (activeSubmission as any).createdAt;
+
+                    let isExpired = false;
+                    if (startedAt) {
+                        const startMs = new Date(startedAt).getTime();
+                        const effectiveMinutes = (Number(exam.objectiveTime || 0) > 0 && Number(exam.cqSqTime || 0) > 0)
+                            ? Number(exam.objectiveTime) + Number(exam.cqSqTime)
+                            : (Number(exam.duration) || 0);
+                        if (effectiveMinutes > 0 && nowMs > startMs + effectiveMinutes * 60 * 1000) {
+                            isExpired = true;
+                        }
+                    }
+                    if (nowMs > examEndMs) {
+                        isExpired = true;
+                    }
+
+                    if (!isExpired) {
+                        return NextResponse.json({
+                            requiresExamConfirmation: true,
+                            examName: exam.name,
+                            message: `The student is in ${exam.name}. Are you sure you still want to log in? Logging in will automatically disconnect their active exam on the other device.`
+                        }, { status: 200 });
+                    }
+                }
+            } catch (examCheckErr) {
+                console.warn('[LOGIN] Active exam check non-blocking error:', examCheckErr);
+            }
+        }
+
+        // Check if user already has an active valid session on this device for the exact same user account
+        const existingSessionToken = request.cookies.get('session-token')?.value;
+        if (existingSessionToken) {
+            try {
+                const existingTokenData = await verifyToken(existingSessionToken);
+                if (existingTokenData && existingTokenData.userId === user.id) {
+                    const sessionValidation = await validateSession(existingSessionToken);
+                    if (sessionValidation.status === 'valid') {
+                        console.log(`[LOGIN] User ${user.id} is already logged in on this device. Reusing existing session.`);
+                        const { password: _password, ...userWithoutPassword } = user;
+                        return NextResponse.json({
+                            message: 'Already logged in',
+                            user: userWithoutPassword,
+                            token: existingSessionToken,
+                            alreadyLoggedIn: true
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn('[LOGIN] Existing session verification non-blocking error:', err);
+            }
+        }
 
         // Create Session ID
         const sessionId = uuidv4();

@@ -283,16 +283,18 @@ export async function middleware(request: NextRequest) {
   if (isPublicRoute) {
     const reason = request.nextUrl.searchParams.get('reason');
 
+    const isLoginOrSignup = pathname === '/login' || pathname === '/login/' || pathname === '/signup' || pathname === '/signup/';
+
     // If user is authenticated and trying to access login/signup, redirect to dashboard
     // EXCEPTION: Allow access if there's a session-related reason (like mismatch/expiry)
-    if (userData && (pathname === '/login' || pathname === '/signup') && !reason) {
+    if (userData && isLoginOrSignup && !reason) {
       const redirectUrl = getDefaultRedirectUrl(userData.role);
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
 
     // Proactive cookie clearing: If we are on login/signup and have a session reason, 
     // clear the token server-side immediately.
-    if ((pathname === '/login' || pathname === '/signup') && reason) {
+    if (isLoginOrSignup && reason) {
       const response = NextResponse.next();
       response.cookies.delete('session-token');
       return response;

@@ -170,20 +170,26 @@ export async function GET(
     // AUTO-RELEASE TRIGGER (Teacher View & Evaluation Load Fallback)
     // -------------------------------------------------------------------------
     try {
-      const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
-      const isTimeOver = (new Date() > new Date(exam.endTime));
+      const { finalizeAndReleaseExam, hasCqSqQuestions } = await import("@/lib/exam-logic");
+      const containsCqSq = hasCqSqQuestions(exam, (exam as any).examSets || []);
 
-      const totalClassStudents = await prisma.studentProfile.count({
-        where: { classId: exam.classId, user: { isActive: true } }
-      });
-      const submittedCount = await prisma.examSubmission.count({
-        where: { examId: exam.id, status: 'SUBMITTED' }
-      });
-      const allSubmitted = totalClassStudents > 0 && submittedCount >= totalClassStudents;
+      // Never auto-release results on evaluation load for exams with CQ/SQ!
+      // Teachers must manually review and click 'Release Results'.
+      if (!containsCqSq) {
+        const isTimeOver = (new Date() > new Date(exam.endTime));
 
-      // Trigger full sweep and release if time is over OR all class students completed
-      if (isTimeOver || allSubmitted) {
-        await finalizeAndReleaseExam(exam.id);
+        const totalClassStudents = await prisma.studentProfile.count({
+          where: { classId: exam.classId, user: { isActive: true } }
+        });
+        const submittedCount = await prisma.examSubmission.count({
+          where: { examId: exam.id, status: 'SUBMITTED' }
+        });
+        const allSubmitted = totalClassStudents > 0 && submittedCount >= totalClassStudents;
+
+        // Trigger full sweep and release if time is over OR all class students completed
+        if (isTimeOver || allSubmitted) {
+          await finalizeAndReleaseExam(exam.id);
+        }
       }
     } catch (e) {
       console.error("Auto-release trigger failed in evaluation API:", e);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,11 @@ import {
   DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent
+} from '@/components/ui/popover';
+import {
   detectAnswerFormat,
   toggleNumerals,
   toBengaliNumerals,
@@ -49,7 +54,248 @@ import {
 } from '@/utils/banglaConverter';
 
 // ==========================================
-// 0. Live Expression Input with LaTeX Preview & Bangla Converter
+// Comprehensive Symbol & Equation Categories (Math, Chemistry, Physics, Greek, Eng)
+// ==========================================
+export const SYMBOL_CATEGORIES = [
+  {
+    id: 'math',
+    label: 'Math & Calculus',
+    items: [
+      { label: 'x²', insert: '^2' },
+      { label: 'x³', insert: '^3' },
+      { label: 'xⁿ', insert: '^' },
+      { label: '10ⁿ', insert: '10^' },
+      { label: 'a/b', insert: '/' },
+      { label: '√x', insert: 'sqrt()' },
+      { label: '∛x', insert: 'cbrt()' },
+      { label: '±', insert: '±' },
+      { label: '∓', insert: '∓' },
+      { label: '×', insert: '×' },
+      { label: '÷', insert: '÷' },
+      { label: '≠', insert: '≠' },
+      { label: '≈', insert: '≈' },
+      { label: '∝', insert: '∝' },
+      { label: '≤', insert: '≤' },
+      { label: '≥', insert: '≥' },
+      { label: '<', insert: '<' },
+      { label: '>', insert: '>' },
+      { label: '∞', insert: '∞' },
+      { label: 'π', insert: 'π' },
+      { label: '°', insert: '°' },
+      { label: '∠', insert: '∠' },
+      { label: 'Δ', insert: 'Δ' },
+      { label: 'd/dx', insert: 'd/dx' },
+      { label: '∫', insert: '∫' },
+      { label: 'lim', insert: 'lim_{x→0}' },
+      { label: '∑', insert: '∑' },
+      { label: '∏', insert: '∏' },
+      { label: 'n!', insert: '!' },
+      { label: 'ⁿCᵣ', insert: '\\binom{n}{r}' },
+      { label: 'ⁿPᵣ', insert: 'P(n,r)' },
+      { label: '∈', insert: '∈' },
+      { label: '∉', insert: '∉' },
+      { label: '⊂', insert: '⊂' },
+      { label: '∪', insert: '∪' },
+      { label: '∩', insert: '∩' },
+      { label: '∅', insert: '∅' },
+      { label: '∴', insert: '∴' },
+      { label: '∵', insert: '∵' },
+      { label: 'sin', insert: 'sin()' },
+      { label: 'cos', insert: 'cos()' },
+      { label: 'tan', insert: 'tan()' },
+      { label: 'cot', insert: 'cot()' },
+      { label: 'sec', insert: 'sec()' },
+      { label: 'csc', insert: 'csc()' },
+      { label: 'sin⁻¹', insert: 'sin⁻¹()' },
+      { label: 'cos⁻¹', insert: 'cos⁻¹()' },
+      { label: 'tan⁻¹', insert: 'tan⁻¹()' },
+      { label: 'log', insert: 'log()' },
+      { label: 'ln', insert: 'ln()' },
+      { label: '|x|', insert: '|x|' },
+    ]
+  },
+  {
+    id: 'chem',
+    label: 'Chemistry',
+    items: [
+      { label: '→', insert: ' → ' },
+      { label: '⇄', insert: ' ⇄ ' },
+      { label: '⇌', insert: ' ⇌ ' },
+      { label: '↑ (gas)', insert: '↑' },
+      { label: '↓ (ppt)', insert: '↓' },
+      { label: '∆ (heat)', insert: '∆' },
+      { label: '(aq)', insert: '(aq)' },
+      { label: '(s)', insert: '(s)' },
+      { label: '(l)', insert: '(l)' },
+      { label: '(g)', insert: '(g)' },
+      { label: 'H⁺', insert: 'H⁺' },
+      { label: 'OH⁻', insert: 'OH⁻' },
+      { label: 'e⁻', insert: 'e⁻' },
+      { label: 'Na⁺', insert: 'Na⁺' },
+      { label: 'K⁺', insert: 'K⁺' },
+      { label: 'Ca²⁺', insert: 'Ca²⁺' },
+      { label: 'Mg²⁺', insert: 'Mg²⁺' },
+      { label: 'Al³⁺', insert: 'Al³⁺' },
+      { label: 'Fe²⁺', insert: 'Fe²⁺' },
+      { label: 'Fe³⁺', insert: 'Fe³⁺' },
+      { label: 'Cu²⁺', insert: 'Cu²⁺' },
+      { label: 'Zn²⁺', insert: 'Zn²⁺' },
+      { label: 'Cl⁻', insert: 'Cl⁻' },
+      { label: 'Br⁻', insert: 'Br⁻' },
+      { label: 'I⁻', insert: 'I⁻' },
+      { label: 'SO₄²⁻', insert: 'SO₄²⁻' },
+      { label: 'CO₃²⁻', insert: 'CO₃²⁻' },
+      { label: 'HCO₃⁻', insert: 'HCO₃⁻' },
+      { label: 'NO₃⁻', insert: 'NO₃⁻' },
+      { label: 'PO₄³⁻', insert: 'PO₄³⁻' },
+      { label: 'NH₄⁺', insert: 'NH₄⁺' },
+      { label: 'H₂O', insert: 'H₂O' },
+      { label: 'CO₂', insert: 'CO₂' },
+      { label: 'O₂', insert: 'O₂' },
+      { label: 'N₂', insert: 'N₂' },
+      { label: 'H₂', insert: 'H₂' },
+      { label: 'HCl', insert: 'HCl' },
+      { label: 'H₂SO₄', insert: 'H₂SO₄' },
+      { label: 'HNO₃', insert: 'HNO₃' },
+      { label: 'NaOH', insert: 'NaOH' },
+      { label: 'NaCl', insert: 'NaCl' },
+      { label: '─ (single)', insert: '─' },
+      { label: '═ (double)', insert: '═' },
+      { label: '≡ (triple)', insert: '≡' },
+    ]
+  },
+  {
+    id: 'subsuper',
+    label: 'Sub / Super',
+    items: [
+      { label: '⁰', insert: '⁰' },
+      { label: '¹', insert: '¹' },
+      { label: '²', insert: '²' },
+      { label: '³', insert: '³' },
+      { label: '⁴', insert: '⁴' },
+      { label: '⁵', insert: '⁵' },
+      { label: '⁶', insert: '⁶' },
+      { label: '⁷', insert: '⁷' },
+      { label: '⁸', insert: '⁸' },
+      { label: '⁹', insert: '⁹' },
+      { label: '⁺', insert: '⁺' },
+      { label: '⁻', insert: '⁻' },
+      { label: 'ⁿ', insert: 'ⁿ' },
+      { label: 'ˣ', insert: 'ˣ' },
+      { label: 'ʸ', insert: 'ʸ' },
+      { label: '₀', insert: '₀' },
+      { label: '₁', insert: '₁' },
+      { label: '₂', insert: '₂' },
+      { label: '₃', insert: '₃' },
+      { label: '₄', insert: '₄' },
+      { label: '₅', insert: '₅' },
+      { label: '₆', insert: '₆' },
+      { label: '₇', insert: '₇' },
+      { label: '₈', insert: '₈' },
+      { label: '₉', insert: '₉' },
+      { label: '₊', insert: '₊' },
+      { label: '₋', insert: '₋' },
+      { label: 'ₐ', insert: 'ₐ' },
+      { label: 'ₑ', insert: 'ₑ' },
+      { label: 'ₒ', insert: 'ₒ' },
+      { label: 'ₓ', insert: 'ₓ' },
+    ]
+  },
+  {
+    id: 'greek',
+    label: 'Greek & Physics',
+    items: [
+      { label: 'α', insert: 'α' },
+      { label: 'β', insert: 'β' },
+      { label: 'γ', insert: 'γ' },
+      { label: 'δ', insert: 'δ' },
+      { label: 'ε', insert: 'ε' },
+      { label: 'θ', insert: 'θ' },
+      { label: 'λ', insert: 'λ' },
+      { label: 'μ', insert: 'μ' },
+      { label: 'ν', insert: 'ν' },
+      { label: 'ξ', insert: 'ξ' },
+      { label: 'π', insert: 'π' },
+      { label: 'ρ', insert: 'ρ' },
+      { label: 'σ', insert: 'σ' },
+      { label: 'τ', insert: 'τ' },
+      { label: 'φ', insert: 'φ' },
+      { label: 'ψ', insert: 'ψ' },
+      { label: 'ω', insert: 'ω' },
+      { label: 'Δ', insert: 'Δ' },
+      { label: 'Ω', insert: 'Ω' },
+      { label: 'Σ', insert: 'Σ' },
+      { label: 'Φ', insert: 'Φ' },
+      { label: 'Ψ', insert: 'Ψ' },
+      { label: 'ℏ', insert: 'ℏ' },
+      { label: 'ε₀', insert: 'ε₀' },
+      { label: 'μ₀', insert: 'μ₀' },
+    ]
+  },
+  {
+    id: 'eng',
+    label: 'Eng & Units',
+    items: [
+      { label: '×10^', insert: '×10^' },
+      { label: 'e+', insert: 'e+' },
+      { label: 'e-', insert: 'e-' },
+      { label: 'Hz', insert: ' Hz' },
+      { label: 'kHz', insert: ' kHz' },
+      { label: 'MHz', insert: ' MHz' },
+      { label: 'GHz', insert: ' GHz' },
+      { label: 'Ω', insert: ' Ω' },
+      { label: 'kΩ', insert: ' kΩ' },
+      { label: 'MΩ', insert: ' MΩ' },
+      { label: 'V', insert: ' V' },
+      { label: 'mV', insert: ' mV' },
+      { label: 'kV', insert: ' kV' },
+      { label: 'A', insert: ' A' },
+      { label: 'mA', insert: ' mA' },
+      { label: 'μA', insert: ' μA' },
+      { label: 'W', insert: ' W' },
+      { label: 'kW', insert: ' kW' },
+      { label: 'MW', insert: ' MW' },
+      { label: 'J', insert: ' J' },
+      { label: 'kJ', insert: ' kJ' },
+      { label: 'eV', insert: ' eV' },
+      { label: 'MeV', insert: ' MeV' },
+      { label: 'N', insert: ' N' },
+      { label: 'kN', insert: ' kN' },
+      { label: 'Pa', insert: ' Pa' },
+      { label: 'kPa', insert: ' kPa' },
+      { label: 'atm', insert: ' atm' },
+      { label: 'bar', insert: ' bar' },
+      { label: 'mol', insert: ' mol' },
+      { label: 'M (molar)', insert: ' M' },
+      { label: 'kg', insert: ' kg' },
+      { label: 'g', insert: ' g' },
+      { label: 'mg', insert: ' mg' },
+      { label: 'm/s', insert: ' m/s' },
+      { label: 'm/s²', insert: ' m/s²' },
+      { label: '°C', insert: ' °C' },
+      { label: 'K', insert: ' K' },
+      { label: 'pF', insert: ' pF' },
+      { label: 'μF', insert: ' μF' },
+      { label: 'mH', insert: ' mH' },
+      { label: 'μH', insert: ' μH' },
+    ]
+  },
+  {
+    id: 'brackets',
+    label: 'Brackets & Format',
+    items: [
+      { label: '( )', insert: '()' },
+      { label: '[ ]', insert: '[]' },
+      { label: '{ }', insert: '{}' },
+      { label: '| |', insert: '||' },
+      { label: '« »', insert: '«»' },
+      { label: '" "', insert: '""' },
+    ]
+  }
+];
+
+// ==========================================
+// 0. Live Expression Input with LaTeX Preview, Bangla Converter & Rich Symbols
 // ==========================================
 export function LiveExpressionInput({
   value,
@@ -69,10 +315,26 @@ export function LiveExpressionInput({
   const strVal = String(value ?? '');
   const [livePhonetic, setLivePhonetic] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('math');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const insertSymbol = (sym: string) => {
     if (disabled) return;
-    onChange(strVal + sym);
+    const input = inputRef.current;
+    if (input) {
+      const start = input.selectionStart ?? strVal.length;
+      const end = input.selectionEnd ?? strVal.length;
+      const nextVal = strVal.slice(0, start) + sym + strVal.slice(end);
+      onChange(nextVal);
+      requestAnimationFrame(() => {
+        input.focus();
+        const nextPos = start + sym.length;
+        input.setSelectionRange(nextPos, nextPos);
+      });
+    } else {
+      onChange(strVal + sym);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,12 +383,14 @@ export function LiveExpressionInput({
     : 'Enter answer or math expression...';
 
   const effectivePlaceholder = placeholder || defaultPlaceholder;
+  const activeCategoryObj = SYMBOL_CATEGORIES.find((c) => c.id === activeCategory) || SYMBOL_CATEGORIES[0];
 
   return (
     <div className="space-y-2">
       {!disabled ? (
         <>
           <Input
+            ref={inputRef}
             type="text"
             placeholder={effectivePlaceholder}
             value={strVal}
@@ -152,8 +416,8 @@ export function LiveExpressionInput({
                   { label: 'n!', insert: '!' },
                   { label: '√x', insert: 'sqrt()' },
                   { label: '10ⁿ', insert: '10^' },
-                  { label: 'π', insert: '\\pi' },
-                  { label: '±', insert: '\\pm' },
+                  { label: 'π', insert: 'π' },
+                  { label: '±', insert: '±' },
                   { label: 'sin', insert: 'sin()' },
                   { label: 'cos', insert: 'cos()' },
                 ].map((btn) => (
@@ -161,11 +425,73 @@ export function LiveExpressionInput({
                     key={btn.label}
                     type="button"
                     onClick={() => insertSymbol(btn.insert)}
-                    className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border text-[11px] font-mono text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+                    className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border text-[11px] font-mono text-slate-700 dark:text-slate-200 transition-colors shrink-0 cursor-pointer"
                   >
                     {btn.label}
                   </button>
                 ))}
+
+                {/* More Symbols & Equations Palette Popover */}
+                <Popover open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors shrink-0 shadow-xs cursor-pointer ml-1"
+                      title="More math symbols, chemical equations, Greek letters, superscripts & units"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>More... (আরো)</span>
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-[340px] sm:w-[440px] p-3 text-xs shadow-xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 z-50">
+                    <div className="flex items-center justify-between pb-2 border-b border-border/80 mb-2">
+                      <span className="font-bold text-xs flex items-center gap-1.5 text-foreground">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                        Symbols & Notations (চিহ্ন ও সমীকরণ)
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">Tap to insert at cursor</span>
+                    </div>
+
+                    {/* Category Tabs */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1.5 mb-2 scrollbar-thin">
+                      {SYMBOL_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setActiveCategory(cat.id)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                            activeCategory === cat.id
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Symbol Items Grid */}
+                    <div className="grid grid-cols-5 sm:grid-cols-6 gap-1 max-h-56 overflow-y-auto p-1 scrollbar-thin rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
+                      {activeCategoryObj?.items.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => insertSymbol(item.insert)}
+                          title={`Insert ${item.insert}`}
+                          className="h-8 rounded-lg bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-600 text-slate-800 dark:text-slate-100 text-xs font-mono flex items-center justify-center transition-all active:scale-95 shadow-2xs hover:shadow-xs px-1 text-center truncate cursor-pointer"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-border/70 mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span>Category: <strong className="text-foreground">{activeCategoryObj?.label}</strong></span>
+                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{activeCategoryObj?.items.length} items</span>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Converter buttons */}

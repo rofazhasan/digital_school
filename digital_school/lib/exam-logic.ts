@@ -122,37 +122,53 @@ export interface QuestionData {
 export type SubmissionAnswers = Record<string, unknown>;
 
 /**
- * Check if an exam consists only of MCQs
- * Now improved to check actual questions if settings are ambiguous
+ * Check if an exam contains CQ, SQ, or descriptive questions
+ * (either alone or alongside objective questions)
  */
-export function isMCQOnlyExam(exam: Partial<Exam>, examSets: Partial<ExamSet>[] = []): boolean {
-    // 1. Check explicit settings if they are zero
-    if (exam.cqTotalQuestions === 0 && exam.sqTotalQuestions === 0) return true;
+export function hasCqSqQuestions(exam: Partial<Exam>, examSets: Partial<ExamSet>[] = []): boolean {
+    // 1. If explicit CQ or SQ counts are set above 0
+    if ((exam.cqTotalQuestions ?? 0) > 0 || (exam.sqTotalQuestions ?? 0) > 0) return true;
+    if ((exam.cqRequiredQuestions ?? 0) > 0 || (exam.sqRequiredQuestions ?? 0) > 0) return true;
 
-    // 2. If settings are non-zero (or default), checking actual questions is safer
-    // because user might have left settings at default but only added MCQ questions.
+    // 2. Check generatedSet if present
+    if (exam.generatedSet && typeof exam.generatedSet === 'object') {
+        const questions = Array.isArray((exam.generatedSet as any).questions)
+            ? (exam.generatedSet as any).questions
+            : [];
+        const hasCqSq = questions.some((q: QuestionData) => {
+            const type = (q.type || q.questionType || '').toUpperCase();
+            return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
+        });
+        if (hasCqSq) return true;
+    }
 
-    if (!examSets || examSets.length === 0) return false; // Can't determine
+    // 3. Check questions in exam sets
+    if (examSets && examSets.length > 0) {
+        for (const set of examSets) {
+            if (set.questionsJson) {
+                const questions = typeof set.questionsJson === 'string'
+                    ? JSON.parse(set.questionsJson)
+                    : set.questionsJson;
 
-    // Check the first set (assuming all sets have similar structure, or fairly enough)
-    // Ideally check all sets, but usually they follow the same pattern
-    for (const set of examSets) {
-        if (set.questionsJson) {
-            const questions = typeof set.questionsJson === 'string'
-                ? JSON.parse(set.questionsJson)
-                : set.questionsJson;
-
-            const hasNonMCQ = questions.some((q: QuestionData) => {
-                const type = (q.type || q.questionType || '').toUpperCase();
-                return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
-            });
-
-            if (hasNonMCQ) return false;
+                if (Array.isArray(questions)) {
+                    const hasCqSq = questions.some((q: QuestionData) => {
+                        const type = (q.type || q.questionType || '').toUpperCase();
+                        return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
+                    });
+                    if (hasCqSq) return true;
+                }
+            }
         }
     }
 
-    // If we scanned sets and found no CQ/SQ, then it IS MCQ only
-    return true;
+    return false;
+}
+
+/**
+ * Check if an exam consists only of MCQs/Objective questions
+ */
+export function isMCQOnlyExam(exam: Partial<Exam>, examSets: Partial<ExamSet>[] = []): boolean {
+    return !hasCqSqQuestions(exam, examSets);
 }
 
 /**
@@ -1126,6 +1142,13 @@ export async function finalizeAndReleaseExam(examId: string) {
         await evaluateSubmission(updatedSubmission, exam, exam.examSets);
     }
 
-    // Now release results to students
+    // If the exam contains CQ/SQ questions, DO NOT auto-release results!
+    // Subjective questions require manual teacher evaluation.
+    if (hasCqSqQuestions(exam, exam.examSets)) {
+        console.log(`[Auto-Release] Exam ${examId} contains CQ/SQ. Results held unreleased for manual teacher grading.`);
+        return;
+    }
+
+    // Now release results to students for objective-only exams
     await releaseExamResults(examId);
 }

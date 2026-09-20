@@ -17,7 +17,15 @@ import { useToast } from "@/components/ui/use-toast";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, Loader2, AlertCircle, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck, CheckCircle } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from "@/components/ui/dialog";
+import { Eye, EyeOff, Loader2, AlertCircle, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ControllerRenderProps } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation';
@@ -47,6 +55,11 @@ function LoginContent() {
 
     const [sessionAlert, setSessionAlert] = useState<{ device: string, ip: string, time: string } | null>(null);
     const [verificationSuccess, setVerificationSuccess] = useState<boolean>(false);
+    const [examWarning, setExamWarning] = useState<{
+        examName: string;
+        message: string;
+        pendingData: TLoginSchema;
+    } | null>(null);
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -91,6 +104,39 @@ function LoginContent() {
             const timer = setTimeout(() => setVerificationSuccess(false), 10000);
             return () => clearTimeout(timer);
         }
+
+        // Check if user is already logged in with an active session to eliminate redundant logins
+        const checkExistingAuth = async () => {
+            if (reason) return; // User arrived due to explicit logout, session invalidation, or expiry
+
+            try {
+                const res = await fetch('/api/auth/session', { cache: 'no-store' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.authenticated && data.status === 'valid' && data.user) {
+                        const userRole = data.user.role;
+                        const callbackUrl = searchParams.get('callbackUrl');
+                        let redirectUrl = '/dashboard';
+                        if (callbackUrl && callbackUrl.startsWith('/') && !callbackUrl.startsWith('/login')) {
+                            redirectUrl = callbackUrl;
+                        } else {
+                            switch (userRole) {
+                                case 'SUPER_USER': redirectUrl = '/super-user/dashboard'; break;
+                                case 'ADMIN': redirectUrl = '/admin/dashboard'; break;
+                                case 'TEACHER': redirectUrl = '/teacher/dashboard'; break;
+                                case 'STUDENT': redirectUrl = '/student/dashboard'; break;
+                                default: redirectUrl = '/dashboard';
+                            }
+                        }
+                        window.location.replace(redirectUrl);
+                    }
+                }
+            } catch {
+                // Non-blocking fallback
+            }
+        };
+
+        checkExistingAuth();
     }, [searchParams, toast]);
 
     const form = useForm<TLoginSchema>({
@@ -101,7 +147,7 @@ function LoginContent() {
         },
     });
 
-    const onSubmit = (data: TLoginSchema) => {
+    const executeLogin = (data: TLoginSchema, force = false) => {
         triggerHaptic(ImpactStyle.Medium);
         setError(null);
         startTransition(async () => {
@@ -111,47 +157,60 @@ function LoginContent() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ...data,
-                        loginMethod
+                        loginMethod,
+                        forceLogin: force,
                     }),
                 });
                 const result = await response.json();
                 if (!response.ok) {
                     triggerHaptic(ImpactStyle.Heavy);
                     setError(result.message || 'An unexpected error occurred.');
-                } else {
-                    triggerHaptic(ImpactStyle.Medium);
-                    const userRole = result.user.role;
-                    let redirectUrl = '/dashboard';
-                    const callbackUrl = searchParams.get('callbackUrl');
-                    if (callbackUrl && callbackUrl.startsWith('/')) {
-                        redirectUrl = callbackUrl;
-                    } else {
-                        switch (userRole) {
-                            case 'SUPER_USER':
-                                redirectUrl = '/super-user/dashboard';
-                                break;
-                            case 'ADMIN':
-                                redirectUrl = '/admin/dashboard';
-                                break;
-                            case 'TEACHER':
-                                redirectUrl = '/teacher/dashboard';
-                                break;
-                            case 'STUDENT':
-                                redirectUrl = '/student/dashboard';
-                                break;
-                            default:
-                                redirectUrl = '/dashboard';
-                        }
-                    }
-
-                    window.location.href = redirectUrl;
+                    return;
                 }
+
+                if (result.requiresExamConfirmation) {
+                    setExamWarning({
+                        examName: result.examName || 'Active Exam',
+                        message: result.message || 'The student is currently taking an exam. Are you sure you still want to log in?',
+                        pendingData: data,
+                    });
+                    return;
+                }
+
+                triggerHaptic(ImpactStyle.Medium);
+                const userRole = result.user.role;
+                let redirectUrl = '/dashboard';
+                const callbackUrl = searchParams.get('callbackUrl');
+                if (callbackUrl && callbackUrl.startsWith('/')) {
+                    redirectUrl = callbackUrl;
+                } else {
+                    switch (userRole) {
+                        case 'SUPER_USER':
+                            redirectUrl = '/super-user/dashboard';
+                            break;
+                        case 'ADMIN':
+                            redirectUrl = '/admin/dashboard';
+                            break;
+                        case 'TEACHER':
+                            redirectUrl = '/teacher/dashboard';
+                            break;
+                        case 'STUDENT':
+                            redirectUrl = '/student/dashboard';
+                            break;
+                        default:
+                            redirectUrl = '/dashboard';
+                    }
+                }
+
+                window.location.href = redirectUrl;
             } catch {
                 triggerHaptic(ImpactStyle.Heavy);
                 setError('Failed to connect to the server. Please try again.');
             }
         });
     };
+
+    const onSubmit = (data: TLoginSchema) => executeLogin(data, false);
 
 
     if (!mounted) return null;
@@ -459,6 +518,65 @@ function LoginContent() {
                     </div>
                 </div >
             </div >
+
+            {/* Active Exam Concurrency Warning Modal */}
+            <Dialog open={!!examWarning} onOpenChange={(open) => { if (!open) setExamWarning(null); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-2">
+                            <AlertTriangle className="w-6 h-6" />
+                        </div>
+                        <DialogTitle className="text-center text-lg font-bold">
+                            Active Exam in Progress
+                        </DialogTitle>
+                        <DialogDescription className="text-center text-sm text-muted-foreground pt-2 space-y-2">
+                            <span className="block font-medium text-foreground">
+                                The student is currently taking the exam:
+                            </span>
+                            <span className="inline-block font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800">
+                                {examWarning?.examName}
+                            </span>
+                            <span className="block text-xs leading-relaxed text-muted-foreground pt-1">
+                                Logging in on this device will automatically log out and disconnect their active exam session on the other device.
+                            </span>
+                            <span className="block font-semibold text-foreground pt-1">
+                                Are you sure you still want to log in?
+                            </span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 mt-4 sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setExamWarning(null)}
+                            className="w-full sm:w-auto"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => {
+                                if (examWarning?.pendingData) {
+                                    const data = examWarning.pendingData;
+                                    setExamWarning(null);
+                                    executeLogin(data, true);
+                                }
+                            }}
+                            className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+                        >
+                            {isPending ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Logging in...
+                                </>
+                            ) : (
+                                "Yes, Log In"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }
