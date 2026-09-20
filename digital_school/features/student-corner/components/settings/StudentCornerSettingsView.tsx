@@ -155,7 +155,7 @@ export function StudentCornerSettingsView({ initialSettings, todayArenaId }: Stu
             <div className="flex flex-wrap gap-2">
               {Object.values(ChallengeCategory).map((cat) => {
                 const isSelected = preferredCategories.includes(cat);
-                const meta = CATEGORY_METADATA[cat];
+                const meta = CATEGORY_METADATA[cat] || CATEGORY_METADATA.CUSTOM;
                 return (
                   <button
                     key={cat}
@@ -168,7 +168,7 @@ export function StudentCornerSettingsView({ initialSettings, todayArenaId }: Stu
                     }`}
                   >
                     {isSelected && <Check className="w-3 h-3" />}
-                    <span>{meta.label}</span>
+                    <span>{meta?.label || cat}</span>
                   </button>
                 );
               })}

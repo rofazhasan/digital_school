@@ -112,11 +112,14 @@ export function QuickAddChallengeModal({
                 onChange={(e) => setCategory(e.target.value as ChallengeCategory)}
                 className="mt-1.5 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-2 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-hidden"
               >
-                {Object.values(ChallengeCategory).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_METADATA[cat].label} ({CATEGORY_METADATA[cat].banglaLabel})
-                  </option>
-                ))}
+                {Object.values(ChallengeCategory).map((cat) => {
+                  const meta = CATEGORY_METADATA[cat] || CATEGORY_METADATA.CUSTOM;
+                  return (
+                    <option key={cat} value={cat}>
+                      {meta?.label || cat} ({meta?.banglaLabel || cat})
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

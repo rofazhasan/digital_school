@@ -101,6 +101,15 @@ export const CATEGORY_METADATA: Record<ChallengeCategory, CategoryMetadata> = {
     bgColor: 'rgba(239, 68, 68, 0.1)',
     borderColor: 'rgba(239, 68, 68, 0.3)',
   },
+  MISTAKE_RETEST: {
+    id: 'MISTAKE_RETEST',
+    label: 'Mistake Retest',
+    banglaLabel: 'ভুল সংশোধন',
+    iconName: 'Target',
+    color: '#f97316',
+    bgColor: 'rgba(249, 115, 22, 0.1)',
+    borderColor: 'rgba(249, 115, 22, 0.3)',
+  },
   CUSTOM: {
     id: 'CUSTOM',
     label: 'Custom Goal',

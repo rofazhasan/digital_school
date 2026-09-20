@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChallengeWithRelations } from '../../types';
 import { CATEGORY_METADATA } from '../../types/categories';
+import { getCategoryMeta } from '../../utils/cast-utils';
 import { DayMode, ChallengeStatus, ChallengePriority } from '@prisma/client';
 import {
   CheckCircle2,
@@ -59,7 +60,7 @@ export function ChallengeCard({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isRemovedOptimistic, setIsRemovedOptimistic] = useState(false);
 
-  const categoryMeta = CATEGORY_METADATA[challenge.category] || CATEGORY_METADATA.CUSTOM;
+  const categoryMeta = getCategoryMeta(challenge.category, challenge.customCategoryName);
 
   if (isRemovedOptimistic) {
     return null;
@@ -82,6 +83,8 @@ export function ChallengeCard({
     } catch (err: any) {
       setIsCompleted(!nextState);
       toast.error(err.message || 'Error updating status');
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -134,7 +137,7 @@ export function ChallengeCard({
     }
   };
 
-  const priorityColors = {
+  const priorityColors: Record<ChallengePriority, string> = {
     LOW: 'text-slate-500 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
     MEDIUM: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60',
     HIGH: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60',
@@ -176,9 +179,9 @@ export function ChallengeCard({
                   <span>{challenge.customCategoryName || categoryMeta.label}</span>
                 </span>
 
-                {challenge.subjects?.map((s) => (
+                {challenge.subjects?.map((s, idx) => (
                   <span
-                    key={s.subjectId}
+                    key={s.subject?.id || idx}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                   >
                     <BookOpen className="w-3 h-3 text-slate-400" />
