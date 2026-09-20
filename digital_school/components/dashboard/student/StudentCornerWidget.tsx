@@ -18,7 +18,11 @@ import { Button } from '@/components/ui/button';
 import { getTodayArenaAction } from '@/features/student-corner/actions/arena-actions';
 import { DailyArenaWithChallenges } from '@/features/student-corner/types';
 
-export function StudentCornerWidget() {
+interface StudentCornerWidgetProps {
+  studentProfileId?: string;
+}
+
+export function StudentCornerWidget({ studentProfileId }: StudentCornerWidgetProps = {}) {
   const router = useRouter();
   const [arenaData, setArenaData] = useState<DailyArenaWithChallenges | null>(null);
   const [streak, setStreak] = useState(0);
@@ -26,18 +30,28 @@ export function StudentCornerWidget() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    // 1. Instantly restore from localStorage in 0ms
+    // Purge any legacy shared unkeyed cache immediately
     try {
-      const cached = localStorage.getItem('sc_widget_cached_v2');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.arena) {
-          setArenaData(parsed.arena);
-          setStreak(parsed.streak || 0);
-          if (parsed.hijriDate) setHijriDate(parsed.hijriDate);
-        }
-      }
+      localStorage.removeItem('sc_widget_cached_v2');
     } catch {}
+
+    // 1. Instantly restore from localStorage ONLY if strictly keyed to this studentProfileId
+    if (studentProfileId) {
+      try {
+        const cacheKey = `sc_widget_cached_${studentProfileId}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.profileId === studentProfileId && parsed?.arena) {
+            setArenaData(parsed.arena);
+            setStreak(parsed.streak || 0);
+            if (parsed.hijriDate) setHijriDate(parsed.hijriDate);
+          }
+        }
+      } catch {}
+    } else {
+      setArenaData(null);
+    }
 
     // 2. Refresh silently in background without blocking UI
     let isMounted = true;
@@ -47,20 +61,29 @@ export function StudentCornerWidget() {
         const res = await getTodayArenaAction();
         if (!isMounted) return;
         if (res.success && res.arena) {
+          const fetchedProfileId = (res.arena as any).studentProfileId;
+          // Guard: if studentProfileId prop was specified, ensure response matches it
+          if (studentProfileId && fetchedProfileId && fetchedProfileId !== studentProfileId) {
+            return;
+          }
+
           setArenaData(res.arena as any);
           setStreak(res.streakInfo?.currentStreak || 0);
           if (res.hijriDate) setHijriDate(res.hijriDate);
 
-          try {
-            localStorage.setItem(
-              'sc_widget_cached_v2',
-              JSON.stringify({
-                arena: res.arena,
-                streak: res.streakInfo?.currentStreak || 0,
-                hijriDate: res.hijriDate,
-              })
-            );
-          } catch {}
+          if (fetchedProfileId) {
+            try {
+              localStorage.setItem(
+                `sc_widget_cached_${fetchedProfileId}`,
+                JSON.stringify({
+                  profileId: fetchedProfileId,
+                  arena: res.arena,
+                  streak: res.streakInfo?.currentStreak || 0,
+                  hijriDate: res.hijriDate,
+                })
+              );
+            } catch {}
+          }
         }
       } catch (err) {
         console.error('Failed to load arena summary in dashboard widget', err);
@@ -73,7 +96,7 @@ export function StudentCornerWidget() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [studentProfileId]);
 
   const total = arenaData?.challenges?.length || 0;
   const completed = arenaData?.challenges?.filter((c) => c.status === 'COMPLETED').length || 0;

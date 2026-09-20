@@ -52,7 +52,7 @@ export async function getOrCreateDailyArena(studentProfileId: string, dateInput:
     },
     include: {
       challenges: {
-        where: { isArchived: false },
+        where: { isArchived: false, studentProfileId },
         orderBy: { orderIndex: 'asc' },
         include: {
           subjects: {
@@ -92,7 +92,7 @@ export async function getOrCreateDailyArena(studentProfileId: string, dateInput:
       },
       include: {
         challenges: {
-          where: { isArchived: false },
+          where: { isArchived: false, studentProfileId },
           orderBy: { orderIndex: 'asc' },
           include: {
             subjects: { include: { subject: true } },
@@ -918,8 +918,8 @@ export async function getArenaDueItemsAndExamDay(studentProfileId: string) {
     }),
     db.exam.findMany({
       where: {
-        examDate: { gte: todayStart, lte: todayEnd },
-        status: { in: ['PUBLISHED', 'ONGOING'] },
+        date: { gte: todayStart, lte: todayEnd },
+        isActive: true,
       },
       take: 2,
       select: {

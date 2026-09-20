@@ -202,6 +202,19 @@ function LoginContent() {
                     }
                 }
 
+                try {
+                    localStorage.removeItem('sc_widget_cached_v2');
+                    localStorage.removeItem('student_dashboard_cache_v4');
+                    const keysToRemove: string[] = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && (k.startsWith('sc_') || k.startsWith('student_') || k.startsWith('ro_'))) {
+                            keysToRemove.push(k);
+                        }
+                    }
+                    keysToRemove.forEach((k) => localStorage.removeItem(k));
+                } catch {}
+
                 window.location.href = redirectUrl;
             } catch {
                 triggerHaptic(ImpactStyle.Heavy);

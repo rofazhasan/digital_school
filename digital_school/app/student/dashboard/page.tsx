@@ -159,13 +159,38 @@ interface Notice {
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
-const DASHBOARD_CACHE_KEY = "student_dashboard_cache_v4";
+const LEGACY_DASHBOARD_CACHE_KEY = "student_dashboard_cache_v4";
+const DASHBOARD_CACHE_PREFIX = "student_dashboard_cache_v5_";
 
-function getCachedData() {
-  if (typeof window === "undefined") return null;
+function getDashboardCacheKey(userId?: string): string | null {
+  return userId ? `${DASHBOARD_CACHE_PREFIX}${userId}` : null;
+}
+
+/** Purge the legacy unscoped cache that caused cross-user data leakage. */
+function purgeLegacyCache() {
+  if (typeof window === "undefined") return;
   try {
-    const raw = localStorage.getItem(DASHBOARD_CACHE_KEY) || sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    localStorage.removeItem(LEGACY_DASHBOARD_CACHE_KEY);
+    sessionStorage.removeItem(LEGACY_DASHBOARD_CACHE_KEY);
+  } catch {}
+}
+
+function getCachedData(userId?: string) {
+  if (typeof window === "undefined") return null;
+  purgeLegacyCache();
+  const key = getDashboardCacheKey(userId);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Safety: verify cached data belongs to the requested user
+    if (parsed?.user?.id && userId && parsed.user.id !== userId) {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -189,48 +214,18 @@ export default function StudentDashboardPage() {
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<UserProfile>(() => {
-    const c = getCachedData();
-    return c?.user || DEFAULT_FALLBACK_USER;
-  });
-  const [exams, setExams] = useState<Exam[]>(() => {
-    const c = getCachedData();
-    return Array.isArray(c?.exams) ? c.exams : [];
-  });
-  const [results, setResults] = useState<Result[]>(() => {
-    const c = getCachedData();
-    return Array.isArray(c?.results) ? c.results : [];
-  });
-  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>(() => {
-    const c = getCachedData();
-    return Array.isArray(c?.submissions) ? c.submissions : [];
-  });
-  const [attendance, setAttendance] = useState<any>(() => {
-    const c = getCachedData();
-    return c?.attendance || null;
-  });
-  const [notices, setNotices] = useState<Notice[]>(() => {
-    const c = getCachedData();
-    return Array.isArray(c?.notices) ? c.notices : [];
-  });
-  const [unreadNoticeCount, setUnreadNoticeCount] = useState(() => {
-    const c = getCachedData();
-    return typeof c?.unreadNoticeCount === "number" ? c.unreadNoticeCount : 0;
-  });
-  const [analytics, setAnalytics] = useState<any>(() => {
-    const c = getCachedData();
-    return c?.analytics || null;
-  });
-  const [loading, setLoading] = useState(() => {
-    const c = getCachedData();
-    return !c?.user;
-  });
+  const [user, setUser] = useState<UserProfile>(DEFAULT_FALLBACK_USER);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
+  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>([]);
+  const [attendance, setAttendance] = useState<any>(null);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
-  const [instituteSettings, setInstituteSettings] = useState<any>(() => {
-    const c = getCachedData();
-    return c?.instituteSettings || null;
-  });
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
   const [now, setNow] = useState<Date>(new Date());
 
   // Performance Trends Controls
@@ -277,20 +272,23 @@ export default function StudentDashboardPage() {
 
         // Cache snapshot in localStorage & sessionStorage for instant 0-second loading
         try {
-          const payload = JSON.stringify({
-            user: data.user,
-            exams: data.exams,
-            results: data.results,
-            submissions: data.submissions,
-            attendance: data.attendance,
-            analytics: data.analytics,
-            notices: data.notices,
-            unreadNoticeCount: data.unreadNoticeCount,
-            instituteSettings: data.instituteSettings,
-            updatedAt: Date.now()
-          });
-          localStorage.setItem(DASHBOARD_CACHE_KEY, payload);
-          sessionStorage.setItem(DASHBOARD_CACHE_KEY, payload);
+          const cacheKey = getDashboardCacheKey(data.user?.id);
+          if (cacheKey) {
+            const payload = JSON.stringify({
+              user: data.user,
+              exams: data.exams,
+              results: data.results,
+              submissions: data.submissions,
+              attendance: data.attendance,
+              analytics: data.analytics,
+              notices: data.notices,
+              unreadNoticeCount: data.unreadNoticeCount,
+              instituteSettings: data.instituteSettings,
+              updatedAt: Date.now()
+            });
+            localStorage.setItem(cacheKey, payload);
+            sessionStorage.setItem(cacheKey, payload);
+          }
         } catch {}
       } else {
         const userRes = await fetch('/api/user', { credentials: 'include' });
@@ -309,31 +307,36 @@ export default function StudentDashboardPage() {
     }
   }, [router]);
 
-  // Client-side Mount and SWR Cache Hydration
+  // Client-side Mount
   useEffect(() => {
     setMounted(true);
-    const cached = getCachedData();
-    if (cached) {
-      if (cached.user) setUser(cached.user);
-      if (Array.isArray(cached.exams)) setExams(cached.exams);
-      if (Array.isArray(cached.results)) setResults(cached.results);
-      if (Array.isArray(cached.submissions)) setExamSubmissions(cached.submissions);
-      if (cached.attendance) setAttendance(cached.attendance);
-      if (cached.analytics) setAnalytics(cached.analytics);
-      if (Array.isArray(cached.notices)) setNotices(cached.notices);
-      if (typeof cached.unreadNoticeCount === "number") setUnreadNoticeCount(cached.unreadNoticeCount);
-      if (cached.instituteSettings) setInstituteSettings(cached.instituteSettings);
-      if (cached.user) setLoading(false);
-    }
-
-    fetchDashboardData(true);
+    purgeLegacyCache();
+    fetchDashboardData(false);
   }, [fetchDashboardData]);
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      localStorage.removeItem(DASHBOARD_CACHE_KEY);
-      sessionStorage.removeItem(DASHBOARD_CACHE_KEY);
+      purgeLegacyCache();
+      const userCacheKey = getDashboardCacheKey(user?.id);
+      if (userCacheKey) {
+        localStorage.removeItem(userCacheKey);
+        sessionStorage.removeItem(userCacheKey);
+      }
+      if (typeof window !== 'undefined') {
+        const removeMatching = (storage: Storage) => {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < storage.length; i++) {
+            const key = storage.key(i);
+            if (key && (key.startsWith('sc_') || key.startsWith('student_') || key.startsWith('ro_'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach((k) => storage.removeItem(k));
+        };
+        try { removeMatching(localStorage); } catch {}
+        try { removeMatching(sessionStorage); } catch {}
+      }
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -816,7 +819,7 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* Student Corner Today's Arena Widget */}
-              <StudentCornerWidget />
+              <StudentCornerWidget studentProfileId={user?.studentProfile?.id} />
 
               {/* 5 Metric Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">

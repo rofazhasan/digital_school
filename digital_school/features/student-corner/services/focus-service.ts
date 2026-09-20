@@ -51,10 +51,10 @@ export async function startFocusSession(studentProfileId: string, input: StartFo
     },
   });
 
-  // If tied to a challenge, mark challenge as IN_PROGRESS
+  // If tied to a challenge, mark challenge as IN_PROGRESS (scoped to student)
   if (input.challengeId) {
-    await db.arenaChallenge.update({
-      where: { id: input.challengeId },
+    await db.arenaChallenge.updateMany({
+      where: { id: input.challengeId, studentProfileId },
       data: { status: ChallengeStatus.IN_PROGRESS },
     });
   }
@@ -152,8 +152,8 @@ export async function completeFocusSession(studentProfileId: string, sessionId: 
   });
 
   if (session.challengeId) {
-    await db.arenaChallenge.update({
-      where: { id: session.challengeId },
+    await db.arenaChallenge.updateMany({
+      where: { id: session.challengeId, studentProfileId },
       data: {
         status: ChallengeStatus.COMPLETED,
         completedAt: now,

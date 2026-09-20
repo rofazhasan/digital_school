@@ -41,10 +41,11 @@ const DEFAULT_CHECKLIST: ChecklistItem[] = [
 interface ExamAwarenessViewProps {
   initialExams: CombinedExamItem[];
   availableTopics?: any[];
+  studentProfileId?: string;
   onRefresh?: () => void;
 }
 
-export function ExamAwarenessView({ initialExams, availableTopics = [], onRefresh }: ExamAwarenessViewProps) {
+export function ExamAwarenessView({ initialExams, availableTopics = [], studentProfileId, onRefresh }: ExamAwarenessViewProps) {
   const [exams, setExams] = useState<CombinedExamItem[]>(initialExams);
   const [addExamOpen, setAddExamOpen] = useState(false);
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
@@ -53,15 +54,20 @@ export function ExamAwarenessView({ initialExams, availableTopics = [], onRefres
   // Map of examId -> checklist
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
 
+  const cacheKey = studentProfileId ? `student_corner_exam_checklists_${studentProfileId}` : null;
+
   // Load from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('student_corner_exam_checklists');
-      if (stored) {
-        setChecklists(JSON.parse(stored));
+      localStorage.removeItem('student_corner_exam_checklists');
+      if (cacheKey) {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          setChecklists(JSON.parse(stored));
+        }
       }
     } catch (e) {}
-  }, []);
+  }, [cacheKey]);
 
   const getExamChecklist = (examId: string): ChecklistItem[] => {
     return checklists[examId] || DEFAULT_CHECKLIST;
@@ -74,9 +80,11 @@ export function ExamAwarenessView({ initialExams, availableTopics = [], onRefres
     );
     const newMap = { ...checklists, [examId]: updated };
     setChecklists(newMap);
-    try {
-      localStorage.setItem('student_corner_exam_checklists', JSON.stringify(newMap));
-    } catch (e) {}
+    if (cacheKey) {
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(newMap));
+      } catch (e) {}
+    }
   };
 
   const getReadinessPercentage = (examId: string): number => {

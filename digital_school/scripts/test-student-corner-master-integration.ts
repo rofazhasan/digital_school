@@ -49,31 +49,39 @@ async function runMasterIntegrationSuite() {
   console.log('🚀 STUDENT CORNER MASTER FEATURE INTEGRATION & ECOSYSTEM TEST SUITE');
   console.log('========================================================================\n');
 
-  // 1. Setup / Find a Student Profile for testing
+  // 1. Setup / Find a Dedicated Test Student Profile
   let student = await db.studentProfile.findFirst({
+    where: { roll: 'TEST_CORNER_ISOLATED' },
     include: { user: true },
   });
 
   if (!student) {
-    console.log('Creating mock student profile for testing...');
+    console.log('Creating dedicated mock student profile for testing...');
+    const classRecord = await db.class.findFirst();
     const user = await db.user.create({
       data: {
-        username: `test_integration_${Date.now()}`,
-        name: 'Test Integration Student',
+        email: `test_corner_isolated_${Date.now()}@example.com`,
+        phone: `01999${Math.floor(100000 + Math.random() * 900000)}`,
+        name: 'Test Isolated Student',
         role: 'STUDENT',
+        password: 'test-password-hash',
       },
     });
     student = await db.studentProfile.create({
       data: {
         userId: user.id,
-        roll: 'TEST-001',
+        roll: 'TEST_CORNER_ISOLATED',
+        registrationNo: `REG_TEST_${Date.now()}`,
+        guardianName: 'Guardian',
+        guardianPhone: '01999000000',
+        classId: classRecord?.id || 'cmg1xbd0o0001l50n431urv36',
       },
       include: { user: true },
     });
   }
 
   const studentProfileId = student.id;
-  console.log(`Using Student Profile ID: ${studentProfileId} (${student.user?.name || 'Student'})\n`);
+  console.log(`Using Dedicated Test Student Profile ID: ${studentProfileId} (${student.user?.name})\n`);
 
   let passedJourneys = 0;
 
@@ -341,6 +349,11 @@ async function runMasterIntegrationSuite() {
   } catch (error) {
     console.error('❌ Test failed with error:', error);
     process.exit(1);
+  } finally {
+    console.log('🧹 Cleaning up isolated test challenges...');
+    await db.arenaChallenge.deleteMany({ where: { studentProfileId } });
+    await db.dailyArena.deleteMany({ where: { studentProfileId } });
+    console.log('✨ Cleanup complete.');
   }
 }
 

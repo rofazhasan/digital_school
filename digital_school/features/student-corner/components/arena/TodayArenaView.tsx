@@ -93,6 +93,13 @@ export function TodayArenaView({
       focusComponent: Math.round((arena.totalPlannedMinutes > 0 ? Math.min(100, (arena.totalCompletedMinutes / arena.totalPlannedMinutes) * 100) : 0) * 0.3),
       criticalComponent: Math.round((totalCount > 0 ? (completedCount / totalCount) * 100 : 0) * 0.2),
     },
+    coreStandardScore: 0,
+    coreStandardPillars: {
+      study: false,
+      recall: false,
+      exam: false,
+      lifestyle: false,
+    },
   };
 
   // Filter challenges by category

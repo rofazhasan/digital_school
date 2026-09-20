@@ -36,7 +36,7 @@ export default async function CastDisplayPage() {
       todayScore={todayScore}
       upcomingExams={upcomingExams}
       quranList={CORE_QURAN_COLLECTION}
-      hijriDate={hijriDate}
+      hijriDate={hijriDate?.hijriFormatted ?? null}
     />
   );
 }

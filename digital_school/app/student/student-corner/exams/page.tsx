@@ -35,7 +35,7 @@ export default async function ExamsPage() {
       currentStreak={streakInfo.currentStreak}
       studentName={student.name}
     >
-      <ExamAwarenessView initialExams={exams} availableTopics={topics} />
+      <ExamAwarenessView initialExams={exams} availableTopics={topics} studentProfileId={student.studentProfileId} />
     </StudentCornerShell>
   );
 }
