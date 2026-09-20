@@ -67,6 +67,8 @@ const MoodJournal = dynamic(() => import("@/components/dashboard/wonderspace/Moo
 import { AIAnalysisCard } from "@/components/dashboard/student/AIAnalysisCard";
 import { PerformancePredictor } from "@/components/dashboard/student/PerformancePredictor";
 import { SecuritySettings } from "@/components/dashboard/SecuritySettings";
+import { StudentCornerWidget } from "@/components/dashboard/student/StudentCornerWidget";
+import { Compass } from "lucide-react";
 
 // Chart Components
 import {
@@ -608,13 +610,14 @@ export default function StudentDashboardPage() {
               <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900/80 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800/80">
                 {[
                   { id: 'dashboard', label: 'Overview', icon: Home, action: () => setActiveTab('dashboard') },
+                  { id: 'student-corner', label: 'Student Corner', icon: Compass, href: '/student/student-corner', isFeatured: true, badgeText: 'OS' },
                   { id: 'exams', label: 'My Exams', icon: FileText, action: () => setActiveTab('exams') },
                   { id: 'analytics', label: 'Analytics', icon: TrendingUp, action: () => setActiveTab('analytics') },
                   { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
                   { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
                   { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
                   { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
-                ].map((item) => (
+                ].map((item: any) => (
                   <button
                     key={item.id}
                     onClick={() => {
@@ -628,13 +631,20 @@ export default function StudentDashboardPage() {
                       }
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 ${
-                      activeTab === item.id && !item.href && item.id !== 'focus'
+                      item.isFeatured
+                        ? 'bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-cyan-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 hover:border-indigo-400 shadow-xs'
+                        : activeTab === item.id && !item.href && item.id !== 'focus'
                         ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-muted-foreground hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
                     }`}
                   >
-                    <item.icon className={`h-4 w-4 ${activeTab === item.id && item.id !== 'focus' ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
+                    <item.icon className={`h-4 w-4 ${item.isFeatured || (activeTab === item.id && item.id !== 'focus') ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
                     <span>{item.label}</span>
+                    {item.badgeText && (
+                      <span className="flex px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-500 text-[8px] font-black text-white leading-none tracking-wider uppercase shadow-xs">
+                        {item.badgeText}
+                      </span>
+                    )}
                     {item.badge && item.badge > 0 ? (
                       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white">
                         {item.badge}
@@ -645,15 +655,15 @@ export default function StudentDashboardPage() {
               </nav>
             </div>
 
-            {/* Quick Actions & Profile */}
-            <div className="flex items-center gap-3">
+            {/* Right Action Icons */}
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => router.push('/student/prac-perfect')}
-                className="hidden sm:flex rounded-full text-xs font-bold border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                className="hidden xl:flex items-center gap-2 rounded-full border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 font-bold text-xs hover:border-indigo-500/50 transition-colors shadow-xs"
               >
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
                 Practice Now
               </Button>
 
@@ -684,6 +694,10 @@ export default function StudentDashboardPage() {
                       </Badge>
                     )}
                   </div>
+                  <DropdownMenuItem onClick={() => router.push('/student/student-corner')} className="rounded-xl text-xs font-semibold py-2 text-indigo-600 dark:text-indigo-400 focus:bg-indigo-50 dark:focus:bg-indigo-950/30">
+                    <Compass className="mr-2 h-4 w-4" />
+                    Student Corner (Personal OS)
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-xl text-xs font-semibold py-2">
                     <Settings className="mr-2 h-4 w-4 text-slate-500" />
                     Profile Settings
@@ -705,13 +719,14 @@ export default function StudentDashboardPage() {
         <div className="flex gap-2">
           {[
             { id: 'dashboard', label: 'Overview', icon: Home, action: () => setActiveTab('dashboard') },
+            { id: 'student-corner', label: 'Student Corner', icon: Compass, href: '/student/student-corner', isFeatured: true, badgeText: 'OS' },
             { id: 'exams', label: 'My Exams', icon: FileText, action: () => setActiveTab('exams') },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp, action: () => setActiveTab('analytics') },
             { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
             { id: 'results', label: 'Completed & Results', icon: BarChart3, href: '/exams/results' },
             { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
             { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
-          ].map((item) => (
+          ].map((item: any) => (
             <button
               key={item.id}
               onClick={() => {
@@ -725,13 +740,20 @@ export default function StudentDashboardPage() {
                 }
               }}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                activeTab === item.id && !item.href && item.id !== 'focus'
+                item.isFeatured
+                  ? 'bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
+                  : activeTab === item.id && !item.href && item.id !== 'focus'
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                   : 'bg-slate-100 dark:bg-slate-900 text-muted-foreground border border-slate-200 dark:border-slate-800'
               }`}
             >
               <item.icon className="h-3.5 w-3.5" />
               <span>{item.label}</span>
+              {item.badgeText && (
+                <span className="flex px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-500 text-[8px] font-black text-white leading-none tracking-wider uppercase">
+                  {item.badgeText}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -769,8 +791,15 @@ export default function StudentDashboardPage() {
 
                   <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto pt-2 sm:pt-0">
                     <Button
+                      onClick={() => router.push('/student/student-corner')}
+                      className="flex-1 sm:flex-initial rounded-2xl font-black text-xs sm:text-sm bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-lg shadow-indigo-500/30 px-4 sm:px-5 py-3 sm:py-5 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                      <Compass className="h-4 w-4" />
+                      Student Corner
+                    </Button>
+                    <Button
                       onClick={() => router.push('/student/prac-perfect')}
-                      className="flex-1 sm:flex-initial rounded-2xl font-black text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white shadow-lg shadow-indigo-500/30 px-4 sm:px-5 py-3 sm:py-5 active:scale-95 transition-all"
+                      className="flex-1 sm:flex-initial rounded-2xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border-white/20 py-3 sm:py-5"
                     >
                       <Sparkles className="h-4 w-4 mr-1.5" />
                       Practice Center
@@ -785,6 +814,9 @@ export default function StudentDashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Student Corner Today's Arena Widget */}
+              <StudentCornerWidget />
 
               {/* 5 Metric Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">

@@ -118,6 +118,18 @@ model StudentProfile {
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Student Corner Relations
+  studentCornerProfile StudentCornerProfile?
+  dailyArenas          DailyArena[]
+  arenaChallenges      ArenaChallenge[]
+  cornerSubjects       StudentCornerSubject[]
+  focusSessions        FocusSession[]
+  personalExams        PersonalExam[]
+  arenaAuditLogs       ArenaAuditLog[]
+  goals                StudentGoal[]
+  savedReflections     SavedReflection[]
+  cornerNotifications  StudentCornerNotification[]
+
   @@map("student_profiles")
 }
 
@@ -1251,4 +1263,373 @@ enum DocumentType {
   ID_CARD
   TRANSFER_CERTIFICATE
   ADMISSION_LETTER
+}
+
+// -----------------------------------------------------------------------------
+// STUDENT CORNER MODELS
+// -----------------------------------------------------------------------------
+
+enum DayMode {
+  NORMAL
+  STRICT
+  LOCKED
+}
+
+enum ChallengeCategory {
+  STUDY
+  CODING
+  SALAT
+  QURAN
+  HABIT
+  EXERCISE
+  READING
+  DIET
+  ASSIGNMENT
+  REVISION
+  EXAM_PREP
+  CUSTOM
+}
+
+enum ChallengePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ChallengeStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum FocusSessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+model StudentCornerProfile {
+  id                  String              @id @default(cuid())
+  studentProfileId    String              @unique
+  timezone            String              @default("Asia/Dhaka")
+  dailyGoalMinutes    Int                 @default(240)
+  defaultDayMode      DayMode             @default(NORMAL)
+  soundEnabled        Boolean             @default(true)
+  notificationsEnabled Boolean            @default(true)
+  preferredCategories ChallengeCategory[] @default([STUDY, CODING, SALAT, QURAN, REVISION])
+  currentStreak            Int                 @default(0)
+  longestStreak            Int                 @default(0)
+  streakGraceDaysAvailable Int                 @default(1)
+  streakQualifyingCriteria String              @default("ONE_CHALLENGE")
+  privacyModeEnabled       Boolean             @default(false)
+  density                  String              @default("COMFORTABLE")
+  widgetConfig             Json?
+  savedViews               Json?
+  lastActiveDate           DateTime?
+  onboardingCompleted      Boolean             @default(false)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  studentProfile      StudentProfile      @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId])
+  @@map("student_corner_profiles")
+}
+
+model StudentCornerSubject {
+  id               String               @id @default(cuid())
+  studentProfileId String
+  name             String
+  color            String               @default("#6366f1")
+  icon             String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  studentProfile   StudentProfile       @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  topics           StudentCornerTopic[]
+  challenges       ChallengeSubjectMap[]
+
+  @@unique([studentProfileId, name])
+  @@index([studentProfileId])
+  @@map("student_corner_subjects")
+}
+
+model StudentCornerTopic {
+  id         String                @id @default(cuid())
+  subjectId  String
+  name       String
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  subject    StudentCornerSubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  challenges ChallengeTopicMap[]
+
+  @@unique([subjectId, name])
+  @@index([subjectId])
+  @@map("student_corner_topics")
+}
+
+model DailyArena {
+  id                    String            @id @default(cuid())
+  studentProfileId      String
+  date                  DateTime          @db.Date
+  mode                  DayMode           @default(NORMAL)
+  isLocked              Boolean           @default(false)
+  lockedAt              DateTime?
+  summary               Json?
+  notes                 String?
+  totalPlannedMinutes   Int               @default(0)
+  totalCompletedMinutes Int               @default(0)
+  completedCount        Int               @default(0)
+  totalCount            Int               @default(0)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  studentProfile        StudentProfile    @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  challenges            ArenaChallenge[]
+  focusSessions         FocusSession[]
+  auditLogs             ArenaAuditLog[]
+
+  @@unique([studentProfileId, date])
+  @@index([studentProfileId, date])
+  @@map("daily_arenas")
+}
+
+model ArenaChallenge {
+  id                 String                @id @default(cuid())
+  arenaId            String
+  studentProfileId   String
+  title              String
+  category           ChallengeCategory     @default(STUDY)
+  customCategoryName String?
+  durationMinutes    Int                   @default(30)
+  scheduledTime      String?
+  priority           ChallengePriority     @default(MEDIUM)
+  status             ChallengeStatus       @default(NOT_STARTED)
+  orderIndex         Int                   @default(0)
+  notes              String?
+  completedAt        DateTime?
+  actualMinutesSpent Int                   @default(0)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  arena              DailyArena            @relation(fields: [arenaId], references: [id], onDelete: Cascade)
+  studentProfile     StudentProfile        @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  subjects           ChallengeSubjectMap[]
+  topics             ChallengeTopicMap[]
+  focusSessions      FocusSession[]
+
+  @@index([arenaId, orderIndex])
+  @@index([studentProfileId, status])
+  @@map("arena_challenges")
+}
+
+model ChallengeSubjectMap {
+  id          String               @id @default(cuid())
+  challengeId String
+  subjectId   String
+
+  challenge   ArenaChallenge       @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  subject     StudentCornerSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, subjectId])
+  @@index([challengeId])
+  @@index([subjectId])
+  @@map("challenge_subject_maps")
+}
+
+model ChallengeTopicMap {
+  id          String             @id @default(cuid())
+  challengeId String
+  topicId     String
+
+  challenge   ArenaChallenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  topic       StudentCornerTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, topicId])
+  @@index([challengeId])
+  @@index([topicId])
+  @@map("challenge_topic_maps")
+}
+
+model FocusSession {
+  id                     String             @id @default(cuid())
+  studentProfileId       String
+  arenaId                String
+  challengeId            String?
+  plannedDurationMinutes Int
+  startedAt              DateTime           @default(now())
+  plannedEnd             DateTime
+  actualEnd              DateTime?
+  status                 FocusSessionStatus @default(ACTIVE)
+  secondsElapsed         Int                @default(0)
+  pauseCount             Int                @default(0)
+  notes                  String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  studentProfile         StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  arena                  DailyArena         @relation(fields: [arenaId], references: [id], onDelete: Cascade)
+  challenge              ArenaChallenge?    @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  @@index([studentProfileId, startedAt])
+  @@index([arenaId])
+  @@index([challengeId])
+  @@map("student_focus_sessions")
+}
+
+model PersonalExam {
+  id                   String            @id @default(cuid())
+  studentProfileId     String
+  title                String
+  subject              String
+  examDate             DateTime
+  startTime            String?
+  location             String?
+  priority             ChallengePriority @default(HIGH)
+  notes                String?
+  isCompleted          Boolean           @default(false)
+  preparationChecklist Json?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  studentProfile       StudentProfile    @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId, examDate])
+  @@map("personal_exams")
+}
+
+model DailyQuranAyah {
+  id                  Int      @id
+  surahNumber         Int
+  surahNameArabic     String
+  surahNameBangla     String
+  surahNameEnglish    String
+  ayahNumber          Int
+  arabicText          String
+  banglaPronunciation String
+  banglaMeaning       String
+  englishMeaning      String?
+  theme               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([id])
+  @@map("daily_quran_ayahs")
+}
+
+model DailyHadith {
+  id           Int      @id
+  arabicText   String?
+  banglaText   String
+  englishText  String?
+  sourceBook   String
+  hadithNumber String
+  chapter      String?
+  grade        String
+  theme        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([id])
+  @@map("daily_hadiths")
+}
+
+model ArenaAuditLog {
+  id               String         @id @default(cuid())
+  arenaId          String
+  studentProfileId String
+  action           String
+  fieldName        String?
+  oldValue         String?
+  newValue         String?
+  reason           String?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime       @default(now())
+
+  arena            DailyArena     @relation(fields: [arenaId], references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([arenaId, createdAt])
+  @@index([studentProfileId])
+  @@map("arena_audit_logs")
+}
+
+enum GoalTargetType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  SEMESTER
+  CUSTOM
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model StudentGoal {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  title            String
+  category         String?
+  targetType       GoalTargetType @default(MONTHLY)
+  targetValue      Int
+  currentValue     Int            @default(0)
+  unit             String         @default("tasks")
+  startDate        DateTime       @default(now())
+  targetDate       DateTime?
+  completedAt      DateTime?
+  status           GoalStatus     @default(ACTIVE)
+  milestonesPassed Int[]          @default([])
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId, status])
+  @@map("student_goals")
+}
+
+model SavedReflection {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  type             String
+  referenceKey     String
+  arabicText       String?
+  banglaText       String
+  source           String
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([studentProfileId, type, referenceKey])
+  @@index([studentProfileId])
+  @@map("saved_reflections")
+}
+
+model StudentCornerNotification {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  title            String
+  message          String
+  type             String         @default("SYSTEM")
+  read             Boolean        @default(false)
+  actionUrl        String?
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId, read])
+  @@index([studentProfileId, createdAt])
+  @@map("student_corner_notifications")
 }
