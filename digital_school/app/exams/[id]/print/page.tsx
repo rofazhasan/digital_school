@@ -44,6 +44,74 @@ export default function PrintExamPage() {
   const [showDate, setShowDate] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Institute customization State
+  const [hideInstitute, setHideInstitute] = useState(false);
+  const [customSchoolName, setCustomSchoolName] = useState('');
+  const [customSchoolAddress, setCustomSchoolAddress] = useState('');
+  const [showEditInstituteModal, setShowEditInstituteModal] = useState(false);
+  const [tempSchoolName, setTempSchoolName] = useState('');
+  const [tempSchoolAddress, setTempSchoolAddress] = useState('');
+
+  // Persist institute customization in localStorage
+  useEffect(() => {
+    if (!examId || typeof window === 'undefined') return;
+    try {
+      const savedHide = localStorage.getItem(`print_hide_institute_${examId}`);
+      if (savedHide !== null) setHideInstitute(savedHide === 'true');
+      const savedName = localStorage.getItem(`print_custom_name_${examId}`);
+      if (savedName !== null) setCustomSchoolName(savedName);
+      const savedAddress = localStorage.getItem(`print_custom_address_${examId}`);
+      if (savedAddress !== null) setCustomSchoolAddress(savedAddress);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [examId]);
+
+  const toggleHideInstitute = () => {
+    setHideInstitute((prev) => {
+      const nextVal = !prev;
+      try {
+        localStorage.setItem(`print_hide_institute_${examId}`, String(nextVal));
+      } catch (e) {}
+      return nextVal;
+    });
+  };
+
+  const openEditInstituteModal = () => {
+    setTempSchoolName(customSchoolName !== '' ? customSchoolName : (examData?.examInfo?.schoolName || ''));
+    setTempSchoolAddress(customSchoolAddress !== '' ? customSchoolAddress : (examData?.examInfo?.schoolAddress || ''));
+    setShowEditInstituteModal(true);
+  };
+
+  const handleSaveInstitute = (name: string, address: string) => {
+    setCustomSchoolName(name);
+    setCustomSchoolAddress(address);
+    try {
+      localStorage.setItem(`print_custom_name_${examId}`, name);
+      localStorage.setItem(`print_custom_address_${examId}`, address);
+    } catch (e) {}
+    setShowEditInstituteModal(false);
+  };
+
+  const handleResetInstitute = () => {
+    setCustomSchoolName('');
+    setCustomSchoolAddress('');
+    try {
+      localStorage.removeItem(`print_custom_name_${examId}`);
+      localStorage.removeItem(`print_custom_address_${examId}`);
+    } catch (e) {}
+    setShowEditInstituteModal(false);
+  };
+
+  const effectiveExamInfo = React.useMemo(() => {
+    if (!examData?.examInfo) return null;
+    return {
+      ...examData.examInfo,
+      schoolName: customSchoolName !== '' ? customSchoolName : examData.examInfo.schoolName,
+      schoolAddress: customSchoolAddress !== '' ? customSchoolAddress : examData.examInfo.schoolAddress,
+    };
+  }, [examData?.examInfo, customSchoolName, customSchoolAddress]);
+
   // --- Data Fetching ---
   useEffect(() => {
     if (!examId) {
@@ -160,7 +228,8 @@ export default function PrintExamPage() {
   }
 
   const t = LANGS[language];
-  const { examInfo, sets } = examData;
+  const { sets } = examData;
+  const examInfo = effectiveExamInfo || examData.examInfo;
   const nonEmptySets = sets.filter(
     (set: any) => (
       set.mcq?.length ||
@@ -204,6 +273,17 @@ export default function PrintExamPage() {
           setShowOMR={setShowOMR}
           showDate={showDate}
           setShowDate={setShowDate}
+          hideInstitute={hideInstitute}
+          toggleHideInstitute={toggleHideInstitute}
+          openEditInstituteModal={openEditInstituteModal}
+          showEditInstituteModal={showEditInstituteModal}
+          setShowEditInstituteModal={setShowEditInstituteModal}
+          tempSchoolName={tempSchoolName}
+          setTempSchoolName={setTempSchoolName}
+          tempSchoolAddress={tempSchoolAddress}
+          setTempSchoolAddress={setTempSchoolAddress}
+          handleSaveInstitute={handleSaveInstitute}
+          handleResetInstitute={handleResetInstitute}
           t={t}
         />
 
@@ -253,13 +333,14 @@ export default function PrintExamPage() {
                     language={language}
                     hideOMR={!showOMR}
                     showDate={showDate}
+                    hideInstitute={hideInstitute}
                   />
                 </div>
               ))}
 
               {/* Render OMR Sheets only for question papers if showOMR is true */}
               {showOMR && nonEmptySets.map((set: any) => (
-                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
+                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} />
               ))}
             </>
           ) : (
@@ -290,6 +371,7 @@ export default function PrintExamPage() {
                   language={language}
                   hideOMR={!showOMR}
                   showDate={showDate}
+                  hideInstitute={hideInstitute}
                 />
               </div>
             ))
@@ -303,7 +385,7 @@ export default function PrintExamPage() {
 
 // --- Refactored Sub-Components for Clarity ---
 
-const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, language: 'bn' | 'en' }) => {
+const OMRPage = ({ set, examInfo, language, hideInstitute }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean }) => {
   const [uniqueCode] = useState(() => uuidv4());
 
   // Calculate max options count (either 4 or 5) based on actual question data
@@ -333,6 +415,7 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
         uniqueCode={uniqueCode}
         objectiveTime={examInfo.objectiveTime}
         cqSqTime={examInfo.cqSqTime}
+        hideInstitute={hideInstitute}
       />
     </div>
   );
@@ -344,7 +427,11 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
 const PrintControls = ({
   language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers,
   objectiveFontSize, setObjectiveFontSize, cqSqFontSize, setCqSqFontSize,
-  forcePageBreak, setForcePageBreak, showOMR, setShowOMR, showDate, setShowDate, t
+  forcePageBreak, setForcePageBreak, showOMR, setShowOMR, showDate, setShowDate,
+  hideInstitute, toggleHideInstitute, openEditInstituteModal,
+  showEditInstituteModal, setShowEditInstituteModal,
+  tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
+  handleSaveInstitute, handleResetInstitute, t
 }: any) => {
   // If page break is off, keep font sizes in sync
   const updateGlobalFontSize = (delta: number) => {
@@ -401,6 +488,28 @@ const PrintControls = ({
             </button>
           </div>
 
+          {/* Institute Customization Controls */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'Institute:' : 'প্রতিষ্ঠান:'}</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={openEditInstituteModal}
+                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold transition flex items-center gap-0.5 shadow-sm"
+                title={language === 'en' ? 'Edit Institute Name & Address' : 'প্রতিষ্ঠানের নাম ও ঠিকানা এডিট করুন'}
+              >
+                ✏️ {language === 'en' ? 'Edit' : 'এডিট'}
+              </button>
+              <button
+                type="button"
+                onClick={toggleHideInstitute}
+                className={`px-2 py-1 rounded text-[10px] font-bold transition shadow-sm ${hideInstitute ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}
+              >
+                {hideInstitute ? (language === 'en' ? 'Hidden' : 'লুকানো') : (language === 'en' ? 'Visible' : 'দৃশ্যমান')}
+              </button>
+            </div>
+          </div>
+
           {!forcePageBreak ? (
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold text-gray-600 underline">গ্লোবাল ফন্ট:</span>
@@ -428,6 +537,78 @@ const PrintControls = ({
             </div>
           )}
         </div>
+
+        {/* Floating Institute Edit Popover Window */}
+        {showEditInstituteModal && (
+          <div className="mt-2 p-2.5 bg-gray-50 border border-amber-300 rounded-lg shadow-md text-left">
+            <div className="flex justify-between items-center mb-2 pb-1 border-b border-gray-200">
+              <h4 className="text-[11px] font-bold text-gray-800 flex items-center gap-1">
+                ✏️ {language === 'en' ? 'Edit Institution' : 'প্রতিষ্ঠান এডিট'}
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowEditInstituteModal(false)}
+                className="text-gray-400 hover:text-gray-700 text-xs font-bold leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-[10px]">
+              <div>
+                <label className="block text-gray-600 font-semibold mb-0.5">
+                  {language === 'en' ? 'Institution Name:' : 'প্রতিষ্ঠানের নাম:'}
+                </label>
+                <input
+                  type="text"
+                  value={tempSchoolName}
+                  onChange={(e) => setTempSchoolName(e.target.value)}
+                  placeholder={language === 'en' ? 'Enter school name...' : 'প্রতিষ্ঠানের নাম লিখুন...'}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 font-semibold mb-0.5">
+                  {language === 'en' ? 'Address:' : 'প্রতিষ্ঠানের ঠিকানা:'}
+                </label>
+                <input
+                  type="text"
+                  value={tempSchoolAddress}
+                  onChange={(e) => setTempSchoolAddress(e.target.value)}
+                  placeholder={language === 'en' ? 'Enter address...' : 'প্রতিষ্ঠানের ঠিকানা লিখুন...'}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-black"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1 gap-1">
+                <button
+                  type="button"
+                  onClick={handleResetInstitute}
+                  className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-[10px] font-semibold transition"
+                >
+                  {language === 'en' ? 'Reset' : 'রিসেট'}
+                </button>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditInstituteModal(false)}
+                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-[10px] transition"
+                  >
+                    {language === 'en' ? 'Cancel' : 'বাতিল'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveInstitute(tempSchoolName, tempSchoolAddress)}
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold transition"
+                  >
+                    {language === 'en' ? 'Save' : 'সংরক্ষণ'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={onPrint}

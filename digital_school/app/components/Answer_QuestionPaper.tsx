@@ -113,6 +113,7 @@ interface AnswerQuestionPaperProps {
   language?: 'bn' | 'en';
   hideOMR?: boolean;
   showDate?: boolean;
+  hideInstitute?: boolean;
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -273,7 +274,7 @@ const MSSubjectHeader = ({
   );
 };
 
-const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lang = 'bn' }: {
+const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lang = 'bn', hideInstitute }: {
   examInfo: any,
   type: 'objective' | 'cqsq',
   qrData: any,
@@ -281,7 +282,8 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
   time: number | string,
   banglaWord?: string,
   showDate?: boolean,
-  lang?: 'bn' | 'en'
+  lang?: 'bn' | 'en',
+  hideInstitute?: boolean
 }) => {
   const isHEn = lang === 'en';
   const isExamMS = examInfo.subjectType ? examInfo.subjectType === 'MS' : Boolean(
@@ -295,10 +297,10 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
 
         {/* Middle Section: School Info */}
         <div className="flex-1 text-center">
-          <h1 className="text-3xl font-black tracking-tight mb-0.5">
+          <h1 className={`text-3xl font-black tracking-tight mb-0.5 ${hideInstitute ? 'invisible' : ''}`}>
             {examInfo.schoolName || (isHEn ? 'School Name' : 'শিক্ষা প্রতিষ্ঠানের নাম')}
           </h1>
-          <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
+          <p className={`text-sm font-semibold text-gray-800 uppercase tracking-widest ${hideInstitute ? 'invisible' : ''}`}>
             {examInfo.schoolAddress || (isHEn ? 'School Address' : 'প্রতিষ্ঠানের ঠিকানা')}
           </p>
         </div>
@@ -349,7 +351,7 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
 
 // Main AnswerQuestionPaper component (forwardRef for printing)
 const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>(
-  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate }, ref) => {
+  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate, hideInstitute = false }, ref) => {
     const lang = language || 'bn';
     const isEn = lang === 'en';
     const mcqs = questions.mcq || [];
@@ -526,7 +528,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
           fontSize: fontSize ? `${fontSize}%` : '100%'
         }}
       >
-        <div className="watermark print-only">{examInfo.schoolName}</div>
+        {!hideInstitute && examInfo.schoolName && <div className="watermark print-only">{examInfo.schoolName}</div>}
 
         <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
           <Header
@@ -538,6 +540,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
             showDate={showDate}
             lang={lang}
+            hideInstitute={hideInstitute}
           />
           {/* Special Instruction Box */}
           <div className="instruction-box">
@@ -1050,6 +1053,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   time={examInfo.cqSqTime || 0}
                   banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 1, lang) : undefined}
                   showDate={showDate}
+                  lang={lang}
+                  hideInstitute={hideInstitute}
                 />
               )}
               {cqs.length > 0 && (

@@ -45,6 +45,7 @@ interface OMRSheetProps {
   uniqueCode?: string;
   objectiveTime?: number;
   cqSqTime?: number;
+  hideInstitute?: boolean;
 }
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -69,6 +70,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   uniqueCode,
   objectiveTime,
   cqSqTime,
+  hideInstitute = false,
 }) => {
   const totalQuestions = 100;
   // Large bubbles enabled by full width
@@ -300,8 +302,8 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
             <div className="flex-1 flex flex-col items-center">
               <div className="text-center">
-                <h1 className="text-2xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
-                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">{schoolAddress}</p>
+                <h1 className={`text-2xl font-black uppercase tracking-tight leading-none text-black ${hideInstitute ? 'invisible' : ''}`}>{instituteName}</h1>
+                <p className={`text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1 ${hideInstitute ? 'invisible' : ''}`}>{schoolAddress}</p>
                 <div className="inline-block bg-black text-white px-2 py-0.5 mt-2 rounded-sm">
                   <h2 className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">OMR ANSWER SHEET</h2>
                 </div>
