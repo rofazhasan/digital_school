@@ -292,7 +292,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <FiducialMarker id={3} size={40} className="absolute bottom-12 left-12" />
 
       {/* --- CONTENT CONTAINER --- */}
-      <div className="flex flex-col h-full mx-10 my-10 mb-20 border-[2px] border-black rounded-sm overflow-visible z-10 relative bg-white/50">
+      <div className="flex flex-col h-full mx-6 my-3 mb-2 border-[2px] border-black rounded-sm overflow-visible z-10 relative bg-white/50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
 
         {/* HEADER - Top Down 1/3 */}
         <header className="flex flex-col border-b-[2px] border-black bg-white">
@@ -302,8 +302,12 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
             <div className="flex-1 flex flex-col items-center">
               <div className="text-center">
-                <h1 className={`text-2xl font-black uppercase tracking-tight leading-none text-black ${hideInstitute ? 'invisible' : ''}`}>{instituteName}</h1>
-                <p className={`text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1 ${hideInstitute ? 'invisible' : ''}`}>{schoolAddress}</p>
+                {!hideInstitute && (
+                  <>
+                    <h1 className="text-2xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
+                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">{schoolAddress}</p>
+                  </>
+                )}
                 <div className="inline-block bg-black text-white px-2 py-0.5 mt-2 rounded-sm">
                   <h2 className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">OMR ANSWER SHEET</h2>
                 </div>

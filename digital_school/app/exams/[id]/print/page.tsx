@@ -396,7 +396,7 @@ const OMRPage = ({ set, examInfo, language, hideInstitute }: { set: any, examInf
   }, [set.mcq]);
 
   return (
-    <div className="print-page-container legal-paper omr-sheet-wrapper">
+    <div className="print-page-container legal-paper omr-sheet-wrapper" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       <OMRSheet
         questions={set}
         qrData={set.qrData}

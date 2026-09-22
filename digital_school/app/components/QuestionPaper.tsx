@@ -286,27 +286,29 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
   );
   return (
     <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
-      <div className="flex items-center justify-between gap-4">
-        {/* Logo Spacer to balance QR */}
-        <div className="w-20" />
+      {!hideInstitute && (
+        <div className="flex items-center justify-between gap-4">
+          {/* Logo Spacer to balance QR */}
+          <div className="w-20" />
 
-        {/* Middle Section: School Info */}
-        <div className="flex-1 text-center">
-          <h1 className={`text-3xl font-black tracking-tight mb-0.5 ${hideInstitute ? 'invisible' : ''}`}>
-            {examInfo.schoolName || 'শিক্ষা প্রতিষ্ঠানের নাম'}
-          </h1>
-          <p className={`text-sm font-semibold text-gray-800 uppercase tracking-widest ${hideInstitute ? 'invisible' : ''}`}>
-            {examInfo.schoolAddress || 'প্রতিষ্ঠানের ঠিকানা'}
-          </p>
-        </div>
+          {/* Middle Section: School Info */}
+          <div className="flex-1 text-center">
+            <h1 className="text-3xl font-black tracking-tight mb-0.5">
+              {examInfo.schoolName || 'শিক্ষা প্রতিষ্ঠানের নাম'}
+            </h1>
+            <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
+              {examInfo.schoolAddress || 'প্রতিষ্ঠানের ঠিকানা'}
+            </p>
+          </div>
 
-        {/* QR Code Section */}
-        <div className="w-20 h-20 flex items-center justify-end">
-          <div className="p-1 border border-black bg-white shadow-sm">
-            <QRCode value={JSON.stringify(qrData)} size={64} />
+          {/* QR Code Section */}
+          <div className="w-20 h-20 flex items-center justify-end">
+            <div className="p-1 border border-black bg-white shadow-sm">
+              <QRCode value={JSON.stringify(qrData)} size={64} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex justify-center">
         <div className="inline-block border-y-2 border-black py-1.5 px-10 my-3 bg-gray-50/50">
