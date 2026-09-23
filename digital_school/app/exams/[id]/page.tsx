@@ -1818,10 +1818,19 @@ export default function ExamBuilderPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" />Manual Set Builder</CardTitle>
                   <div className={`flex justify-between items-center text-sm pt-2 p-2 rounded-md ${isSelectionValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-                    <span className="font-medium">Selected Marks:</span>
-                    <span className={`font-bold text-lg ${isSelectionValid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                      {currentMarks} / {exam.totalMarks}
-                    </span>
+                    <span className="font-medium">{isMS ? "Student Marks Target:" : "Selected Marks:"}</span>
+                    <div className="text-right">
+                      <span className={`font-bold text-lg ${isSelectionValid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                        {isMS && isMSValid
+                          ? `${exam.totalMarks} / ${exam.totalMarks}`
+                          : (isMS ? `${Math.min(currentMarks, exam.totalMarks)} / ${exam.totalMarks}` : `${currentMarks} / ${exam.totalMarks}`)}
+                      </span>
+                      {isMS && currentMarks !== exam.totalMarks && (
+                        <div className="text-[10px] text-muted-foreground font-semibold">
+                          Total Question Pool: {currentMarks} Marks
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Multiple Subject (MS): Subject Quota Tracker */}

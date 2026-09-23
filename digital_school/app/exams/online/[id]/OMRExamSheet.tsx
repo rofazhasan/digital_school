@@ -91,6 +91,37 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   const questions = setOrderedQuestions || sortedQuestions || [];
   const totalQuestions = questions.length;
 
+  const optionalSubjects = useMemo(() => {
+    if (!isMS || !msSubjects) return [];
+    return msSubjects.filter((s: any) => !s.isMandatory);
+  }, [isMS, msSubjects]);
+
+  const mandatorySubjects = useMemo(() => {
+    if (!isMS || !msSubjects) return [];
+    return msSubjects.filter((s: any) => s.isMandatory);
+  }, [isMS, msSubjects]);
+
+  const requiredOptionalCount = Number((exam.subjectsConfig as any)?.requiredOptionalCount) || Number((exam as any).requiredOptionalCount) || 1;
+
+  // Student's chosen optional subject(s) state
+  const [chosenOptionalSubjects, setChosenOptionalSubjects] = useState<string[]>(() => {
+    if (attemptedOptionalSubjects && attemptedOptionalSubjects.size > 0) {
+      return (Array.from(attemptedOptionalSubjects) as string[]).slice(0, requiredOptionalCount);
+    }
+    return [];
+  });
+
+  // Keep chosenOptionalSubjects in sync if user answered an optional subject
+  useEffect(() => {
+    if (attemptedOptionalSubjects && attemptedOptionalSubjects.size > 0) {
+      setChosenOptionalSubjects(prev => {
+        const attemptedArr = Array.from(attemptedOptionalSubjects) as string[];
+        const set = new Set<string>([...prev, ...attemptedArr]);
+        return Array.from(set);
+      });
+    }
+  }, [attemptedOptionalSubjects]);
+
   // Session user fallback state
   const [sessionUser, setSessionUser] = useState<any>(null);
 
@@ -208,6 +239,31 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
   }, [answeredStatusMap]);
 
   const unansweredCount = totalQuestions - answeredCount;
+
+  const handleToggleOptionalSubject = useCallback((subjName: string) => {
+    setChosenOptionalSubjects(prev => {
+      if (prev.includes(subjName)) {
+        const hasAnswers = questions.some((q: any) => 
+          (matchSubject ? matchSubject(q.subject, subjName) : (q.subject || '').toLowerCase().trim() === subjName.toLowerCase().trim()) &&
+          answeredStatusMap[q.id]
+        );
+        if (hasAnswers) {
+          toast.warning(`আপনি ইতিমধ্যে ${subjName} বিষয়ে উত্তর করেছেন। পরিবর্তন করতে চাইলে পূরণকৃত উত্তরগুলো ক্লিয়ার করুন।`);
+          return prev;
+        }
+        return prev.filter(s => s !== subjName);
+      } else {
+        if (requiredOptionalCount === 1) {
+          return [subjName];
+        }
+        if (prev.length >= requiredOptionalCount) {
+          toast.info(`আপনি সর্বোচ্চ ${toBengaliNumerals(requiredOptionalCount)}টি ঐচ্ছিক বিষয় নির্বাচন করতে পারবেন।`);
+          return prev;
+        }
+        return [...prev, subjName];
+      }
+    });
+  }, [questions, matchSubject, answeredStatusMap, requiredOptionalCount]);
 
   // Handle single MCQ Bubble Select (One-Time Fill Rule in OMR Mode)
   const handleMCQSelect = useCallback((qId: string, optionLabel: string, optionIndex: number) => {
@@ -596,6 +652,69 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
           </div>
         )}
 
+        {/* MS Optional Subject Selection Card */}
+        {isMS && optionalSubjects.length > 0 && (
+          <div className="bg-gradient-to-r from-indigo-50/90 via-white to-purple-50/90 dark:from-slate-900 dark:via-slate-850 dark:to-indigo-950/40 border-2 border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-3.5 sm:p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-indigo-100 dark:border-indigo-900/50">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                <h4 className="font-black text-xs sm:text-sm uppercase tracking-wide text-indigo-950 dark:text-indigo-200">
+                  ঐচ্ছিক বিষয় নির্বাচন (Optional Subject Selection)
+                </h4>
+              </div>
+              <div className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300">
+                <span className="bg-indigo-100 dark:bg-indigo-950 px-2 py-0.5 rounded-md border border-indigo-300 dark:border-indigo-700">
+                  অনুমোদিত: যেকোনো {toBengaliNumerals(requiredOptionalCount)}টি বিষয়
+                </span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-md font-bold",
+                  chosenOptionalSubjects.length === requiredOptionalCount
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                )}>
+                  {toBengaliNumerals(chosenOptionalSubjects.length)}/{toBengaliNumerals(requiredOptionalCount)}টি নির্বাচিত
+                </span>
+              </div>
+            </div>
+            <div className="pt-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                যে ঐচ্ছিক বিষয়টি উত্তর করবেন ক্লিক করুন:
+              </span>
+              {optionalSubjects.map((sub: any) => {
+                const isSelected = chosenOptionalSubjects.includes(sub.name);
+                const subAnswered = questions.filter((q: any) => 
+                  (matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()) &&
+                  answeredStatusMap[q.id]
+                ).length;
+
+                return (
+                  <button
+                    key={sub.name}
+                    type="button"
+                    onClick={() => handleToggleOptionalSubject(sub.name)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer",
+                      isSelected
+                        ? "bg-indigo-600 text-white border-indigo-700 shadow-indigo-500/25 ring-2 ring-indigo-400/50"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-indigo-400"
+                    )}
+                  >
+                    <span>{isSelected ? '✓ ' : '+ '}{sub.name}</span>
+                    {subAnswered > 0 && (
+                      <span className="text-[10px] bg-white/20 dark:bg-black/30 px-1.5 py-0.2 rounded font-normal">
+                        {toBengaliNumerals(subAnswered)} উত্তর
+                      </span>
+                    )}
+                    <span className="text-[9px] opacity-80 uppercase">
+                      {isSelected ? '(নির্বাচিত)' : '(ঐচ্ছিক)'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* MS Subject Selector Tabs with Live Question Counters */}
         {isMS && msSubjects && msSubjects.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -913,7 +1032,13 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                   const subjectSections: { name: string; isMandatory?: boolean; totalMarks?: number; questions: any[] }[] = [];
                   const mapped = new Set<string>();
 
-                  msSubjects.forEach((sub: any) => {
+                  // Mandatory subjects first, then optional subjects
+                  const orderedSubjects = [
+                    ...msSubjects.filter((s: any) => s.isMandatory !== false),
+                    ...msSubjects.filter((s: any) => s.isMandatory === false)
+                  ];
+
+                  orderedSubjects.forEach((sub: any) => {
                     const subQs = displayedQuestions.filter((q: any) => 
                       matchSubject ? matchSubject(q.subject, sub.name) : (q.subject || '').toLowerCase().trim() === sub.name?.toLowerCase().trim()
                     );
@@ -963,6 +1088,11 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                 <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 ${sec.isMandatory ? 'border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' : 'border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300'}`}>
                                   {sec.isMandatory ? 'আবশ্যক (Mandatory)' : 'ঐচ্ছিক (Optional)'}
                                 </Badge>
+                                {!sec.isMandatory && chosenOptionalSubjects.includes(sec.name) && (
+                                  <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                                    নির্বাচিত বিষয় ✓
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 text-xs font-bold">
                                 <span className="text-muted-foreground">উত্তর করা হয়েছে:</span>
@@ -995,6 +1125,12 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                   <div className="divide-y divide-slate-200 dark:divide-slate-700/60 p-0.5 sm:p-1 flex-1">
                                     {colQuestions.map((q: any) => {
                                       const globalIdx = questions.indexOf(q);
+                                      const allSubjectQuestions = questions.filter((item: any) =>
+                                        matchSubject ? matchSubject(item.subject, sec.name) : (item.subject || '').toLowerCase().trim() === sec.name.toLowerCase().trim()
+                                      );
+                                      const subjectQuestionIdx = allSubjectQuestions.indexOf(q);
+                                      const displayIdx = isMS && subjectQuestionIdx >= 0 ? subjectQuestionIdx : (isMS ? sec.questions.indexOf(q) : globalIdx);
+
                                       const isAnswered = answeredStatusMap[q.id];
                                       const isHighlighted = highlightedQId === q.id;
 
@@ -1009,7 +1145,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                         >
                                           <OMRQuestionRow
                                             question={q}
-                                            index={globalIdx}
+                                            index={displayIdx}
                                             userAnswer={answers[q.id]}
                                             subAnswers={answers}
                                             isAnswered={isAnswered}
@@ -1269,8 +1405,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                           </span>
                         </div>
                         <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                          {subQs.map((q: any) => {
-                            const i = questions.indexOf(q);
+                          {subQs.map((q: any, subIdx: number) => {
                             const isAnswered = answeredStatusMap[q.id];
                             return (
                               <button
@@ -1284,8 +1419,8 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                     : "bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
                                 )}
                               >
-                                <span className="font-mono">{toBengaliNumerals(i + 1)}</span>
-                                <span className="text-[9px] opacity-70">({i + 1})</span>
+                                <span className="font-mono">{toBengaliNumerals(subIdx + 1)}</span>
+                                <span className="text-[9px] opacity-70">({subIdx + 1})</span>
                               </button>
                             );
                           })}

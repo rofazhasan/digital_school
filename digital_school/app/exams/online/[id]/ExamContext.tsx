@@ -371,7 +371,9 @@ export function ExamContextProvider({
     if (!isMS) return [];
     const configured: any[] = parsedSubjectsConfig?.subjects || [];
     if (configured.length > 0) {
-      return configured.map((s: any) => ({
+      const mandatory = configured.filter((s: any) => s.isMandatory !== false && s.isOptional !== true);
+      const optional = configured.filter((s: any) => s.isMandatory === false || s.isOptional === true);
+      return [...mandatory, ...optional].map((s: any) => ({
         ...s,
         name: s.name,
         isMandatory: s.isMandatory !== false && s.isOptional !== true,

@@ -255,11 +255,6 @@ const MSSubjectHeader = ({
     <div className="ms-subject-header my-5 break-inside-avoid border-y-2 border-black bg-gray-100/80 p-2.5 sm:p-3 text-black">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5">
-          {subject.sectionLetter && (
-            <span className="inline-flex items-center justify-center bg-black text-white font-black text-xs px-2.5 py-1 uppercase tracking-wider rounded-xs shadow-xs">
-              {isEn ? `SECTION - ${subject.sectionLetter}` : `বিভাগ - ${subject.sectionBengali || subject.sectionLetter}`}
-            </span>
-          )}
           <h3 className="text-base sm:text-lg font-black tracking-tight uppercase">
             {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
           </h3>
@@ -354,12 +349,16 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
         {showDate !== false && (
           <span><strong>{isHEn ? 'Date' : 'তারিখ'}:</strong> {isHEn ? examInfo.date : toBengaliNumerals(examInfo.date)}</span>
         )}
-        {examInfo.set && (
-          <span>
-            <strong>{isHEn ? 'Set' : 'সেট'}:</strong> {examInfo.set}
-            {banglaWord && <span className="ml-1 text-gray-500">({banglaWord})</span>}
-          </span>
-        )}
+        {examInfo.set && (() => {
+          const rawSet = String(examInfo.set).trim();
+          const cleanSet = rawSet.replace(/\b([A-Za-z0-9]+)\s+\1\b/gi, '$1').trim();
+          const displaySet = cleanSet.includes('(') ? cleanSet : (banglaWord ? `${cleanSet}(${banglaWord})` : cleanSet);
+          return (
+            <span>
+              <strong>{isHEn ? 'Set' : 'সেট'}:</strong> {displaySet}
+            </span>
+          );
+        })()}
         <span><strong>{isHEn ? 'Time' : 'সময়'}:</strong> {typeof time === 'number' ? formatBengaliDuration(time) : (isHEn ? time : toBengaliNumerals(String(time)))}</span>
         <span><strong>{isHEn ? 'Full Marks' : 'পূর্ণমান'}:</strong> {isHEn ? marks : toBengaliNumerals(marks)}</span>
       </div>
@@ -603,7 +602,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             examInfo={examInfo}
             type="objective"
             qrData={qrData}
-            marks={forcePageBreak ? objectiveTotal : grandTotalMarks}
+            marks={isMS ? (Number(examInfo.totalMarks) || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)) || 100) : (forcePageBreak ? objectiveTotal : grandTotalMarks)}
             time={forcePageBreak ? (examInfo.objectiveTime || 0) : totalTimeMinutes}
             banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
             showDate={showDate}

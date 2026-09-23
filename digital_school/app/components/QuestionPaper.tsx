@@ -249,11 +249,6 @@ const MSSubjectHeader = ({
     <div className="ms-subject-header my-4 break-inside-avoid border-y-2 border-black bg-gray-100/90 p-2.5 sm:p-3 text-black">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5">
-          {subject.sectionLetter && (
-            <span className="inline-flex items-center justify-center bg-black text-white font-black text-xs px-2.5 py-1 uppercase tracking-wider rounded-xs shadow-xs">
-              {isEn ? `SECTION - ${subject.sectionLetter}` : `বিভাগ - ${subject.sectionBengali || subject.sectionLetter}`}
-            </span>
-          )}
           <h3 className="text-base sm:text-lg font-black tracking-tight uppercase">
             {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
           </h3>
@@ -348,12 +343,16 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
         {showDate !== false && (
           <span><strong>{isHEn ? 'Date' : 'তারিখ'}:</strong> {isHEn ? examInfo.date : toBengaliNumerals(examInfo.date)}</span>
         )}
-        {examInfo.set && (
-          <span>
-            <strong>{isHEn ? 'Set' : 'সেট'}:</strong> {examInfo.set}
-            {banglaWord && <span className="ml-1 text-gray-500">({banglaWord})</span>}
-          </span>
-        )}
+        {examInfo.set && (() => {
+          const rawSet = String(examInfo.set).trim();
+          const cleanSet = rawSet.replace(/\b([A-Za-z0-9]+)\s+\1\b/gi, '$1').trim();
+          const displaySet = cleanSet.includes('(') ? cleanSet : (banglaWord ? `${cleanSet}(${banglaWord})` : cleanSet);
+          return (
+            <span>
+              <strong>{isHEn ? 'Set' : 'সেট'}:</strong> {displaySet}
+            </span>
+          );
+        })()}
         <span><strong>{isHEn ? 'Time' : 'সময়'}:</strong> {typeof time === 'number' ? formatBengaliDuration(time) : (isHEn ? time : toBengaliNumerals(String(time)))}</span>
         <span><strong>{isHEn ? 'Full Marks' : 'পূর্ণমান'}:</strong> {isHEn ? marks : toBengaliNumerals(marks)}</span>
       </div>
@@ -591,7 +590,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             examInfo={examInfo}
             type="objective"
             qrData={qrData}
-            marks={forcePageBreak ? objectiveTotal : grandTotalMarks}
+            marks={isMS ? (Number(examInfo.totalMarks) || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)) || 100) : (forcePageBreak ? objectiveTotal : grandTotalMarks)}
             time={forcePageBreak ? (examInfo.objectiveTime || 0) : totalTimeMinutes}
             banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
             showDate={showDate}
@@ -632,8 +631,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     <strong>{isEn ? 'Marks Breakdown & Subject Choice Rule:' : 'নম্বর বণ্টন ও বিষয় নির্বাচন নিয়ম:'}</strong>
                     <div className="text-[11px] mt-0.5 font-semibold text-gray-800">
                       {isEn
-                        ? `Compulsory: ${mandatoryMarks} Marks + Optional: ${singleOptionalMarks} Marks (Answer any ${parsedSubjectsConfig?.requiredOptionalCount || 1} subject) = Student Full Marks: ${examInfo.totalMarks || (mandatoryMarks + singleOptionalMarks)}.`
-                        : `আবশ্যিক বিষয়: ${toBengaliNumerals(mandatoryMarks)} নম্বর + ঐচ্ছিক বিষয়: ${toBengaliNumerals(singleOptionalMarks)} নম্বর (যেকোনো ${toBengaliNumerals(parsedSubjectsConfig?.requiredOptionalCount || 1)}টি উত্তর করতে হবে) = পরীক্ষার্থীর পূর্ণমান: ${toBengaliNumerals(examInfo.totalMarks || (mandatoryMarks + singleOptionalMarks))} নম্বর।`}
+                        ? `Compulsory: ${mandatoryMarks} Marks + Optional: ${singleOptionalMarks}*${parsedSubjectsConfig?.requiredOptionalCount || 1} Marks (Answer any ${parsedSubjectsConfig?.requiredOptionalCount || 1} subject) = Student Full Marks: ${examInfo.totalMarks || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks))}.`
+                        : `আবশ্যিক বিষয়: ${toBengaliNumerals(mandatoryMarks)} নম্বর + ঐচ্ছিক বিষয়: ${toBengaliNumerals(singleOptionalMarks)}*${parsedSubjectsConfig?.requiredOptionalCount || 1} নম্বর (যেকোনো ${toBengaliNumerals(parsedSubjectsConfig?.requiredOptionalCount || 1)}টি উত্তর করতে হবে) = পরীক্ষার্থীর পূর্ণমান: ${toBengaliNumerals(examInfo.totalMarks || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)))} নম্বর।`}
                     </div>
                   </div>
                   {Number(examInfo.mcqNegativeMarking) > 0 && (
