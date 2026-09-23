@@ -30,17 +30,35 @@ const SUBJECT_ALIASES: Record<string, string[]> = {
   'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
 };
 
-// Subject matching helper with aliases
+// Helper to detect specific variant or compound subject configurations (e.g., "Only Biology", "Bio + Math", "(25 Qs)")
+function isSpecificVariantSubject(name: string): boolean {
+  return /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(name);
+}
+
+// Subject matching helper with aliases and compound-safety
 function matchSubject(questionSubject: string | undefined | null, targetSubjectName: string): boolean {
   if (!questionSubject || !targetSubjectName) return false;
   const qClean = questionSubject.trim().toLowerCase();
   const tClean = targetSubjectName.trim().toLowerCase();
   if (qClean === tClean) return true;
-  if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
 
+  // Normalized alphanumeric match
+  const qAlpha = qClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+  const tAlpha = tClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+  if (qAlpha && qAlpha === tAlpha) return true;
+
+  // Specific variant subjects (e.g. "Only Biology", "Bio (12 Qs) + H.Math (13 Qs)") MUST NEVER match generic single-subject aliases!
+  const qIsVariant = isSpecificVariantSubject(qClean);
+  const tIsVariant = isSpecificVariantSubject(tClean);
+  if (qIsVariant || tIsVariant) {
+    if (qIsVariant !== tIsVariant) return false;
+    return qAlpha === tAlpha;
+  }
+
+  // Single-subject aliases
   for (const [key, list] of Object.entries(SUBJECT_ALIASES)) {
-    const isTarget = tClean === key || list.some(a => tClean.includes(a));
-    const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+    const isTarget = tClean === key || list.some(a => tClean === a || tClean.includes(a));
+    const isQuestion = qClean === key || list.some(a => qClean === a || qClean.includes(a));
     if (isTarget && isQuestion) return true;
   }
 
@@ -91,19 +109,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // 3. Construct a dynamic where clause for professional-grade filtering
     let subjectFilterClause: Prisma.QuestionWhereInput | undefined = undefined;
     if (subject && subject.trim() !== '' && subject.toLowerCase() !== 'all') {
-      const sClean = subject.trim().toLowerCase();
-      const aliasTerms = [subject.trim()];
-      for (const [key, list] of Object.entries(SUBJECT_ALIASES)) {
-        if (sClean === key || list.some(a => sClean.includes(a) || a.includes(sClean))) {
-          aliasTerms.push(key, ...list);
+      const sTrim = subject.trim();
+      const sClean = sTrim.toLowerCase();
+      if (isSpecificVariantSubject(sClean)) {
+        // Specific variant/compound subject (e.g. "Only Biology (25 Qs)", "Bio (12 Qs) + H.Math (13 Qs)") - match specifically
+        subjectFilterClause = {
+          subject: { contains: sTrim, mode: 'insensitive' as const }
+        };
+      } else {
+        const aliasTerms = [sTrim];
+        for (const [key, list] of Object.entries(SUBJECT_ALIASES)) {
+          if (sClean === key || list.some(a => sClean === a || sClean.includes(a))) {
+            aliasTerms.push(key, ...list);
+          }
         }
+        const uniqueTerms = Array.from(new Set(aliasTerms));
+        subjectFilterClause = {
+          OR: uniqueTerms.map(term => ({
+            subject: { contains: term, mode: 'insensitive' as const }
+          }))
+        };
       }
-      const uniqueTerms = Array.from(new Set(aliasTerms));
-      subjectFilterClause = {
-        OR: uniqueTerms.map(term => ({
-          subject: { contains: term, mode: 'insensitive' as const }
-        }))
-      };
     }
 
     const whereClause: Prisma.QuestionWhereInput = {
@@ -191,8 +217,21 @@ export async function PUT(
 
     const totalMarksOfSelectedQuestions = Math.round(selectedQuestions.reduce((sum, q) => sum + q.marks, 0) * 100) / 100;
 
-    if (Math.abs(totalMarksOfSelectedQuestions - exam.totalMarks) >= 0.01) {
-      return NextResponse.json({ error: `Marks mismatch. Exam requires ${exam.totalMarks}, but selected questions total ${totalMarksOfSelectedQuestions}.` }, { status: 400 });
+    const isMS = (exam as any).subjectType ? (exam as any).subjectType === 'MS' : Boolean(
+      exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
+    );
+    const configuredSubjects: any[] = isMS ? ((exam.subjectsConfig as any)?.subjects || []) : [];
+    const totalPoolMarks = configuredSubjects.length > 0
+      ? Math.round(configuredSubjects.reduce((sum: number, s: any) => sum + (Number(s.totalMarks) || 0), 0) * 100) / 100
+      : exam.totalMarks;
+
+    const matchesExamMarks = Math.abs(totalMarksOfSelectedQuestions - exam.totalMarks) < 0.01;
+    const matchesPoolMarks = Math.abs(totalMarksOfSelectedQuestions - totalPoolMarks) < 0.01;
+
+    if (!matchesExamMarks && !matchesPoolMarks) {
+      return NextResponse.json({
+        error: `Marks mismatch. Exam requires ${exam.totalMarks}${totalPoolMarks !== exam.totalMarks ? ` (or full subject pool of ${totalPoolMarks})` : ''}, but selected questions total ${totalMarksOfSelectedQuestions}.`
+      }, { status: 400 });
     }
 
     // Use questionsWithNegativeMarks if provided, otherwise use selectedQuestions
@@ -342,8 +381,12 @@ export async function POST(
       }
     }
 
-    if (Math.abs(currentMarks - exam.totalMarks) >= 0.01) {
-      return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 });
+    const expectedMarks = (isMS && configuredSubjects.length > 0)
+      ? Math.round(configuredSubjects.reduce((sum: number, s: any) => sum + (Number(s.totalMarks) || 0), 0) * 100) / 100
+      : exam.totalMarks;
+
+    if (Math.abs(currentMarks - expectedMarks) >= 0.01) {
+      return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${expectedMarks}. Please try again or create a set manually.` }, { status: 409 });
     }
 
     // Process questions: Shuffle options, attach originalIndex, and calculate negative marks

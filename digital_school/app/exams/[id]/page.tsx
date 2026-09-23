@@ -751,20 +751,36 @@ export default function ExamBuilderPage() {
     return questionSubjectOverrides[q.id] || q.subject || '';
   }, [questionSubjectOverrides]);
 
+  const isSpecificVariantSubject = useCallback((name: string): boolean => {
+    return /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(name);
+  }, []);
+
   // Subject matching helper with aliases and normalization
   const matchSubject = useCallback((questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
     if (!questionSubject || !targetSubjectName) return false;
     const qClean = questionSubject.trim().toLowerCase();
     const tClean = targetSubjectName.trim().toLowerCase();
     if (qClean === tClean) return true;
-    if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+    // Normalized alphanumeric match
+    const qAlpha = qClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+    const tAlpha = tClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+    if (qAlpha && qAlpha === tAlpha) return true;
+
+    // Specific variant subjects (e.g. "Only Biology", "Bio + Math") MUST NOT match single-subject aliases!
+    const qIsVariant = isSpecificVariantSubject(qClean);
+    const tIsVariant = isSpecificVariantSubject(tClean);
+    if (qIsVariant || tIsVariant) {
+      if (qIsVariant !== tIsVariant) return false;
+      return qAlpha === tAlpha;
+    }
 
     // Common Bengali / English aliases
     const aliases: Record<string, string[]> = {
       'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
       'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
-      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
-      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
+      'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h.math'],
+      'mathematics': ['গণিত', 'math', 'maths'],
       'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
       'bangla': ['বাংলা', 'bengali'],
       'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
@@ -772,17 +788,25 @@ export default function ExamBuilderPage() {
     };
 
     for (const [key, list] of Object.entries(aliases)) {
-      const isTarget = tClean === key || list.some(a => tClean.includes(a));
-      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      const isTarget = tClean === key || list.some(a => tClean === a || tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean === a || qClean.includes(a));
       if (isTarget && isQuestion) return true;
     }
 
     return false;
-  }, []);
+  }, [isSpecificVariantSubject]);
 
   const findConfiguredSubject = useCallback((question: Question): SubjectConfigItem | undefined => {
     if (!isMS || configuredSubjects.length === 0) return undefined;
     const sub = getQuestionSubject(question);
+    if (!sub) return undefined;
+    const qClean = sub.trim().toLowerCase();
+
+    // 1. Exact name match first (highest precedence)
+    const exact = configuredSubjects.find(s => s.name.trim().toLowerCase() === qClean);
+    if (exact) return exact;
+
+    // 2. Compound-safe normalized match
     return configuredSubjects.find(s => matchSubject(sub, s.name));
   }, [isMS, configuredSubjects, matchSubject, getQuestionSubject]);
 
@@ -804,19 +828,18 @@ export default function ExamBuilderPage() {
     });
 
     selectedQuestions.forEach(q => {
-      const sub = getQuestionSubject(q);
-      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
+      const matched = findConfiguredSubject(q);
       if (matched) {
         const entry = map.get(matched.name);
         if (entry) {
-          entry.current += q.marks;
+          entry.current = Math.round((entry.current + q.marks) * 100) / 100;
           entry.count += 1;
         }
       }
     });
 
     return map;
-  }, [isMS, configuredSubjects, selectedQuestions, matchSubject, getQuestionSubject]);
+  }, [isMS, configuredSubjects, selectedQuestions, findConfiguredSubject]);
 
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
@@ -855,7 +878,13 @@ export default function ExamBuilderPage() {
   }, [isMS, msCurrentMarks, cqMarks, sqMarks, mcqMarks]);
 
   // Validation logic
-  const isMarksMatched = useMemo(() => exam ? currentMarks === exam.totalMarks : false, [currentMarks, exam]);
+  const isMarksMatched = useMemo(() => {
+    if (!exam) return false;
+    const totalPoolMarks = configuredSubjects.length > 0
+      ? Math.round(configuredSubjects.reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0) * 100) / 100
+      : exam.totalMarks;
+    return Math.abs(currentMarks - exam.totalMarks) < 0.01 || Math.abs(currentMarks - totalPoolMarks) < 0.01;
+  }, [currentMarks, exam, configuredSubjects]);
   const isCQValid = useMemo(() => {
     if (!exam) return false;
     return selectedCQQuestions.length >= exam.cqRequiredQuestions && selectedCQQuestions.length <= exam.cqTotalQuestions;
@@ -874,7 +903,7 @@ export default function ExamBuilderPage() {
     for (const subj of configuredSubjects) {
       const entry = subjectMarksBreakdown.get(subj.name);
       const current = entry?.current || 0;
-      if (subj.isMandatory && current !== subj.totalMarks) {
+      if (subj.isMandatory && Math.abs(current - subj.totalMarks) >= 0.01) {
         return false;
       }
     }
@@ -901,18 +930,20 @@ export default function ExamBuilderPage() {
 
     // Multiple Subject (MS) Check: Ensure subject quota is not exceeded
     if (isMS && configuredSubjects.length > 0) {
-      const sub = targetSubjectOverride || getQuestionSubject(question);
-      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
+      const matched = targetSubjectOverride
+        ? (configuredSubjects.find(s => s.name.trim().toLowerCase() === targetSubjectOverride.trim().toLowerCase()) ||
+           configuredSubjects.find(s => matchSubject(targetSubjectOverride, s.name)))
+        : findConfiguredSubject(question);
       if (!matched) {
         // If question doesn't match a subject yet, allow adding if ANY configured subject has room
         return configuredSubjects.some(s => {
           const entry = subjectMarksBreakdown.get(s.name);
-          return (entry?.current || 0) + question.marks <= s.totalMarks;
+          return Math.round(((entry?.current || 0) + question.marks) * 100) / 100 <= s.totalMarks;
         });
       }
       const entry = subjectMarksBreakdown.get(matched.name);
       const current = entry?.current || 0;
-      if (current + question.marks > matched.totalMarks) {
+      if (Math.round((current + question.marks) * 100) / 100 > matched.totalMarks) {
         return false;
       }
       return true;
@@ -941,14 +972,13 @@ export default function ExamBuilderPage() {
 
     // Multiple Subject (MS) Tooltip
     if (isMS && configuredSubjects.length > 0) {
-      const sub = getQuestionSubject(question);
-      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
+      const matched = findConfiguredSubject(question);
       if (!matched) {
         return `Assign to an exam section with open quota`;
       }
       const entry = subjectMarksBreakdown.get(matched.name);
       const current = entry?.current || 0;
-      if (current + question.marks > matched.totalMarks) {
+      if (Math.round((current + question.marks) * 100) / 100 > matched.totalMarks) {
         return `Subject "${matched.name}" quota full (${current}/${matched.totalMarks} M)`;
       }
       return `Add to ${matched.name} (${current}/${matched.totalMarks} M)`;
@@ -973,12 +1003,14 @@ export default function ExamBuilderPage() {
   const handleAddQuestion = (question: Question) => {
     let sub = getQuestionSubject(question);
     if (isMS && configuredSubjects.length > 0) {
-      const matched = configuredSubjects.find(s => matchSubject(sub, s.name));
-      if (!matched) {
+      const matched = findConfiguredSubject(question);
+      if (matched) {
+        sub = matched.name;
+      } else {
         // Auto-assign to the first subject that has room
         const available = configuredSubjects.find(s => {
           const entry = subjectMarksBreakdown.get(s.name);
-          return (entry?.current || 0) + question.marks <= s.totalMarks;
+          return Math.round(((entry?.current || 0) + question.marks) * 100) / 100 <= s.totalMarks;
         });
         if (available) {
           sub = available.name;
@@ -1913,8 +1945,8 @@ export default function ExamBuilderPage() {
                             const target = subj.totalMarks;
                             const isDone = curr === target;
                             const subjQuestions = selectedQuestions.filter(q => {
-                              const s = getQuestionSubject(q);
-                              return matchSubject(s, subj.name);
+                              const matched = findConfiguredSubject(q);
+                              return matched ? matched.name === subj.name : false;
                             });
 
                             return (
