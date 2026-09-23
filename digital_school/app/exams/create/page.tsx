@@ -52,6 +52,7 @@ const schema = z.object({
   duration: z.coerce.number().min(1, "Duration is required"),
   type: z.enum(["ONLINE", "OFFLINE", "MIXED"]),
   subjectType: z.enum(["SS", "MS"]).default("SS"),
+  requiredOptionalCount: z.coerce.number().min(0).default(0).optional(),
   subjectsConfig: subjectsConfigSchema,
   totalMarks: z.coerce.number().min(1, "Total marks required"),
   passMarks: z.coerce.number().min(0, "Pass marks required"),
@@ -124,6 +125,7 @@ export default function CreateExamPage() {
       duration: 60,
       type: "OFFLINE",
       subjectType: "SS",
+      requiredOptionalCount: 0,
       subjectsConfig: null,
       totalMarks: 100,
       passMarks: 33,
@@ -218,6 +220,18 @@ export default function CreateExamPage() {
   const subjectType = form.watch("subjectType");
   const subjectsConfig = form.watch("subjectsConfig");
 
+  const syncEffectiveMarks = (subjects: SubjectItem[], reqOpt: number) => {
+    const mandatoryMarks = subjects
+      .filter(s => s.isMandatory)
+      .reduce((sum, s) => sum + (Number(s.totalMarks) || 0), 0);
+    const optionalSubjects = subjects.filter(s => !s.isMandatory);
+    const singleOptMarks = optionalSubjects.length > 0 ? (Number(optionalSubjects[0].totalMarks) || 0) : 0;
+    const effectiveTotal = mandatoryMarks + (reqOpt * singleOptMarks);
+    if (effectiveTotal > 0) {
+      form.setValue("totalMarks", effectiveTotal, { shouldValidate: true });
+    }
+  };
+
   const addSubject = () => {
     const current = form.getValues("subjectsConfig")?.subjects || [];
     const updated = [
@@ -227,12 +241,14 @@ export default function CreateExamPage() {
     const mandatoryCount = updated.filter(s => s.isMandatory).length;
     const optionalCount = updated.filter(s => !s.isMandatory).length;
     const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    const newReq = optionalCount > 0 ? (currentReq || 1) : 0;
     form.setValue("subjectsConfig", {
       subjects: updated,
       mandatoryCount,
       optionalCount,
-      requiredOptionalCount: optionalCount > 0 ? (currentReq || 1) : 0,
+      requiredOptionalCount: newReq,
     });
+    syncEffectiveMarks(updated, newReq);
   };
 
   const removeSubject = (index: number) => {
@@ -242,12 +258,14 @@ export default function CreateExamPage() {
     const mandatoryCount = updated.filter(s => s.isMandatory).length;
     const optionalCount = updated.filter(s => !s.isMandatory).length;
     const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    const newReq = Math.min(currentReq, optionalCount);
     form.setValue("subjectsConfig", {
       subjects: updated,
       mandatoryCount,
       optionalCount,
-      requiredOptionalCount: Math.min(currentReq, optionalCount),
+      requiredOptionalCount: newReq,
     });
+    syncEffectiveMarks(updated, newReq);
   };
 
   const updateSubject = (index: number, field: keyof SubjectItem, value: any) => {
@@ -257,12 +275,14 @@ export default function CreateExamPage() {
     const mandatoryCount = updated.filter(s => s.isMandatory).length;
     const optionalCount = updated.filter(s => !s.isMandatory).length;
     const currentReq = form.getValues("subjectsConfig")?.requiredOptionalCount || 0;
+    const newReq = Math.min(currentReq, optionalCount);
     form.setValue("subjectsConfig", {
       subjects: updated,
       mandatoryCount,
       optionalCount,
-      requiredOptionalCount: Math.min(currentReq, optionalCount),
+      requiredOptionalCount: newReq,
     });
+    syncEffectiveMarks(updated, newReq);
   };
 
   const updateRequiredOptionalCount = (count: number) => {
@@ -272,6 +292,7 @@ export default function CreateExamPage() {
         ...current,
         requiredOptionalCount: count,
       });
+      syncEffectiveMarks(current.subjects || [], count);
     }
   };
 
@@ -309,6 +330,7 @@ export default function CreateExamPage() {
       const submissionData = {
         ...data,
         subjectType: data.subjectType,
+        requiredOptionalCount: data.subjectType === "MS" ? (data.subjectsConfig?.requiredOptionalCount || 0) : 0,
         subjectsConfig: data.subjectType === "MS" ? (data.subjectsConfig || null) : null,
       };
 
@@ -675,6 +697,22 @@ export default function CreateExamPage() {
           };
         }
 
+        let calculatedTotalMarks = n(getValue(row, ["Total Marks", "Marks"]));
+        if (subjectType === "MS" && subjectsConfig) {
+          const mandatoryMarks = (subjectsConfig.subjects || [])
+            .filter((s: any) => s.isMandatory)
+            .reduce((acc: number, s: any) => acc + (Number(s.totalMarks) || 0), 0);
+          const optSubjects = (subjectsConfig.subjects || []).filter((s: any) => !s.isMandatory);
+          const singleOptMarks = optSubjects.length > 0 ? (Number(optSubjects[0].totalMarks) || 0) : 0;
+          const reqOptCount = subjectsConfig.requiredOptionalCount || 0;
+          const computedEffective = mandatoryMarks + (reqOptCount * singleOptMarks);
+
+          const allPoolMarks = (subjectsConfig.subjects || []).reduce((acc: number, s: any) => acc + (Number(s.totalMarks) || 0), 0);
+          if (!calculatedTotalMarks || calculatedTotalMarks === allPoolMarks) {
+            calculatedTotalMarks = computedEffective;
+          }
+        }
+
         const exam: any = {
           name: getValue(row, ["Exam Name", "Name"]) || `Exam ${index + 1}`,
           description: getValue(row, ["Description", "Desc"]) || "",
@@ -684,8 +722,9 @@ export default function CreateExamPage() {
           duration: Number(getValue(row, ["Duration"]) ?? 0) || 0,
           type: (String(getValue(row, ["Type"]) || "OFFLINE")).toUpperCase(),
           subjectType: subjectType,
+          requiredOptionalCount: subjectsConfig?.requiredOptionalCount || 0,
           subjectsConfig: subjectsConfig,
-          totalMarks: n(getValue(row, ["Total Marks", "Marks"])) || 100,
+          totalMarks: calculatedTotalMarks || 100,
           passMarks: n(getValue(row, ["Pass Marks"])) || 33,
           classId: "",
           allowRetake: !!getValue(row, ["Allow Retake", "Retake"]),
@@ -770,6 +809,7 @@ export default function CreateExamPage() {
       const sanitizedExams = validExams.map(e => ({
         ...e,
         subjectType: e.subjectType || "SS",
+        requiredOptionalCount: e.subjectType === "MS" ? (e.requiredOptionalCount || e.subjectsConfig?.requiredOptionalCount || 0) : 0,
         subjectsConfig: e.subjectType === "MS" ? (e.subjectsConfig || null) : null,
       }));
       const res = await fetch("/api/exams/bulk", {
@@ -926,18 +966,22 @@ export default function CreateExamPage() {
                                   form.setValue("subjectType", "MS");
                                   const currentCfg = form.getValues("subjectsConfig");
                                   if (!currentCfg || !currentCfg.subjects || currentCfg.subjects.length === 0) {
+                                    const defaultSubjects = [
+                                      { name: "Physics", totalMarks: 25, isMandatory: true },
+                                      { name: "Chemistry", totalMarks: 25, isMandatory: true },
+                                      { name: "Mathematics", totalMarks: 25, isMandatory: true },
+                                      { name: "Biology", totalMarks: 25, isMandatory: false },
+                                      { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
+                                    ];
                                     form.setValue("subjectsConfig", {
-                                      subjects: [
-                                        { name: "Physics", totalMarks: 25, isMandatory: true },
-                                        { name: "Chemistry", totalMarks: 25, isMandatory: true },
-                                        { name: "Mathematics", totalMarks: 25, isMandatory: true },
-                                        { name: "Biology", totalMarks: 25, isMandatory: false },
-                                        { name: "Higher Mathematics", totalMarks: 25, isMandatory: false },
-                                      ],
+                                      subjects: defaultSubjects,
                                       mandatoryCount: 3,
                                       optionalCount: 2,
                                       requiredOptionalCount: 1,
                                     });
+                                    syncEffectiveMarks(defaultSubjects, 1);
+                                  } else {
+                                    syncEffectiveMarks(currentCfg.subjects, currentCfg.requiredOptionalCount || 0);
                                   }
                                 }}
                                 className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
@@ -1053,6 +1097,26 @@ export default function CreateExamPage() {
                                     onChange={(e) => updateRequiredOptionalCount(Number(e.target.value) || 0)}
                                     className="h-8 text-sm font-bold"
                                   />
+                                </div>
+                              </div>
+
+                              {/* Student Full Marks vs Question Pool Summary */}
+                              <div className="p-3 bg-blue-50/80 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800 text-xs flex flex-wrap items-center justify-between gap-2 mt-3">
+                                <div>
+                                  <span className="font-semibold text-blue-900 dark:text-blue-200">
+                                    Student Full Marks (Exam Total):
+                                  </span>
+                                  <span className="ml-1.5 font-bold text-sm text-blue-700 dark:text-blue-300">
+                                    {form.watch("totalMarks")} Marks
+                                  </span>
+                                  <span className="text-gray-500 ml-1.5">
+                                    ({subjectsConfig?.mandatoryCount || 0} Mandatory + {subjectsConfig?.requiredOptionalCount || 0} Optional)
+                                  </span>
+                                </div>
+                                <div className="text-gray-500 dark:text-gray-400">
+                                  Total Question Pool Marks: <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                    {subjectsConfig?.subjects?.reduce((sum: number, s: any) => sum + (Number(s.totalMarks) || 0), 0) || 0} Marks
+                                  </span> (all {subjectsConfig?.subjects?.length || 0} subjects)
                                 </div>
                               </div>
                             </div>

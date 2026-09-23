@@ -54,11 +54,25 @@ export function shuffleArrayWithSeed<T>(array: T[], seedStr: string): T[] {
   return arr;
 }
 
+// Helper to detect specific compound or qualified variant subjects like "Bio(12Qs)+H.Math(13 Qs)" or "Only Biology"
+export const isSpecificVariantSubject = (name: string): boolean => {
+  const lower = name.toLowerCase();
+  return lower.includes('+') || lower.includes('&') || lower.includes('only') || lower.includes('qs') || lower.includes('(') || lower.includes(')');
+};
+
 export const matchSubject = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
   if (!questionSubject || !targetSubjectName) return false;
   const qClean = questionSubject.trim().toLowerCase();
   const tClean = targetSubjectName.trim().toLowerCase();
   if (qClean === tClean) return true;
+
+  // If either subject is a specific combination/compound, only allow exact string equality or exact sub-string if not cross-contaminating
+  const qIsVariant = isSpecificVariantSubject(qClean);
+  const tIsVariant = isSpecificVariantSubject(tClean);
+  if (qIsVariant || tIsVariant) {
+    return qClean === tClean;
+  }
+
   if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
 
   const aliases: Record<string, string[]> = {

@@ -105,6 +105,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     cqSqTime: (exam as any).cqSqTime || null,
     cqSubsections: exam.cqSubsections || null,
     subjectType: (exam as any).subjectType || (isExamMS ? 'MS' : 'SS'),
+    requiredOptionalCount: exam.requiredOptionalCount ?? (exam.subjectsConfig as any)?.requiredOptionalCount ?? 0,
     subjectsConfig: isExamMS ? ((exam as any).subjectsConfig || null) : null,
   };
 

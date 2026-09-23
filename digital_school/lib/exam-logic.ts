@@ -12,6 +12,10 @@ import { sendSMS } from "@/lib/sms";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { Exam, ExamSet, ExamSubmission, SubmissionStatus, Institute, PrismaClient } from "@prisma/client";
 import React from "react";
+// Helper to detect specific compound or qualified variant subjects like "Bio(12Qs)+H.Math(13 Qs)" or "Only Biology"
+export const isSpecificVariantSubject = (name: string): boolean => {
+    return /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(name);
+};
 
 /**
  * Assign an exam set to a student using a balanced random approach (least-assigned).
@@ -504,33 +508,43 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
     totalScore = Math.round((mcqMarks + cqMarks + sqMarks) * 100) / 100;
 
     // --- Multiple Subject (MS) Evaluation & Disqualification check ---
-    const isMS = (exam as any).subjectType === 'MS' || ((exam as any).subjectsConfig && ((exam as any).subjectsConfig?.subjects || []).length > 0);
-    const msConfig = (exam as any).subjectsConfig as any;
+    const rawSubjectsConfig = (exam as any).subjectsConfig;
+    const msConfig = typeof rawSubjectsConfig === 'string' ? JSON.parse(rawSubjectsConfig) : rawSubjectsConfig;
+    const isMS = (exam as any).subjectType === 'MS' || (msConfig && (msConfig.subjects || []).length > 0);
     let isDisqualified = (answers as any)?._suspended === true;
-
-    const subjectWiseBreakdown: Record<string, { totalScore: number; maxMarks: number; isMandatory: boolean; attempted: boolean }> = {};
+    const subjectWiseBreakdown: Record<string, { totalScore: number; maxMarks: number; isMandatory: boolean; attempted: boolean; isCounted?: boolean; note?: string }> = {};
 
     const matchSubjectName = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
         if (!questionSubject || !targetSubjectName) return false;
         const qClean = questionSubject.trim().toLowerCase();
         const tClean = targetSubjectName.trim().toLowerCase();
         if (qClean === tClean) return true;
-        if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+        const qAlpha = qClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+        const tAlpha = tClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+        if (qAlpha && qAlpha === tAlpha) return true;
+
+        const qIsVariant = isSpecificVariantSubject(qClean);
+        const tIsVariant = isSpecificVariantSubject(tClean);
+        if (qIsVariant || tIsVariant) {
+            if (qIsVariant !== tIsVariant) return false;
+            return qAlpha === tAlpha;
+        }
 
         const aliases: Record<string, string[]> = {
-            'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
-            'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
-            'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
-            'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
-            'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
-            'bangla': ['বাংলা', 'bengali'],
-            'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
-            'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+            'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
+            'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
+            'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'h.math', 'math 1st', 'math 2nd'],
+            'mathematics': ['গণিত', 'math', 'maths', 'সাধারণ গণিত', 'general math'],
+            'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
+            'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
+            'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
+            'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
         };
 
         for (const [key, list] of Object.entries(aliases)) {
-            const isTarget = tClean === key || list.some(a => tClean.includes(a));
-            const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+            const isTarget = tClean === key || list.some(a => tClean === a || tClean.includes(a));
+            const isQuestion = qClean === key || list.some(a => qClean === a || qClean.includes(a));
             if (isTarget && isQuestion) return true;
         }
 
@@ -557,7 +571,11 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
         msSubjectsList.forEach((sub: any) => {
             const subName = sub.name;
-            const subQuestions = (qList as any[]).filter((q: any) => matchSubjectName(q.subject, subName));
+            const subQuestions = (qList as any[]).filter((q: any) => {
+                const qSub = (q.subject || '').trim().toLowerCase();
+                if (qSub === subName.trim().toLowerCase()) return true;
+                return matchSubjectName(q.subject, subName);
+            });
             let subScore = 0;
             let subAttempted = false;
 
@@ -582,9 +600,12 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 }
             });
 
+            const maxSubMarks = sub.totalMarks || 0;
+            const clampedSubScore = maxSubMarks > 0 ? Math.min(Math.max(0, subScore), maxSubMarks) : Math.max(0, subScore);
+
             subjectWiseBreakdown[subName] = {
-                totalScore: Math.max(0, subScore),
-                maxMarks: sub.totalMarks || 0,
+                totalScore: clampedSubScore,
+                maxMarks: maxSubMarks,
                 isMandatory: sub.isMandatory ?? true,
                 attempted: subAttempted
             };
@@ -594,7 +615,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             }
         });
 
-        const maxOptionalAllowed = Number(msConfig?.requiredOptionalCount) || 1;
+        const maxOptionalAllowed = Number((exam as any).requiredOptionalCount) || Number(msConfig?.requiredOptionalCount) || 1;
         
         // Graceful handling of optional subjects: sort attempted optional subjects by total score (highest first)
         const optionalSubjsList = msSubjectsList.filter((s: any) => !s.isMandatory);
@@ -606,14 +627,14 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         attemptedOptionalList.slice(0, maxOptionalAllowed).forEach((s: any) => {
             countedOptionalNames.add(s.name);
             if (subjectWiseBreakdown[s.name]) {
-                (subjectWiseBreakdown[s.name] as any).isCounted = true;
+                subjectWiseBreakdown[s.name].isCounted = true;
             }
         });
 
         attemptedOptionalList.slice(maxOptionalAllowed).forEach((s: any) => {
             if (subjectWiseBreakdown[s.name]) {
-                (subjectWiseBreakdown[s.name] as any).isCounted = false;
-                (subjectWiseBreakdown[s.name] as any).note = 'অতিরিক্ত ঐচ্ছিক বিষয় (গণনা বহির্ভূত)';
+                subjectWiseBreakdown[s.name].isCounted = false;
+                subjectWiseBreakdown[s.name].note = 'অতিরিক্ত ঐচ্ছিক বিষয় (গণনা বহির্ভূত)';
             }
         });
 
@@ -627,7 +648,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             const subBreakdown = subjectWiseBreakdown[sub.name];
             if (!subBreakdown) return;
             if (sub.isMandatory) {
-                (subBreakdown as any).isCounted = true;
+                subBreakdown.isCounted = true;
                 msTotalScore += subBreakdown.totalScore;
             } else if (countedOptionalNames.has(sub.name)) {
                 msTotalScore += subBreakdown.totalScore;
@@ -641,10 +662,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             else msMcqMarks += mark;
         });
 
-        totalScore = Math.round(msTotalScore * 100) / 100;
+        totalScore = Math.min(Math.round(msTotalScore * 100) / 100, exam.totalMarks);
         mcqMarks = Math.round(msMcqMarks * 100) / 100;
-        cqMarks = Math.round(msCqMarks * 100) / 100;
-        sqMarks = Math.round(msSqMarks * 100) / 100;
+        cqMarks = Math.round(cqMarks * 100) / 100;
+        sqMarks = Math.round(sqMarks * 100) / 100;
     }
 
     if (isDisqualified) {

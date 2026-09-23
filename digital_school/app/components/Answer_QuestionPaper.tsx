@@ -48,12 +48,14 @@ interface CQ {
   subQuestions?: any[];
   subAnswers?: string[]; // Array of answers for sub-questions
   type?: string;
+  subject?: string;
 }
 interface SQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
   type?: string;
+  subject?: string;
 }
 interface MTF {
   leftColumn: { id: string; text: string }[];
@@ -62,6 +64,7 @@ interface MTF {
   marks?: number;
   explanation?: string;
   type?: string;
+  subject?: string;
 }
 interface DESCRIPTIVE {
   id: string;
@@ -69,6 +72,7 @@ interface DESCRIPTIVE {
   marks: number;
   subQuestions: any[];
   questionText?: string;
+  subject?: string;
 }
 interface AnswerQuestionPaperProps {
   examInfo: {
@@ -89,6 +93,9 @@ interface AnswerQuestionPaperProps {
     sqRequiredQuestions?: number;
     cqSubsections?: any[];
     id?: string;
+    subjectType?: 'SS' | 'MS';
+    requiredOptionalCount?: number;
+    subjectsConfig?: any;
   };
   questions: {
     mcq: MCQ[];
@@ -183,19 +190,34 @@ const Text = ({ children }: { children: string }) => (
   </span>
 );
 
-// Bilingual subject alias matching helper
+// Helper to detect specific variant or compound subject configurations (e.g., "Only Biology", "Bio + Math", "(25 Qs)")
+const isSpecificVariantSubject = (name: string): boolean => {
+  return /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(name);
+};
+
+// Bilingual subject alias matching helper with compound-safe protection
 const matchSubject = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
   if (!questionSubject || !targetSubjectName) return false;
   const qClean = questionSubject.trim().toLowerCase();
   const tClean = targetSubjectName.trim().toLowerCase();
   if (qClean === tClean) return true;
-  if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
+
+  const qAlpha = qClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+  const tAlpha = tClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+  if (qAlpha && qAlpha === tAlpha) return true;
+
+  const qIsVariant = isSpecificVariantSubject(qClean);
+  const tIsVariant = isSpecificVariantSubject(tClean);
+  if (qIsVariant || tIsVariant) {
+    if (qIsVariant !== tIsVariant) return false;
+    return qAlpha === tAlpha;
+  }
 
   const aliases: Record<string, string[]> = {
     'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
     'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
-    'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths', 'সাধারণ গণিত', 'general math', 'math 1st', 'math 2nd'],
-    'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
+    'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'h.math', 'math 1st', 'math 2nd'],
+    'mathematics': ['গণিত', 'math', 'maths', 'সাধারণ গণিত', 'general math'],
     'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
     'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
     'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
@@ -203,8 +225,8 @@ const matchSubject = (questionSubject: string | undefined | null, targetSubjectN
   };
 
   for (const [key, list] of Object.entries(aliases)) {
-    const isTarget = tClean === key || list.some(a => tClean.includes(a));
-    const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+    const isTarget = tClean === key || list.some(a => tClean === a || tClean.includes(a));
+    const isQuestion = qClean === key || list.some(a => qClean === a || qClean.includes(a));
     if (isTarget && isQuestion) return true;
   }
 
@@ -407,16 +429,23 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const grandTotalMarks = objectiveTotal + cqSqTotalMarks;
 
     const parsedSubjectsConfig = React.useMemo(() => {
-      if (!examInfo.subjectsConfig) return null;
-      if (typeof examInfo.subjectsConfig === 'string') {
-        try {
-          return JSON.parse(examInfo.subjectsConfig);
-        } catch {
-          return null;
+      let cfg: any = null;
+      if (examInfo.subjectsConfig) {
+        if (typeof examInfo.subjectsConfig === 'string') {
+          try {
+            cfg = JSON.parse(examInfo.subjectsConfig);
+          } catch {
+            cfg = null;
+          }
+        } else {
+          cfg = { ...examInfo.subjectsConfig };
         }
       }
-      return examInfo.subjectsConfig;
-    }, [examInfo.subjectsConfig]);
+      if (cfg && (cfg.requiredOptionalCount === undefined || cfg.requiredOptionalCount === null) && (examInfo as any)?.requiredOptionalCount !== undefined) {
+        cfg.requiredOptionalCount = (examInfo as any).requiredOptionalCount;
+      }
+      return cfg;
+    }, [examInfo.subjectsConfig, (examInfo as any)?.requiredOptionalCount]);
 
     const isMS = Boolean(
       examInfo.subjectType ? examInfo.subjectType === 'MS' : (
@@ -427,30 +456,54 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const configuredSubjects = React.useMemo(() => {
       if (!isMS) return [];
       const rawList: any[] = parsedSubjectsConfig?.subjects || [];
+      let baseList: any[] = [];
       if (rawList.length > 0) {
-        return rawList.map((s: any, idx: number) => ({
+        baseList = rawList.map((s: any) => ({
           name: s.name,
-          sectionLetter: String.fromCharCode(65 + idx),
-          sectionBengali: ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ'][idx] || String(idx + 1),
           isMandatory: s.isMandatory !== false && s.isOptional !== true,
           totalMarks: Number(s.totalMarks) || 0
         }));
+      } else {
+        const discovered: string[] = [];
+        allObjective.forEach((q: any) => {
+          const sub = q.subject || q.subjectName;
+          if (sub && !discovered.some(d => matchSubject(sub, d))) {
+            discovered.push(sub);
+          }
+        });
+        baseList = discovered.map(name => ({
+          name,
+          isMandatory: true,
+          totalMarks: 0
+        }));
       }
-      const discovered: string[] = [];
-      allObjective.forEach((q: any) => {
-        const sub = q.subject || q.subjectName;
-        if (sub && !discovered.some(d => matchSubject(sub, d))) {
-          discovered.push(sub);
-        }
-      });
-      return discovered.map((name, idx) => ({
-        name,
+
+      // Group: all compulsory (mandatory) first, followed by all optional
+      const mandatories = baseList.filter(s => s.isMandatory);
+      const optionals = baseList.filter(s => !s.isMandatory);
+      const sorted = [...mandatories, ...optionals];
+
+      return sorted.map((s, idx) => ({
+        ...s,
         sectionLetter: String.fromCharCode(65 + idx),
-        sectionBengali: ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ'][idx] || String(idx + 1),
-        isMandatory: true,
-        totalMarks: 0
+        sectionBengali: ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ'][idx] || String(idx + 1),
+        divisionType: s.isMandatory ? ('compulsory' as const) : ('optional' as const)
       }));
     }, [isMS, parsedSubjectsConfig, allObjective]);
+
+    const mandatoryMarks = React.useMemo(() => {
+      return configuredSubjects
+        .filter(s => s.isMandatory)
+        .reduce((sum, s) => sum + s.totalMarks, 0);
+    }, [configuredSubjects]);
+
+    const optionalSubjectsList = React.useMemo(() => {
+      return configuredSubjects.filter(s => !s.isMandatory);
+    }, [configuredSubjects]);
+
+    const singleOptionalMarks = React.useMemo(() => {
+      return optionalSubjectsList.length > 0 ? optionalSubjectsList[0].totalMarks : 0;
+    }, [optionalSubjectsList]);
 
     const orderedObjective = React.useMemo(() => {
       if (!isMS || configuredSubjects.length === 0) {
@@ -459,12 +512,34 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
       const result: any[] = [];
       const assigned = new Set<string>();
 
+      // Group into subjects ensuring NO question is assigned twice
       configuredSubjects.forEach(sub => {
-        const subQuestions = allObjective.filter((q: any) => 
-          matchSubject(q.subject || q.subjectName, sub.name)
-        );
-        subQuestions.forEach((q: any) => {
-          assigned.add(q.id || `${q.type}_${q.q}`);
+        // 1. Exact match first (highest precedence)
+        const exactMatches = allObjective.filter((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          if (assigned.has(qId)) return false;
+          const qSub = (q.subject || q.subjectName || '').trim().toLowerCase();
+          return qSub === sub.name.trim().toLowerCase();
+        });
+        exactMatches.forEach((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          assigned.add(qId);
+          result.push({
+            ...q,
+            _canonicalSubject: sub.name,
+            _subConfig: sub
+          });
+        });
+
+        // 2. Compound-safe alias match for remaining questions
+        const aliasMatches = allObjective.filter((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          if (assigned.has(qId)) return false;
+          return matchSubject(q.subject || q.subjectName, sub.name);
+        });
+        aliasMatches.forEach((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          assigned.add(qId);
           result.push({
             ...q,
             _canonicalSubject: sub.name,
@@ -474,7 +549,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
       });
 
       // Remaining unassigned questions
-      allObjective.filter((q: any) => !assigned.has(q.id || `${q.type}_${q.q}`)).forEach((q: any) => {
+      allObjective.filter((q: any) => !assigned.has(q.id || `${q.type}_${q.q || q.questionText}`)).forEach((q: any) => {
         result.push({
           ...q,
           _canonicalSubject: q.subject || (isEn ? 'General' : 'সাধারণ'),
@@ -491,31 +566,22 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
     const subjectQuestionRanges = React.useMemo(() => {
       if (!isMS) return new Map<string, string>();
-      const ranges = new Map<string, string>();
-      let counter = 1;
-      let curSub = '';
-      let subStart = 1;
+      const counts = new Map<string, number>();
 
-      orderedObjective.forEach((q: any, i: number) => {
+      orderedObjective.forEach((q: any) => {
         const qSub = q._canonicalSubject || '';
         const qCount = q.type?.toUpperCase() === 'SMCQ' ? (q.subQuestions?.length || 1) : 1;
+        counts.set(qSub, (counts.get(qSub) || 0) + qCount);
+      });
 
-        if (i === 0) {
-          curSub = qSub;
-          subStart = 1;
-        } else if (qSub !== curSub) {
-          const subEnd = counter - 1;
-          ranges.set(curSub, isEn ? `Questions: ${subStart} - ${subEnd}` : `প্রশ্ন: ${toBengaliNumerals(subStart)} - ${toBengaliNumerals(subEnd)}`);
-          curSub = qSub;
-          subStart = counter;
-        }
-
-        counter += qCount;
-
-        if (i === orderedObjective.length - 1) {
-          const subEnd = counter - 1;
-          ranges.set(curSub, isEn ? `Questions: ${subStart} - ${subEnd}` : `প্রশ্ন: ${toBengaliNumerals(subStart)} - ${toBengaliNumerals(subEnd)}`);
-        }
+      const ranges = new Map<string, string>();
+      counts.forEach((total, subName) => {
+        ranges.set(
+          subName,
+          isEn
+            ? `Questions: 1 - ${total} (Total: ${total})`
+            : `প্রশ্ন: ১ - ${toBengaliNumerals(total)} (মোট ${toBengaliNumerals(total)}টি প্রশ্ন)`
+        );
       });
 
       return ranges;
@@ -604,21 +670,29 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
               <div className="mcq-container">
                 {(() => {
-                  let questionCounter = 1;
+                  let globalCounter = 1;
+                  let subjectCounter = 1;
+                  let lastSubject = '';
+
                   return orderedObjective.map((q: any, idx: number) => {
-                    const startNum = questionCounter;
-                    if (q.type?.toUpperCase() === 'SMCQ') {
-                      questionCounter += (q.subQuestions?.length || 0);
-                    } else {
-                      questionCounter++;
+                    const isNewSubject = isMS && (idx === 0 || q._canonicalSubject !== lastSubject);
+                    if (isNewSubject) {
+                      lastSubject = q._canonicalSubject;
+                      subjectCounter = 1;
                     }
+
+                    const startNum = isMS ? subjectCounter : globalCounter;
+                    const qCount = q.type?.toUpperCase() === 'SMCQ' ? (q.subQuestions?.length || 0) : 1;
+                    subjectCounter += qCount;
+                    globalCounter += qCount;
+
                     const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
-                    const showSubjectHeader = isMS && (
-                      idx === 0 || 
-                      orderedObjective[idx - 1]?._canonicalSubject !== q._canonicalSubject
-                    );
                     const matchedSub = q._subConfig || configuredSubjects.find((s: any) => matchSubject(q.subject, s.name));
+                    const prevSub = idx > 0 ? orderedObjective[idx - 1]?._subConfig : null;
+                    const showDivisionA = isMS && idx === 0 && matchedSub?.isMandatory;
+                    const showDivisionB = isMS && matchedSub && !matchedSub.isMandatory && (idx === 0 || prevSub?.isMandatory);
+                    const showSubjectHeader = isMS && isNewSubject;
 
                     const renderQuestionContent = () => {
                     if (q.type === 'MCQ' || q.type === 'MC') {
@@ -860,7 +934,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     }
 
                     if (q.type?.toUpperCase() === 'SMCQ') {
-                      const endNum = questionCounter - 1;
+                      const endNum = (isMS ? subjectCounter : globalCounter) - 1;
                       const rangeStr = startNum === endNum ? qNum : (isEn ? `${startNum}-${endNum}` : `${toBengaliNumerals(startNum)}-${toBengaliNumerals(endNum)}`);
                       return (
                         <div key={idx} className="mb-6 question-block break-inside-avoid">
@@ -1017,6 +1091,26 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                     return (
                       <React.Fragment key={idx}>
+                        {showDivisionA && (
+                          <div className="ms-division-banner my-4 py-2 px-3 bg-black text-white font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-between rounded-xs shadow-xs break-inside-avoid">
+                            <span>{isEn ? 'PART - A: COMPULSORY SUBJECTS (MANDATORY)' : 'ক-বিভাগ: আবশ্যিক বিষয়সমূহ (সকল বিষয়ের সমাধান)'}</span>
+                            <span className="text-[11px] bg-white text-black px-2 py-0.5 font-bold rounded-xs">
+                              {isEn ? `Full Marks: ${mandatoryMarks}` : `পূর্ণমান: ${toBengaliNumerals(mandatoryMarks)}`}
+                            </span>
+                          </div>
+                        )}
+                        {showDivisionB && (
+                          <div className="ms-division-banner my-6 py-2 px-3 bg-neutral-900 text-white font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-between rounded-xs border-2 border-black shadow-xs break-inside-avoid">
+                            <span>
+                              {isEn 
+                                ? `PART - B: OPTIONAL SUBJECTS (Evaluate any ${parsedSubjectsConfig?.requiredOptionalCount || 1} out of ${parsedSubjectsConfig?.optionalCount || optionalSubjectsList.length || 1})` 
+                                : `খ-বিভাগ: ঐচ্ছিক বিষয়সমূহ (মোট ${toBengaliNumerals(parsedSubjectsConfig?.optionalCount || optionalSubjectsList.length || 1)}টি বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig?.requiredOptionalCount || 1)}টি মূল্যায়ন প্রযোজ্য)`}
+                            </span>
+                            <span className="text-[11px] bg-white text-black px-2 py-0.5 font-bold rounded-xs">
+                              {isEn ? `Marks: ${singleOptionalMarks}` : `পূর্ণমান: ${toBengaliNumerals(singleOptionalMarks)}`}
+                            </span>
+                          </div>
+                        )}
                         {showSubjectHeader && matchedSub && (
                           <MSSubjectHeader
                             subject={matchedSub}
@@ -1025,8 +1119,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             optionalInstruction={
                               !matchedSub.isMandatory && parsedSubjectsConfig?.requiredOptionalCount
                                 ? (isEn
-                                  ? `Select and evaluate any ${parsedSubjectsConfig.requiredOptionalCount} optional subject(s) out of ${parsedSubjectsConfig.optionalCount || 1}.`
-                                  : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount || 1)}টি ঐচ্ছিক বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি উত্তরপত্র মূল্যায়ন প্রযোজ্য।`)
+                                  ? `Select and evaluate any ${parsedSubjectsConfig.requiredOptionalCount} optional subject(s) out of ${parsedSubjectsConfig.optionalCount || optionalSubjectsList.length || 1}.`
+                                  : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount || optionalSubjectsList.length || 1)}টি ঐচ্ছিক বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি উত্তরপত্র মূল্যায়ন প্রযোজ্য।`)
                                 : undefined
                             }
                           />

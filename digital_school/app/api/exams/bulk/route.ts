@@ -34,6 +34,7 @@ const examSchema = z.object({
     cqSqTime: z.coerce.number().optional().nullable(),
     cqSubsections: z.array(cqSubsectionSchema).optional().nullable(),
     subjectType: z.enum(["SS", "MS"]).optional().default("SS"),
+    requiredOptionalCount: z.coerce.number().optional().default(0),
     subjectsConfig: z.any().optional().nullable(),
 });
 
@@ -80,6 +81,9 @@ export async function POST(request: NextRequest) {
                         duration: dur,
                         type: exam.type,
                         subjectType: (exam.subjectType === "MS") ? "MS" : "SS",
+                        requiredOptionalCount: (exam.subjectType === "MS")
+                            ? (exam.requiredOptionalCount || ((exam.subjectsConfig as any)?.requiredOptionalCount) || 0)
+                            : 0,
                         subjectsConfig: (exam.subjectType === "MS") ? ((exam.subjectsConfig as any) || null) : null,
                         totalMarks: Number(exam.totalMarks) || 100,
                         passMarks: Number(exam.passMarks) || 33,

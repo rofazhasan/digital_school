@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
         cqSqTime: exam.cqSqTime || null,
         cqSubsections: exam.cqSubsections || null,
         subjectType: exam.subjectType || 'SS',
+        requiredOptionalCount: exam.requiredOptionalCount ?? (exam.subjectsConfig as any)?.requiredOptionalCount ?? 0,
         subjectsConfig: exam.subjectType === 'MS' ? (exam.subjectsConfig || null) : null,
       };
 
@@ -190,6 +191,7 @@ export async function GET(request: NextRequest) {
             objectiveTime: true,
             cqSqTime: true,
             cqSubsections: true,
+            requiredOptionalCount: true,
             subjectsConfig: true,
           });
         }
@@ -253,6 +255,7 @@ export async function GET(request: NextRequest) {
         objectiveTime: summary ? undefined : exam.objectiveTime,
         cqSqTime: summary ? undefined : exam.cqSqTime,
         cqSubsections: summary ? undefined : exam.cqSubsections,
+        requiredOptionalCount: summary ? undefined : (exam.requiredOptionalCount ?? (exam.subjectsConfig as any)?.requiredOptionalCount ?? 0),
         subjectsConfig: summary ? undefined : (exam.subjectType === 'MS' ? exam.subjectsConfig : null),
       };
     });
@@ -356,6 +359,9 @@ export async function POST(request: NextRequest) {
         duration: dur,
         type: (type || 'OFFLINE').toUpperCase(),
         subjectType: (subjectType === 'MS') ? 'MS' : 'SS',
+        requiredOptionalCount: (subjectType === 'MS')
+          ? (item.requiredOptionalCount !== undefined ? Number(item.requiredOptionalCount) : (subjectsConfig?.requiredOptionalCount !== undefined ? Number(subjectsConfig.requiredOptionalCount) : 0))
+          : 0,
         subjectsConfig: (subjectType === 'MS') ? (subjectsConfig || null) : null,
         totalMarks: totalMarks !== undefined && totalMarks !== null ? Number(totalMarks) : 100,
         passMarks: passMarks !== undefined && passMarks !== null ? Number(passMarks) : 33,
@@ -450,12 +456,18 @@ export async function PATCH(request: NextRequest) {
       updateData.subjectType = rawUpdateData.subjectType;
       if (rawUpdateData.subjectType === 'SS') {
         updateData.subjectsConfig = null;
+        updateData.requiredOptionalCount = 0;
       }
     }
     if (rawUpdateData.subjectsConfig !== undefined) {
       updateData.subjectsConfig = (rawUpdateData.subjectType === 'SS' || (!rawUpdateData.subjectType && updateData.subjectType === 'SS'))
         ? null
         : rawUpdateData.subjectsConfig;
+    }
+    if (rawUpdateData.requiredOptionalCount !== undefined) {
+      updateData.requiredOptionalCount = Number(rawUpdateData.requiredOptionalCount) || 0;
+    } else if (rawUpdateData.subjectsConfig?.requiredOptionalCount !== undefined) {
+      updateData.requiredOptionalCount = Number(rawUpdateData.subjectsConfig.requiredOptionalCount) || 0;
     }
     if (rawUpdateData.objectiveTime !== undefined) updateData.objectiveTime = rawUpdateData.objectiveTime ? Number(rawUpdateData.objectiveTime) : null;
     if (rawUpdateData.cqSqTime !== undefined) updateData.cqSqTime = rawUpdateData.cqSqTime ? Number(rawUpdateData.cqSqTime) : null;

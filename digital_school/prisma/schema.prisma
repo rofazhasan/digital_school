@@ -209,6 +209,7 @@ model Exam {
   objectiveTime         Int?
   subjectType           ExamSubjectType            @default(SS)
   subjectsConfig        Json?
+  requiredOptionalCount Int?                       @default(0)
   examSubmissions       ExamSubmission[]
   admitCards            AdmitCard[]
   evaluationAssignments ExamEvaluationAssignment[]
