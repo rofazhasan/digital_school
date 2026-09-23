@@ -1022,7 +1022,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       <h3>{isEn ? 'Creative Questions (CQ)' : 'সৃজনশীল প্রশ্ন (CQ)'}</h3>
                     </div>
                     <div className="text-right">
-                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? cqRequiredMarks : toBengaliNumerals(cqRequiredMarks)}</div>
+                      {Number(cqRequiredMarks) > 0 && (
+                        <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? cqRequiredMarks : toBengaliNumerals(cqRequiredMarks)}</div>
+                      )}
                       {cqRequired > 0 && (
                         <div className="">{isEn ? `(Answer any ${cqRequired})` : `(মোট ${toBengaliNumerals(cqRequired)} টি উত্তর করতে হবে)`}</div>
                       )}
@@ -1128,7 +1130,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 sq-section section-break">
                     <h3>{isEn ? 'Short Questions (SQ)' : 'সংক্ষিপ্ত প্রশ্ন (SQ)'}</h3>
                     <div className="text-right">
-                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? sqRequiredMarks : toBengaliNumerals(sqRequiredMarks)}</div>
+                      {Number(sqRequiredMarks) > 0 && (
+                        <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? sqRequiredMarks : toBengaliNumerals(sqRequiredMarks)}</div>
+                      )}
                       {sqRequired > 0 && (
                         <div className="">(মোট {toBengaliNumerals(sqRequired)} টি উত্তর করতে হবে)</div>
                       )}
@@ -1167,7 +1171,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 desc-section section-break">
                     <h3>{isEn ? 'Descriptive & Grammar Questions' : 'রচনামূলক ও ব্যাকরণ প্রশ্ন (Descriptive & Grammar)'}</h3>
                     <div className="text-right">
-                      <div>{isEn ? 'Total Marks' : 'মোট নম্বর'}: {isEn ? descMarks : toBengaliNumerals(descMarks)}</div>
+                      {Number(descMarks) > 0 && (
+                        <div>{isEn ? 'Total Marks' : 'মোট নম্বর'}: {isEn ? descMarks : toBengaliNumerals(descMarks)}</div>
+                      )}
                     </div>
                   </div>
                   <div>

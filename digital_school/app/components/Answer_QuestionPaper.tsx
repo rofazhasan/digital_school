@@ -1159,7 +1159,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   >
                     <h3>{isEn ? 'CQ Answers' : 'সৃজনশীল প্রশ্নের উত্তর (CQ Answers)'}</h3>
                     <div className="text-right">
-                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? cqRequiredMarks : toBengaliNumerals(cqRequiredMarks)}</div>
+                      {Number(cqRequiredMarks) > 0 && (
+                        <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? cqRequiredMarks : toBengaliNumerals(cqRequiredMarks)}</div>
+                      )}
                       {cqRequired > 0 && (
                         <div className="">{isEn ? `(Answer any ${cqRequired})` : `(যেকোনো ${toBengaliNumerals(cqRequired)} টি উত্তর করতে হবে)`}</div>
                       )}
@@ -1284,7 +1286,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 desc-section section-break">
                     <h3>{isEn ? 'Descriptive & Grammar Answers' : 'রচনামূলক ও ব্যাকরণ প্রশ্নের উত্তর (Descriptive & Grammar Answers)'}</h3>
                     <div className="text-right">
-                      <div>{isEn ? 'Total Marks' : 'মোট নম্বর'}: {isEn ? descMarks : toBengaliNumerals(descMarks)}</div>
+                      {Number(descMarks) > 0 && (
+                        <div>{isEn ? 'Total Marks' : 'মোট নম্বর'}: {isEn ? descMarks : toBengaliNumerals(descMarks)}</div>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -1867,7 +1871,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 sq-section section-break">
                     <h3>{isEn ? 'SQ Answers' : 'সংক্ষিপ্ত প্রশ্নের উত্তর (SQ Answers)'}</h3>
                     <div className="text-right">
-                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? sqRequiredMarks : toBengaliNumerals(sqRequiredMarks)}</div>
+                      {Number(sqRequiredMarks) > 0 && (
+                        <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? sqRequiredMarks : toBengaliNumerals(sqRequiredMarks)}</div>
+                      )}
                       {sqRequired > 0 && (
                         <div className="">{isEn ? `(Answer any ${sqRequired})` : `(যেকোনো ${toBengaliNumerals(sqRequired)} টি উত্তর করতে হবে)`}</div>
                       )}
