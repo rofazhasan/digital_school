@@ -96,8 +96,8 @@ export function evaluateMCQuestion(
     // Round to 2 decimal places
     finalScore = Math.round(finalScore * 100) / 100;
 
-    // If score is at least 99% of total marks or within 0.02, award full marks
-    if (question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= 0.02)) {
+    // If score is at least 99% of total marks or within tolerance, award full marks
+    if (question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= Math.min(0.02, question.marks * 0.05))) {
         finalScore = question.marks;
     }
 
@@ -145,7 +145,7 @@ export function getMCFeedback(
     const missedCorrect = correctIndices.filter(idx => !selectedSet.has(idx));
     const wronglySelected = answer.selectedOptions.filter(idx => !correctSet.has(idx));
 
-    const isFullyCorrect = score === question.marks || (question.marks > 0 && (score >= question.marks * 0.99 || Math.abs(score - question.marks) <= 0.02));
+    const isFullyCorrect = score === question.marks || (question.marks > 0 && (score >= question.marks * 0.99 || Math.abs(score - question.marks) <= Math.min(0.02, question.marks * 0.05)));
     const isPartiallyCorrect = score > 0 && !isFullyCorrect;
 
     let feedback = '';

@@ -9,7 +9,7 @@ export const mtfQuestionSchema = z.object({
     type: z.literal("MTF"),
     subject: z.string().min(1, "Subject is required"),
     topic: z.string().optional().nullable(),
-    marks: z.coerce.number().int().min(1, "Marks must be at least 1"),
+    marks: z.coerce.number().positive("Marks must be greater than 0"),
     difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
     questionText: z.string().optional().nullable().default("Match the items in Column A with the correct items in Column B."),
     leftColumn: z.array(mtfItemSchema).min(1, "At least one item in left column is required"),

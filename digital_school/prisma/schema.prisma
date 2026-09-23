@@ -186,8 +186,8 @@ model Exam {
   endTime               DateTime
   duration              Int
   type                  ExamType                   @default(OFFLINE)
-  totalMarks            Int
-  passMarks             Int
+  totalMarks            Float
+  passMarks             Float
   isActive              Boolean                    @default(false)
   allowRetake           Boolean                    @default(false)
   instructions          String?
@@ -248,7 +248,7 @@ model Question {
   editedById             String?
   isPrivate              Boolean                  @default(false)
   lastEditedAt           DateTime?
-  marks                  Int
+  marks                  Float
   usageCount             Int                      @default(0)
   options                Json?
   difficulty             Difficulty
@@ -905,7 +905,7 @@ model PracticeResult {
   examId     String
   answers    Json
   score      Float          @default(0)
-  totalMarks Int
+  totalMarks Float
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   exam       Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)

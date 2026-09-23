@@ -282,6 +282,17 @@ async function validateAndMapRow(row: any, classes: any[]) {
             if (data.subQuestions.length === 0) throw new Error("DESCRIPTIVE requires at least one Sub-Question");
         }
 
+        // If parent marks not provided, calculate sum of subquestions if present
+        if ((!data.marks || data.marks <= 0) && Array.isArray(data.subQuestions) && data.subQuestions.length > 0) {
+            const sum = data.subQuestions.reduce((acc: number, sq: any) => acc + (n(sq.marks) || 0), 0);
+            if (sum > 0) {
+                data.marks = Math.round(sum * 100) / 100;
+            }
+        }
+        if (!data.marks || data.marks <= 0) {
+            data.marks = (data.type === 'CQ' || data.type === 'DESCRIPTIVE') ? 10 : 1;
+        }
+
         const { processedData } = processQuestionWithInlineFBDs(data);
         Object.assign(data, processedData);
 
@@ -383,10 +394,13 @@ export async function POST(req: NextRequest) {
                         subject: q.subject,
                         topic: q.topic,
                         difficulty: (q.difficulty || 'MEDIUM') as any,
-                        marks: q.marks || 1,
+                        marks: (q.marks !== undefined && q.marks !== null && !isNaN(Number(q.marks)) && Number(q.marks) > 0) ? Number(q.marks) : 1,
                         questionText: q.questionText,
                         options: q.options || undefined,
-                        subQuestions: q.subQuestions || undefined,
+                        subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions.map((sq: any) => ({
+                            ...sq,
+                            marks: (sq.marks !== undefined && sq.marks !== null && !isNaN(Number(sq.marks)) && Number(sq.marks) > 0) ? Number(sq.marks) : 1
+                        })) : (q.subQuestions || undefined),
                         modelAnswer: q.modelAnswer,
                         explanation: q.explanation,
                         assertion: q.assertion || undefined,

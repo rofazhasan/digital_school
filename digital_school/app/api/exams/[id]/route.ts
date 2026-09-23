@@ -189,9 +189,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Some question IDs are invalid.' }, { status: 400 });
     }
 
-    const totalMarksOfSelectedQuestions = selectedQuestions.reduce((sum, q) => sum + q.marks, 0);
+    const totalMarksOfSelectedQuestions = Math.round(selectedQuestions.reduce((sum, q) => sum + q.marks, 0) * 100) / 100;
 
-    if (totalMarksOfSelectedQuestions !== exam.totalMarks) {
+    if (Math.abs(totalMarksOfSelectedQuestions - exam.totalMarks) >= 0.01) {
       return NextResponse.json({ error: `Marks mismatch. Exam requires ${exam.totalMarks}, but selected questions total ${totalMarksOfSelectedQuestions}.` }, { status: 400 });
     }
 
@@ -316,33 +316,33 @@ export async function POST(
         );
 
         for (const question of subjectCandidates) {
-          if (subjectMarks + question.marks <= targetMarks) {
+          if (Math.round((subjectMarks + question.marks) * 100) / 100 <= targetMarks) {
             generatedSet.push({ ...question, subject: subj.name });
             usedQuestionIds.add(question.id);
-            subjectMarks += question.marks;
+            subjectMarks = Math.round((subjectMarks + question.marks) * 100) / 100;
           }
-          if (subjectMarks === targetMarks) break;
+          if (Math.abs(subjectMarks - targetMarks) < 0.001) break;
         }
 
-        if (subjectMarks !== targetMarks) {
+        if (Math.abs(subjectMarks - targetMarks) >= 0.01) {
           return NextResponse.json({
             error: `Could not automatically fulfill quota for subject "${subj.name}" (${subjectMarks}/${targetMarks} marks found). Please add more questions for this subject or create a set manually.`
           }, { status: 409 });
         }
-        currentMarks += subjectMarks;
+        currentMarks = Math.round((currentMarks + subjectMarks) * 100) / 100;
       }
     } else {
       // Single Subject (SS): Strictly preserved greedy algorithm
       for (const question of shuffledQuestions) {
-        if (currentMarks + question.marks <= exam.totalMarks) {
+        if (Math.round((currentMarks + question.marks) * 100) / 100 <= exam.totalMarks) {
           generatedSet.push(question);
-          currentMarks += question.marks;
+          currentMarks = Math.round((currentMarks + question.marks) * 100) / 100;
         }
-        if (currentMarks === exam.totalMarks) break;
+        if (Math.abs(currentMarks - exam.totalMarks) < 0.001) break;
       }
     }
 
-    if (currentMarks !== exam.totalMarks) {
+    if (Math.abs(currentMarks - exam.totalMarks) >= 0.01) {
       return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 });
     }
 
@@ -437,6 +437,8 @@ export async function PATCH(
 ) {
   try {
     const { id: examId } = await params;
+    const prisma = await DatabaseClient.getInstance();
+    if (!prisma) throw new Error("Database client not available");
     const body = await request.json();
     const { subjectsConfig, subjectType, totalMarks } = body;
 

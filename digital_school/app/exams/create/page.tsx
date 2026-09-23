@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import * as XLSX from 'xlsx';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { n } from "@/utils/parser-utils";
 
 const examTypes = ["ONLINE", "OFFLINE", "MIXED"];
 
@@ -31,7 +32,7 @@ const cqSubsectionSchema = z.object({
 
 const subjectItemSchema = z.object({
   name: z.string().min(1, "Subject name is required"),
-  totalMarks: z.coerce.number().min(1, "Marks must be at least 1"),
+  totalMarks: z.coerce.number().positive("Marks must be greater than 0"),
   isMandatory: z.boolean().default(true),
 });
 
@@ -644,7 +645,7 @@ export default function CreateExamPage() {
         for (let sIdx = 1; sIdx <= 8; sIdx++) {
           const sName = getValue(row, [`MS Subject ${sIdx} Name`, `Subject ${sIdx} Name`, `Subj ${sIdx} Name`]);
           if (sName) {
-            const sMarks = Number(getValue(row, [`MS Subject ${sIdx} Marks`, `Subject ${sIdx} Marks`]) || 25);
+            const sMarks = n(getValue(row, [`MS Subject ${sIdx} Marks`, `Subject ${sIdx} Marks`])) || 25;
             const sMandatoryRaw = getValue(row, [`MS Subject ${sIdx} Mandatory`, `Subject ${sIdx} Mandatory`]);
             const isMandatory = sMandatoryRaw === true || String(sMandatoryRaw).toLowerCase() === 'true' || String(sMandatoryRaw).toLowerCase() === 'yes' || sMandatoryRaw === 1;
             msSubjects.push({
@@ -684,8 +685,8 @@ export default function CreateExamPage() {
           type: (String(getValue(row, ["Type"]) || "OFFLINE")).toUpperCase(),
           subjectType: subjectType,
           subjectsConfig: subjectsConfig,
-          totalMarks: Number(getValue(row, ["Total Marks", "Marks"]) ?? 0) || 100,
-          passMarks: Number(getValue(row, ["Pass Marks"]) ?? 0) || 33,
+          totalMarks: n(getValue(row, ["Total Marks", "Marks"])) || 100,
+          passMarks: n(getValue(row, ["Pass Marks"])) || 33,
           classId: "",
           allowRetake: !!getValue(row, ["Allow Retake", "Retake"]),
           instructions: getValue(row, ["Instructions"]) || "",
@@ -880,12 +881,12 @@ export default function CreateExamPage() {
                               <FormMessage /></FormItem>
                           )} />
                           <FormField name="totalMarks" control={form.control} render={({ field }) => (
-                            <FormItem><FormLabel>Total Marks</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Total Marks</FormLabel><FormControl><Input type="number" step="any" min="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="passMarks" control={form.control} render={({ field }) => (
-                            <FormItem><FormLabel>Pass Marks</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Pass Marks</FormLabel><FormControl><Input type="number" step="any" min="0.01" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField name="allowRetake" control={form.control} render={({ field }) => (
                             <FormItem className="flex flex-row items-center space-x-3 mt-6"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="mb-0">Allow Retake</FormLabel></FormItem>
@@ -990,10 +991,11 @@ export default function CreateExamPage() {
                                     <div className="w-28">
                                       <Input
                                         type="number"
-                                        min={1}
+                                        step="any"
+                                        min={0.01}
                                         placeholder="Marks"
                                         value={subj.totalMarks}
-                                        onChange={(e) => updateSubject(idx, "totalMarks", Number(e.target.value) || 0)}
+                                        onChange={(e) => updateSubject(idx, "totalMarks", n(e.target.value) || 0)}
                                         className="h-9 text-sm"
                                       />
                                     </div>

@@ -4,7 +4,7 @@ export const arQuestionSchema = z.object({
     type: z.literal("AR"),
     subject: z.string().min(2, "Subject must be at least 2 characters"),
     topic: z.string().optional(),
-    marks: z.number().min(1, "Marks must be at least 1").max(10, "Marks cannot exceed 10"),
+    marks: z.number().positive("Marks must be greater than 0").max(20, "Marks cannot exceed 20"),
     difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
     questionText: z.string().min(10, "Question context must be at least 10 characters").optional(),
     assertion: z.string().min(5, "Assertion must be at least 5 characters"),

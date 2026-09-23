@@ -38,6 +38,7 @@ import {
   EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
+import { n } from "@/utils/parser-utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
@@ -242,9 +243,9 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
 
       const firstLine = lines[0].replace(/^\d+[\.\)]\s*/, '');
       let marks = 1;
-      const marksMatch = firstLine.match(/\[(\d+)\s*M\]/i);
+      const marksMatch = firstLine.match(/\[([\d\./\u09E6-\u09EF\u00BC-\u00BE]+)\s*M\]/i);
       if (marksMatch) {
-        marks = parseInt(marksMatch[1]);
+        marks = n(marksMatch[1]) || 1;
       }
 
       let type: QuestionType = 'MCQ';
@@ -318,7 +319,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
 
       const staged: StagedQuestion[] = dataArray.map((item, idx) => {
         let qType: QuestionType = item.type || 'MCQ';
-        let marks = Number(item.marks) || 1;
+        let marks = n(item.marks) || 1;
 
         return {
           id: `bulk_json_${Date.now()}_${idx}`,
@@ -459,7 +460,8 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
 
   // Metrics
   const batchTotalMarks = useMemo(() => {
-    return previewQuestions.reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
+    const sum = previewQuestions.reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
+    return Math.round(sum * 100) / 100;
   }, [previewQuestions]);
 
   const batchCounts = useMemo(() => {
@@ -484,7 +486,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
       questionText: q.questionText,
       type: q.type,
       subject: q.subject || defaultSubject,
-      marks: Number(q.marks) || 1,
+      marks: n(q.marks) || 1,
       difficulty: q.difficulty || 'MEDIUM',
       tags: q.tags || [],
       hasMath: Boolean(q.hasMath),
@@ -537,7 +539,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
           subject: q.subject || defaultSubject,
           topic: q.topic,
           difficulty: q.difficulty || 'MEDIUM',
-          marks: Number(q.marks) || 1,
+          marks: n(q.marks) || 1,
           className: q.className || defaultClassName,
           classId: resolvedClassId,
           options: q.options,
@@ -572,7 +574,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
         questionText: q.questionText,
         type: q.type,
         subject: q.subject || defaultSubject,
-        marks: Number(q.marks) || 1,
+        marks: n(q.marks) || 1,
         difficulty: q.difficulty || 'MEDIUM',
         tags: q.tags || [],
         hasMath: Boolean(q.hasMath),
@@ -939,10 +941,11 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                           <td className="p-3 text-center">
                             <Input
                               type="number"
-                              min={1}
+                              step="any"
+                              min={0.01}
                               value={q.marks}
-                              onChange={(e) => handleEditRow(idx, 'marks', Number(e.target.value))}
-                              className="h-8 text-xs rounded-lg text-center font-bold w-14 mx-auto"
+                              onChange={(e) => handleEditRow(idx, 'marks', n(e.target.value))}
+                              className="h-8 text-xs rounded-lg text-center font-bold w-16 mx-auto"
                             />
                           </td>
                           <td className="p-3">

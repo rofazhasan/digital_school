@@ -566,5 +566,16 @@ WHERE
         '20260204073345_init_local',
         '20260205132340_add_school_management_system',
         '20260206055459_add_fbd_to_questions'
-    )
 ORDER BY finished_at DESC;
+
+-- ============================================
+-- MIGRATION: allow_fractional_marks (20260923220000)
+-- ============================================
+DO $$ BEGIN
+    ALTER TABLE "questions" ALTER COLUMN "marks" TYPE DOUBLE PRECISION;
+    ALTER TABLE "exams" ALTER COLUMN "totalMarks" TYPE DOUBLE PRECISION;
+    ALTER TABLE "exams" ALTER COLUMN "passMarks" TYPE DOUBLE PRECISION;
+    ALTER TABLE "practice_results" ALTER COLUMN "totalMarks" TYPE DOUBLE PRECISION;
+EXCEPTION
+    WHEN OTHERS THEN null;
+END $$;

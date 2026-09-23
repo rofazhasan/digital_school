@@ -18,7 +18,7 @@ const questionSchema = z.object({
     type: z.nativeEnum(QuestionType),
     subject: z.string().min(1, "Subject is required"),
     topic: z.string().optional().nullable(),
-    marks: z.coerce.number().int().min(1, "Marks must be at least 1"),
+    marks: z.coerce.number().positive("Marks must be greater than 0"),
     difficulty: z.nativeEnum(Difficulty),
     questionText: z.string().min(1, "Question content is required"),
     hasMath: z.boolean().default(false),
@@ -33,7 +33,7 @@ const questionSchema = z.object({
     subQuestions: z.array(z.object({
         question: z.string().optional().nullable(),
         text: z.string().optional().nullable(),
-        marks: z.number().optional().nullable(),
+        marks: z.coerce.number().positive().optional().nullable(),
         modelAnswer: z.string().optional().nullable(),
         explanation: z.string().optional().nullable(),
         options: z.array(z.any()).optional().nullable(),

@@ -45,6 +45,7 @@ import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { Capacitor } from "@capacitor/core";
 import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet";
 import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
+import { n } from "@/utils/parser-utils";
 
 
 // --- Types ---
@@ -2082,10 +2083,11 @@ export default function QuestionBankPage() {
                                       <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">Custom Marks:</span>
                                       <Input
                                         type="number"
-                                        min="1"
+                                        step="any"
+                                        min="0.01"
                                         value={q.customMarks !== undefined ? q.customMarks : (q.marks || (q.type === 'CQ' ? 10 : 1))}
                                         onChange={(e) => {
-                                          const val = Number(e.target.value);
+                                          const val = n(e.target.value);
                                           setSheetQuestions(prev => prev.map((item, i) => i === idx ? { ...item, customMarks: val } : item));
                                         }}
                                         className="h-7 text-xs w-20 rounded-md bg-white dark:bg-gray-800"
@@ -4916,7 +4918,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             <div><Label>Topic (Optional)</Label><Input value={topic} onChange={e => setTopic(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Marks</Label><Input type="number" value={marks} onChange={e => setMarks(Number(e.target.value))} required /></div>
+            <div><Label>Marks</Label><Input type="number" step="any" min="0.01" value={marks} onChange={e => setMarks(n(e.target.value))} required /></div>
             <div><Label>Difficulty</Label><Select value={difficulty} onValueChange={(v: Difficulty) => setDifficulty(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
           </div>
           <div>
@@ -5175,8 +5177,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                             <Label className="text-sm text-gray-600 dark:text-gray-400">Marks</Label>
                             <Input
                               type="number"
+                              step="any"
+                              min="0.01"
                               value={sq.marks}
-                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = Number(e.target.value); setSubQuestions(newSQs); }}
+                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = n(e.target.value); setSubQuestions(newSQs); }}
                               placeholder="Marks"
                               className="w-24"
                             />
@@ -5326,8 +5330,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         <Label className="text-[10px] uppercase text-gray-400">Marks</Label>
                         <Input
                           type="number"
+                          step="any"
+                          min="0.01"
                           value={sq.marks}
-                          onChange={e => { const newSQs = [...smcqQuestions]; newSQs[i].marks = Number(e.target.value); setSmcqQuestions(newSQs); }}
+                          onChange={e => { const newSQs = [...smcqQuestions]; newSQs[i].marks = n(e.target.value); setSmcqQuestions(newSQs); }}
                           className="w-16 h-7 text-xs"
                         />
                       </div>
@@ -6009,7 +6015,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                <UniversalMathJax inline dynamic>{cleanupMath(sq.question || sq.questionText || sq.text || '')}</UniversalMathJax>
+                                <UniversalMathJax inline dynamic>{cleanupMath(sq.question || (sq as any).questionText || (sq as any).text || '')}</UniversalMathJax>
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (
@@ -6564,7 +6570,11 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
     const newData = [...editedPreviewData];
 
     if (newData[index].data) {
-      (newData[index].data as any)[field] = value;
+      if (field === 'marks') {
+        (newData[index].data as any).marks = n(value);
+      } else {
+        (newData[index].data as any)[field] = value;
+      }
 
       // Special handling for Class Name change -> Update Class ID
       if (field === 'className') {
@@ -6861,7 +6871,16 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{row.data.marks}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          value={row.data.marks ?? 1}
+                          onChange={(e) => handleEditRow(index, 'marks', e.target.value)}
+                          className="h-8 text-xs w-16 text-center font-bold"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => handleRemoveRow(index)}>
                           <Trash2 className="w-4 h-4 text-red-500" />

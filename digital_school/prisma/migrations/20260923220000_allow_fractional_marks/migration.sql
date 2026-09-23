@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "questions" ALTER COLUMN "marks" TYPE DOUBLE PRECISION;
+
+-- AlterTable
+ALTER TABLE "exams" ALTER COLUMN "totalMarks" TYPE DOUBLE PRECISION;
+ALTER TABLE "exams" ALTER COLUMN "passMarks" TYPE DOUBLE PRECISION;
+
+-- AlterTable
+ALTER TABLE "practice_results" ALTER COLUMN "totalMarks" TYPE DOUBLE PRECISION;

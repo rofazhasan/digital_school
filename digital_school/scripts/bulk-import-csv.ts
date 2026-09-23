@@ -66,7 +66,7 @@ async function main() {
                             type: type.toUpperCase(),
                             subject: subject || 'General',
                             topic: topic || null,
-                            marks: parseInt(marks) || 1,
+                            marks: parseFloat(marks) || 1,
                             difficulty: (difficulty || 'MEDIUM').toUpperCase() as any,
                             questionText,
                             explanation: explanation || null,
