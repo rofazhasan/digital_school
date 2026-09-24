@@ -4,10 +4,10 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Search, Activity, ArrowRight, User, CheckCircle, Clock, AlertTriangle, LayoutGrid, Layers, Trophy } from "lucide-react";
+import { RefreshCw, Search, Activity, ArrowRight, Clock, AlertTriangle, LayoutGrid, Layers, Trophy, Timer, CheckCircle, Hourglass } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
 export interface ActivitySubmission {
@@ -27,13 +27,71 @@ export interface ActivitySubmission {
     maxScore: number;
     updatedAt: string;
     startedAt: string;
+    durationMinutes?: number;
+    durationSeconds?: number;
+    elapsedSeconds?: number;
+    remainingSeconds?: number;
+    timeSpentSeconds?: number;
+    isOverdue?: boolean;
     isIdle?: boolean;
+    serverTime?: string;
+    endTime?: string | null;
 }
 
-// Memory-stable card component to avoid unnecessary re-renders
-const StudentCard = React.memo(({ sub, i, router }: { sub: ActivitySubmission, i: number, router: any }) => {
+function formatDuration(seconds: number): string {
+    if (seconds <= 0) return "0s";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+
+    if (h > 0) {
+        return `${h}h ${m}m ${s}s`;
+    }
+    if (m > 0) {
+        return `${m}m ${s}s`;
+    }
+    return `${s}s`;
+}
+
+function formatClockTime(isoString: string | null | undefined): string {
+    if (!isoString) return "N/A";
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// Memory-stable card component with live local countdown ticker
+const StudentCard = React.memo(({ sub, i, router, now }: { sub: ActivitySubmission; i: number; router: any; now: number }) => {
     const isLive = sub.status === 'IN_PROGRESS';
     const isIdle = sub.isIdle;
+
+    const startedAtMs = sub.startedAt ? new Date(sub.startedAt).getTime() : null;
+    const durationMin = sub.durationMinutes || 60;
+    const totalDurationSec = durationMin * 60;
+
+    let currentElapsedSec = sub.elapsedSeconds || 0;
+    let currentRemainingSec = sub.remainingSeconds ?? totalDurationSec;
+    let isCurrentlyOverdue = !!sub.isOverdue;
+
+    if (startedAtMs) {
+        if (!isLive) {
+            currentElapsedSec = sub.timeSpentSeconds ?? Math.max(0, Math.floor((new Date(sub.updatedAt).getTime() - startedAtMs) / 1000));
+            currentRemainingSec = 0;
+            isCurrentlyOverdue = false;
+        } else {
+            currentElapsedSec = Math.max(0, Math.floor((now - startedAtMs) / 1000));
+            currentRemainingSec = Math.max(0, totalDurationSec - currentElapsedSec);
+
+            if (sub.endTime) {
+                const untilEnd = Math.max(0, Math.floor((new Date(sub.endTime).getTime() - now) / 1000));
+                currentRemainingSec = Math.min(currentRemainingSec, untilEnd);
+            }
+
+            isCurrentlyOverdue = currentElapsedSec > totalDurationSec;
+        }
+    }
+
+    const timePercentUsed = Math.min(100, Math.round((currentElapsedSec / totalDurationSec) * 100));
 
     return (
         <div
@@ -43,26 +101,28 @@ const StudentCard = React.memo(({ sub, i, router }: { sub: ActivitySubmission, i
             <Card
                 className={`group relative overflow-hidden transition-all duration-500 cursor-pointer border-none shadow-sm hover:shadow-2xl hover:-translate-y-2
         ${isLive
-                        ? isIdle
-                            ? 'bg-gradient-to-br from-white to-amber-50/60 dark:from-slate-900 dark:to-slate-900 ring-2 ring-amber-400/50 shadow-amber-500/10'
-                            : 'bg-gradient-to-br from-white to-blue-50/40 dark:from-slate-900 dark:to-slate-900'
+                        ? isCurrentlyOverdue
+                            ? 'bg-gradient-to-br from-white to-rose-50/60 dark:from-slate-900 dark:to-slate-900 ring-2 ring-rose-400/50 shadow-rose-500/10'
+                            : isIdle
+                                ? 'bg-gradient-to-br from-white to-amber-50/60 dark:from-slate-900 dark:to-slate-900 ring-2 ring-amber-400/50 shadow-amber-500/10'
+                                : 'bg-gradient-to-br from-white to-blue-50/40 dark:from-slate-900 dark:to-slate-900'
                         : 'bg-gradient-to-br from-white to-slate-50/40 dark:from-slate-900 dark:to-slate-800'}`}
-                onClick={() => router.push(`/exams/evaluations/${sub.examId}?studentId=${sub.studentId}`)}
+                onClick={() => router.push(`/exams/evaluations/${sub.examId}?studentId=${sub.studentId}&tab=live`)}
             >
                 <div className={`absolute top-0 left-0 w-full h-1 
-          ${isLive ? isIdle ? 'bg-amber-500' : 'bg-blue-500' : 'bg-emerald-500'}`} />
+          ${isLive ? isCurrentlyOverdue ? 'bg-rose-500' : isIdle ? 'bg-amber-500' : 'bg-blue-500' : 'bg-emerald-500'}`} />
 
                 <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <div className="relative">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black text-white shadow-xl
-                  ${isLive ? isIdle ? 'bg-amber-500 shadow-amber-500/20' : 'bg-blue-600 shadow-blue-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
+                  ${isLive ? isCurrentlyOverdue ? 'bg-rose-500 shadow-rose-500/20' : isIdle ? 'bg-amber-500 shadow-amber-500/20' : 'bg-blue-600 shadow-blue-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
                                     {sub.studentName?.substring(0, 1)?.toUpperCase() || 'S'}
                                 </div>
                                 {isLive && (
                                     <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center
-                    ${isIdle ? 'bg-amber-500' : 'bg-blue-500'}`}>
+                    ${isCurrentlyOverdue ? 'bg-rose-500' : isIdle ? 'bg-amber-500' : 'bg-blue-500'}`}>
                                         <div className={`w-1.5 h-1.5 rounded-full bg-white ${isIdle ? 'animate-none opacity-50' : 'animate-ping'}`} />
                                     </div>
                                 )}
@@ -76,23 +136,103 @@ const StudentCard = React.memo(({ sub, i, router }: { sub: ActivitySubmission, i
                                 </p>
                             </div>
                         </div>
+
+                        {/* Status / Timing Badge */}
+                        <div>
+                            {isLive ? (
+                                isCurrentlyOverdue ? (
+                                    <Badge variant="destructive" className="text-[10px] font-black animate-pulse flex items-center gap-1 shadow-sm">
+                                        <AlertTriangle className="w-3 h-3" /> Overdue
+                                    </Badge>
+                                ) : currentRemainingSec <= 300 ? (
+                                    <Badge className="bg-amber-500 text-white text-[10px] font-black flex items-center gap-1 shadow-sm">
+                                        <Timer className="w-3 h-3 animate-spin-slow" /> {formatDuration(currentRemainingSec)}
+                                    </Badge>
+                                ) : (
+                                    <Badge className="bg-blue-600 text-white text-[10px] font-black flex items-center gap-1 shadow-sm">
+                                        <Clock className="w-3 h-3" /> {formatDuration(currentRemainingSec)}
+                                    </Badge>
+                                )
+                            ) : (
+                                <Badge className="bg-emerald-600 text-white text-[10px] font-black flex items-center gap-1 shadow-sm">
+                                    <CheckCircle className="w-3 h-3" /> Done
+                                </Badge>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="mb-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Exam</p>
-                        <p className="font-bold text-sm truncate" title={sub.examName}>{sub.examName}</p>
+                    <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="truncate mr-2">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Exam</p>
+                            <p className="font-bold text-sm truncate" title={sub.examName}>{sub.examName}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800/50">
+                                <Hourglass className="w-3 h-3" /> {durationMin} min
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="space-y-2 mb-6">
+                    {/* Live Duration & Start Time vs Current Time Comparison */}
+                    <div className="mb-4 p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                            <span className="flex items-center gap-1 truncate mr-2">
+                                <Clock className="w-3 h-3 text-primary shrink-0" />
+                                Start: <span className="text-foreground">{formatClockTime(sub.startedAt)}</span>
+                            </span>
+                            <span className="shrink-0 text-slate-500">
+                                Total: {durationMin}m
+                            </span>
+                        </div>
+
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                                <span className={isCurrentlyOverdue ? 'text-rose-600 dark:text-rose-400 font-black' : 'text-slate-600 dark:text-slate-300'}>
+                                    {isLive ? `Elapsed: ${formatDuration(currentElapsedSec)}` : `Finished in: ${formatDuration(currentElapsedSec)}`}
+                                </span>
+                                <span>
+                                    {isLive ? (
+                                        isCurrentlyOverdue ? (
+                                            <span className="text-rose-600 dark:text-rose-400 font-black">
+                                                +{formatDuration(currentElapsedSec - totalDurationSec)} over
+                                            </span>
+                                        ) : (
+                                            <span className={currentRemainingSec <= 300 ? 'text-amber-600 dark:text-amber-400 font-black' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
+                                                {formatDuration(currentRemainingSec)} remaining
+                                            </span>
+                                        )
+                                    ) : (
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Completed</span>
+                                    )}
+                                </span>
+                            </div>
+
+                            <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-1000 ${
+                                        isCurrentlyOverdue
+                                            ? 'bg-rose-500'
+                                            : timePercentUsed > 80
+                                                ? 'bg-amber-500'
+                                                : 'bg-indigo-500'
+                                    }`}
+                                    style={{ width: `${Math.min(100, Math.max(5, timePercentUsed))}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Question Answering Progress */}
+                    <div className="space-y-2 mb-5">
                         <div className="flex justify-between items-center px-1">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                Completion ({sub.answered}/{sub.totalQuestions})
+                                Answered ({sub.answered}/{sub.totalQuestions})
                             </span>
                             <span className={`text-xs font-black ${sub.progress === 100 ? 'text-emerald-500' : isLive ? 'text-blue-500' : 'text-slate-500'}`}>
                                 {sub.progress}%
                             </span>
                         </div>
-                        <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
+                        <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
                             <div
                                 className={`h-full rounded-full transition-all duration-1000 ease-in-out relative
                   ${sub.progress === 100 ? 'bg-emerald-500 shadow-emerald-500/50' : isIdle ? 'bg-amber-500 shadow-amber-500/50' : 'bg-blue-500 shadow-blue-500/50'}`}
@@ -103,8 +243,8 @@ const StudentCard = React.memo(({ sub, i, router }: { sub: ActivitySubmission, i
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
                             {isIdle ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> : <Clock className="w-3.5 h-3.5 text-muted-foreground" />}
                             <span className={`text-[10px] font-bold uppercase ${isIdle ? 'text-amber-600' : 'text-muted-foreground'}`}>
                                 {isIdle ? 'Idle > 5m' : formatDistanceToNow(new Date(sub.updatedAt), { addSuffix: true })}
@@ -112,7 +252,7 @@ const StudentCard = React.memo(({ sub, i, router }: { sub: ActivitySubmission, i
                         </div>
 
                         <div className="flex items-center text-[11px] font-bold text-primary group-hover:underline">
-                            Evaluate
+                            Live Monitor
                             <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform group-hover:translate-x-1" />
                         </div>
                     </div>
@@ -130,11 +270,20 @@ export function ActivityTab() {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [historicalActiveCount, setHistoricalActiveCount] = useState<number[]>(Array(10).fill(0));
+    const [now, setNow] = useState<number>(Date.now());
 
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [sortBy, setSortBy] = useState("started");
     const [viewMode, setViewMode] = useState<"grid" | "grouped">("grid");
+
+    // Local 1-second clock ticker for smooth, live countdowns with zero network load
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setNow(Date.now());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     const fetchActivity = useCallback(async (isSilent = false) => {
         if (!isSilent) setLoading(true);
@@ -143,7 +292,7 @@ export function ActivityTab() {
         try {
             const url = new URL("/api/exams/evaluations/activity", window.location.origin);
             url.searchParams.append("limit", "80");
-            if (statusFilter !== "ALL") {
+            if (statusFilter !== "ALL" && statusFilter !== "OVERDUE") {
                 url.searchParams.append("status", statusFilter);
             }
 
@@ -157,33 +306,67 @@ export function ActivityTab() {
                 setHistoricalActiveCount(prev => [...prev.slice(1), currentActive]);
             }
         } catch (e) {
-            console.error(e);
+            console.error("Failed to load activity:", e);
         } finally {
             setLoading(false);
-            setTimeout(() => setSyncing(false), 800);
+            setTimeout(() => setSyncing(false), 500);
         }
     }, [statusFilter]);
 
     useEffect(() => {
         fetchActivity();
-        // Use 15s instead of 10s for better performance and stability
-        const interval = setInterval(() => fetchActivity(true), 15000);
+        // Fast background poll every 10 seconds (API is now lightweight and cached)
+        const interval = setInterval(() => fetchActivity(true), 10000);
         return () => clearInterval(interval);
     }, [fetchActivity]);
 
     const processedData = useMemo(() => {
         let filtered = activities.filter(a => {
-            const query = searchQuery.toLowerCase();
-            return (
+            const query = searchQuery.toLowerCase().trim();
+            const matchesQuery = !query || (
                 a.studentName.toLowerCase().includes(query) ||
                 a.examName.toLowerCase().includes(query) ||
                 a.roll.toLowerCase().includes(query) ||
                 a.className.toLowerCase().includes(query)
             );
+
+            if (!matchesQuery) return false;
+
+            if (statusFilter === "OVERDUE") {
+                const startedAtMs = a.startedAt ? new Date(a.startedAt).getTime() : null;
+                const totalDurationSec = (a.durationMinutes || 60) * 60;
+                const isOverdueNow = a.status === 'IN_PROGRESS' && startedAtMs && (now - startedAtMs > totalDurationSec * 1000);
+                return !!isOverdueNow || !!a.isOverdue;
+            }
+
+            return true;
         });
 
         filtered = [...filtered].sort((a, b) => {
-            if (sortBy === 'started') return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+            const aStartMs = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+            const bStartMs = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+
+            const aDurationSec = (a.durationMinutes || 60) * 60;
+            const bDurationSec = (b.durationMinutes || 60) * 60;
+
+            const aElapsedSec = aStartMs ? Math.max(0, Math.floor((now - aStartMs) / 1000)) : 0;
+            const bElapsedSec = bStartMs ? Math.max(0, Math.floor((now - bStartMs) / 1000)) : 0;
+
+            const aRemainingSec = Math.max(0, aDurationSec - aElapsedSec);
+            const bRemainingSec = Math.max(0, bDurationSec - bElapsedSec);
+
+            if (sortBy === 'urgent') {
+                // In progress items first, sorted by least remaining time
+                if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
+                if (b.status === 'IN_PROGRESS' && a.status !== 'IN_PROGRESS') return 1;
+                return aRemainingSec - bRemainingSec;
+            }
+            if (sortBy === 'overdue') {
+                const aOver = aElapsedSec - aDurationSec;
+                const bOver = bElapsedSec - bDurationSec;
+                return bOver - aOver;
+            }
+            if (sortBy === 'started') return bStartMs - aStartMs;
             if (sortBy === 'progress') return b.progress - a.progress;
             if (sortBy === 'score') return b.score - a.score;
             if (sortBy === 'idle') return (b.isIdle ? 1 : 0) - (a.isIdle ? 1 : 0);
@@ -191,12 +374,19 @@ export function ActivityTab() {
         });
 
         return filtered;
-    }, [activities, searchQuery, sortBy]);
+    }, [activities, searchQuery, statusFilter, sortBy, now]);
 
     const activeExams = activities.filter(a => a.status === 'IN_PROGRESS');
     const activeCount = activeExams.length;
     const completedCount = activities.filter(a => a.status === 'COMPLETED' || a.status === 'SUBMITTED').length;
     const avgClassProgress = activeCount > 0 ? Math.round(activeExams.reduce((acc, a) => acc + a.progress, 0) / activeCount) : 0;
+
+    const overdueCount = activeExams.filter(a => {
+        const startMs = a.startedAt ? new Date(a.startedAt).getTime() : null;
+        const totalDurationSec = (a.durationMinutes || 60) * 60;
+        return a.isOverdue || (startMs && (now - startMs > totalDurationSec * 1000));
+    }).length;
+
     const idleCount = activeExams.filter(a => a.isIdle).length;
 
     const groupedByExam = useMemo(() => {
@@ -233,10 +423,10 @@ export function ActivityTab() {
                         <CardContent className="p-6">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Live Exams</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Live Students</p>
                                     <div className="flex items-baseline gap-2">
                                         <h3 className="text-4xl font-black tracking-tight">{activeCount}</h3>
-                                        {activeCount > 0 && <span className="text-xs font-bold text-blue-500 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>Online</span>}
+                                        {activeCount > 0 && <span className="text-xs font-bold text-blue-500 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>Active Now</span>}
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end">
@@ -251,16 +441,21 @@ export function ActivityTab() {
                 </div>
 
                 <div className="relative group overflow-hidden rounded-2xl">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-600 blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-amber-600 blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
                     <Card className="relative bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-white/20 shadow-xl h-full">
                         <CardContent className="p-6 h-full flex flex-col justify-between">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Status Alerts</p>
-                                    <h3 className={`text-3xl font-black tracking-tight ${idleCount > 0 ? 'text-amber-600' : ''}`}>{idleCount}</h3>
-                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">Idle &gt; 5 mins</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Time Alerts</p>
+                                    <div className="flex items-baseline gap-2">
+                                        <h3 className={`text-3xl font-black tracking-tight ${overdueCount > 0 ? 'text-rose-600' : ''}`}>{overdueCount}</h3>
+                                        <span className="text-xs font-medium text-muted-foreground">overdue</span>
+                                    </div>
+                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">
+                                        {idleCount > 0 ? `${idleCount} idle > 5m` : 'All actively responding'}
+                                    </p>
                                 </div>
-                                <div className={`p-3 rounded-xl ${idleCount > 0 ? 'bg-amber-500/10 text-amber-600 animate-pulse' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
+                                <div className={`p-3 rounded-xl ${overdueCount > 0 ? 'bg-rose-500/10 text-rose-600 animate-pulse' : idleCount > 0 ? 'bg-amber-500/10 text-amber-600' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
                                     <AlertTriangle className="w-6 h-6" />
                                 </div>
                             </div>
@@ -274,9 +469,9 @@ export function ActivityTab() {
                         <CardContent className="p-6 h-full flex flex-col justify-between">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Completion</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Avg Progress</p>
                                     <h3 className="text-3xl font-black tracking-tight">{avgClassProgress}%</h3>
-                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">Avg class progress</p>
+                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">Across live exams</p>
                                 </div>
                                 <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600">
                                     <Trophy className="w-6 h-6" />
@@ -292,9 +487,9 @@ export function ActivityTab() {
                         <CardContent className="p-6 h-full flex flex-col justify-between">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Submissions</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Completed</p>
                                     <h3 className="text-3xl font-black tracking-tight">{completedCount}</h3>
-                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">Awaiting evaluation</p>
+                                    <p className="text-[10px] font-medium text-muted-foreground mt-1">Ready for evaluation</p>
                                 </div>
                                 <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-600">
                                     <CheckCircle className="w-6 h-6" />
@@ -307,11 +502,11 @@ export function ActivityTab() {
 
             <div className="flex flex-col lg:flex-row gap-4 items-center justify-between sticky top-4 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3.5 rounded-2xl border border-white/40 shadow-lg">
 
-                <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                     <div className="relative group w-full sm:w-64 shrink-0">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
-                            placeholder="Search..."
+                            placeholder="Search student, roll, exam..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10 w-full bg-slate-100/50 dark:bg-slate-800/50 border-none shadow-inner focus-visible:ring-2 focus-visible:ring-primary/20 rounded-xl"
@@ -320,25 +515,27 @@ export function ActivityTab() {
 
                     <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
                         <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[130px] shrink-0 bg-slate-100/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                            <SelectTrigger className="w-[140px] shrink-0 bg-slate-100/50 dark:bg-slate-800/50 border-none rounded-xl font-medium text-xs">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-none shadow-2xl">
                                 <SelectItem value="ALL">All Status</SelectItem>
                                 <SelectItem value="IN_PROGRESS">Live / Active</SelectItem>
-                                <SelectItem value="SUBMITTED">Done</SelectItem>
+                                <SelectItem value="OVERDUE">🚨 Overdue Only</SelectItem>
+                                <SelectItem value="SUBMITTED">Done / Submitted</SelectItem>
                             </SelectContent>
                         </Select>
 
                         <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-[150px] shrink-0 bg-slate-100/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                            <SelectTrigger className="w-[170px] shrink-0 bg-slate-100/50 dark:bg-slate-800/50 border-none rounded-xl font-medium text-xs">
                                 <SelectValue placeholder="Sort By" />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-none shadow-2xl">
+                                <SelectItem value="urgent">⏱️ Urgent (Least Time Left)</SelectItem>
+                                <SelectItem value="overdue">🚨 Most Overdue First</SelectItem>
                                 <SelectItem value="started">Recently Started</SelectItem>
                                 <SelectItem value="updated">Recent Activity</SelectItem>
                                 <SelectItem value="progress">Top Progress</SelectItem>
-                                <SelectItem value="idle">Needs Attention</SelectItem>
                                 <SelectItem value="score">Top Score</SelectItem>
                             </SelectContent>
                         </Select>
@@ -383,19 +580,20 @@ export function ActivityTab() {
                         <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
                         <Activity className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                     </div>
-                    <p className="text-muted-foreground font-medium animate-pulse">Synchronizing Monitor...</p>
+                    <p className="text-muted-foreground font-medium animate-pulse">Synchronizing Live Activity...</p>
                 </div>
             ) : processedData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-50/50 dark:bg-slate-900/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
                     <Clock className="w-12 h-12 text-slate-300 mb-4" />
-                    <h3 className="text-lg font-bold">No tracking data</h3>
+                    <h3 className="text-lg font-bold">No active submissions found</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Try changing filters or search terms</p>
                 </div>
             ) : (
                 <>
                     {viewMode === 'grid' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {processedData.map((sub, i) => (
-                                <StudentCard key={sub.id} sub={sub} i={i} router={router} />
+                                <StudentCard key={sub.id} sub={sub} i={i} router={router} now={now} />
                             ))}
                         </div>
                     )}
@@ -407,12 +605,12 @@ export function ActivityTab() {
                                     <div className="flex items-center gap-3 border-b border-border pb-2">
                                         <h3 className="text-2xl font-black">{examName}</h3>
                                         <div className="bg-muted px-2.5 py-1 rounded-full text-xs font-bold text-muted-foreground">
-                                            {groupedByExam[examName].length}
+                                            {groupedByExam[examName].length} students
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                         {groupedByExam[examName].map((sub, i) => (
-                                            <StudentCard key={sub.id} sub={sub} i={i} router={router} />
+                                            <StudentCard key={sub.id} sub={sub} i={i} router={router} now={now} />
                                         ))}
                                     </div>
                                 </div>

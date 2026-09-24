@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   User,
   FileText,
@@ -56,7 +56,10 @@ import {
   X,
   Minus,
   Layers,
-  Sparkles
+  Sparkles,
+  Clock,
+  Hourglass,
+  Timer
 } from "lucide-react";
 import {
   Tooltip,
@@ -392,6 +395,7 @@ export function evaluateINTDetails(question: any, studentAnswer: any, negPct = 0
 
 interface LiveStudent {
   id: string;
+  studentId?: string;
   studentName: string;
   roll: string;
   className: string;
@@ -408,10 +412,23 @@ interface LiveStudent {
   isOnline?: boolean;
   isFocus?: boolean;
   examSetId?: string;
+  startedAt?: string | null;
+  durationMinutes?: number;
+  durationSeconds?: number;
+  elapsedSeconds?: number;
+  remainingSeconds?: number;
+  timeSpentSeconds?: number;
+  isOverdue?: boolean;
 }
 
 interface LiveExamStats {
   examName: string;
+  examDuration?: number;
+  objectiveTime?: number;
+  cqSqTime?: number;
+  startTime?: string | null;
+  endTime?: string | null;
+  serverTime?: string;
   totalStudents: number;
   activeStudents: number;
   submittedStudents: number;
@@ -505,6 +522,10 @@ const mathJaxConfig = {
 export default function ExamEvaluationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlStudentId = searchParams?.get('studentId') || null;
+  const urlTab = searchParams?.get('tab') || null;
+
   const [exam, setExam] = useState<Exam | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
@@ -517,8 +538,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   // Global catch for state initialization errors -- MOVED BELOW HOOKS
 
-  // Tabs State
-  const [activeTab, setActiveTab] = useState("evaluation");
+  // Tabs State (respects ?tab=live URL parameter)
+  const [activeTab, setActiveTab] = useState(urlTab === 'live' ? "live" : "evaluation");
+
+  // Real-time ticking clock for live monitor (zero network overhead, 1-second accuracy)
+  const [now, setNow] = useState<number>(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Live Monitor State
   const [liveStats, setLiveStats] = useState<LiveExamStats | null>(null);
@@ -527,8 +555,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   // Monitor View State
   const [monitorSearch, setMonitorSearch] = useState("");
-  const [monitorFilter, setMonitorFilter] = useState<'all' | 'active' | 'submitted'>('all');
-  const [monitorSort, setMonitorSort] = useState<'progress' | 'score' | 'time'>('progress');
+  const [monitorFilter, setMonitorFilter] = useState<'all' | 'active' | 'overdue' | 'submitted'>('all');
+  const [monitorSort, setMonitorSort] = useState<'progress' | 'score' | 'time' | 'urgent' | 'overdue'>('progress');
   const [monitorViewMode, setMonitorViewMode] = useState<'grid' | 'list'>('grid');
 
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -1444,6 +1472,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       if (response.ok) {
         const data = await response.json();
         setLiveStats(data);
+
+        // Auto-select target student if specified in URL query
+        if (urlStudentId && data?.liveData?.length > 0) {
+          const found = data.liveData.find((s: any) => s.studentId === urlStudentId || s.id === urlStudentId);
+          if (found && !selectedLiveStudent) {
+            setSelectedLiveStudent(found);
+            if (activeTab === 'live') {
+              setIsLiveModalOpen(true);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching live stats:", error);
@@ -1471,23 +1510,106 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
     const { liveData, activeStudents, submittedStudents, totalStudents } = liveStats;
 
+    const formatDuration = (seconds: number): string => {
+      if (seconds <= 0) return "0s";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    };
+
+    const formatClockTime = (isoString: string | null | undefined): string => {
+      if (!isoString) return "N/A";
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return "N/A";
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
+    const getStudentLiveTiming = (student: LiveStudent) => {
+      const startMs = student?.startedAt ? new Date(student.startedAt).getTime() : null;
+      const durationMin = student?.durationMinutes || liveStats?.examDuration || 60;
+      const totalDurationSec = durationMin * 60;
+
+      let elapsedSec = student?.elapsedSeconds || 0;
+      let remainingSec = student?.remainingSeconds ?? totalDurationSec;
+      let isOverdue = !!student?.isOverdue;
+
+      if (startMs) {
+        if (student?.status === 'COMPLETED') {
+          elapsedSec = student?.timeSpentSeconds ?? Math.max(0, Math.floor((new Date(student?.lastActive || now).getTime() - startMs) / 1000));
+          remainingSec = 0;
+          isOverdue = false;
+        } else {
+          elapsedSec = Math.max(0, Math.floor((now - startMs) / 1000));
+          remainingSec = Math.max(0, totalDurationSec - elapsedSec);
+
+          if (liveStats?.endTime) {
+            const untilEnd = Math.max(0, Math.floor((new Date(liveStats.endTime).getTime() - now) / 1000));
+            remainingSec = Math.min(remainingSec, untilEnd);
+          }
+
+          isOverdue = elapsedSec > totalDurationSec;
+        }
+      }
+
+      const percentUsed = Math.min(100, Math.round((elapsedSec / totalDurationSec) * 100));
+
+      return {
+        startMs,
+        durationMin,
+        totalDurationSec,
+        elapsedSec,
+        remainingSec,
+        isOverdue,
+        percentUsed
+      };
+    };
+
+    const overdueCount = (liveData || []).filter(student => {
+      const timing = getStudentLiveTiming(student);
+      return student?.status === 'IN_PROGRESS' && timing.isOverdue;
+    }).length;
+
     let filteredData = (liveData || [])?.filter(student => {
       const matchesSearch = student?.studentName?.toLowerCase()?.includes(monitorSearch?.toLowerCase()) ||
         student?.roll?.includes(monitorSearch);
-      const matchesFilter = monitorFilter === 'all'
-        ? true
-        : monitorFilter === 'active'
-          ? student?.status === 'IN_PROGRESS'
-          : student?.status === 'COMPLETED';
+
+      let matchesFilter = true;
+      if (monitorFilter === 'active') {
+        matchesFilter = student?.status === 'IN_PROGRESS';
+      } else if (monitorFilter === 'submitted') {
+        matchesFilter = student?.status === 'COMPLETED';
+      } else if (monitorFilter === 'overdue') {
+        const timing = getStudentLiveTiming(student);
+        matchesFilter = student?.status === 'IN_PROGRESS' && timing.isOverdue;
+      }
+
       return matchesSearch && matchesFilter;
     });
 
     filteredData = (filteredData || [])?.sort((a, b) => {
+      const aTiming = getStudentLiveTiming(a);
+      const bTiming = getStudentLiveTiming(b);
+
+      if (monitorSort === 'urgent') {
+        if (a?.status === 'IN_PROGRESS' && b?.status !== 'IN_PROGRESS') return -1;
+        if (b?.status === 'IN_PROGRESS' && a?.status !== 'IN_PROGRESS') return 1;
+        return aTiming.remainingSec - bTiming.remainingSec;
+      }
+      if (monitorSort === 'overdue') {
+        const aOver = aTiming.elapsedSec - aTiming.totalDurationSec;
+        const bOver = bTiming.elapsedSec - bTiming.totalDurationSec;
+        return bOver - aOver;
+      }
       if (monitorSort === 'progress') return (b?.progress || 0) - (a?.progress || 0);
       if (monitorSort === 'score') return (b?.score || 0) - (a?.score || 0);
       if (monitorSort === 'time') return new Date(b?.lastActive || 0).getTime() - new Date(a?.lastActive || 0).getTime();
       return 0;
     });
+
+    const selectedModalTiming = selectedLiveStudent ? getStudentLiveTiming(selectedLiveStudent) : null;
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -1495,8 +1617,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: 'Live Monitoring', value: activeStudents, icon: Activity, color: 'blue', sub: 'Active Students' },
+            { label: 'Time Alerts', value: overdueCount, icon: AlertCircle, color: overdueCount > 0 ? 'rose' : 'slate', sub: overdueCount > 0 ? `${overdueCount} Overdue Exam Time` : 'All Within Duration' },
             { label: 'Evaluation Done', value: submittedStudents, icon: CheckCircle, color: 'emerald', sub: `${totalStudents > 0 ? Math.round((submittedStudents / totalStudents) * 100) : 0}% Completion` },
-            { label: 'Class Average', value: totalStudents > 0 ? (liveData.reduce((acc, s) => acc + (s.score || 0), 0) / totalStudents).toFixed(1) : '0', icon: Trophy, color: 'amber', sub: 'Based on current scores' },
             { label: 'Total Candidates', value: totalStudents, icon: Users, color: 'indigo', sub: 'Registered for Exam' }
           ].map((stat, i) => (
             <div key={i} className="relative group">
@@ -1506,7 +1628,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">{stat.label}</p>
-                      <h3 className="text-3xl font-black tracking-tight">{stat.value}</h3>
+                      <h3 className={`text-3xl font-black tracking-tight ${stat.color === 'rose' && stat.value > 0 ? 'text-rose-600 animate-pulse' : ''}`}>{stat.value}</h3>
                       <p className="text-[10px] font-medium text-muted-foreground mt-1 flex items-center gap-1">
                         <span className={`w-1 h-1 rounded-full bg-${stat.color}-500 animate-pulse`}></span>
                         {stat.sub}
@@ -1523,7 +1645,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* Dynamic Action Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-4 z-10 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-lg">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-4 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-3.5 rounded-2xl border border-white/20 shadow-lg">
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <div className="relative group flex-1 md:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -1537,21 +1659,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
             <div className="flex gap-2">
               <Select value={monitorFilter} onValueChange={(v: any) => setMonitorFilter(v)}>
-                <SelectTrigger className="w-[130px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                <SelectTrigger className="w-[140px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium text-xs">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-2xl">
                   <SelectItem value="all">All Participation</SelectItem>
                   <SelectItem value="active">In Progress</SelectItem>
+                  <SelectItem value="overdue">🚨 Overdue Only</SelectItem>
                   <SelectItem value="submitted">Completed</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={monitorSort} onValueChange={(v: any) => setMonitorSort(v)}>
-                <SelectTrigger className="w-[130px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                <SelectTrigger className="w-[170px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium text-xs">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-2xl">
+                  <SelectItem value="urgent">⏱️ Least Time Remaining</SelectItem>
+                  <SelectItem value="overdue">🚨 Most Overdue First</SelectItem>
                   <SelectItem value="progress">Top Progress</SelectItem>
                   <SelectItem value="score">Highest Score</SelectItem>
                   <SelectItem value="time">Activity Time</SelectItem>
@@ -1594,107 +1719,185 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         {/* Main Feed */}
         {monitorViewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredData.map((student, i) => (
-              <div
-                key={student?.id}
-                className="animate-in fade-in zoom-in-95 duration-500 fill-mode-both"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <Card
-                  className={`group relative overflow-hidden transition-all duration-500 cursor-pointer border-none shadow-sm hover:shadow-2xl hover:-translate-y-2
-                  ${student?.status === 'IN_PROGRESS'
-                      ? 'bg-gradient-to-br from-white to-blue-50/30'
-                      : 'bg-gradient-to-br from-white to-emerald-50/30'} dark:from-slate-900 dark:to-slate-900`}
-                  onClick={() => {
-                    setSelectedLiveStudent(student);
-                    setIsLiveModalOpen(true);
-                  }}
+            {filteredData.map((student, i) => {
+              const timing = getStudentLiveTiming(student);
+              const isTargetStudent = (urlStudentId && (student.studentId === urlStudentId || student.id === urlStudentId));
+
+              return (
+                <div
+                  key={student?.id}
+                  className="animate-in fade-in zoom-in-95 duration-500 fill-mode-both"
+                  style={{ animationDelay: `${(i % 12) * 40}ms` }}
                 >
-                  {/* Status Indicator Bar */}
-                  <div className={`absolute top-0 left-0 w-full h-1 ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                  <Card
+                    className={`group relative overflow-hidden transition-all duration-500 cursor-pointer border-none shadow-sm hover:shadow-2xl hover:-translate-y-2
+                    ${isTargetStudent ? 'ring-4 ring-primary shadow-xl shadow-primary/20 scale-[1.02]' : ''}
+                    ${student?.status === 'IN_PROGRESS'
+                        ? timing.isOverdue
+                          ? 'bg-gradient-to-br from-white to-rose-50/60 ring-2 ring-rose-400/50 dark:from-slate-900 dark:to-slate-900'
+                          : 'bg-gradient-to-br from-white to-blue-50/30 dark:from-slate-900 dark:to-slate-900'
+                        : 'bg-gradient-to-br from-white to-emerald-50/30 dark:from-slate-900 dark:to-slate-900'}`}
+                    onClick={() => {
+                      setSelectedLiveStudent(student);
+                      setIsLiveModalOpen(true);
+                    }}
+                  >
+                    {/* Status Indicator Bar */}
+                    <div className={`absolute top-0 left-0 w-full h-1 ${student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'bg-rose-500' : 'bg-blue-500' : 'bg-emerald-500'}`} />
 
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-6">
-                      <div className="relative">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-xl transition-transform group-hover:scale-110 duration-500
-                          ${student?.status === 'IN_PROGRESS' ? 'bg-blue-600 shadow-blue-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
-                          {student?.studentName?.substring(0, 1)?.toUpperCase()}
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="relative">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-xl transition-transform group-hover:scale-110 duration-500
+                            ${student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'bg-rose-500 shadow-rose-500/20' : 'bg-blue-600 shadow-blue-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
+                            {student?.studentName?.substring(0, 1)?.toUpperCase()}
+                          </div>
+                          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center
+                            ${student?.isOnline !== false ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                          </div>
                         </div>
-                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center
-                          ${student?.isOnline !== false ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+
+                        <div className="text-right">
+                          <h4 className="font-black text-lg leading-tight truncate max-w-[150px]">{student?.studentName}</h4>
+                          <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">ROLL: {student?.roll}</p>
+                          <div className="mt-1">
+                            {student?.status === 'IN_PROGRESS' ? (
+                              timing.isOverdue ? (
+                                <Badge variant="destructive" className="text-[9px] font-black animate-pulse">
+                                  🚨 Overdue
+                                </Badge>
+                              ) : timing.remainingSec <= 300 ? (
+                                <Badge className="bg-amber-500 text-white text-[9px] font-black">
+                                  ⚠️ {formatDuration(timing.remainingSec)}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-600 text-white text-[9px] font-black">
+                                  ⏱️ {formatDuration(timing.remainingSec)}
+                                </Badge>
+                              )
+                            ) : (
+                              <Badge className="bg-emerald-600 text-white text-[9px] font-black">
+                                ✓ Done
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <h4 className="font-black text-lg leading-tight truncate max-w-[150px]">{student?.studentName}</h4>
-                        <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">ROLL: {student?.roll}</p>
-                      </div>
-                    </div>
+                      {/* Live Time & Duration Comparison Widget */}
+                      <div className="mb-4 p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span className="flex items-center gap-1 truncate mr-2">
+                            <Clock className="w-3 h-3 text-primary shrink-0" />
+                            Start: <span className="text-foreground">{formatClockTime(student.startedAt)}</span>
+                          </span>
+                          <span className="shrink-0 text-slate-500">
+                            Limit: {timing.durationMin}m
+                          </span>
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Answers</p>
-                        <p className="font-black text-xl">{student?.answered}<span className="text-xs text-muted-foreground font-medium ml-1">/ {student?.totalQuestions}</span></p>
-                      </div>
-                      <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Live Score</p>
-                        <p className="font-black text-xl text-primary">{student?.score}<span className="text-[10px] text-muted-foreground font-medium ml-1">pts</span></p>
-                      </div>
-                    </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-bold">
+                            <span className={timing.isOverdue ? 'text-rose-600 dark:text-rose-400 font-black' : 'text-slate-600 dark:text-slate-300'}>
+                              {student?.status === 'IN_PROGRESS' ? `Elapsed: ${formatDuration(timing.elapsedSec)}` : `Time Taken: ${formatDuration(timing.elapsedSec)}`}
+                            </span>
+                            <span>
+                              {student?.status === 'IN_PROGRESS' ? (
+                                timing.isOverdue ? (
+                                  <span className="text-rose-600 dark:text-rose-400 font-black">
+                                    +{formatDuration(timing.elapsedSec - timing.totalDurationSec)} over
+                                  </span>
+                                ) : (
+                                  <span className={timing.remainingSec <= 300 ? 'text-amber-600 dark:text-amber-400 font-black' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
+                                    {formatDuration(timing.remainingSec)} left
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Completed</span>
+                              )}
+                            </span>
+                          </div>
 
-                    {/* Premium Progress Bar */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center px-1">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Course Progress</span>
-                        <span className={`text-xs font-black ${student?.progress === 100 ? 'text-emerald-500' : 'text-blue-500'}`}>{student?.progress}%</span>
-                      </div>
-                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
-                        <div
-                          className={`h-full rounded-full transition-all duration-1000 ease-in-out relative
-                            ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-emerald-500 shadow-lg shadow-emerald-500/50'}`}
-                          style={{ width: `${student?.progress}%` }}
-                        >
-                          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                          <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ${
+                                timing.isOverdue
+                                  ? 'bg-rose-500'
+                                  : timing.percentUsed > 80
+                                    ? 'bg-amber-500'
+                                    : 'bg-indigo-500'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(5, timing.percentUsed))}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Device Status Bar */}
-                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <div className="flex gap-3">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className={`p-1.5 rounded-lg ${(student?.batteryLevel ?? 100) > 20 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
-                                <Battery className="w-3.5 h-3.5" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>Battery: {student?.batteryLevel || 100}%</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className={`p-1.5 rounded-lg ${student?.isFocus !== false ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'}`}>
-                                <ShieldCheck className="w-3.5 h-3.5" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>{student?.isFocus !== false ? 'In Focus - Secure' : 'App Minimized - Warning'}</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Answers</p>
+                          <p className="font-black text-lg">{student?.answered}<span className="text-xs text-muted-foreground font-medium ml-1">/ {student?.totalQuestions}</span></p>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Live Score</p>
+                          <p className="font-black text-lg text-primary">{student?.score}<span className="text-[10px] text-muted-foreground font-medium ml-1">pts</span></p>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                        {new Date(student?.lastActive || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
+
+                      {/* Course Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center px-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Course Progress</span>
+                          <span className={`text-xs font-black ${student?.progress === 100 ? 'text-emerald-500' : 'text-blue-500'}`}>{student?.progress}%</span>
+                        </div>
+                        <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
+                          <div
+                            className={`h-full rounded-full transition-all duration-1000 ease-in-out relative
+                              ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-emerald-500 shadow-lg shadow-emerald-500/50'}`}
+                            style={{ width: `${student?.progress}%` }}
+                          >
+                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Device Status Bar */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="flex gap-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className={`p-1.5 rounded-lg ${(student?.batteryLevel ?? 100) > 20 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                                  <Battery className="w-3.5 h-3.5" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Battery: {student?.batteryLevel || 100}%</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className={`p-1.5 rounded-lg ${student?.isFocus !== false ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>{student?.isFocus !== false ? 'In Focus - Secure' : 'App Minimized - Warning'}</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <span className="text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
+                          {formatClockTime(student.startedAt || student?.lastActive)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          /* List View - Also Premium Glassmorphism */
+          /* List View */
           <div className="bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -1702,80 +1905,169 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <tr className="bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-white/10">
                     <th className="px-6 py-4">Student Identity</th>
                     <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4">Timing & Duration</th>
                     <th className="px-6 py-4">Progress Monitor</th>
                     <th className="px-6 py-4 text-center">Live Score</th>
                     <th className="px-6 py-4 text-right">Metrics</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredData.map(student => (
-                    <tr
-                      key={student?.id}
-                      className="group hover:bg-white/40 dark:hover:bg-slate-800/40 transition-all cursor-pointer"
-                      onClick={() => {
-                        setSelectedLiveStudent(student);
-                        setIsLiveModalOpen(true);
-                      }}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg
-                            ${student?.status === 'IN_PROGRESS' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
-                            {student?.studentName?.substring(0, 1)?.toUpperCase()}
+                  {filteredData.map(student => {
+                    const timing = getStudentLiveTiming(student);
+
+                    return (
+                      <tr
+                        key={student?.id}
+                        className="group hover:bg-white/40 dark:hover:bg-slate-800/40 transition-all cursor-pointer"
+                        onClick={() => {
+                          setSelectedLiveStudent(student);
+                          setIsLiveModalOpen(true);
+                        }}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg
+                              ${student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'bg-rose-600' : 'bg-blue-600' : 'bg-emerald-600'}`}>
+                              {student?.studentName?.substring(0, 1)?.toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm">{student?.studentName}</p>
+                              <p className="text-[10px] font-medium text-muted-foreground">Roll: {student?.roll} • {student?.className}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-sm">{student?.studentName}</p>
-                            <p className="text-[10px] font-medium text-muted-foreground">Roll: {student?.roll} • {student?.className}</p>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase
+                            ${student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'bg-rose-100 text-rose-700 animate-pulse' : 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full mr-2 ${student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'bg-rose-500' : 'bg-blue-500' : 'bg-emerald-500'} animate-pulse`}></span>
+                            {student?.status === 'IN_PROGRESS' ? timing.isOverdue ? 'Overdue' : 'Live' : 'Done'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 min-w-[180px]">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] font-bold">
+                              <span className="text-muted-foreground">Start: {formatClockTime(student.startedAt)}</span>
+                              <span className="text-primary">{timing.durationMin}m limit</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] font-black">
+                              <span className={timing.isOverdue ? 'text-rose-600' : 'text-slate-700 dark:text-slate-200'}>
+                                {formatDuration(timing.elapsedSec)} elapsed
+                              </span>
+                              <span>
+                                {student?.status === 'IN_PROGRESS' ? (
+                                  timing.isOverdue ? (
+                                    <span className="text-rose-600 font-black">+{formatDuration(timing.elapsedSec - timing.totalDurationSec)}</span>
+                                  ) : (
+                                    <span className={timing.remainingSec <= 300 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                      {formatDuration(timing.remainingSec)} left
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-emerald-600 font-bold">Finished</span>
+                                )}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase
-                          ${student?.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full mr-2 ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-emerald-500'} animate-pulse`}></span>
-                          {student?.status === 'IN_PROGRESS' ? 'Live' : 'Done'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 min-w-[200px]">
-                        <div className="space-y-1">
-                          <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${student?.progress}%` }} />
+                        </td>
+                        <td className="px-6 py-4 min-w-[180px]">
+                          <div className="space-y-1">
+                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${student?.progress}%` }} />
+                            </div>
+                            <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase">
+                              <span>{student?.answered} / {student?.totalQuestions} Q</span>
+                              <span>{student?.progress}%</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase">
-                            <span>{student?.answered} / {student?.totalQuestions} Q</span>
-                            <span>{student?.progress}%</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="inline-block px-3 py-1 bg-primary/10 rounded-lg">
+                            <p className="font-black text-lg text-primary">{student?.score}</p>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="inline-block px-3 py-1 bg-primary/10 rounded-lg">
-                          <p className="font-black text-lg text-primary">{student?.score}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-3 text-muted-foreground">
-                          <Battery className={`w-4 h-4 ${(student?.batteryLevel ?? 100) > 20 ? 'text-emerald-500' : 'text-rose-500'}`} />
-                          <ShieldCheck className={`w-4 h-4 ${student?.isFocus !== false ? 'text-blue-500' : 'text-amber-500'}`} />
-                          <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-3 text-muted-foreground">
+                            <Battery className={`w-4 h-4 ${(student?.batteryLevel ?? 100) > 20 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                            <ShieldCheck className={`w-4 h-4 ${student?.isFocus !== false ? 'text-blue-500' : 'text-amber-500'}`} />
+                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-
         {/* Detailed View Modal */}
         <Dialog open={isLiveModalOpen} onOpenChange={setIsLiveModalOpen}>
           <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Live Status: {selectedLiveStudent?.studentName}</DialogTitle>
+              <DialogTitle className="text-xl font-black">Live Status: {selectedLiveStudent?.studentName}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-6">
+              {/* Dedicated Live Time & Duration Comparison Panel */}
+              {selectedLiveStudent && selectedModalTiming && (
+                <div className="p-4 rounded-2xl bg-slate-100/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-primary" /> Live Time & Duration Comparison
+                    </h5>
+                    <span className="text-xs font-bold text-primary">
+                      Allocated Duration: {selectedModalTiming.durationMin} Minutes
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Start Time</p>
+                      <p className="text-sm font-black mt-0.5">{formatClockTime(selectedLiveStudent.startedAt)}</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Current Time</p>
+                      <p className="text-sm font-black mt-0.5 text-blue-600 dark:text-blue-400">{formatClockTime(new Date(now).toISOString())}</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Elapsed Time</p>
+                      <p className="text-sm font-black mt-0.5">{formatDuration(selectedModalTiming.elapsedSec)}</p>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Time Remaining</p>
+                      <p className={`text-sm font-black mt-0.5 ${selectedModalTiming.isOverdue ? 'text-rose-600 animate-pulse' : selectedModalTiming.remainingSec <= 300 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {selectedLiveStudent.status === 'COMPLETED' ? 'Completed' : selectedModalTiming.isOverdue ? `Overdue by ${formatDuration(selectedModalTiming.elapsedSec - selectedModalTiming.totalDurationSec)}` : `${formatDuration(selectedModalTiming.remainingSec)} left`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Gauge bar */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
+                      <span>Started ({formatClockTime(selectedLiveStudent.startedAt)})</span>
+                      <span>{selectedModalTiming.percentUsed}% duration used</span>
+                      <span>Deadline ({selectedModalTiming.durationMin}m limit)</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden p-0.5">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          selectedModalTiming.isOverdue
+                            ? 'bg-rose-500'
+                            : selectedModalTiming.percentUsed > 80
+                              ? 'bg-amber-500'
+                              : 'bg-indigo-600'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(5, selectedModalTiming.percentUsed))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Summary Header */}
               <div className="grid grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
                 <div>
@@ -1997,6 +2289,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         } else {
           // Initial load or full refresh
           setExam(data);
+          if (urlStudentId && data?.submissions && data.submissions.length > 0) {
+            const studentIdx = data.submissions.findIndex((s: any) => s?.student?.id === urlStudentId);
+            if (studentIdx !== -1) {
+              setCurrentStudentIndex(studentIdx);
+            }
+          }
         }
       } else {
         const errorText = await response.text();
