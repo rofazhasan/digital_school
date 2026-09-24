@@ -497,6 +497,7 @@ export async function GET(
         parts: question.parts || question.cmaParts || question.subQuestions || question.sub_questions || null,
         stages: question.stages || question.mpcStages || question.subQuestions || question.sub_questions || null,
         partResults: cmaResObj?.partResults || null,
+        subject: question.subject || question.subjectName || null,
         stageResults: mpcResObj?.stageResults || null,
         scenario: question.scenario || null,
       };
@@ -533,7 +534,7 @@ export async function GET(
         ...result,
         source,
         setName,
-        grade: calculateGrade(result.percentage || 0, Number(exam.passMarks) || 33),
+        grade: result.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(result.percentage || 0, Number(exam.passMarks) || 33),
         gpa: calculateGPA(result.percentage || 0, Number(exam.passMarks) || 33),
         rank: rankCount + 1,
         status: isSuspended ? 'SUSPENDED' : (result as any).status

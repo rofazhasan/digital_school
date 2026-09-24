@@ -59,6 +59,7 @@ import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { StudentAnalyticsTab } from "@/components/dashboard/student-tabs";
+import { InteractivePerformanceTrends } from "@/components/dashboard/student/InteractivePerformanceTrends";
 
 const FocusMode = dynamic(() => import("@/components/dashboard/wonderspace/FocusMode").then(mod => mod.FocusMode), { ssr: false });
 const AmbientPlayer = dynamic(() => import("@/components/dashboard/wonderspace/AmbientPlayer").then(mod => mod.AmbientPlayer), { ssr: false });
@@ -927,115 +928,21 @@ export default function StudentDashboardPage() {
               {/* Performance Trends & Subject Strengths (Totally Revamped) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
                 {/* Performance Trends Chart (7 Cols) */}
-                <Card className="lg:col-span-7 rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                          <TrendingUp className="h-4 w-4" />
-                        </span>
-                        <h3 className="font-extrabold text-base sm:text-lg text-foreground">
-                          Performance Trends
-                        </h3>
-                      </div>
-                      <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-                        Track score trajectory over examinations
-                      </p>
-                    </div>
-
-                    {/* Timeframe & Subject Controls */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                        {(['5', '10', 'all'] as const).map((range) => (
-                          <button
-                            key={range}
-                            onClick={() => { triggerHaptic(ImpactStyle.Light); setTrendRange(range); }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                              trendRange === range
-                                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {range === 'all' ? 'All' : `Last ${range}`}
-                          </button>
-                        ))}
-                      </div>
-
-                      {availableSubjects.length > 0 && (
-                        <select
-                          value={trendSubjectFilter}
-                          onChange={(e) => setTrendSubjectFilter(e.target.value)}
-                          className="text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 border-0 px-2.5 py-1.5 text-foreground max-w-[130px] sm:max-w-none truncate"
-                        >
-                          <option value="all">All Subjects</option>
-                          {availableSubjects.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Summary Metric Stats Bar */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3 p-2.5 sm:p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/60">
-                    <div>
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average</span>
-                      <div className="text-base sm:text-lg font-black text-foreground">{trendChartData.avgScore}%</div>
-                    </div>
-                    <div>
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Peak</span>
-                      <div className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400">{trendChartData.maxScore}%</div>
-                    </div>
-                    <div>
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Growth</span>
-                      <div className={`text-base sm:text-lg font-black ${trendChartData.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
-                        {trendChartData.delta >= 0 ? `+${trendChartData.delta}%` : `${trendChartData.delta}%`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Line Chart */}
-                  <div className="h-[220px] sm:h-[260px] w-full">
-                    {trendChartData.items.length > 0 ? (
-                      <Line
-                        data={trendChartData.chart}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'top',
-                              labels: { usePointStyle: true, boxWidth: 6, font: { size: 10, weight: 600 } }
-                            },
-                            tooltip: {
-                              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                              padding: 10,
-                              cornerRadius: 12,
-                              titleFont: { size: 11, weight: 'bold' },
-                              bodyFont: { size: 11 }
-                            }
-                          },
-                          scales: {
-                            y: {
-                              min: 0,
-                              max: 100,
-                              grid: { color: 'rgba(156, 163, 175, 0.1)' },
-                              ticks: { font: { size: 9 } }
-                            },
-                            x: {
-                              grid: { display: false },
-                              ticks: { font: { size: 9 } }
-                            }
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-                        No examination records found for selected criteria.
-                      </div>
-                    )}
-                  </div>
-                </Card>
+                <div className="lg:col-span-7">
+                  <InteractivePerformanceTrends
+                    results={results}
+                    analyticsTrends={analytics?.trends}
+                    availableSubjects={availableSubjects}
+                    title="Performance Trends"
+                    subtitle="Track score trajectory over examinations with zoom & milestone inspection"
+                    compact={true}
+                    onSelectExam={() => {
+                      triggerHaptic(ImpactStyle.Medium);
+                      setActiveTab('exams');
+                      setExamSubTab('results');
+                    }}
+                  />
+                </div>
 
                 {/* Subject Strengths Matrix (5 Cols) */}
                 <Card className="lg:col-span-5 rounded-2xl sm:rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5">

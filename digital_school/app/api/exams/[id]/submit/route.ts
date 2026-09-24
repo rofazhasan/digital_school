@@ -212,7 +212,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       if (attemptedOptionalSubjects.size > maxAllowedOptional) {
-        console.warn(`[Submit] User ${studentId} answered ${attemptedOptionalSubjects.size} optional subjects (max ${maxAllowedOptional}). Scoring engine will count top ${maxAllowedOptional} subjects.`);
+        exceededQuestionLimit = true;
+        console.warn(`[Submit] User ${studentId} answered ${attemptedOptionalSubjects.size} optional subjects (max ${maxAllowedOptional}). Exceeded optional subject limit.`);
       }
     }
 

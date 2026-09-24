@@ -554,22 +554,36 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     const qClean = questionSubject.trim().toLowerCase();
     const tClean = targetSubjectName.trim().toLowerCase();
     if (qClean === tClean) return true;
+
+    const qAlpha = qClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+    const tAlpha = tClean.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
+    if (qAlpha && qAlpha === tAlpha) return true;
+
+    // Check if either is a qualified/compound variant like "Bio (12 Qs) + H.Math (13 Qs)" or "Only Biology (25 Qs)"
+    const isVariant = (str: string) => /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(str);
+    const qIsVariant = isVariant(qClean);
+    const tIsVariant = isVariant(tClean);
+    if (qIsVariant || tIsVariant) {
+      if (qIsVariant !== tIsVariant) return false;
+      return qAlpha === tAlpha;
+    }
+
     if (qClean.includes(tClean) || tClean.includes(qClean)) return true;
 
     const aliases: Record<string, string[]> = {
-      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy'],
-      'chemistry': ['রসায়ন', 'রসায়ন', 'chem'],
-      'mathematics': ['গণিত', 'উচ্চতর গণিত', 'math', 'higher math', 'higher mathematics', 'maths'],
-      'higher mathematics': ['উচ্চতর গণিত', 'গণিত', 'math', 'higher math'],
-      'biology': ['জীববিজ্ঞান', 'জীব', 'bio'],
-      'bangla': ['বাংলা', 'bengali'],
-      'english': ['ইংরেজি', 'ইংরেজী', 'eng'],
-      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি'],
+      'physics': ['পদার্থবিজ্ঞান', 'পদার্থ', 'phy', 'physics 1st', 'physics 2nd'],
+      'chemistry': ['রসায়ন', 'রসায়ন', 'chem', 'chemistry 1st', 'chemistry 2nd'],
+      'higher mathematics': ['উচ্চতর গণিত', 'higher math', 'higher mathematics', 'h math', 'math 1st', 'math 2nd'],
+      'mathematics': ['গণিত', 'math', 'maths', 'সাধারণ গণিত', 'general math'],
+      'biology': ['জীববিজ্ঞান', 'জীব', 'bio', 'biology 1st', 'biology 2nd'],
+      'bangla': ['বাংলা', 'bengali', 'bangla 1st', 'bangla 2nd'],
+      'english': ['ইংরেজি', 'ইংরেজী', 'eng', 'english 1st', 'english 2nd'],
+      'ict': ['তথ্য ও যোগাযোগ প্রযুক্তি', 'আইসিটি', 'information and communication technology'],
     };
 
     for (const [key, list] of Object.entries(aliases)) {
-      const isTarget = tClean === key || list.some(a => tClean.includes(a));
-      const isQuestion = qClean === key || list.some(a => qClean.includes(a));
+      const isTarget = tClean === key || list.some(a => tClean === a || tClean.includes(a));
+      const isQuestion = qClean === key || list.some(a => qClean === a || qClean.includes(a));
       if (isTarget && isQuestion) return true;
     }
 
@@ -2215,17 +2229,23 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const recalculatedSqMarks = sqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
 
   // Use recalculated values if the provided result.result totals are zero but awarded marks exist
-  const effectiveCqMarks = (result.result?.cqMarks || 0) || recalculatedCqMarks;
-  const effectiveSqMarks = (result.result?.sqMarks || 0) || recalculatedSqMarks;
-  const effectiveTotalMarks = (result.result?.total || 0) || (recalculatedCqMarks + recalculatedSqMarks + (result.result?.mcqMarks || 0));
+  const effectiveCqMarks = (result.result?.cqMarks != null) ? result.result.cqMarks : recalculatedCqMarks;
+  const effectiveSqMarks = (result.result?.sqMarks != null) ? result.result.sqMarks : recalculatedSqMarks;
+  const effectiveTotalMarks = (result.result?.total != null)
+    ? result.result.total
+    : Math.max(0, Math.min(Math.round((recalculatedCqMarks + recalculatedSqMarks + (result.result?.mcqMarks || 0)) * 100) / 100, result.exam.totalMarks));
 
   /* Fix: Use required counts for marks breakdown if available */
   const cqMarkPerQuestion = cqQuestions[0]?.marks || 10;
   const sqMarkPerQuestion = sqQuestions[0]?.marks || 10;
 
-  const totalObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+  const rawObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
   const totalCqMarks = (result.exam.cqRequiredQuestions ? result.exam.cqRequiredQuestions : cqQuestions.length) * cqMarkPerQuestion;
   const totalSqMarks = (result.exam.sqRequiredQuestions ? result.exam.sqRequiredQuestions : sqQuestions.length) * sqMarkPerQuestion;
+  const maxAllowedObjective = Math.max(0, (result.exam.totalMarks || 0) - totalCqMarks - totalSqMarks);
+  const totalObjectiveMarks = (isMS && maxAllowedObjective > 0)
+    ? Math.min(rawObjectiveMarks, maxAllowedObjective)
+    : rawObjectiveMarks;
 
   return (
     <MathJaxContext config={mathJaxConfig}>

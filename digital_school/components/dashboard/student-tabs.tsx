@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { AIAnalysisCard } from "./student/AIAnalysisCard";
 import { PerformancePredictor } from "./student/PerformancePredictor";
+import { InteractivePerformanceTrends } from "./student/InteractivePerformanceTrends";
 import { TrendingUp, Target, Award, BookOpen } from "lucide-react";
 import { Line, Radar } from "react-chartjs-2";
 
@@ -119,48 +120,13 @@ export function StudentAnalyticsTab({ analytics }: StudentAnalyticsTabProps) {
 
             {/* Detailed Analysis Section */}
             <div className="grid gap-6 md:grid-cols-2">
-                <Card className="shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10 overflow-hidden">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5 text-indigo-500" />
-                            Academic Growth
-                        </CardTitle>
-                        <CardDescription>Your score trends relative to class average.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[350px]">
-                        {(analytics.trends || []).length > 0 ? (
-                            <Line
-                                data={performanceData}
-                                options={{
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: { position: 'top' as const, labels: { usePointStyle: true, boxWidth: 6, padding: 20 } },
-                                        tooltip: {
-                                            backgroundColor: 'rgba(0,0,0,0.8)',
-                                            padding: 12,
-                                            titleFont: { size: 14, weight: 'bold' },
-                                            bodyFont: { size: 13 },
-                                            cornerRadius: 8,
-                                            displayColors: false
-                                        }
-                                    },
-                                    scales: {
-                                        y: { min: 0, max: 100, grid: { color: 'rgba(156, 163, 175, 0.05)' }, border: { display: false } },
-                                        x: { grid: { display: false }, border: { display: false } }
-                                    }
-                                }}
-                            />
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground text-sm italic py-12">
-                                <div className="text-center">
-                                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-10" />
-                                    Take more exams to see your progress trend!
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <InteractivePerformanceTrends
+                    analyticsTrends={analytics?.trends}
+                    title="Academic Growth"
+                    subtitle="Your score trends relative to class average with zoom & milestone inspection"
+                    compact={true}
+                    className="shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10"
+                />
 
                 <Card className="shadow-2xl border-0 bg-card/60 backdrop-blur-xl border border-white/10 overflow-hidden">
                     <CardHeader>

@@ -31,6 +31,7 @@ import {
   Activity
 } from "lucide-react";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+import { InteractivePerformanceTrends } from "@/components/dashboard/student/InteractivePerformanceTrends";
 
 // Chart Components
 import {
@@ -282,22 +283,15 @@ export default function UnifiedStudentLearningAnalyticsPage() {
         {/* ========================================================================= */}
         {/* 1. CONTINUOUS PERFORMANCE TIMELINE */}
         {/* ========================================================================= */}
-        <div className="p-6 sm:p-8 rounded-[2.5rem] bg-slate-900/60 border border-slate-800/80 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-indigo-400" />
-                Score Progression Timeline
-              </h2>
-              <p className="text-xs text-slate-400">
-                Continuous performance curve across physical OMR and digital examination milestones
-              </p>
-            </div>
-
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+              Examination Milestones Timeline
+            </span>
             {/* Source Filter Switcher */}
             <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
               <button
-                onClick={() => setActiveHistoryFilter('ALL')}
+                onClick={() => { triggerHaptic(ImpactStyle.Light); setActiveHistoryFilter('ALL'); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeHistoryFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
                 }`}
@@ -305,7 +299,7 @@ export default function UnifiedStudentLearningAnalyticsPage() {
                 All Exams ({analytics?.timeline?.length || 0})
               </button>
               <button
-                onClick={() => setActiveHistoryFilter('OMR')}
+                onClick={() => { triggerHaptic(ImpactStyle.Light); setActiveHistoryFilter('OMR'); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeHistoryFilter === 'OMR' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
                 }`}
@@ -313,7 +307,7 @@ export default function UnifiedStudentLearningAnalyticsPage() {
                 Physical OMR ({analytics?.omrExamsCount || 0})
               </button>
               <button
-                onClick={() => setActiveHistoryFilter('ONLINE')}
+                onClick={() => { triggerHaptic(ImpactStyle.Light); setActiveHistoryFilter('ONLINE'); }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeHistoryFilter === 'ONLINE' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
                 }`}
@@ -323,9 +317,14 @@ export default function UnifiedStudentLearningAnalyticsPage() {
             </div>
           </div>
 
-          <div className="h-64 sm:h-72 w-full">
-            <Line data={chartData} options={chartOptions} />
-          </div>
+          <InteractivePerformanceTrends
+            results={filteredTimeline}
+            title="Score Progression Timeline"
+            subtitle="Continuous performance curve across physical OMR and digital examination milestones"
+            showSubjectFilter={true}
+            showPastTrendsDrawer={true}
+            className="p-6 sm:p-8 rounded-[2.5rem] bg-slate-900/60 border border-slate-800/80 shadow-2xl"
+          />
         </div>
 
         {/* 2-Column Diagnostics Grid: Repeated Weaknesses & Verified Strengths */}

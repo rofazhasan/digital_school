@@ -306,6 +306,9 @@ export async function GET(
           : allQuestions;
 
         studentQuestions.forEach((q: any) => studentTotalMarks += (q.marks || 0));
+        if (exam.totalMarks && exam.totalMarks > 0) {
+          studentTotalMarks = Math.min(studentTotalMarks, exam.totalMarks);
+        }
 
         processedSubmissions.push({
           id: submission.id,
@@ -459,6 +462,7 @@ export async function GET(
         label: q.label || null,
         instructions: q.instructions || null,
         chartConfig: q.chartConfig || q.chart_config || null,
+        subject: q.subject || q.subjectName || null,
         image: q.image || q.imageUrl || q.image_url || null
       };
     };

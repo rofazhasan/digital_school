@@ -512,7 +512,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
     const msConfig = typeof rawSubjectsConfig === 'string' ? JSON.parse(rawSubjectsConfig) : rawSubjectsConfig;
     const isMS = (exam as any).subjectType === 'MS' || (msConfig && (msConfig.subjects || []).length > 0);
     let isDisqualified = (answers as any)?._suspended === true;
-    const subjectWiseBreakdown: Record<string, { totalScore: number; maxMarks: number; isMandatory: boolean; attempted: boolean; isCounted?: boolean; note?: string }> = {};
+    const subjectWiseBreakdown: Record<string, { totalScore: number; rawScore?: number; maxMarks: number; isMandatory: boolean; attempted: boolean; isCounted?: boolean; note?: string }> = {};
 
     const matchSubjectName = (questionSubject: string | undefined | null, targetSubjectName: string): boolean => {
         if (!questionSubject || !targetSubjectName) return false;
@@ -593,7 +593,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     (answers as any)[k] !== '' && 
                     (answers as any)[k] !== 'No answer provided'
                 );
-                const hasMarks = typeof mark === 'number' && mark > 0;
+                const hasMarks = typeof mark === 'number' && mark !== 0;
 
                 if (hasDirectAns || hasSubAns || hasMarks) {
                     subAttempted = true;
@@ -601,10 +601,11 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             });
 
             const maxSubMarks = sub.totalMarks || 0;
-            const clampedSubScore = maxSubMarks > 0 ? Math.min(Math.max(0, subScore), maxSubMarks) : Math.max(0, subScore);
+            const displaySubScore = maxSubMarks > 0 ? Math.min(Math.max(0, subScore), maxSubMarks) : Math.max(0, subScore);
 
             subjectWiseBreakdown[subName] = {
-                totalScore: clampedSubScore,
+                totalScore: Math.round(displaySubScore * 100) / 100,
+                rawScore: Math.round(subScore * 100) / 100,
                 maxMarks: maxSubMarks,
                 isMandatory: sub.isMandatory ?? true,
                 attempted: subAttempted
@@ -617,55 +618,73 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
         const maxOptionalAllowed = Number((exam as any).requiredOptionalCount) || Number(msConfig?.requiredOptionalCount) || 1;
         
-        // Graceful handling of optional subjects: sort attempted optional subjects by total score (highest first)
+        // CHECK DISQUALIFICATION FOR EXCEEDING OPTIONAL SUBJECTS:
+        // Rule: If a student answers more optional subjects than permitted, they are disqualified and given zero to all.
         const optionalSubjsList = msSubjectsList.filter((s: any) => !s.isMandatory);
-        const attemptedOptionalList = optionalSubjsList
-            .filter((s: any) => subjectWiseBreakdown[s.name]?.attempted)
-            .sort((a: any, b: any) => (subjectWiseBreakdown[b.name]?.totalScore || 0) - (subjectWiseBreakdown[a.name]?.totalScore || 0));
+        if (optionalSubjsList.length > 0 && optionalSubjectsAttempted.size > maxOptionalAllowed) {
+            isDisqualified = true;
+            const dqReason = 'অনুমোদিত সীমার অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করায় পরীক্ষা বাতিল (Disqualified)';
+            msSubjectsList.forEach((sub: any) => {
+                if (subjectWiseBreakdown[sub.name]) {
+                    subjectWiseBreakdown[sub.name].isCounted = false;
+                    subjectWiseBreakdown[sub.name].note = dqReason;
+                }
+            });
+        }
 
         const countedOptionalNames = new Set<string>();
-        attemptedOptionalList.slice(0, maxOptionalAllowed).forEach((s: any) => {
-            countedOptionalNames.add(s.name);
-            if (subjectWiseBreakdown[s.name]) {
-                subjectWiseBreakdown[s.name].isCounted = true;
-            }
-        });
+        if (!isDisqualified) {
+            optionalSubjectsAttempted.forEach(sName => {
+                countedOptionalNames.add(sName);
+                if (subjectWiseBreakdown[sName]) {
+                    subjectWiseBreakdown[sName].isCounted = true;
+                }
+            });
+            optionalSubjsList.forEach((s: any) => {
+                if (!countedOptionalNames.has(s.name) && subjectWiseBreakdown[s.name]) {
+                    subjectWiseBreakdown[s.name].isCounted = false;
+                }
+            });
+        }
 
-        attemptedOptionalList.slice(maxOptionalAllowed).forEach((s: any) => {
-            if (subjectWiseBreakdown[s.name]) {
-                subjectWiseBreakdown[s.name].isCounted = false;
-                subjectWiseBreakdown[s.name].note = 'অতিরিক্ত ঐচ্ছিক বিষয় (গণনা বহির্ভূত)';
-            }
-        });
-
-        // Aggregate multi-subject score: mandatory subjects + top allowed optional subjects
+        // Aggregate multi-subject score: count questions belonging to counted subjects (mandatory + allowed attempted optional)
         let msTotalScore = 0;
         let msMcqMarks = 0;
         let msCqMarks = 0;
         let msSqMarks = 0;
 
-        msSubjectsList.forEach((sub: any) => {
-            const subBreakdown = subjectWiseBreakdown[sub.name];
-            if (!subBreakdown) return;
-            if (sub.isMandatory) {
-                subBreakdown.isCounted = true;
-                msTotalScore += subBreakdown.totalScore;
-            } else if (countedOptionalNames.has(sub.name)) {
-                msTotalScore += subBreakdown.totalScore;
-            }
-        });
+        if (!isDisqualified) {
+            const countedQuestions = (qList as any[]).filter((q: any) => {
+                if (!q.subject) return true; // untagged questions are counted by default
+                return msSubjectsList.some((sub: any) => {
+                    const isCountedSub = sub.isMandatory || countedOptionalNames.has(sub.name);
+                    if (!isCountedSub) return false;
+                    const qSub = (q.subject || '').trim().toLowerCase();
+                    if (qSub === sub.name.trim().toLowerCase()) return true;
+                    return matchSubjectName(q.subject, sub.name);
+                });
+            });
 
-        (qList as any[]).forEach((q: any) => {
-            const mark = (answers as any)[`${q.id}_marks`] || 0;
-            if (q.type === 'CQ') msCqMarks += mark;
-            else if (q.type === 'SQ' || q.type === 'DESCRIPTIVE') msSqMarks += mark;
-            else msMcqMarks += mark;
-        });
+            countedQuestions.forEach((q: any) => {
+                const mark = (answers as any)[`${q.id}_marks`] || 0;
+                const qType = (q.type || '').toUpperCase();
+                if (qType === 'CQ') msCqMarks += mark;
+                else if (qType === 'SQ' || qType === 'DESCRIPTIVE') msSqMarks += mark;
+                else msMcqMarks += mark;
+            });
 
-        totalScore = Math.min(Math.round(msTotalScore * 100) / 100, exam.totalMarks);
-        mcqMarks = Math.round(msMcqMarks * 100) / 100;
-        cqMarks = Math.round(cqMarks * 100) / 100;
-        sqMarks = Math.round(sqMarks * 100) / 100;
+            // Overall total score reflects question marks (including negative marking deductions from counted questions)
+            const rawTotal = msMcqMarks + msCqMarks + msSqMarks;
+            totalScore = Math.max(0, Math.min(Math.round(rawTotal * 100) / 100, exam.totalMarks));
+            mcqMarks = Math.max(0, Math.round(msMcqMarks * 100) / 100);
+            cqMarks = Math.max(0, Math.round(msCqMarks * 100) / 100);
+            sqMarks = Math.max(0, Math.round(msSqMarks * 100) / 100);
+        } else {
+            totalScore = 0;
+            mcqMarks = 0;
+            cqMarks = 0;
+            sqMarks = 0;
+        }
     }
 
     if (isDisqualified) {
@@ -673,6 +692,8 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         mcqMarks = 0;
         cqMarks = 0;
         sqMarks = 0;
+        (answers as any)._isDisqualified = true;
+        (answers as any)._disqualificationReason = 'অনুমোদিত সীমার অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করায় পরীক্ষা বাতিল (Disqualified)';
     }
 
     (answers as any)._subjectWiseBreakdown = subjectWiseBreakdown;
@@ -689,6 +710,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             evaluatedAt: new Date()
         };
 
+        if (isDisqualified) {
+            updateData.exceededQuestionLimit = true;
+        }
+
         if (isFinal) {
             updateData.status = SubmissionStatus.SUBMITTED;
             updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
@@ -704,6 +729,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
         if (isFinal) {
             // 4. Upsert Result
+            const resultComment = isDisqualified ? 'অনুমোদিত সীমার অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করায় পরীক্ষা বাতিল (Disqualified)' : undefined;
             await prisma.result.upsert({
                 where: {
                     studentId_examId: {
@@ -716,6 +742,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     mcqMarks, cqMarks, sqMarks,
                     percentage,
                     grade,
+                    comment: resultComment,
                     isPublished: false, // Don't publish individual results yet (wait for release)
                     examSubmissionId: submission.id
                 },
@@ -726,6 +753,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     mcqMarks, cqMarks, sqMarks,
                     percentage,
                     grade,
+                    comment: resultComment,
                     isPublished: false,
                     examSubmissionId: submission.id
                 }
@@ -733,7 +761,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         }
     }
 
-    return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks, evaluationResult };
+    return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks, evaluationResult, isDisqualified };
 }
 
 /**
