@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { toBengaliNumerals } from "@/utils/numeralConverter";
 
 const ExamContext = createContext<any>(null);
 
@@ -120,6 +121,15 @@ export const detectIsMS = (exam: any) => {
     canonical.length > 1
   );
 };
+
+export interface OptionalNotice {
+  count: number;
+  total: number;
+  message: string;
+  type: 'info' | 'success' | 'warning';
+  isFull?: boolean;
+  isExceeded?: boolean;
+}
 
 export function ExamContextProvider({
   exam: examProp,
@@ -669,6 +679,66 @@ export function ExamContextProvider({
     return sortedQuestions.filter((q: any) => matchSubject(q.subject, selectedSubject));
   }, [isMS, selectedSubject, sortedQuestions, matchSubject]);
 
+  const [optionalNotice, setOptionalNotice] = useState<OptionalNotice | null>(null);
+  const noticeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevAttemptedSizeRef = useRef<number>(attemptedOptionalSubjects.size);
+
+  const triggerOptionalNotice = useCallback((
+    count: number,
+    total: number,
+    customMessage?: string,
+    typeOverride?: 'info' | 'success' | 'warning'
+  ) => {
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+    }
+
+    const isExceeded = count > total;
+    const isFull = count === total;
+
+    let message = customMessage || '';
+    let type: 'info' | 'success' | 'warning' = typeOverride || (isExceeded ? 'warning' : isFull ? 'success' : 'info');
+
+    if (!customMessage) {
+      if (isExceeded) {
+        message = `⚠️ সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় (${toBengaliNumerals(count)}/${toBengaliNumerals(total)})! অনুমোদিত কোটা অতিক্রম করেছে। সর্বোচ্চ ${toBengaliNumerals(total)}টির বেশি উত্তর দিলে পরীক্ষা বাতিল গণ্য হবে।`;
+        type = 'warning';
+      } else if (isFull) {
+        message = `✓ ${toBengaliNumerals(count)}/${toBengaliNumerals(total)} ঐচ্ছিক বিষয় উত্তরিত (${count}/${total} Answered - কোটা পূর্ণ)`;
+        type = 'success';
+      } else {
+        message = `📝 ${toBengaliNumerals(count)}/${toBengaliNumerals(total)} ঐচ্ছিক বিষয় উত্তরিত (${count}/${total} Answered)`;
+        type = 'info';
+      }
+    }
+
+    setOptionalNotice({
+      count,
+      total,
+      message,
+      type,
+      isFull,
+      isExceeded
+    });
+
+    noticeTimerRef.current = setTimeout(() => {
+      setOptionalNotice(null);
+    }, isExceeded ? 3500 : 2500);
+  }, []);
+
+  // Whenever attemptedOptionalSubjects size increases, automatically trigger fading notice
+  useEffect(() => {
+    if (!isMS) return;
+    const currentSize = attemptedOptionalSubjects.size;
+    const prevSize = prevAttemptedSizeRef.current;
+    prevAttemptedSizeRef.current = currentSize;
+
+    if (currentSize > 0 && currentSize !== prevSize) {
+      const maxAllowed = Number(parsedSubjectsConfig?.requiredOptionalCount) || 1;
+      triggerOptionalNotice(currentSize, maxAllowed);
+    }
+  }, [isMS, attemptedOptionalSubjects.size, parsedSubjectsConfig?.requiredOptionalCount, triggerOptionalNotice]);
+
   // Optimized Context Value to prevent unnecessary re-renders in consumers
   const contextValue = useMemo(() => ({
     exam,
@@ -709,7 +779,10 @@ export function ExamContextProvider({
     setSelectedSubject,
     attemptedOptionalSubjects,
     attemptedSubjects,
-    isExceedingOptional
+    isExceedingOptional,
+    optionalNotice,
+    setOptionalNotice,
+    triggerOptionalNotice
   }), [
     exam,
     patchExam,
@@ -749,7 +822,9 @@ export function ExamContextProvider({
     setSelectedSubject,
     attemptedOptionalSubjects,
     attemptedSubjects,
-    isExceedingOptional
+    isExceedingOptional,
+    optionalNotice,
+    triggerOptionalNotice
   ]);
 
   return (

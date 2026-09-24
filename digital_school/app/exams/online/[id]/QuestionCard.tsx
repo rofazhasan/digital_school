@@ -13,7 +13,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 // Context & Utils
 import { useExamContext } from "./ExamContext";
-import { toBengaliAlphabets } from '@/utils/numeralConverter';
+import { toBengaliAlphabets, toBengaliNumerals } from '@/utils/numeralConverter';
 import { cn } from "@/lib/utils";
 import { compressImage } from "./performance-utils";
 import { findSelectedOptionIndex } from "@/lib/evaluation/mcqEvaluation";
@@ -54,7 +54,9 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     isMS,
     msSubjects,
     matchSubject,
-    fontSize
+    fontSize,
+    attemptedOptionalSubjects,
+    triggerOptionalNotice
   } = useExamContext();
 
   const questions = exam.questions || [];
@@ -121,9 +123,33 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
       toast.info("নিয়ম: একবার উত্তর নির্বাচন করলে তা আর পরিবর্তন করা যাবে না।", { id: 'mcq-locked-toast' });
       return;
     }
+
+    if (isMS && subConfig && !subConfig.isMandatory) {
+      const canonicalName = subConfig.name;
+      const isNewSubject = !attemptedOptionalSubjects?.has(canonicalName);
+      const currentSize = attemptedOptionalSubjects?.size || 0;
+      const reqOpt = Number((exam.subjectsConfig as any)?.requiredOptionalCount) || Number((exam as any).requiredOptionalCount) || 1;
+      if (isNewSubject) {
+        const nextCount = currentSize + 1;
+        if (nextCount > reqOpt) {
+          triggerOptionalNotice?.(
+            nextCount,
+            reqOpt,
+            `⚠️ সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় (${nextCount}/${reqOpt})! অনুমোদিত সীমার অতিরিক্ত উত্তর দিলে পরীক্ষা বাতিল গণ্য হবে।`,
+            'warning'
+          );
+          toast.warning(`⚠️ অতিরিক্ত ঐচ্ছিক বিষয় (${nextCount}/${reqOpt})! সর্বোচ্চ ${toBengaliNumerals(reqOpt)}টির বেশি উত্তর দিলে পরীক্ষা বাতিল গণ্য হবে।`, { id: 'warn-exceed-opt' });
+        } else {
+          triggerOptionalNotice?.(nextCount, reqOpt);
+        }
+      } else {
+        triggerOptionalNotice?.(currentSize, reqOpt);
+      }
+    }
+
     setLocalAnswer(val);
     onAnswerChange(val);
-  }, [hasMCQAnswer, disabled, submitted, onAnswerChange]);
+  }, [hasMCQAnswer, disabled, submitted, onAnswerChange, isMS, subConfig, attemptedOptionalSubjects, exam, triggerOptionalNotice]);
 
   // Keyboard Shortcuts for MCQ
   useEffect(() => {

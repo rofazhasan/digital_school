@@ -82,7 +82,9 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
     matchSubject,
     attemptedOptionalSubjects,
     attemptedSubjects,
-    isExceedingOptional
+    isExceedingOptional,
+    optionalNotice,
+    triggerOptionalNotice
   } = useExamContext();
 
   const [selectedOmrSubject, setSelectedOmrSubject] = useState<string>('ALL');
@@ -251,23 +253,66 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
           toast.warning(`আপনি ইতিমধ্যে ${subjName} বিষয়ে উত্তর করেছেন। পরিবর্তন করতে চাইলে পূরণকৃত উত্তরগুলো ক্লিয়ার করুন।`);
           return prev;
         }
-        return prev.filter(s => s !== subjName);
+        const updated = prev.filter(s => s !== subjName);
+        if (updated.length > 0) {
+          triggerOptionalNotice?.(updated.length, requiredOptionalCount);
+        }
+        return updated;
       } else {
         if (requiredOptionalCount === 1) {
+          triggerOptionalNotice?.(1, 1);
           return [subjName];
         }
         if (prev.length >= requiredOptionalCount) {
-          toast.info(`আপনি সর্বোচ্চ ${toBengaliNumerals(requiredOptionalCount)}টি ঐচ্ছিক বিষয় নির্বাচন করতে পারবেন।`);
+          const nextCount = prev.length + 1;
+          triggerOptionalNotice?.(
+            nextCount,
+            requiredOptionalCount,
+            `⚠️ সতর্কতা: আপনি সর্বোচ্চ ${toBengaliNumerals(requiredOptionalCount)}টি ঐচ্ছিক বিষয় নির্বাচন করতে পারবেন। ৪টি বিষয় উত্তর করলে বাতিল/০ গণ্য হবে!`,
+            'warning'
+          );
+          toast.warning(`আপনি সর্বোচ্চ ${toBengaliNumerals(requiredOptionalCount)}টি ঐচ্ছিক বিষয় নির্বাচন করতে পারবেন।`);
           return prev;
         }
+        const nextCount = prev.length + 1;
+        triggerOptionalNotice?.(nextCount, requiredOptionalCount);
         return [...prev, subjName];
       }
     });
-  }, [questions, matchSubject, answeredStatusMap, requiredOptionalCount]);
+  }, [questions, matchSubject, answeredStatusMap, requiredOptionalCount, triggerOptionalNotice]);
 
   // Handle single MCQ Bubble Select (One-Time Fill Rule in OMR Mode)
   const handleMCQSelect = useCallback((qId: string, optionLabel: string, optionIndex: number) => {
     if (isSubmitting) return;
+
+    if (isMS) {
+      const q = questions.find((item: any) => item.id === qId);
+      if (q && q.subject) {
+        const subConfig = msSubjects?.find((s: any) => matchSubject ? matchSubject(q.subject, s.name) : s.name.toLowerCase() === q.subject.toLowerCase());
+        if (subConfig && !subConfig.isMandatory) {
+          const canonicalName = subConfig.name;
+          const isNewSubject = !attemptedOptionalSubjects?.has(canonicalName);
+          const currentSize = attemptedOptionalSubjects?.size || 0;
+          if (isNewSubject) {
+            const nextCount = currentSize + 1;
+            if (nextCount > requiredOptionalCount) {
+              triggerOptionalNotice?.(
+                nextCount,
+                requiredOptionalCount,
+                `⚠️ সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় (${nextCount}/${requiredOptionalCount})! অনুমোদিত সীমার অতিরিক্ত উত্তর দিলে পরীক্ষা বাতিল গণ্য হবে।`,
+                'warning'
+              );
+              toast.warning(`⚠️ অতিরিক্ত ঐচ্ছিক বিষয় (${nextCount}/${requiredOptionalCount})! সর্বোচ্চ ${toBengaliNumerals(requiredOptionalCount)}টির বেশি উত্তর দিলে পরীক্ষা বাতিল গণ্য হবে।`, { id: 'warn-exceed-opt' });
+            } else {
+              triggerOptionalNotice?.(nextCount, requiredOptionalCount);
+            }
+          } else {
+            triggerOptionalNotice?.(currentSize, requiredOptionalCount);
+          }
+        }
+      }
+    }
+
     setAnswers((prev: any) => {
       const current = prev[qId];
       const currentStr = typeof current === "object" ? current?.selectedOption || current?.text : String(current || "");
@@ -279,7 +324,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
       vibrateOnTouch();
       return { ...prev, [qId]: optionLabel };
     });
-  }, [isSubmitting, setAnswers, vibrateOnTouch]);
+  }, [isSubmitting, setAnswers, vibrateOnTouch, isMS, questions, msSubjects, matchSubject, attemptedOptionalSubjects, requiredOptionalCount, triggerOptionalNotice]);
 
   // Handle Multiple Correct (MC) Toggle (One-Time Fill per Bubble in OMR Mode)
   const handleMCToggle = useCallback((qId: string, optIndex: number) => {
@@ -646,7 +691,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                 সতর্কতা: অতিরিক্ত ঐচ্ছিক বিষয় উত্তর করা হয়েছে!
               </h4>
               <p className="text-xs font-semibold mt-1">
-                আপনি অনুমোদিত সীমার চেয়ে বেশি ({attemptedOptionalSubjects?.size}টি) ঐচ্ছিক বিষয়ের উত্তর পূরণ করেছেন। নিয়মানুযায়ী সর্বোচ্চ {(exam.subjectsConfig as any)?.requiredOptionalCount || 1}টি ঐচ্ছিক বিষয় স্বয়ংক্রিয়ভাবে গণনা করা হবে।
+                আপনি অনুমোদিত সীমার চেয়ে বেশি ({toBengaliNumerals(attemptedOptionalSubjects?.size)}টি) ঐচ্ছিক বিষয়ের উত্তর পূরণ করেছেন। নিয়ম বহির্ভূত অতিরিক্ত বিষয়ের উত্তর দিলে সম্পূর্ণ পরীক্ষা বাতিল (০ নম্বর) গণ্য হতে পারে।
               </p>
             </div>
           </div>
@@ -664,7 +709,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
               </div>
               <div className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300">
                 <span className="bg-indigo-100 dark:bg-indigo-950 px-2 py-0.5 rounded-md border border-indigo-300 dark:border-indigo-700">
-                  অনুমোদিত: যেকোনো {toBengaliNumerals(requiredOptionalCount)}টি বিষয়
+                  অনুমোদিত: মোট {toBengaliNumerals(optionalSubjects.length)}টির মধ্যে যেকোনো {toBengaliNumerals(requiredOptionalCount)}টি বিষয় (অতিরিক্ত উত্তর দিলে বাতিল/০ নম্বর)
                 </span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-md font-bold",

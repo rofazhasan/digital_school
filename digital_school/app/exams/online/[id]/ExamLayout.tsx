@@ -8,12 +8,14 @@ import Navigator from "./Navigator";
 import OMRExamSheet from "./OMRExamSheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check, BookOpen, FileSpreadsheet, Play, CheckSquare, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, CheckCircle2, AlertCircle, AlertTriangle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check, BookOpen, FileSpreadsheet, Play, CheckSquare, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { toBengaliNumerals } from "@/utils/numeralConverter";
 import { setKeepAwake, setBrightness } from "@/lib/native/display";
 import { nativeConfirm } from "@/lib/native/interaction";
 import { speakText, stopSpeech } from "@/lib/native/accessibility";
@@ -182,7 +184,9 @@ export default function ExamLayout() {
     setSelectedSubject,
     attemptedOptionalSubjects,
     attemptedSubjects,
-    isExceedingOptional
+    isExceedingOptional,
+    optionalNotice,
+    triggerOptionalNotice
   } = useExamContext();
 
   const questions = sortedQuestions || [];
@@ -580,6 +584,52 @@ export default function ExamLayout() {
   }, [isBlocked, isExamActive, handleNext, handlePrevious]);
 
 
+  // Hook declarations for MS subjects & marks (guaranteed consistent call order)
+  const parsedSubjectsConfig = useMemo(() => {
+    if (!exam.subjectsConfig) return null;
+    if (typeof exam.subjectsConfig === 'object') return exam.subjectsConfig as any;
+    try {
+      return JSON.parse(exam.subjectsConfig);
+    } catch {
+      return null;
+    }
+  }, [exam.subjectsConfig]);
+
+  const msSubjectsList: any[] = useMemo(() => {
+    if (parsedSubjectsConfig?.subjects && Array.isArray(parsedSubjectsConfig.subjects)) {
+      return parsedSubjectsConfig.subjects;
+    }
+    return [];
+  }, [parsedSubjectsConfig]);
+
+  const mandatorySubjects = useMemo(() => msSubjectsList.filter((s: any) => s.isMandatory), [msSubjectsList]);
+  const optionalSubjects = useMemo(() => msSubjectsList.filter((s: any) => !s.isMandatory), [msSubjectsList]);
+
+  const mandatoryCount = parsedSubjectsConfig?.mandatoryCount ?? mandatorySubjects.length;
+  const optionalCount = parsedSubjectsConfig?.optionalCount ?? optionalSubjects.length;
+  const requiredOptionalCount = Number(parsedSubjectsConfig?.requiredOptionalCount || (exam as any).requiredOptionalCount || 1);
+
+  const mandatoryTotalMarks = useMemo(() => {
+    return mandatorySubjects.reduce((sum: number, s: any) => sum + (Number(s.totalMarks) || 0), 0);
+  }, [mandatorySubjects]);
+
+  const singleOptionalMarks = useMemo(() => {
+    if (optionalSubjects.length > 0 && optionalSubjects[0]?.totalMarks) {
+      return Number(optionalSubjects[0].totalMarks) || 0;
+    }
+    if (optionalSubjects.length > 0 && requiredOptionalCount > 0) {
+      return (Number(exam.totalMarks) - mandatoryTotalMarks) / requiredOptionalCount;
+    }
+    return 0;
+  }, [optionalSubjects, requiredOptionalCount, exam.totalMarks, mandatoryTotalMarks]);
+
+  const optionalTotalMarks = singleOptionalMarks * requiredOptionalCount;
+  const studentFullMarks = Number(exam.totalMarks) || (mandatoryTotalMarks + optionalTotalMarks);
+
+  const mandatoryMarksBreakdownStr = useMemo(() => {
+    return mandatorySubjects.map((s: any) => toBengaliNumerals(s.totalMarks)).join(' + ');
+  }, [mandatorySubjects]);
+
   if (showInstructions) {
     const questionsForDist = fullSortedQuestions || [];
     const mcqQuestions = questionsForDist.filter((q: any) => q.type?.toLowerCase() === 'mcq' || q.questionType?.toLowerCase() === 'mcq');
@@ -658,8 +708,12 @@ export default function ExamLayout() {
               <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{requiredTotalQuestions}</p>
             </div>
             <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-xl text-center border border-emerald-100/50 dark:border-emerald-900/30">
-              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">মোট নম্বর (Total Marks)</div>
-              <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{exam.totalMarks}</p>
+              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">
+                {isMS ? 'পূর্ণমান (Full Marks)' : 'মোট নম্বর (Total Marks)'}
+              </div>
+              <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                {isMS ? toBengaliNumerals(studentFullMarks) : exam.totalMarks}
+              </p>
             </div>
             <div className="bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-xl text-center border border-rose-100/50 dark:border-rose-900/30">
               <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">পাস নম্বর (Pass Mark)</div>
@@ -668,44 +722,100 @@ export default function ExamLayout() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Question Breakdown */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Menu className="w-4 h-4 text-primary" /> প্রশ্নের ধরন ও বণ্টন (Question Distribution)
-              </h3>
-              <div className="space-y-2">
-                {mcqQuestions.length > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <span className="text-sm font-medium">MCQ (বহুনির্বাচনী)</span>
-                    <Badge variant="secondary" className="font-bold">{mcqQuestions.length} ({mcqMarks} Marks)</Badge>
-                  </div>
-                )}
-                {creativeQuestions.length > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">Creative (সৃজনশীল)</span>
-                      <span className="text-[10px] text-muted-foreground">{creativeQuestions.length} টি প্রশ্নের মধ্যে {cqRequired} টির উত্তর দাও</span>
+            {/* Question / Subject Breakdown */}
+            {isMS ? (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Menu className="w-4 h-4 text-primary" /> বিষয় বণ্টন ও নম্বর কাঠামো (Subject Distribution)
+                </h3>
+                <div className="space-y-2">
+                  {mandatorySubjects.length > 0 && (
+                    <div className="p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          আবশ্যক বিষয়সমূহ ({toBengaliNumerals(mandatoryCount)}টি)
+                        </span>
+                        <Badge variant="secondary" className="font-bold text-[11px]">
+                          মোট: {toBengaliNumerals(mandatoryTotalMarks)} নম্বর
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {mandatorySubjects.map((s: any, idx: number) => (
+                          <span key={idx} className="text-[11px] bg-background/80 px-2 py-0.5 rounded-md border border-border/60 text-muted-foreground">
+                            {s.name} <strong className="text-foreground">({toBengaliNumerals(s.totalMarks)})</strong>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <Badge variant="secondary" className="font-bold">CQ: {cqRequired}/{creativeQuestions.length} ({cqRequired}*{cqMarkPerQuestion}={creativeMarks} Marks)</Badge>
-                  </div>
-                )}
-                {shortQuestions.length > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">Short (সংক্ষিপ্ত)</span>
-                      <span className="text-[10px] text-muted-foreground">{shortQuestions.length} টি প্রশ্নের মধ্যে {sqRequired} টির উত্তর দাও</span>
+                  )}
+
+                  {optionalSubjects.length > 0 && (
+                    <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-xl border border-indigo-200/60 dark:border-indigo-800/40">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                          ঐচ্ছিক বিষয়সমূহ (মোট {toBengaliNumerals(optionalCount)}টির মধ্যে যেকোনো {toBengaliNumerals(requiredOptionalCount)}টি উত্তর দাও)
+                        </span>
+                        <Badge className="bg-indigo-600 text-white font-bold text-[11px]">
+                          {toBengaliNumerals(requiredOptionalCount)} × {toBengaliNumerals(singleOptionalMarks)} = {toBengaliNumerals(optionalTotalMarks)} নম্বর
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {optionalSubjects.map((s: any, idx: number) => (
+                          <span key={idx} className="text-[11px] bg-background/80 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200">
+                            {s.name} <strong className="text-foreground">({toBengaliNumerals(s.totalMarks || singleOptionalMarks)})</strong>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <Badge variant="secondary" className="font-bold">SQ: {sqRequired}/{shortQuestions.length} ({sqRequired}*{sqMarkPerQuestion}={shortMarks} Marks)</Badge>
+                  )}
+
+                  <div className="flex items-center justify-between p-2.5 bg-muted/30 rounded-xl border border-border/40 text-xs">
+                    <span className="font-semibold text-muted-foreground">প্রশ্নপত্রে মোট প্রশ্ন:</span>
+                    <span className="font-bold text-foreground">{questionsForDist.length} টি ({toBengaliNumerals(studentFullMarks)} নম্বরের পূর্ণমান)</span>
                   </div>
-                )}
-                {otherQuestions.length > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <span className="text-sm font-medium">অন্যান্য (Others)</span>
-                    <Badge variant="secondary" className="font-bold">{otherQuestions.length}</Badge>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Menu className="w-4 h-4 text-primary" /> প্রশ্নের ধরন ও বণ্টন (Question Distribution)
+                </h3>
+                <div className="space-y-2">
+                  {mcqQuestions.length > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <span className="text-sm font-medium">MCQ (বহুনির্বাচনী)</span>
+                      <Badge variant="secondary" className="font-bold">{mcqQuestions.length} ({mcqMarks} Marks)</Badge>
+                    </div>
+                  )}
+                  {creativeQuestions.length > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">Creative (সৃজনশীল)</span>
+                        <span className="text-[10px] text-muted-foreground">{creativeQuestions.length} টি প্রশ্নের মধ্যে {cqRequired} টির উত্তর দাও</span>
+                      </div>
+                      <Badge variant="secondary" className="font-bold">CQ: {cqRequired}/{creativeQuestions.length} ({cqRequired}*{cqMarkPerQuestion}={creativeMarks} Marks)</Badge>
+                    </div>
+                  )}
+                  {shortQuestions.length > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">Short (সংক্ষিপ্ত)</span>
+                        <span className="text-[10px] text-muted-foreground">{shortQuestions.length} টি প্রশ্নের মধ্যে {sqRequired} টির উত্তর দাও</span>
+                      </div>
+                      <Badge variant="secondary" className="font-bold">SQ: {sqRequired}/{shortQuestions.length} ({sqRequired}*{sqMarkPerQuestion}={shortMarks} Marks)</Badge>
+                    </div>
+                  )}
+                  {otherQuestions.length > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                      <span className="text-sm font-medium">অন্যান্য (Others)</span>
+                      <Badge variant="secondary" className="font-bold">{otherQuestions.length}</Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* General Instructions */}
             <div className="space-y-3">
@@ -713,6 +823,36 @@ export default function ExamLayout() {
                 <AlertCircle className="w-4 h-4 text-amber-500" /> পরীক্ষার্থীদের জন্য নির্দেশাবলি (Instructions)
               </h3>
               <ul className="space-y-2 text-xs font-medium text-muted-foreground">
+                {isMS && (
+                  <>
+                    {mandatorySubjects.length > 0 && (
+                      <li className="flex items-start gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>
+                          <strong className="text-foreground">আবশ্যক বিষয়:</strong> সকল {toBengaliNumerals(mandatoryCount)}টি আবশ্যক বিষয়ের উত্তর প্রদান বাধ্যতামূলক।
+                        </span>
+                      </li>
+                    )}
+                    <li className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
+                      <span>
+                        <strong className="text-foreground">ঐচ্ছিক বিষয়:</strong> প্রশ্নপত্রে মোট {toBengaliNumerals(optionalCount)}টি ঐচ্ছিক বিষয় রয়েছে, যার মধ্য থেকে পরীক্ষার্থীকে যেকোনো {toBengaliNumerals(requiredOptionalCount)}টি বিষয়ের উত্তর করতে হবে।
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
+                      <span className="text-rose-600 dark:text-rose-400 font-bold">
+                        কঠোর সতর্কবার্তা: অনুমোদিত সীমার অতিরিক্ত ({toBengaliNumerals(requiredOptionalCount)}টির বেশি) ঐচ্ছিক বিষয়ের প্রশ্নের উত্তর দিলে পরীক্ষার্থী অযোগ্য/বাতিল (Disqualified) গণ্য হবে এবং পরীক্ষায় ০ (শূন্য) নম্বর পাবে।
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-purple-500 mt-0.5 shrink-0" />
+                      <span className="font-bold text-foreground">
+                        নম্বর বণ্টন ও পূর্ণমান: আবশ্যিক {mandatoryMarksBreakdownStr ? `(${mandatoryMarksBreakdownStr})` : `${toBengaliNumerals(mandatoryTotalMarks)} নম্বর`} + ঐচ্ছিক ({toBengaliNumerals(requiredOptionalCount)} × {toBengaliNumerals(singleOptionalMarks)} = {toBengaliNumerals(optionalTotalMarks)} নম্বর) = পরীক্ষার্থীর পূর্ণমান {toBengaliNumerals(studentFullMarks)} নম্বর।
+                      </span>
+                    </li>
+                  </>
+                )}
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
                   <span>ফুলস্ক্রিন মোড বাধ্যতামূলক। ট্যাব পরিবর্তন, ফুলস্ক্রিন ত্যাগ, কপি-পেস্ট বা স্ক্রিনশট নেওয়ার চেষ্টা করলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
@@ -834,6 +974,36 @@ export default function ExamLayout() {
       illusionMode ? "illusion-mode" : "bg-background",
       isBlocked ? "select-none overflow-hidden" : ""
     )}>
+      {/* Floating Optional Subject HUD Notice (Fades in seconds) */}
+      <AnimatePresence>
+        {optionalNotice && (
+          <motion.div
+            key="optional-notice-hud"
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -15, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className={cn(
+              "fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-[100] pointer-events-none px-4 py-2 sm:px-5 sm:py-2.5 rounded-full shadow-2xl backdrop-blur-md border flex items-center gap-2.5 text-xs sm:text-sm font-bold tracking-tight transition-all duration-300",
+              optionalNotice.type === 'warning'
+                ? "bg-rose-600/95 text-white border-rose-300 ring-4 ring-rose-500/25 shadow-rose-900/40 animate-pulse"
+                : optionalNotice.isFull
+                ? "bg-emerald-600/95 text-white border-emerald-300 ring-4 ring-emerald-500/25 shadow-emerald-900/40"
+                : "bg-indigo-600/95 text-white border-indigo-300 ring-4 ring-indigo-500/25 shadow-indigo-900/40"
+            )}
+          >
+            {optionalNotice.type === 'warning' ? (
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-bounce shrink-0" />
+            ) : optionalNotice.isFull ? (
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-200 shrink-0" />
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse shrink-0" />
+            )}
+            <span>{optionalNotice.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className={cn(
         "flex flex-col flex-1"
       )}>
