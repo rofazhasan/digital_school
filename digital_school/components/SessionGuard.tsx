@@ -62,32 +62,20 @@ export default function SessionGuard() {
         const initializeSession = async () => {
             try {
                 // Initial check
-                await checkSession();
+                await checkSession().catch(() => {});
                 if (isShowingModal.current) return;
 
-                // Setup WebSocket - DISABLED for Serverless/Netlify
-                // const socketUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                // activeSocket = io(socketUrl, {
-                //     auth: {
-                //         token: document.cookie.split('; ').find(row => row.startsWith('session-token='))?.split('=')[1]
-                //     },
-                //     reconnectionAttempts: 3
-                // });
-
-                // activeSocket.on('forced-logout', handleForcedLogout);
-                // activeSocket.on('notification', (data: any) => {
-                //     if (data.type === 'forced-logout') handleForcedLogout(data);
-                // });
-
                 // Setup Polling (Fallback is now primary)
-                pollInterval = setInterval(checkSession, 5000);
+                pollInterval = setInterval(() => {
+                    checkSession().catch(() => {});
+                }, 5000);
 
             } catch (error) {
                 console.error('[SessionGuard] Initialization failed:', error);
             }
         };
 
-        initializeSession();
+        initializeSession().catch(() => {});
 
         return () => {
             // if (activeSocket) activeSocket.disconnect();

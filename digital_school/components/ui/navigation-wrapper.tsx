@@ -29,9 +29,20 @@ export function NavigationWrapper({ children }: NavigationWrapperProps) {
     window.addEventListener('beforeunload', handleStart);
     window.addEventListener('load', handleComplete);
 
+    // Filter out known third-party browser extension errors (e.g., Urban VPN / proxy extensions injecting 200.js and throwing M_ID)
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const msg = event?.reason?.message || '';
+      const stack = event?.reason?.stack || '';
+      if (msg.includes('M_ID') || stack.includes('200.js')) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
     return () => {
       window.removeEventListener('beforeunload', handleStart);
       window.removeEventListener('load', handleComplete);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
 
