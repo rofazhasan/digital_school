@@ -132,7 +132,7 @@
   /* RESTORED: This is what the user asked for */
   .mcq-container {
     columns: 2;
-    column-gap: 2rem;
+    column-gap: 1.25rem;
     column-fill: balance;
     orphans: 3;
     widows: 3;
@@ -147,14 +147,14 @@
   .options-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+    gap: 0.15rem 0.4rem;
     align-items: start;
   }
 
   .options-grid-4 {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.2rem 0.4rem;
+    gap: 0.1rem 0.3rem;
     align-items: start;
   }
 
@@ -174,10 +174,11 @@
   .desc-section,
   .subsection-header,
   h3 {
-    border-bottom: 2px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
     background: #f8fafc !important;
-    padding: 2px 8px !important;
-    margin-top: 1rem !important;
+    padding: 1px 6px !important;
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.25rem !important;
     break-after: avoid !important;
     page-break-after: avoid !important;
     display: flex !important;
@@ -187,25 +188,25 @@
 
   /* Instruction Box */
   .instruction-box {
-    border: 1.5px solid #000;
-    padding: 8px 12px;
-    margin-bottom: 1.5rem;
-    background-color: #fdfdfd;
-    border-radius: 4px;
-    font-size: inherit;
-    line-height: 1.5;
+    border: 1px solid #000;
+    padding: 3px 6px;
+    margin-bottom: 0.35rem;
+    background-color: #fafafa;
+    border-radius: 2px;
+    font-size: 11px;
+    line-height: 1.35;
   }
 
   /* Multi-Subject (MS) Print Section Headers */
   .ms-subject-header {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    border-top: 2px solid #000 !important;
-    border-bottom: 2px solid #000 !important;
+    border-top: 1.5px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
     background-color: #f3f4f6 !important;
-    padding: 6px 10px !important;
-    margin-top: 1.25rem !important;
-    margin-bottom: 1rem !important;
+    padding: 2px 6px !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
     color: #000 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
@@ -285,13 +286,13 @@
   .sq-question {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-bottom: 0.75rem !important;
+    margin-bottom: 0.4rem !important;
   }
 
   .question-block {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-bottom: 0.4rem !important;
+    margin-bottom: 0.18rem !important;
   }
 
   /* OMR Specific Adjustments */
@@ -326,7 +327,7 @@
 
 /* Global Optimizations (Non-Print) */
 .question-block {
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.22rem;
   break-inside: avoid;
 }
 
@@ -352,14 +353,14 @@
 .options-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.3rem 0.5rem;
+  gap: 0.15rem 0.4rem;
   align-items: start;
 }
 
 .options-grid-4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.2rem 0.4rem;
+  gap: 0.1rem 0.3rem;
   align-items: start;
 }
 
@@ -489,14 +490,30 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 8.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #475569;
+  letter-spacing: 0.04em;
+  color: #334155;
   border-bottom: 1px solid #cbd5e1;
-  padding-bottom: 3px;
-  margin-bottom: 8px;
+  padding-bottom: 2px;
+  margin-bottom: 4px;
+}
+
+@media print {
+  .booklet-sheet {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+
+  .booklet-half-page {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
 }
 
 @media screen {

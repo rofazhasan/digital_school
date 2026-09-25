@@ -252,37 +252,37 @@ const MSSubjectHeader = ({
   optionalInstruction?: string;
 }) => {
   return (
-    <div className="ms-subject-header my-4 break-inside-avoid border-y-2 border-black bg-gray-100/90 p-2.5 sm:p-3 text-black">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2.5">
-          <h3 className="text-base sm:text-lg font-black tracking-tight uppercase">
+    <div className="ms-subject-header my-1.5 break-inside-avoid border-y border-black bg-gray-100/90 py-0.5 px-2 text-black">
+      <div className="flex items-center justify-between flex-wrap gap-1">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs sm:text-sm font-black tracking-tight uppercase">
             {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
           </h3>
         </div>
-        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
-          <span className={`px-2.5 py-0.5 rounded-xs border font-extrabold uppercase tracking-wide ${
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold">
+          <span className={`px-1.5 py-0.2 rounded-xs border font-extrabold uppercase tracking-wide ${
             subject.isMandatory
               ? 'border-black bg-white text-black'
               : 'border-black bg-black text-white'
           }`}>
             {subject.isMandatory
-              ? (isEn ? 'COMPULSORY / MANDATORY' : 'আবশ্যক বিষয়')
+              ? (isEn ? 'COMPULSORY' : 'আবশ্যক বিষয়')
               : (isEn ? 'OPTIONAL' : 'ঐচ্ছিক বিষয়')}
           </span>
           {questionRangeText && (
-            <span className="bg-white border border-black/40 px-2 py-0.5 rounded-xs text-[11px] font-semibold">
+            <span className="bg-white border border-black/40 px-1.5 py-0.2 rounded-xs text-[10px] font-semibold">
               {questionRangeText}
             </span>
           )}
           {subject.totalMarks && subject.totalMarks > 0 ? (
-            <span className="font-extrabold text-xs">
+            <span className="font-extrabold text-[10px]">
               [{isEn ? `Full Marks: ${subject.totalMarks}` : `পূর্ণমান: ${toBengaliNumerals(subject.totalMarks)}`}]
             </span>
           ) : null}
         </div>
       </div>
       {!subject.isMandatory && optionalInstruction && (
-        <div className="mt-1.5 text-[11px] font-semibold italic text-gray-800 border-t border-black/20 pt-1 flex items-center gap-1">
+        <div className="mt-0.5 text-[9.5px] font-semibold italic text-gray-800 border-t border-black/20 pt-0.5 flex items-center gap-1">
           <span>*</span>
           <span>{optionalInstruction}</span>
         </div>
@@ -307,38 +307,38 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
     examInfo.subjectsConfig && ((examInfo.subjectsConfig as any)?.subjects || []).length > 0
   );
   return (
-    <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
+    <header className="mb-1.5 relative border-b-2 border-black pb-1 text-black">
       {!hideInstitute && (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
           {/* Logo Spacer to balance QR */}
-          <div className="w-20" />
+          <div className="w-12" />
 
           {/* Middle Section: School Info */}
           <div className="flex-1 text-center">
-            <h1 className="text-3xl font-black tracking-tight mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight mb-0 leading-tight">
               {examInfo.schoolName || 'শিক্ষা প্রতিষ্ঠানের নাম'}
             </h1>
-            <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
+            <p className="text-[11px] font-semibold text-gray-700 uppercase tracking-wider">
               {examInfo.schoolAddress || 'প্রতিষ্ঠানের ঠিকানা'}
             </p>
           </div>
 
           {/* QR Code Section */}
-          <div className="w-20 h-20 flex items-center justify-end">
-            <div className="p-1 border border-black bg-white shadow-sm">
-              <QRCode value={JSON.stringify(qrData)} size={64} />
+          <div className="w-12 h-12 flex items-center justify-end">
+            <div className="p-0.5 border border-black bg-white shadow-xs">
+              <QRCode value={JSON.stringify(qrData)} size={42} />
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex justify-center">
-        <div className="inline-block border-y-2 border-black py-1.5 px-10 my-3 bg-gray-50/50">
-          <h2 className="text-2xl font-black uppercase tracking-tight">{examInfo.title}</h2>
+      <div className="flex justify-center my-0.5">
+        <div className="inline-block border-y border-black py-0.5 px-6 bg-gray-50/50">
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wide leading-none">{examInfo.title}</h2>
         </div>
       </div>
 
-      <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
+      <div className="text-xs flex flex-row justify-center gap-x-4 gap-y-0.5 flex-wrap mt-0.5 font-semibold border-t border-black/30 pt-0.5">
         <span><strong>{isHEn ? 'Class' : 'শ্রেণি'}:</strong> {isHEn ? examInfo.class : toBengaliNumerals(examInfo.class)}</span>
         <span>
           <strong>{isHEn ? 'Subject' : 'বিষয়'}:</strong>{' '}
@@ -621,42 +621,34 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {!hideHeader && (
             <div className="instruction-box">
             {isMS && (parsedSubjectsConfig || configuredSubjects.length > 0) ? (
-              <div className="space-y-1.5 text-xs sm:text-sm">
-                <div className="flex items-center justify-between border-b border-black/20 pb-1 flex-wrap gap-1">
-                  <span className="font-black text-sm uppercase tracking-wide">
-                    {isEn ? 'MULTI-SUBJECT EXAMINATION GUIDELINES' : 'বহু-বিষয় ভিত্তিক পরীক্ষার সাধারণ নির্দেশাবলী'}
+              <div className="space-y-0.5 text-xs">
+                <div className="flex items-center justify-between border-b border-black/20 pb-0.5 flex-wrap gap-1">
+                  <span className="font-black text-xs uppercase tracking-wide">
+                    {isEn ? 'EXAMINATION GUIDELINES' : 'পরীক্ষার নির্দেশাবলী'}
                   </span>
-                  <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded-xs">
-                    {isEn ? `Total Subjects: ${configuredSubjects.length}` : `মোট বিষয়: ${toBengaliNumerals(configuredSubjects.length)}টি`}
+                  <span className="text-[10px] font-bold bg-black text-white px-1.5 py-0.2 rounded-xs">
+                    {isEn ? `Subjects: ${configuredSubjects.length}` : `মোট বিষয়: ${toBengaliNumerals(configuredSubjects.length)}টি`}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs pt-0.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] pt-0.5 leading-snug">
                   <div>
-                    <strong>{isEn ? '1. Mandatory Subjects:' : '১. আবশ্যক বিষয়সমূহ:'}</strong>{' '}
+                    <strong>{isEn ? '1. Mandatory:' : '১. আবশ্যক বিষয়:'}</strong>{' '}
                     {(parsedSubjectsConfig?.mandatoryCount || 0) > 0
                       ? (isEn
-                        ? `All ${parsedSubjectsConfig.mandatoryCount} mandatory subject(s) must be answered strictly.`
-                        : `সকল ${toBengaliNumerals(parsedSubjectsConfig.mandatoryCount)}টি আবশ্যক বিষয়ের উত্তর প্রদান বাধ্যতামূলক।`)
+                        ? `All ${parsedSubjectsConfig.mandatoryCount} mandatory subject(s) must be answered.`
+                        : `সকল ${toBengaliNumerals(parsedSubjectsConfig.mandatoryCount)}টি আবশ্যক বিষয়ের উত্তর দিতে হবে।`)
                       : (isEn ? 'All subjects must be answered.' : 'সকল নির্ধারিত বিষয়ের উত্তর দিতে হবে।')}
                   </div>
                   <div>
-                    <strong>{isEn ? '2. Optional Subjects:' : '২. ঐচ্ছিক বিষয়সমূহ:'}</strong>{' '}
+                    <strong>{isEn ? '2. Optional:' : '২. ঐচ্ছিক বিষয়:'}</strong>{' '}
                     {(parsedSubjectsConfig?.optionalCount || 0) > 0
                       ? (isEn
-                        ? `Answer any ${parsedSubjectsConfig.requiredOptionalCount || 1} out of ${parsedSubjectsConfig.optionalCount} optional subject(s). Do not answer more than permitted.`
-                        : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount)}টি ঐচ্ছিক বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি বিষয়ের উত্তর করতে হবে। অনুমোদিত সংখ্যার চেয়ে বেশি বিষয়ের উত্তর গ্রহণযোগ্য নয়।`)
+                        ? `Answer any ${parsedSubjectsConfig.requiredOptionalCount || 1} out of ${parsedSubjectsConfig.optionalCount} optional subject(s).`
+                        : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount)}টি ঐচ্ছিকের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি বিষয়ের উত্তর করতে হবে।`)
                       : (isEn ? 'No optional subjects.' : 'কোনো ঐচ্ছিক বিষয় নেই।')}
                   </div>
-                  <div className="sm:col-span-2 bg-gray-50 border border-black/30 p-2 rounded-xs my-1">
-                    <strong>{isEn ? 'Marks Breakdown & Subject Choice Rule:' : 'নম্বর বণ্টন ও বিষয় নির্বাচন নিয়ম:'}</strong>
-                    <div className="text-[11px] mt-0.5 font-semibold text-gray-800">
-                      {isEn
-                        ? `Compulsory: ${mandatoryMarks} Marks + Optional: ${singleOptionalMarks}*${parsedSubjectsConfig?.requiredOptionalCount || 1} Marks (Answer any ${parsedSubjectsConfig?.requiredOptionalCount || 1} subject) = Student Full Marks: ${examInfo.totalMarks || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks))}.`
-                        : `আবশ্যিক বিষয়: ${toBengaliNumerals(mandatoryMarks)} নম্বর + ঐচ্ছিক বিষয়: ${toBengaliNumerals(singleOptionalMarks)}*${parsedSubjectsConfig?.requiredOptionalCount || 1} নম্বর (যেকোনো ${toBengaliNumerals(parsedSubjectsConfig?.requiredOptionalCount || 1)}টি উত্তর করতে হবে) = পরীক্ষার্থীর পূর্ণমান: ${toBengaliNumerals(examInfo.totalMarks || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)))} নম্বর।`}
-                    </div>
-                  </div>
                   {Number(examInfo.mcqNegativeMarking) > 0 && (
-                    <div className="sm:col-span-2 font-bold text-black mt-0.5">
+                    <div className="sm:col-span-2 font-bold text-black text-[10.5px]">
                       <strong>{isEn ? '3. Negative Marking:' : '৩. ভুল উত্তরের কর্তন:'}</strong>{' '}
                       {isEn
                         ? `Negative marking of ${examInfo.mcqNegativeMarking}% will be deducted for each incorrect answer.`
@@ -666,10 +658,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 </div>
               </div>
             ) : hideOMR ? (
-              <p>
-                <strong>{isEn ? 'General Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
+              <p className="text-[11px] leading-snug m-0">
+                <strong>{isEn ? 'Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
                 {isEn
-                  ? 'Answer the following questions carefully. The figures in the right margin indicate full marks.'
+                  ? 'Answer the following questions carefully. Figures in the right margin indicate marks.'
                   : 'নিচের প্রশ্নগুলোর উত্তর দাও। ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।'}
                 {Number(examInfo.mcqNegativeMarking) > 0 && (
                   <span className="font-semibold">
@@ -680,11 +672,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 )}
               </p>
             ) : (
-              <p>
-                <strong>{isEn ? 'General Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
+              <p className="text-[11px] leading-snug m-0">
+                <strong>{isEn ? 'Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
                 {isEn
-                  ? 'Fill in the corresponding circles on the provided MCQ answer sheet with a black ballpoint pen. Figures in the right margin indicate full marks.'
-                  : 'সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।'}
+                  ? 'Fill in the corresponding circles on the provided MCQ answer sheet with a black ballpoint pen. Figures in right margin indicate full marks.'
+                  : 'উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বৃত্তসমূহ সঠিক বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। ডান পাশের সংখ্যা পূর্ণমান নির্দেশ করে।'}
                 {Number(examInfo.mcqNegativeMarking) > 0 && (
                   <span className="font-semibold">
                     {' '}{isEn
@@ -714,7 +706,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     const isNewSubject = isMS && (idx === 0 || q._canonicalSubject !== lastSubject);
                     if (isNewSubject) {
                       lastSubject = q._canonicalSubject;
-                      subjectCounter = 1;
+                      // Respect startQuestionIndex when continuing a subject across pages
+                      subjectCounter = (idx === 0 && startQuestionIndex) ? startQuestionIndex : 1;
                     }
 
                     const startNum = isMS ? subjectCounter : globalCounter;
@@ -726,8 +719,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                     const matchedSub = q._subConfig || configuredSubjects.find((s: any) => matchSubject(q.subject, s.name));
                     const prevSub = idx > 0 ? orderedObjective[idx - 1]?._subConfig : null;
-                    const showDivisionA = isMS && idx === 0 && matchedSub?.isMandatory;
-                    const showDivisionB = isMS && matchedSub && !matchedSub.isMandatory && (idx === 0 || prevSub?.isMandatory);
+                    const showDivisionA = isMS && !hideHeader && idx === 0 && matchedSub?.isMandatory;
+                    const showDivisionB = isMS && matchedSub && !matchedSub.isMandatory && (idx === 0 ? (!hideHeader && (matchedSub.sectionLetter === 'A' || !prevSub)) : prevSub?.isMandatory);
                     const showSubjectHeader = isMS && isNewSubject;
 
                     const renderQuestionContent = () => {
@@ -743,7 +736,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
 
                       return (
-                        <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
+                        <div key={idx} className="mb-1.5 sm:mb-2 text-left question-block break-inside-avoid">
                           <div className="flex items-start">
                             <span className="font-bold mr-2">
                               {qNum}.{q.type?.toUpperCase() === 'MC' ? '*' : ''}
@@ -768,7 +761,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                     if (q.type?.toUpperCase() === 'INT' || q.type?.toUpperCase() === 'NUMERIC') {
                       return (
-                        <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
+                        <div key={idx} className="mb-1.5 sm:mb-2 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <span className="font-bold">{qNum}. </span>
@@ -786,7 +779,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                     if (q.type?.toUpperCase() === 'AR') {
                       return (
-                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                        <div key={idx} className="mb-2 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1 space-y-1">
                               <span className="font-bold">{qNum}. </span>
@@ -868,7 +861,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       const endNum = (isMS ? subjectCounter : globalCounter) - 1;
                       const rangeStr = startNum === endNum ? qNum : (isEn ? `${startNum}-${endNum}` : `${toBengaliNumerals(startNum)}-${toBengaliNumerals(endNum)}`);
                       return (
-                        <div key={idx} className="mb-6 question-block break-inside-avoid">
+                        <div key={idx} className="mb-2 question-block break-inside-avoid">
                           <div className="bg-gray-50 p-2 border-l-4 border-black mb-3 italic text-sm">
                             <p className="font-bold mb-2">
                               {isEn ? `Read the following stem and answer questions ${rangeStr}:` : `নিচের উদ্দীপকটি পড়ো এবং ${rangeStr} নং প্রশ্নের উত্তর দাও:`}
@@ -973,21 +966,21 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     return (
                       <React.Fragment key={idx}>
                         {showDivisionA && (
-                          <div className="ms-division-banner my-4 py-2 px-3 bg-black text-white font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-between rounded-xs shadow-xs break-inside-avoid">
+                          <div className="ms-division-banner my-1 py-1 px-2.5 bg-black text-white font-black text-xs uppercase tracking-wider flex items-center justify-between rounded-xs shadow-xs break-inside-avoid">
                             <span>{isEn ? 'PART - A: COMPULSORY SUBJECTS (MANDATORY)' : 'ক-বিভাগ: আবশ্যিক বিষয়সমূহ (সকল বিষয়ের উত্তর প্রদান বাধ্যতামূলক)'}</span>
-                            <span className="text-[11px] bg-white text-black px-2 py-0.5 font-bold rounded-xs">
+                            <span className="text-[10px] bg-white text-black px-1.5 py-0.2 font-bold rounded-xs">
                               {isEn ? `Full Marks: ${mandatoryMarks}` : `পূর্ণমান: ${toBengaliNumerals(mandatoryMarks)}`}
                             </span>
                           </div>
                         )}
                         {showDivisionB && (
-                          <div className="ms-division-banner my-6 py-2 px-3 bg-neutral-900 text-white font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-between rounded-xs border-2 border-black shadow-xs break-inside-avoid">
+                          <div className="ms-division-banner my-1.5 py-1 px-2.5 bg-neutral-900 text-white font-black text-xs uppercase tracking-wider flex items-center justify-between rounded-xs border border-black shadow-xs break-inside-avoid">
                             <span>
                               {isEn 
                                 ? `PART - B: OPTIONAL SUBJECTS (Answer any ${parsedSubjectsConfig?.requiredOptionalCount || 1} out of ${parsedSubjectsConfig?.optionalCount || optionalSubjectsList.length || 1})` 
                                 : `খ-বিভাগ: ঐচ্ছিক বিষয়সমূহ (মোট ${toBengaliNumerals(parsedSubjectsConfig?.optionalCount || optionalSubjectsList.length || 1)}টি বিষয়ের মধ্যে যেকোনো ${toBengaliNumerals(parsedSubjectsConfig?.requiredOptionalCount || 1)}টি বিষয়ের উত্তর দাও)`}
                             </span>
-                            <span className="text-[11px] bg-white text-black px-2 py-0.5 font-bold rounded-xs">
+                            <span className="text-[10px] bg-white text-black px-1.5 py-0.2 font-bold rounded-xs">
                               {isEn ? `Marks: ${singleOptionalMarks}` : `পূর্ণমান: ${toBengaliNumerals(singleOptionalMarks)}`}
                             </span>
                           </div>
@@ -1037,7 +1030,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {cqs.length > 0 && (
                 <>
                   <div
-                    className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 cq-section section-break"
+                    className="flex justify-between items-center font-bold mb-1.5 border-b border-dotted border-black pb-0.5 mt-2 cq-section section-break"
                   >
                     <div className="flex flex-col">
                       <h3>{isEn ? 'Creative Questions (CQ)' : 'সৃজনশীল প্রশ্ন (CQ)'}</h3>
@@ -1148,7 +1141,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {/* SQ Section */}
               {sqs.length > 0 && (
                 <>
-                  <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 sq-section section-break">
+                  <div className="flex justify-between items-center font-bold mb-1.5 border-b border-dotted border-black pb-0.5 mt-2 sq-section section-break">
                     <h3>{isEn ? 'Short Questions (SQ)' : 'সংক্ষিপ্ত প্রশ্ন (SQ)'}</h3>
                     <div className="text-right">
                       {Number(sqRequiredMarks) > 0 && (

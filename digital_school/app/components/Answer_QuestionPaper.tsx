@@ -258,37 +258,37 @@ const MSSubjectHeader = ({
   optionalInstruction?: string;
 }) => {
   return (
-    <div className="ms-subject-header my-5 break-inside-avoid border-y-2 border-black bg-gray-100/80 p-2.5 sm:p-3 text-black">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2.5">
-          <h3 className="text-base sm:text-lg font-black tracking-tight uppercase">
+    <div className="ms-subject-header my-1.5 break-inside-avoid border-y border-black bg-gray-100/90 py-0.5 px-2 text-black">
+      <div className="flex items-center justify-between flex-wrap gap-1">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs sm:text-sm font-black tracking-tight uppercase">
             {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
           </h3>
         </div>
-        <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
-          <span className={`px-2.5 py-0.5 rounded-xs border font-extrabold uppercase tracking-wide ${
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold">
+          <span className={`px-1.5 py-0.2 rounded-xs border font-extrabold uppercase tracking-wide ${
             subject.isMandatory
               ? 'border-black bg-white text-black'
               : 'border-black bg-black text-white'
           }`}>
             {subject.isMandatory
-              ? (isEn ? 'COMPULSORY / MANDATORY' : 'আবশ্যক বিষয়')
+              ? (isEn ? 'COMPULSORY' : 'আবশ্যক বিষয়')
               : (isEn ? 'OPTIONAL' : 'ঐচ্ছিক বিষয়')}
           </span>
           {questionRangeText && (
-            <span className="bg-white border border-black/40 px-2 py-0.5 rounded-xs text-[11px] font-semibold">
+            <span className="bg-white border border-black/40 px-1.5 py-0.2 rounded-xs text-[10px] font-semibold">
               {questionRangeText}
             </span>
           )}
           {subject.totalMarks && subject.totalMarks > 0 ? (
-            <span className="font-extrabold text-xs">
+            <span className="font-extrabold text-[10px]">
               [{isEn ? `Full Marks: ${subject.totalMarks}` : `পূর্ণমান: ${toBengaliNumerals(subject.totalMarks)}`}]
             </span>
           ) : null}
         </div>
       </div>
       {!subject.isMandatory && optionalInstruction && (
-        <div className="mt-1.5 text-[11px] font-semibold italic text-gray-800 border-t border-black/20 pt-1 flex items-center gap-1">
+        <div className="mt-0.5 text-[9.5px] font-semibold italic text-gray-800 border-t border-black/20 pt-0.5 flex items-center gap-1">
           <span>*</span>
           <span>{optionalInstruction}</span>
         </div>
@@ -313,38 +313,38 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
     examInfo.subjectsConfig && ((examInfo.subjectsConfig as any)?.subjects || []).length > 0
   );
   return (
-    <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
+    <header className="mb-1.5 relative border-b-2 border-black pb-1 text-black">
       {!hideInstitute && (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
           {/* Logo Spacer to balance QR */}
-          <div className="w-20" />
+          <div className="w-12" />
 
           {/* Middle Section: School Info */}
           <div className="flex-1 text-center">
-            <h1 className="text-3xl font-black tracking-tight mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight mb-0 leading-tight">
               {examInfo.schoolName || (isHEn ? 'School Name' : 'শিক্ষা প্রতিষ্ঠানের নাম')}
             </h1>
-            <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
+            <p className="text-[11px] font-semibold text-gray-700 uppercase tracking-wider">
               {examInfo.schoolAddress || (isHEn ? 'School Address' : 'প্রতিষ্ঠানের ঠিকানা')}
             </p>
           </div>
 
           {/* QR Code Section */}
-          <div className="w-20 h-20 flex items-center justify-end">
-            <div className="p-1 border border-black bg-white shadow-sm">
-              <QRCode value={JSON.stringify(qrData)} size={64} />
+          <div className="w-12 h-12 flex items-center justify-end">
+            <div className="p-0.5 border border-black bg-white shadow-xs">
+              <QRCode value={JSON.stringify(qrData)} size={42} />
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex justify-center">
-        <div className="inline-block border-y-2 border-black py-1.5 px-10 my-3 bg-gray-50/50">
-          <h2 className="text-2xl font-black uppercase tracking-tight">{examInfo.title}</h2>
+      <div className="flex justify-center my-0.5">
+        <div className="inline-block border-y border-black py-0.5 px-6 bg-gray-50/50">
+          <h2 className="text-sm sm:text-base font-black uppercase tracking-wide leading-none">{examInfo.title}</h2>
         </div>
       </div>
 
-      <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
+      <div className="text-xs flex flex-row justify-center gap-x-4 gap-y-0.5 flex-wrap mt-0.5 font-semibold border-t border-black/30 pt-0.5">
         <span><strong>{isHEn ? 'Class' : 'শ্রেণি'}:</strong> {isHEn ? examInfo.class : toBengaliNumerals(examInfo.class)}</span>
         <span>
           <strong>{isHEn ? 'Subject' : 'বিষয়'}:</strong>{' '}
@@ -369,8 +369,8 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
         <span><strong>{isHEn ? 'Full Marks' : 'পূর্ণমান'}:</strong> {isHEn ? marks : toBengaliNumerals(marks)}</span>
       </div>
 
-      <div className="mt-4 text-center">
-        <div className="inline-block text-xl font-bold text-red-600 border-2 border-red-600 px-4 py-1 rounded shadow-sm">
+      <div className="mt-1 text-center">
+        <div className="inline-block text-xs font-bold text-red-600 border border-red-600 px-3 py-0.5 rounded shadow-xs">
           {type === 'objective' ? (isHEn ? 'Objective Answers' : 'বহুনির্বাচনি উত্তরপত্র (Objective Answers)') : (isHEn ? 'CQ/SQ Answers' : 'সৃজনশীল উত্তরপত্র (CQ/SQ Answers)')}
         </div>
       </div>
@@ -632,37 +632,37 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
           {!hideHeader && (
             <div className="instruction-box">
             {isMS && (parsedSubjectsConfig || configuredSubjects.length > 0) ? (
-              <div className="space-y-1.5 text-xs sm:text-sm">
-                <div className="flex items-center justify-between border-b border-black/20 pb-1 flex-wrap gap-1">
-                  <span className="font-black text-sm uppercase tracking-wide">
-                    {isEn ? 'MULTI-SUBJECT SOLUTION SHEET GUIDELINES' : 'বহু-বিষয় ভিত্তিক পরীক্ষার উত্তরপত্র নির্দেশাবলী'}
+              <div className="space-y-0.5 text-xs">
+                <div className="flex items-center justify-between border-b border-black/20 pb-0.5 flex-wrap gap-1">
+                  <span className="font-black text-xs uppercase tracking-wide">
+                    {isEn ? 'SOLUTION SHEET GUIDELINES' : 'উত্তরপত্র নির্দেশাবলী'}
                   </span>
-                  <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded-xs">
-                    {isEn ? `Total Subjects: ${configuredSubjects.length}` : `মোট বিষয়: ${toBengaliNumerals(configuredSubjects.length)}টি`}
+                  <span className="text-[10px] font-bold bg-black text-white px-1.5 py-0.2 rounded-xs">
+                    {isEn ? `Subjects: ${configuredSubjects.length}` : `মোট বিষয়: ${toBengaliNumerals(configuredSubjects.length)}টি`}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs pt-0.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] pt-0.5 leading-snug">
                   <div>
-                    <strong>{isEn ? '1. Mandatory Subjects:' : '১. আবশ্যক বিষয়সমূহ:'}</strong>{' '}
+                    <strong>{isEn ? '1. Mandatory:' : '১. আবশ্যক বিষয়:'}</strong>{' '}
                     {(parsedSubjectsConfig?.mandatoryCount || 0) > 0
                       ? (isEn
-                        ? `All ${parsedSubjectsConfig.mandatoryCount} mandatory subject(s) solutions.`
+                        ? `All ${parsedSubjectsConfig.mandatoryCount} mandatory subject solutions.`
                         : `সকল ${toBengaliNumerals(parsedSubjectsConfig.mandatoryCount)}টি আবশ্যক বিষয়ের সমাধান।`)
                       : (isEn ? 'All subject solutions.' : 'সকল নির্ধারিত বিষয়ের সমাধান।')}
                   </div>
                   <div>
-                    <strong>{isEn ? '2. Optional Subjects:' : '২. ঐচ্ছিক বিষয়সমূহ:'}</strong>{' '}
+                    <strong>{isEn ? '2. Optional:' : '২. ঐচ্ছিক বিষয়:'}</strong>{' '}
                     {(parsedSubjectsConfig?.optionalCount || 0) > 0
                       ? (isEn
-                        ? `Includes all ${parsedSubjectsConfig.optionalCount} optional subjects (Evaluate any ${parsedSubjectsConfig.requiredOptionalCount || 1}).`
-                        : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount)}টি ঐচ্ছিক বিষয়ের সমাধান অন্তর্ভুক্ত (যেকোনো ${toBengaliNumerals(parsedSubjectsConfig.requiredOptionalCount || 1)}টি নির্বাচনীয়)।`)
+                        ? `Includes all ${parsedSubjectsConfig.optionalCount} optional subjects.`
+                        : `মোট ${toBengaliNumerals(parsedSubjectsConfig.optionalCount)}টি ঐচ্ছিক বিষয়ের সমাধান অন্তর্ভুক্ত।`)
                       : (isEn ? 'No optional subjects.' : 'কোনো ঐচ্ছিক বিষয় নেই।')}
                   </div>
                 </div>
               </div>
             ) : (
-              <p>
-                <strong>{isEn ? 'Answer Sheet / Solution:' : 'উত্তরপত্র / সমাধান:'}</strong>{' '}
+              <p className="text-[11px] leading-snug m-0">
+                <strong>{isEn ? 'Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
                 {isEn
                   ? 'This document contains the correct answers and explanations for the exam questions.'
                   : 'এই নথিতে পরীক্ষার প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা দেওয়া হয়েছে।'}
@@ -698,7 +698,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     const isNewSubject = isMS && (idx === 0 || q._canonicalSubject !== lastSubject);
                     if (isNewSubject) {
                       lastSubject = q._canonicalSubject;
-                      subjectCounter = 1;
+                      // Respect startQuestionIndex when continuing a subject across pages
+                      subjectCounter = (idx === 0 && startQuestionIndex) ? startQuestionIndex : 1;
                     }
 
                     const startNum = isMS ? subjectCounter : globalCounter;
@@ -710,8 +711,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                     const matchedSub = q._subConfig || configuredSubjects.find((s: any) => matchSubject(q.subject, s.name));
                     const prevSub = idx > 0 ? orderedObjective[idx - 1]?._subConfig : null;
-                    const showDivisionA = isMS && idx === 0 && matchedSub?.isMandatory;
-                    const showDivisionB = isMS && matchedSub && !matchedSub.isMandatory && (idx === 0 || prevSub?.isMandatory);
+                    const showDivisionA = isMS && !hideHeader && idx === 0 && matchedSub?.isMandatory;
+                    const showDivisionB = isMS && matchedSub && !matchedSub.isMandatory && (idx === 0 ? (!hideHeader && (matchedSub.sectionLetter === 'A' || !prevSub)) : prevSub?.isMandatory);
                     const showSubjectHeader = isMS && isNewSubject;
 
                     const renderQuestionContent = () => {
@@ -722,7 +723,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
 
                       return (
-                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                        <div key={idx} className="mb-1.5 sm:mb-2 text-left question-block break-inside-avoid">
                           <div className="flex items-start">
                             <span className="font-bold mr-2">
                               {qNum}.{q.type === 'MC' ? '*' : ''}

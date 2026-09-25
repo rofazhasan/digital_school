@@ -22,7 +22,7 @@ const LANGS = {
 };
 
 // --- Helper: Split an Exam Set into 4 Logical Pages for Booklet Printing ---
-function splitExamSetForBooklet(set: any) {
+function splitExamSetForBooklet(set: any, examInfo?: any) {
   const allObj = (set.orderedObjective && set.orderedObjective.length > 0)
     ? [...set.orderedObjective]
     : [
@@ -51,10 +51,10 @@ function splitExamSetForBooklet(set: any) {
 
   if (totalObj === 0 && totalWritten === 0) {
     return [
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
     ];
   }
 
@@ -75,15 +75,137 @@ function splitExamSetForBooklet(set: any) {
     allObjective: arr
   });
 
-  // Case 1: Purely or predominantly Objective exam (Standard Admission Test format)
+  // Check if Multi-Subject (MS) exam with subjects
+  let parsedConfig: any = null;
+  if (examInfo?.subjectsConfig) {
+    if (typeof examInfo.subjectsConfig === 'string') {
+      try { parsedConfig = JSON.parse(examInfo.subjectsConfig); } catch { parsedConfig = null; }
+    } else {
+      parsedConfig = examInfo.subjectsConfig;
+    }
+  }
+
+  // Group questions by subject
+  const subjectGroups: { name: string; questions: any[] }[] = [];
+  const configuredSubs: string[] = parsedConfig?.subjects?.map((s: any) => s.name) || [];
+
+  if (configuredSubs.length > 0) {
+    configuredSubs.forEach((subName) => {
+      const qs = allObj.filter((q: any) => {
+        const qSub = (q.subject || q.subjectName || q._canonicalSubject || '').trim().toLowerCase();
+        return qSub === subName.trim().toLowerCase() || (qSub && subName.toLowerCase().includes(qSub));
+      });
+      if (qs.length > 0) {
+        subjectGroups.push({ name: subName, questions: qs });
+      }
+    });
+    // Add any remaining questions not matched to configured subjects
+    const assignedIds = new Set(subjectGroups.flatMap(g => g.questions.map(q => q.id || q.q || q.questionText)));
+    const unassigned = allObj.filter(q => !assignedIds.has(q.id || q.q || q.questionText));
+    if (unassigned.length > 0) {
+      if (subjectGroups.length > 0) {
+        subjectGroups[subjectGroups.length - 1].questions.push(...unassigned);
+      } else {
+        subjectGroups.push({ name: 'General', questions: unassigned });
+      }
+    }
+  } else {
+    // Detect subjects dynamically from question objects
+    allObj.forEach((q: any) => {
+      const sName = (q.subject || q.subjectName || q._canonicalSubject || '').trim();
+      if (sName) {
+        let group = subjectGroups.find(g => g.name.toLowerCase() === sName.toLowerCase());
+        if (!group) {
+          group = { name: sName, questions: [] };
+          subjectGroups.push(group);
+        }
+        group.questions.push(q);
+      }
+    });
+  }
+
+  const isMultiSubject = subjectGroups.length >= 2;
+
+  // =========================================================================
+  // SCENARIO 1: Multi-Subject Exam (Admission Standard: 4 Subjects -> 4 Pages)
+  // =========================================================================
+  if (isMultiSubject) {
+    // Case 1A: Exactly 4 Subjects -> 1 Subject per Page! (The Admission Test Standard)
+    if (subjectGroups.length === 4) {
+      return [
+        { questions: makeObjQuestions(subjectGroups[0].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
+        { questions: makeObjQuestions(subjectGroups[1].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
+        { questions: makeObjQuestions(subjectGroups[2].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name },
+        { questions: makeObjQuestions(subjectGroups[3].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[3].name }
+      ];
+    }
+
+    // Case 1B: 2 Subjects -> 2 Pages each! (Page 1+2 = Sub 1, Page 3+4 = Sub 2)
+    if (subjectGroups.length === 2) {
+      const s1 = subjectGroups[0].questions;
+      const s2 = subjectGroups[1].questions;
+      // Page 1 has header so give it ~42% of Sub 1
+      const s1P1Count = Math.max(1, Math.round(s1.length * 0.42));
+      const s1P1 = s1.slice(0, s1P1Count);
+      const s1P2 = s1.slice(s1P1Count);
+
+      const s2Half = Math.max(1, Math.round(s2.length * 0.5));
+      const s2P3 = s2.slice(0, s2Half);
+      const s2P4 = s2.slice(s2Half);
+
+      return [
+        { questions: makeObjQuestions(s1P1), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
+        { questions: makeObjQuestions(s1P2), startIndex: s1P1Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
+        { questions: makeObjQuestions(s2P3), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
+        { questions: makeObjQuestions(s2P4), startIndex: s2Half + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name }
+      ];
+    }
+
+    // Case 1C: 3 Subjects -> Sub 1 (P1), Sub 2 (P2), Sub 3 (P3 & P4)
+    if (subjectGroups.length === 3) {
+      const s3 = subjectGroups[2].questions;
+      const half = Math.max(1, Math.round(s3.length / 2));
+      return [
+        { questions: makeObjQuestions(subjectGroups[0].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
+        { questions: makeObjQuestions(subjectGroups[1].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
+        { questions: makeObjQuestions(s3.slice(0, half)), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name },
+        { questions: makeObjQuestions(s3.slice(half)), startIndex: half + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name }
+      ];
+    }
+
+    // Case 1D: > 4 Subjects -> Distribute subjects cleanly without mid-subject breaks where possible
+    const bins: any[][] = [[], [], [], []];
+    const binNames: string[][] = [[], [], [], []];
+    let curBin = 0;
+    subjectGroups.forEach((sg, idx) => {
+      bins[curBin].push(...sg.questions);
+      binNames[curBin].push(sg.name);
+      if (curBin < 3 && idx < subjectGroups.length - 1) {
+        curBin++;
+      }
+    });
+
+    return bins.map((binQs, bIdx) => ({
+      questions: makeObjQuestions(binQs),
+      startIndex: 1,
+      cqStartIndex: 1,
+      sqStartIndex: 1,
+      subjectName: binNames[bIdx].join(', ')
+    }));
+  }
+
+  // =========================================================================
+  // SCENARIO 2: Single-Subject Pure Objective Exam (Height-Balanced Formula)
+  // =========================================================================
   if (totalWritten === 0) {
-    // Page 1 has Header & Instructions, so it takes ~20% of questions
-    // Page 2 takes ~27%
-    // Page 3 takes ~27%
-    // Page 4 takes remaining ~26% + Signature Block
-    const p1Count = Math.max(1, Math.round(totalObj * 0.20));
-    const p2Count = Math.max(1, Math.round(totalObj * 0.27));
-    const p3Count = Math.max(1, Math.round(totalObj * 0.27));
+    // Page 1 has Exam Header + Instruction Box (~18-20% capacity)
+    // Pages 2, 3, 4 have 100% vertical space available (~27% each)
+    // Formula ensures p1 + p2 + p3 + p4 === totalObj exactly!
+    const p1Count = totalObj <= 8 ? Math.max(1, Math.floor(totalObj / 4)) : Math.max(1, Math.round(totalObj * 0.18));
+    const remaining = totalObj - p1Count;
+    const p2Count = Math.max(1, Math.round(remaining / 3));
+    const p3Count = Math.max(1, Math.round((remaining - p2Count) / 2));
+    const p4Count = Math.max(0, totalObj - p1Count - p2Count - p3Count);
 
     const p1Obj = allObj.slice(0, p1Count);
     const p2Obj = allObj.slice(p1Count, p1Count + p2Count);
@@ -91,67 +213,98 @@ function splitExamSetForBooklet(set: any) {
     const p4Obj = allObj.slice(p1Count + p2Count + p3Count);
 
     return [
-      { questions: makeObjQuestions(p1Obj), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: makeObjQuestions(p2Obj), startIndex: p1Count + 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: makeObjQuestions(p3Obj), startIndex: p1Count + p2Count + 1, cqStartIndex: 1, sqStartIndex: 1 },
-      { questions: makeObjQuestions(p4Obj), startIndex: p1Count + p2Count + p3Count + 1, cqStartIndex: 1, sqStartIndex: 1 }
+      { questions: makeObjQuestions(p1Obj), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: makeObjQuestions(p2Obj), startIndex: p1Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: makeObjQuestions(p3Obj), startIndex: p1Count + p2Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: makeObjQuestions(p4Obj), startIndex: p1Count + p2Count + p3Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' }
     ];
   }
 
-  // Case 2: Mixed Objective and Written
-  const halfObj = Math.ceil(totalObj / 2);
-  const p1Obj = allObj.slice(0, halfObj);
-  const p2Obj = allObj.slice(halfObj);
+  // =========================================================================
+  // SCENARIO 3: Mixed Objective + Written (CQ / SQ / Descriptive)
+  // =========================================================================
+  if (totalObj > 0 && totalWritten > 0) {
+    const halfObj = Math.ceil(totalObj / 2);
+    const p1Obj = allObj.slice(0, halfObj);
+    const p2Obj = allObj.slice(halfObj);
 
-  const halfCq = Math.ceil(cqs.length / 2);
-  const p3Cq = cqs.slice(0, halfCq);
-  const p4Cq = cqs.slice(halfCq);
+    const halfCq = Math.ceil(cqs.length / 2);
+    const p3Cq = cqs.slice(0, halfCq);
+    const p4Cq = cqs.slice(halfCq);
 
-  const halfSq = Math.ceil(sqs.length / 2);
-  const p3Sq = sqs.slice(0, halfSq);
-  const p4Sq = sqs.slice(halfSq);
+    const halfSq = Math.ceil(sqs.length / 2);
+    const p3Sq = sqs.slice(0, halfSq);
+    const p4Sq = sqs.slice(halfSq);
 
-  const halfDesc = Math.ceil(descriptives.length / 2);
-  const p3Desc = descriptives.slice(0, halfDesc);
-  const p4Desc = descriptives.slice(halfDesc);
+    const halfDesc = Math.ceil(descriptives.length / 2);
+    const p3Desc = descriptives.slice(0, halfDesc);
+    const p4Desc = descriptives.slice(halfDesc);
 
-  const halfMtf = Math.ceil(mtfs.length / 2);
-  const p3Mtf = mtfs.slice(0, halfMtf);
-  const p4Mtf = mtfs.slice(halfMtf);
+    const halfMtf = Math.ceil(mtfs.length / 2);
+    const p3Mtf = mtfs.slice(0, halfMtf);
+    const p4Mtf = mtfs.slice(halfMtf);
+
+    return [
+      { questions: makeObjQuestions(p1Obj), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: makeObjQuestions(p2Obj), startIndex: halfObj + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      {
+        questions: {
+          mcq: [], mc: [], int: [], ar: [],
+          cq: p3Cq, sq: p3Sq, mtf: p3Mtf, descriptive: p3Desc,
+          smcq: [], cma: [], mpc: [], dr: [], allObjective: []
+        },
+        startIndex: totalObj + 1,
+        cqStartIndex: 1,
+        sqStartIndex: 1,
+        subjectName: ''
+      },
+      {
+        questions: {
+          mcq: [], mc: [], int: [], ar: [],
+          cq: p4Cq, sq: p4Sq, mtf: p4Mtf, descriptive: p4Desc,
+          smcq: [], cma: [], mpc: [], dr: [], allObjective: []
+        },
+        startIndex: totalObj + 1,
+        cqStartIndex: halfCq + 1,
+        sqStartIndex: halfSq + 1,
+        subjectName: ''
+      }
+    ];
+  }
+
+  // =========================================================================
+  // SCENARIO 4: Pure Written Exam (CQ / SQ Only)
+  // =========================================================================
+  const allWritten: any[] = [];
+  cqs.forEach(q => allWritten.push({ ...q, _kind: 'cq' }));
+  sqs.forEach(q => allWritten.push({ ...q, _kind: 'sq' }));
+  descriptives.forEach(q => allWritten.push({ ...q, _kind: 'desc' }));
+  mtfs.forEach(q => allWritten.push({ ...q, _kind: 'mtf' }));
+
+  const wTotal = allWritten.length;
+  const p1WCount = Math.max(1, Math.round(wTotal * 0.20));
+  const wRem = wTotal - p1WCount;
+  const p2WCount = Math.max(1, Math.round(wRem / 3));
+  const p3WCount = Math.max(1, Math.round((wRem - p2WCount) / 2));
+
+  const p1W = allWritten.slice(0, p1WCount);
+  const p2W = allWritten.slice(p1WCount, p1WCount + p2WCount);
+  const p3W = allWritten.slice(p1WCount + p2WCount, p1WCount + p2WCount + p3WCount);
+  const p4W = allWritten.slice(p1WCount + p2WCount + p3WCount);
+
+  const packWritten = (arr: any[]) => ({
+    mcq: [], mc: [], int: [], ar: [], smcq: [], cma: [], mpc: [], dr: [], allObjective: [],
+    cq: arr.filter(q => q._kind === 'cq'),
+    sq: arr.filter(q => q._kind === 'sq'),
+    descriptive: arr.filter(q => q._kind === 'desc'),
+    mtf: arr.filter(q => q._kind === 'mtf')
+  });
 
   return [
-    {
-      questions: makeObjQuestions(p1Obj),
-      startIndex: 1,
-      cqStartIndex: 1,
-      sqStartIndex: 1
-    },
-    {
-      questions: makeObjQuestions(p2Obj),
-      startIndex: halfObj + 1,
-      cqStartIndex: 1,
-      sqStartIndex: 1
-    },
-    {
-      questions: {
-        mcq: [], mc: [], int: [], ar: [],
-        cq: p3Cq, sq: p3Sq, mtf: p3Mtf, descriptive: p3Desc,
-        smcq: [], cma: [], mpc: [], dr: [], allObjective: []
-      },
-      startIndex: totalObj + 1,
-      cqStartIndex: 1,
-      sqStartIndex: 1
-    },
-    {
-      questions: {
-        mcq: [], mc: [], int: [], ar: [],
-        cq: p4Cq, sq: p4Sq, mtf: p4Mtf, descriptive: p4Desc,
-        smcq: [], cma: [], mpc: [], dr: [], allObjective: []
-      },
-      startIndex: totalObj + 1,
-      cqStartIndex: p3Cq.length + 1,
-      sqStartIndex: p3Sq.length + 1
-    }
+    { questions: packWritten(p1W), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+    { questions: packWritten(p2W), startIndex: 1, cqStartIndex: p1W.filter(q => q._kind === 'cq').length + 1, sqStartIndex: p1W.filter(q => q._kind === 'sq').length + 1, subjectName: '' },
+    { questions: packWritten(p3W), startIndex: 1, cqStartIndex: (p1W.length + p2W.length) + 1, sqStartIndex: 1, subjectName: '' },
+    { questions: packWritten(p4W), startIndex: 1, cqStartIndex: (p1W.length + p2W.length + p3W.length) + 1, sqStartIndex: 1, subjectName: '' }
   ];
 }
 
@@ -593,7 +746,7 @@ export default function PrintExamPage() {
           {layoutMode === 'booklet_4page' && (
             <>
               {nonEmptySets.map((set: any) => {
-                const [p1, p2, p3, p4] = splitExamSetForBooklet(set);
+                const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo);
                 return (
                   <React.Fragment key={`booklet-imposed-${set.setId}`}>
                     {/* SHEET 1: OUTER SPREAD (Side 1) -> Left: Page 4 (Back) | Right: Page 1 (Front) */}
@@ -601,8 +754,8 @@ export default function PrintExamPage() {
                       {/* Left Column: Page 4 (Back Cover & Final Questions) */}
                       <div className="booklet-half-page booklet-left">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 4 (BACK COVER)' : 'পৃষ্ঠা ৪ (শেষ পাতা / ব্যাক কভার)'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                          <span>{p4.subjectName ? (language === 'en' ? `SUBJECT: ${p4.subjectName}` : `বিষয়: ${p4.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 4 (Back Cover)' : 'পৃষ্ঠা ৪ (শেষ পাতা)'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -621,7 +774,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p4.startIndex}
                             startCqIndex={p4.cqStartIndex}
                             startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -640,7 +793,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p4.startIndex}
                             startCqIndex={p4.cqStartIndex}
                             startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -655,8 +808,8 @@ export default function PrintExamPage() {
                       {/* Right Column: Page 1 (Front Cover & Initial Questions) */}
                       <div className="booklet-half-page booklet-right">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 1 (FRONT COVER)' : 'পৃষ্ঠা ১ (প্রথম পাতা / কভার)'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                          <span>{examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 1 (Front Cover)' : 'পৃষ্ঠা ১ (কভার)'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -675,7 +828,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p1.startIndex}
                             startCqIndex={p1.cqStartIndex}
                             startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -694,7 +847,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p1.startIndex}
                             startCqIndex={p1.cqStartIndex}
                             startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -705,8 +858,8 @@ export default function PrintExamPage() {
                       {/* Left Column: Page 2 (Inside Left) */}
                       <div className="booklet-half-page booklet-left">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 2 (INSIDE LEFT)' : 'পৃষ্ঠা ২ (ভেতরের বাম পাতা)'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                          <span>{p2.subjectName ? (language === 'en' ? `SUBJECT: ${p2.subjectName}` : `বিষয়: ${p2.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -725,7 +878,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p2.startIndex}
                             startCqIndex={p2.cqStartIndex}
                             startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -744,7 +897,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p2.startIndex}
                             startCqIndex={p2.cqStartIndex}
                             startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -759,8 +912,8 @@ export default function PrintExamPage() {
                       {/* Right Column: Page 3 (Inside Right) */}
                       <div className="booklet-half-page booklet-right">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 3 (INSIDE RIGHT)' : 'পৃষ্ঠা ৩ (ভেতরের ডান পাতা)'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                          <span>{p3.subjectName ? (language === 'en' ? `SUBJECT: ${p3.subjectName}` : `বিষয়: ${p3.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -779,7 +932,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p3.startIndex}
                             startCqIndex={p3.cqStartIndex}
                             startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -798,7 +951,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p3.startIndex}
                             startCqIndex={p3.cqStartIndex}
                             startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -820,15 +973,15 @@ export default function PrintExamPage() {
           {layoutMode === 'booklet_2up' && (
             <>
               {nonEmptySets.map((set: any) => {
-                const [p1, p2, p3, p4] = splitExamSetForBooklet(set);
+                const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo);
                 return (
                   <React.Fragment key={`booklet-seq-${set.setId}`}>
                     {/* SPREAD 1: Page 1 [Left] | Page 2 [Right] */}
                     <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
                       <div className="booklet-half-page booklet-left">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 1' : 'পৃষ্ঠা ১'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                          <span>{examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -847,7 +1000,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p1.startIndex}
                             startCqIndex={p1.cqStartIndex}
                             startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -866,7 +1019,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p1.startIndex}
                             startCqIndex={p1.cqStartIndex}
                             startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -879,8 +1032,8 @@ export default function PrintExamPage() {
 
                       <div className="booklet-half-page booklet-right">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 2' : 'পৃষ্ঠা ২'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                          <span>{p2.subjectName ? (language === 'en' ? `SUBJECT: ${p2.subjectName}` : `বিষয়: ${p2.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -899,7 +1052,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p2.startIndex}
                             startCqIndex={p2.cqStartIndex}
                             startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -918,7 +1071,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p2.startIndex}
                             startCqIndex={p2.cqStartIndex}
                             startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -928,8 +1081,8 @@ export default function PrintExamPage() {
                     <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
                       <div className="booklet-half-page booklet-left">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 3' : 'পৃষ্ঠা ৩'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                          <span>{p3.subjectName ? (language === 'en' ? `SUBJECT: ${p3.subjectName}` : `বিষয়: ${p3.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -948,7 +1101,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p3.startIndex}
                             startCqIndex={p3.cqStartIndex}
                             startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -967,7 +1120,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p3.startIndex}
                             startCqIndex={p3.cqStartIndex}
                             startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
@@ -980,8 +1133,8 @@ export default function PrintExamPage() {
 
                       <div className="booklet-half-page booklet-right">
                         <div className="booklet-page-header-tag">
-                          <span>{language === 'en' ? 'PAGE 4' : 'পৃষ্ঠা ৪'}</span>
-                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                          <span>{p4.subjectName ? (language === 'en' ? `SUBJECT: ${p4.subjectName}` : `বিষয়: ${p4.subjectName}`) : examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}</span>
                         </div>
                         {!showAnswers ? (
                           <QuestionPaper
@@ -1000,7 +1153,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p4.startIndex}
                             startCqIndex={p4.cqStartIndex}
                             startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                            pageNumberLabel=""
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1019,7 +1172,7 @@ export default function PrintExamPage() {
                             startQuestionIndex={p4.startIndex}
                             startCqIndex={p4.cqStartIndex}
                             startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                            pageNumberLabel=""
                           />
                         )}
                       </div>
