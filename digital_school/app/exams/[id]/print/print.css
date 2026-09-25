@@ -509,14 +509,29 @@
   border-bottom: 1px solid #cbd5e1;
   padding-bottom: 2px;
   margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.booklet-end-banner {
+  flex-shrink: 0;
+  padding-top: 3px;
+  margin-top: 2px;
+  text-align: center;
+  border-top: 1px dashed #94a3b8;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  break-inside: avoid;
 }
 
 @media print {
   .booklet-sheet {
     box-sizing: border-box !important;
     width: 100% !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
+    height: 100% !important;
+    max-height: calc(100vh - 12mm) !important;
     overflow: hidden !important;
     page-break-after: always !important;
     break-after: page !important;
@@ -529,8 +544,33 @@
     height: 100% !important;
     max-height: 100% !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
     font-size: 10px !important;
     line-height: 1.32 !important;
+  }
+
+  .booklet-half-page > .question-paper-container,
+  .booklet-half-page > .answer-paper-container {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .booklet-end-banner {
+    flex-shrink: 0 !important;
+    padding-top: 2px !important;
+    margin-top: 2px !important;
+    text-align: center !important;
+    border-top: 1px dashed #94a3b8 !important;
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: #475569 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Compact typography inside booklet mode */
