@@ -121,6 +121,12 @@ interface AnswerQuestionPaperProps {
   hideOMR?: boolean;
   showDate?: boolean;
   hideInstitute?: boolean;
+  hideHeader?: boolean;
+  hideSignature?: boolean;
+  startQuestionIndex?: number;
+  startCqIndex?: number;
+  startSqIndex?: number;
+  pageNumberLabel?: string;
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -374,7 +380,10 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
 
 // Main AnswerQuestionPaper component (forwardRef for printing)
 const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>(
-  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate, hideInstitute = false }, ref) => {
+  ({
+    examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate, hideInstitute = false,
+    hideHeader = false, hideSignature = false, startQuestionIndex = 1, startCqIndex = 1, startSqIndex = 1, pageNumberLabel
+  }, ref) => {
     const lang = language || 'bn';
     const isEn = lang === 'en';
     const mcqs = questions.mcq || [];
@@ -598,19 +607,30 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
         {!hideInstitute && examInfo.schoolName && <div className="watermark print-only">{examInfo.schoolName}</div>}
 
         <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
-          <Header
-            examInfo={examInfo}
-            type="objective"
-            qrData={qrData}
-            marks={isMS ? (Number(examInfo.totalMarks) || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)) || 100) : (forcePageBreak ? objectiveTotal : grandTotalMarks)}
-            time={forcePageBreak ? (examInfo.objectiveTime || 0) : totalTimeMinutes}
-            banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
-            showDate={showDate}
-            lang={lang}
-            hideInstitute={hideInstitute}
-          />
+          {!hideHeader ? (
+            <Header
+              examInfo={examInfo}
+              type="objective"
+              qrData={qrData}
+              marks={isMS ? (Number(examInfo.totalMarks) || (mandatoryMarks + ((parsedSubjectsConfig?.requiredOptionalCount || 1) * singleOptionalMarks)) || 100) : (forcePageBreak ? objectiveTotal : grandTotalMarks)}
+              time={forcePageBreak ? (examInfo.objectiveTime || 0) : totalTimeMinutes}
+              banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
+              showDate={showDate}
+              lang={lang}
+              hideInstitute={hideInstitute}
+            />
+          ) : (
+            pageNumberLabel ? (
+              <div className="flex justify-between items-center text-xs font-bold border-b border-black pb-1 mb-2 text-gray-700">
+                <span>{!hideInstitute ? (examInfo.schoolName || '') : ''}</span>
+                <span>{examInfo.title} {examInfo.set ? `(${isEn ? 'Set' : 'সেট'}: ${examInfo.set})` : ''}</span>
+                <span className="border border-black px-1.5 py-0.5 rounded text-[10px] bg-gray-50">{pageNumberLabel}</span>
+              </div>
+            ) : null
+          )}
           {/* Special Instruction Box */}
-          <div className="instruction-box">
+          {!hideHeader && (
+            <div className="instruction-box">
             {isMS && (parsedSubjectsConfig || configuredSubjects.length > 0) ? (
               <div className="space-y-1.5 text-xs sm:text-sm">
                 <div className="flex items-center justify-between border-b border-black/20 pb-1 flex-wrap gap-1">
@@ -649,6 +669,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               </p>
             )}
           </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -669,8 +690,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
               <div className="mcq-container">
                 {(() => {
-                  let globalCounter = 1;
-                  let subjectCounter = 1;
+                  let globalCounter = startQuestionIndex || 1;
+                  let subjectCounter = startQuestionIndex || 1;
                   let lastSubject = '';
 
                   return orderedObjective.map((q: any, idx: number) => {
@@ -1913,20 +1934,22 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               )}
 
               {/* Signature Block */}
-              <div className="signature-container print-only mt-12 grid grid-cols-3 gap-8 text-center pt-8 border-t border-dotted border-gray-300">
-                <div className="flex flex-col items-center">
-                  <div className="w-32 border-b border-black mb-1"></div>
-                  <p className="text-xs font-bold">{isEn ? "Principal's Signature" : "অধ্যক্ষের স্বাক্ষর"}</p>
+              {!hideSignature && (
+                <div className="signature-container print-only mt-12 grid grid-cols-3 gap-8 text-center pt-8 border-t border-dotted border-gray-300">
+                  <div className="flex flex-col items-center">
+                    <div className="w-32 border-b border-black mb-1"></div>
+                    <p className="text-xs font-bold">{isEn ? "Principal's Signature" : "অধ্যক্ষের স্বাক্ষর"}</p>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-32 border-b border-black mb-1"></div>
+                    <p className="text-xs font-bold">{isEn ? "Controller of Exams" : "পরীক্ষা নিয়ন্ত্রকের স্বাক্ষর"}</p>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-32 border-b border-black mb-1"></div>
+                    <p className="text-xs font-bold">{isEn ? "Teacher's Signature" : "শিক্ষকের স্বাক্ষর"}</p>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <div className="w-32 border-b border-black mb-1"></div>
-                  <p className="text-xs font-bold">{isEn ? "Controller of Exams" : "পরীক্ষা নিয়ন্ত্রকের স্বাক্ষর"}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="w-32 border-b border-black mb-1"></div>
-                  <p className="text-xs font-bold">{isEn ? "Teacher's Signature" : "শিক্ষকের স্বাক্ষর"}</p>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </main>

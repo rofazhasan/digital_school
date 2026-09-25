@@ -82,8 +82,7 @@
 
 @media print {
   @page {
-    size: legal;
-    margin: 12mm;
+    margin: 10mm;
   }
 
   body {
@@ -387,18 +386,143 @@
 @media screen {
   .print-page-container {
     padding: 2rem;
-    margin: 1rem auto;
+    margin: 1.5rem auto;
     background: white !important;
     color: black !important;
     /* Force black text for visibility in dark mode */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-sizing: border-box;
+  }
+
+  .print-page-container.a4-paper:not(.booklet-sheet) {
+    max-width: 210mm;
+    min-height: 297mm;
+  }
+
+  .print-page-container.a3-paper:not(.booklet-sheet) {
+    max-width: 297mm;
+    min-height: 420mm;
+  }
+
+  .print-page-container.legal-paper:not(.booklet-sheet) {
     max-width: 8.5in;
-    /* Standard width preview */
+    min-height: 14in;
+  }
+
+  .print-page-container.letter-paper:not(.booklet-sheet) {
+    max-width: 8.5in;
+    min-height: 11in;
   }
 
   .omr-sheet-wrapper {
     padding: 0 !important;
     /* OMR wrapper handles its own internal layout */
     overflow: hidden;
+  }
+}
+
+/* ============================================================
+   BOOKLET & BI-FOLD SPREAD LAYOUT STYLES
+   ============================================================ */
+.booklet-sheet {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  page-break-after: always !important;
+  break-after: page !important;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+.booklet-half-page {
+  flex: 0 0 calc(50% - 5mm) !important;
+  width: calc(50% - 5mm) !important;
+  max-width: calc(50% - 5mm) !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100% !important;
+}
+
+.booklet-half-page.booklet-left {
+  padding-right: 5mm !important;
+}
+
+.booklet-half-page.booklet-right {
+  padding-left: 5mm !important;
+}
+
+.booklet-center-crease {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: 1.5px dashed #94a3b8;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.booklet-fold-badge {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+.booklet-page-header-tag {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 3px;
+  margin-bottom: 8px;
+}
+
+@media screen {
+  .booklet-sheet {
+    background: white !important;
+    color: black !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+    margin: 2rem auto !important;
+    border-radius: 8px;
+    padding: 1.5rem !important;
+    border: 1px solid #e2e8f0;
+  }
+  .booklet-sheet.a3-paper {
+    max-width: 1400px !important;
+    min-height: 850px;
+  }
+  .booklet-sheet.a4-paper {
+    max-width: 1050px !important;
+    min-height: 680px;
+  }
+  .booklet-sheet.legal-paper {
+    max-width: 1250px !important;
+    min-height: 720px;
+  }
+  .booklet-sheet.letter-paper {
+    max-width: 1050px !important;
+    min-height: 680px;
   }
 }

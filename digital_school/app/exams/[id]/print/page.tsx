@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useReactToPrint } from 'react-to-print';
 import { MathJaxContext } from 'better-react-mathjax';
@@ -8,19 +8,152 @@ import { v4 as uuidv4 } from 'uuid';
 import { mathJaxConfig as globalMathJaxConfig } from '@/app/components/MathJaxConfig';
 import Head from 'next/head';
 
-// --- Component Imports (Assumed to be in these paths) ---
-import QuestionPaper from '../../../components/QuestionPaper'; // The layout-only part of the question paper
-import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper'; // The answer sheet component
-import OMRSheet from '../../../components/OMRSheet'; // Your OMR component
-// import { Loader, PrintControls, SecurityFeatures } from './PrintPageComponents'; // Remove this line
+// --- Component Imports ---
+import QuestionPaper from '../../../components/QuestionPaper';
+import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper';
+import OMRSheet from '../../../components/OMRSheet';
 
-import "./print.css"; // Your custom print styles
+import "./print.css";
 
 // --- Constants & Configuration ---
 const LANGS = {
   bn: { print: "প্রিন্ট করুন", pdf: "PDF ডাউনলোড করুন", preparing: "প্রস্তুত করা হচ্ছে...", waiting: "ম্যাথ রেন্ডারিং এর জন্য অপেক্ষা করা হচ্ছে..." },
   en: { print: "Print", pdf: "Download PDF", preparing: "Preparing...", waiting: "Waiting for Math to render..." }
 };
+
+// --- Helper: Split an Exam Set into 4 Logical Pages for Booklet Printing ---
+function splitExamSetForBooklet(set: any) {
+  const allObj = (set.orderedObjective && set.orderedObjective.length > 0)
+    ? [...set.orderedObjective]
+    : [
+        ...(set.mcq || []),
+        ...(set.mc || []),
+        ...(set.int || []),
+        ...(set.ar || []),
+        ...(set.smcq || []),
+        ...(set.cma || []),
+        ...(set.mpc || []),
+        ...(set.dr || [])
+      ];
+
+  const cqs = [...(set.cq || [])];
+  const sqs = [...(set.sq || [])];
+  const descriptives = [...(set.descriptive || [])];
+  const mtfs = [...(set.mtf || [])];
+
+  const totalObj = allObj.length;
+  const totalWritten = cqs.length + sqs.length + descriptives.length + mtfs.length;
+
+  const emptyQuestions = {
+    mcq: [], mc: [], int: [], ar: [], cq: [], sq: [], mtf: [], descriptive: [],
+    smcq: [], cma: [], mpc: [], dr: [], allObjective: []
+  };
+
+  if (totalObj === 0 && totalWritten === 0) {
+    return [
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+    ];
+  }
+
+  // Helper to package objective array into question format
+  const makeObjQuestions = (arr: any[]) => ({
+    mcq: arr.filter((q: any) => !q.type || q.type?.toUpperCase() === 'MCQ'),
+    mc: arr.filter((q: any) => q.type?.toUpperCase() === 'MC'),
+    int: arr.filter((q: any) => q.type?.toUpperCase() === 'INT' || q.type?.toUpperCase() === 'NUMERIC'),
+    ar: arr.filter((q: any) => q.type?.toUpperCase() === 'AR'),
+    cq: [],
+    sq: [],
+    mtf: [],
+    descriptive: [],
+    smcq: arr.filter((q: any) => q.type?.toUpperCase() === 'SMCQ'),
+    cma: arr.filter((q: any) => q.type?.toUpperCase() === 'CMA'),
+    mpc: arr.filter((q: any) => q.type?.toUpperCase() === 'MPC'),
+    dr: arr.filter((q: any) => q.type?.toUpperCase() === 'DR'),
+    allObjective: arr
+  });
+
+  // Case 1: Purely or predominantly Objective exam (Standard Admission Test format)
+  if (totalWritten === 0) {
+    // Page 1 has Header & Instructions, so it takes ~20% of questions
+    // Page 2 takes ~27%
+    // Page 3 takes ~27%
+    // Page 4 takes remaining ~26% + Signature Block
+    const p1Count = Math.max(1, Math.round(totalObj * 0.20));
+    const p2Count = Math.max(1, Math.round(totalObj * 0.27));
+    const p3Count = Math.max(1, Math.round(totalObj * 0.27));
+
+    const p1Obj = allObj.slice(0, p1Count);
+    const p2Obj = allObj.slice(p1Count, p1Count + p2Count);
+    const p3Obj = allObj.slice(p1Count + p2Count, p1Count + p2Count + p3Count);
+    const p4Obj = allObj.slice(p1Count + p2Count + p3Count);
+
+    return [
+      { questions: makeObjQuestions(p1Obj), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: makeObjQuestions(p2Obj), startIndex: p1Count + 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: makeObjQuestions(p3Obj), startIndex: p1Count + p2Count + 1, cqStartIndex: 1, sqStartIndex: 1 },
+      { questions: makeObjQuestions(p4Obj), startIndex: p1Count + p2Count + p3Count + 1, cqStartIndex: 1, sqStartIndex: 1 }
+    ];
+  }
+
+  // Case 2: Mixed Objective and Written
+  const halfObj = Math.ceil(totalObj / 2);
+  const p1Obj = allObj.slice(0, halfObj);
+  const p2Obj = allObj.slice(halfObj);
+
+  const halfCq = Math.ceil(cqs.length / 2);
+  const p3Cq = cqs.slice(0, halfCq);
+  const p4Cq = cqs.slice(halfCq);
+
+  const halfSq = Math.ceil(sqs.length / 2);
+  const p3Sq = sqs.slice(0, halfSq);
+  const p4Sq = sqs.slice(halfSq);
+
+  const halfDesc = Math.ceil(descriptives.length / 2);
+  const p3Desc = descriptives.slice(0, halfDesc);
+  const p4Desc = descriptives.slice(halfDesc);
+
+  const halfMtf = Math.ceil(mtfs.length / 2);
+  const p3Mtf = mtfs.slice(0, halfMtf);
+  const p4Mtf = mtfs.slice(halfMtf);
+
+  return [
+    {
+      questions: makeObjQuestions(p1Obj),
+      startIndex: 1,
+      cqStartIndex: 1,
+      sqStartIndex: 1
+    },
+    {
+      questions: makeObjQuestions(p2Obj),
+      startIndex: halfObj + 1,
+      cqStartIndex: 1,
+      sqStartIndex: 1
+    },
+    {
+      questions: {
+        mcq: [], mc: [], int: [], ar: [],
+        cq: p3Cq, sq: p3Sq, mtf: p3Mtf, descriptive: p3Desc,
+        smcq: [], cma: [], mpc: [], dr: [], allObjective: []
+      },
+      startIndex: totalObj + 1,
+      cqStartIndex: 1,
+      sqStartIndex: 1
+    },
+    {
+      questions: {
+        mcq: [], mc: [], int: [], ar: [],
+        cq: p4Cq, sq: p4Sq, mtf: p4Mtf, descriptive: p4Desc,
+        smcq: [], cma: [], mpc: [], dr: [], allObjective: []
+      },
+      startIndex: totalObj + 1,
+      cqStartIndex: p3Cq.length + 1,
+      sqStartIndex: p3Sq.length + 1
+    }
+  ];
+}
 
 // --- Main Page Component ---
 export default function PrintExamPage() {
@@ -44,6 +177,13 @@ export default function PrintExamPage() {
   const [showDate, setShowDate] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Paper Size & Booklet Options State
+  const [paperSize, setPaperSize] = useState<'legal' | 'a4' | 'a3' | 'letter'>('a4');
+  const [layoutMode, setLayoutMode] = useState<'standard' | 'booklet_4page' | 'booklet_2up'>('standard');
+  const [showFoldGuide, setShowFoldGuide] = useState(true);
+  const [showBookletGuideModal, setShowBookletGuideModal] = useState(false);
+  const [activeGuideTab, setActiveGuideTab] = useState<'paper_comparison' | 'print_steps'>('paper_comparison');
+
   // Institute customization State
   const [hideInstitute, setHideInstitute] = useState(false);
   const [customSchoolName, setCustomSchoolName] = useState('');
@@ -52,20 +192,47 @@ export default function PrintExamPage() {
   const [tempSchoolName, setTempSchoolName] = useState('');
   const [tempSchoolAddress, setTempSchoolAddress] = useState('');
 
-  // Persist institute customization in localStorage
+  // Persist print setup & institute customization in localStorage
   useEffect(() => {
-    if (!examId || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
     try {
-      const savedHide = localStorage.getItem(`print_hide_institute_${examId}`);
-      if (savedHide !== null) setHideInstitute(savedHide === 'true');
-      const savedName = localStorage.getItem(`print_custom_name_${examId}`);
-      if (savedName !== null) setCustomSchoolName(savedName);
-      const savedAddress = localStorage.getItem(`print_custom_address_${examId}`);
-      if (savedAddress !== null) setCustomSchoolAddress(savedAddress);
+      const savedPaper = localStorage.getItem('print_paper_size');
+      if (savedPaper) setPaperSize(savedPaper as any);
+      const savedLayout = localStorage.getItem('print_layout_mode');
+      if (savedLayout) setLayoutMode(savedLayout as any);
+      const savedFold = localStorage.getItem('print_show_fold_guide');
+      if (savedFold !== null) setShowFoldGuide(savedFold === 'true');
+
+      if (examId) {
+        const savedHide = localStorage.getItem(`print_hide_institute_${examId}`);
+        if (savedHide !== null) setHideInstitute(savedHide === 'true');
+        const savedName = localStorage.getItem(`print_custom_name_${examId}`);
+        if (savedName !== null) setCustomSchoolName(savedName);
+        const savedAddress = localStorage.getItem(`print_custom_address_${examId}`);
+        if (savedAddress !== null) setCustomSchoolAddress(savedAddress);
+      }
     } catch (e) {
       console.error(e);
     }
   }, [examId]);
+
+  const handlePaperSizeChange = (val: 'legal' | 'a4' | 'a3' | 'letter') => {
+    setPaperSize(val);
+    try { localStorage.setItem('print_paper_size', val); } catch (e) {}
+  };
+
+  const handleLayoutModeChange = (val: 'standard' | 'booklet_4page' | 'booklet_2up') => {
+    setLayoutMode(val);
+    try { localStorage.setItem('print_layout_mode', val); } catch (e) {}
+  };
+
+  const toggleFoldGuide = () => {
+    setShowFoldGuide((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('print_show_fold_guide', String(next)); } catch (e) {}
+      return next;
+    });
+  };
 
   const toggleHideInstitute = () => {
     setHideInstitute((prev) => {
@@ -103,7 +270,7 @@ export default function PrintExamPage() {
     setShowEditInstituteModal(false);
   };
 
-  const effectiveExamInfo = React.useMemo(() => {
+  const effectiveExamInfo = useMemo(() => {
     if (!examData?.examInfo) return null;
     return {
       ...examData.examInfo,
@@ -118,7 +285,7 @@ export default function PrintExamPage() {
       setError("Exam ID is missing.");
       setIsLoading(false);
       return;
-    };
+    }
 
     const fetchExamData = async () => {
       setIsLoading(true);
@@ -139,7 +306,7 @@ export default function PrintExamPage() {
     };
 
     fetchExamData();
-  }, [examId]); // Dependency array is correct
+  }, [examId]);
 
   // Check if MathJax is already loaded in parent context
   useEffect(() => {
@@ -163,41 +330,28 @@ export default function PrintExamPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Apply page breaks when exam data changes
-  useEffect(() => {
-    if (examData && printRef.current) {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-      }, 100);
-    }
-  }, [examData]);
-
   // --- THE CORE PRINTING LOGIC ---
   // @ts-ignore: react-to-print typing issue, content is valid
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: examData?.examInfo?.title || "exam-print",
     onBeforeGetContent: async () => {
-      // This is the key! We wait until MathJax is ready.
       setIsPrinting(true);
-
       if (isMathJaxReady) {
-        return; // Already ready, proceed to print
+        return;
       }
-      // Not ready, so we wait for the pageReady callback to fire
       return new Promise<void>((resolve) => {
         const checkInterval = setInterval(() => {
-          // The isMathJaxReady state will be updated by the MathJaxContext callback
           if (printRef.current && (window as any).__IS_MATHJAX_READY) {
             clearInterval(checkInterval);
             resolve();
           }
-        }, 100); // Check every 100ms
+        }, 100);
       });
     },
     onAfterPrint: () => {
-      setIsPrinting(false); // Reset state after printing
-      (window as any).__IS_MATHJAX_READY = false; // Reset global flag
+      setIsPrinting(false);
+      (window as any).__IS_MATHJAX_READY = false;
     },
   } as any);
 
@@ -248,12 +402,37 @@ export default function PrintExamPage() {
     )
   );
 
+  const paperClass = paperSize === 'legal' ? 'legal-paper' : paperSize === 'a3' ? 'a3-paper' : paperSize === 'letter' ? 'letter-paper' : 'a4-paper';
+  const isBooklet = layoutMode === 'booklet_4page' || layoutMode === 'booklet_2up';
+
   return (
     <MathJaxContext config={mathJaxConfig}>
       <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif" }}>
         <Head>
           <title>প্রিন্ট প্রশ্নপত্র ও OMR</title>
         </Head>
+
+        {/* Dynamic @page configuration for print */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            @page {
+              size: ${
+                isBooklet
+                  ? (paperSize === 'a3' ? 'A3 landscape' : paperSize === 'a4' ? 'A4 landscape' : paperSize === 'legal' ? 'legal landscape' : 'letter landscape')
+                  : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
+              };
+              margin: ${
+                isBooklet
+                  ? (paperSize === 'a3' ? '8mm' : '5mm')
+                  : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
+              };
+            }
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+        ` }} />
 
         <PrintControls
           language={language}
@@ -284,119 +463,611 @@ export default function PrintExamPage() {
           setTempSchoolAddress={setTempSchoolAddress}
           handleSaveInstitute={handleSaveInstitute}
           handleResetInstitute={handleResetInstitute}
+          paperSize={paperSize}
+          setPaperSize={handlePaperSizeChange}
+          layoutMode={layoutMode}
+          setLayoutMode={handleLayoutModeChange}
+          showFoldGuide={showFoldGuide}
+          toggleFoldGuide={toggleFoldGuide}
+          openBookletGuide={() => setShowBookletGuideModal(true)}
           t={t}
         />
 
-        {/* Status Indicators */}
-        <div className="flex justify-center mt-2 gap-4">
+        {/* Status Badges */}
+        <div className="flex flex-wrap justify-center items-center mt-3 gap-2 px-4 print:hidden">
           {isMathJaxReady ? (
-            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-[10px] font-bold">MathJax Ready</span>
+            <span className="bg-green-100 text-green-800 border border-green-300 px-3 py-0.5 rounded-full text-[10px] font-bold">
+              ✓ MathJax Ready
+            </span>
           ) : (
-            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-bold animate-pulse">Waiting for MathJax...</span>
+            <span className="bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+              ⏳ Waiting for MathJax...
+            </span>
           )}
-          <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${showAnswers ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-            {showAnswers ? 'উত্তরপত্র' : 'প্রশ্নপত্র'}
+
+          <span className={`px-3 py-0.5 rounded-full text-[10px] font-bold border ${showAnswers ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-blue-100 text-blue-800 border-blue-300'}`}>
+            {showAnswers ? 'উত্তরপত্র ও সমাধান' : 'প্রশ্নপত্র'}
           </span>
-          <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-[10px] font-bold">
-            OBJ: {objectiveFontSize}% | CQ/SQ: {cqSqFontSize}%
+
+          <span className="bg-purple-100 text-purple-800 border border-purple-300 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase">
+            সাইজ: {paperSize.toUpperCase()} {isBooklet ? '(বুকলেট ল্যান্ডস্কেপ)' : '(খাড়া পেপার)'}
+          </span>
+
+          {paperSize === 'a3' && isBooklet && (
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 px-3 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 shadow-sm">
+              🌟 ভর্তি পরীক্ষার গোল্ড স্ট্যান্ডার্ড (ভাঁজ করলে পূর্ণাঙ্গ A4 বুকলেট)
+            </span>
+          )}
+
+          <span className="bg-gray-100 text-gray-800 border border-gray-300 px-3 py-0.5 rounded-full text-[10px] font-bold">
+            ফন্ট: OBJ {objectiveFontSize}% | CQ/SQ {cqSqFontSize}%
           </span>
         </div>
 
-        <div ref={printRef} className="relative z-10">
-          {/* Render Question Papers or Answer Sheets based on toggle */}
-          {!showAnswers ? (
-            // Question Papers
+        {/* Main Printable Content Container */}
+        <div ref={printRef} className="relative z-10 my-4">
+          
+          {/* ==============================================================
+              CASE 1: STANDARD 1-PAGE VERTICAL CONTINUOUS PRINTING
+             ============================================================== */}
+          {layoutMode === 'standard' && (
             <>
-              {nonEmptySets.map((set: any) => (
-                <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
-                  <QuestionPaper
-                    examInfo={{ ...examInfo, set: set.setName }}
-                    questions={{
-                      mcq: set.mcq || [],
-                      mc: set.mc || [],
-                      int: set.int || [],
-                      ar: set.ar || [],
-                      cq: set.cq || [],
-                      sq: set.sq || [],
-                      mtf: set.mtf || [],
-                      descriptive: set.descriptive || [],
-                      smcq: set.smcq || [],
-                      cma: set.cma || [],
-                      mpc: set.mpc || [],
-                      dr: set.dr || [],
-                      allObjective: set.orderedObjective || []
-                    }}
-                    qrData={set.qrData}
-                    fontSize={objectiveFontSize}
-                    cqSqFontSize={cqSqFontSize}
-                    forcePageBreak={forcePageBreak}
-                    language={language}
-                    hideOMR={!showOMR}
-                    showDate={showDate}
-                    hideInstitute={hideInstitute}
-                  />
-                </div>
-              ))}
+              {!showAnswers ? (
+                // Question Papers (Standard)
+                <>
+                  {nonEmptySets.map((set: any) => (
+                    <div key={set.setId} className={`print-page-container ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                      <QuestionPaper
+                        examInfo={{ ...examInfo, set: set.setName }}
+                        questions={{
+                          mcq: set.mcq || [],
+                          mc: set.mc || [],
+                          int: set.int || [],
+                          ar: set.ar || [],
+                          cq: set.cq || [],
+                          sq: set.sq || [],
+                          mtf: set.mtf || [],
+                          descriptive: set.descriptive || [],
+                          smcq: set.smcq || [],
+                          cma: set.cma || [],
+                          mpc: set.mpc || [],
+                          dr: set.dr || [],
+                          allObjective: set.orderedObjective || []
+                        }}
+                        qrData={set.qrData}
+                        fontSize={objectiveFontSize}
+                        cqSqFontSize={cqSqFontSize}
+                        forcePageBreak={forcePageBreak}
+                        language={language}
+                        hideOMR={!showOMR}
+                        showDate={showDate}
+                        hideInstitute={hideInstitute}
+                      />
+                    </div>
+                  ))}
 
-              {/* Render OMR Sheets only for question papers if showOMR is true */}
-              {showOMR && nonEmptySets.map((set: any) => (
-                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} />
+                  {/* Render OMR Sheets only for question papers if showOMR is true */}
+                  {showOMR && nonEmptySets.map((set: any) => (
+                    <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} paperClass={paperClass} />
+                  ))}
+                </>
+              ) : (
+                // Answer Sheets (Standard)
+                nonEmptySets.map((set: any) => (
+                  <div key={`answer-${set.setId}`} className={`print-page-container ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                    <AnswerQuestionPaper
+                      examInfo={{ ...examInfo, set: set.setName }}
+                      questions={{
+                        mcq: set.mcq || [],
+                        mc: set.mc || [],
+                        int: set.int || [],
+                        ar: set.ar || [],
+                        cq: set.cq || [],
+                        sq: set.sq || [],
+                        mtf: set.mtf || [],
+                        descriptive: set.descriptive || [],
+                        smcq: set.smcq || [],
+                        cma: set.cma || [],
+                        mpc: set.mpc || [],
+                        dr: set.dr || [],
+                        allObjective: set.orderedObjective || []
+                      }}
+                      qrData={set.qrData}
+                      fontSize={objectiveFontSize}
+                      cqSqFontSize={cqSqFontSize}
+                      forcePageBreak={forcePageBreak}
+                      language={language}
+                      hideOMR={!showOMR}
+                      showDate={showDate}
+                      hideInstitute={hideInstitute}
+                    />
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {/* ==============================================================
+              CASE 2: 4-PAGE BOOKLET IMPOSITION (OUTER 4|1, INNER 2|3)
+             ============================================================== */}
+          {layoutMode === 'booklet_4page' && (
+            <>
+              {nonEmptySets.map((set: any) => {
+                const [p1, p2, p3, p4] = splitExamSetForBooklet(set);
+                return (
+                  <React.Fragment key={`booklet-imposed-${set.setId}`}>
+                    {/* SHEET 1: OUTER SPREAD (Side 1) -> Left: Page 4 (Back) | Right: Page 1 (Front) */}
+                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                      {/* Left Column: Page 4 (Back Cover & Final Questions) */}
+                      <div className="booklet-half-page booklet-left">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 4 (BACK COVER)' : 'পৃষ্ঠা ৪ (শেষ পাতা / ব্যাক কভার)'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p4.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={false}
+                            startQuestionIndex={p4.startIndex}
+                            startCqIndex={p4.cqStartIndex}
+                            startSqIndex={p4.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p4.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={false}
+                            startQuestionIndex={p4.startIndex}
+                            startCqIndex={p4.cqStartIndex}
+                            startSqIndex={p4.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                          />
+                        )}
+                      </div>
+
+                      {/* Center Fold Crease Line */}
+                      {showFoldGuide && (
+                        <div className="booklet-center-crease">
+                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
+                        </div>
+                      )}
+
+                      {/* Right Column: Page 1 (Front Cover & Initial Questions) */}
+                      <div className="booklet-half-page booklet-right">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 1 (FRONT COVER)' : 'পৃষ্ঠা ১ (প্রথম পাতা / কভার)'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p1.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={false}
+                            hideSignature={true}
+                            startQuestionIndex={p1.startIndex}
+                            startCqIndex={p1.cqStartIndex}
+                            startSqIndex={p1.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p1.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={false}
+                            hideSignature={true}
+                            startQuestionIndex={p1.startIndex}
+                            startCqIndex={p1.cqStartIndex}
+                            startSqIndex={p1.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SHEET 2: INNER SPREAD (Side 2) -> Left: Page 2 | Right: Page 3 */}
+                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                      {/* Left Column: Page 2 (Inside Left) */}
+                      <div className="booklet-half-page booklet-left">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 2 (INSIDE LEFT)' : 'পৃষ্ঠা ২ (ভেতরের বাম পাতা)'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p2.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p2.startIndex}
+                            startCqIndex={p2.cqStartIndex}
+                            startSqIndex={p2.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p2.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p2.startIndex}
+                            startCqIndex={p2.cqStartIndex}
+                            startSqIndex={p2.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                          />
+                        )}
+                      </div>
+
+                      {/* Center Fold Crease Line */}
+                      {showFoldGuide && (
+                        <div className="booklet-center-crease">
+                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
+                        </div>
+                      )}
+
+                      {/* Right Column: Page 3 (Inside Right) */}
+                      <div className="booklet-half-page booklet-right">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 3 (INSIDE RIGHT)' : 'পৃষ্ঠা ৩ (ভেতরের ডান পাতা)'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p3.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p3.startIndex}
+                            startCqIndex={p3.cqStartIndex}
+                            startSqIndex={p3.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p3.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p3.startIndex}
+                            startCqIndex={p3.cqStartIndex}
+                            startSqIndex={p3.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+
+              {/* OMR Sheets if requested */}
+              {showOMR && !showAnswers && nonEmptySets.map((set: any) => (
+                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} paperClass={paperClass} />
               ))}
             </>
-          ) : (
-            // Answer Sheets (no OMR sheets)
-            nonEmptySets.map((set: any) => (
-              <div key={`answer-${set.setId}`} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
-                <AnswerQuestionPaper
-                  examInfo={{ ...examInfo, set: set.setName }}
-                  questions={{
-                    mcq: set.mcq || [],
-                    mc: set.mc || [],
-                    int: set.int || [],
-                    ar: set.ar || [],
-                    cq: set.cq || [],
-                    sq: set.sq || [],
-                    mtf: set.mtf || [],
-                    descriptive: set.descriptive || [],
-                    smcq: set.smcq || [],
-                    cma: set.cma || [],
-                    mpc: set.mpc || [],
-                    dr: set.dr || [],
-                    allObjective: set.orderedObjective || []
-                  }}
-                  qrData={set.qrData}
-                  fontSize={objectiveFontSize}
-                  cqSqFontSize={cqSqFontSize}
-                  forcePageBreak={forcePageBreak}
-                  language={language}
-                  hideOMR={!showOMR}
-                  showDate={showDate}
-                  hideInstitute={hideInstitute}
-                />
-              </div>
-            ))
+          )}
+
+          {/* ==============================================================
+              CASE 3: 2-UP SEQUENTIAL SPREAD (1|2, 3|4)
+             ============================================================== */}
+          {layoutMode === 'booklet_2up' && (
+            <>
+              {nonEmptySets.map((set: any) => {
+                const [p1, p2, p3, p4] = splitExamSetForBooklet(set);
+                return (
+                  <React.Fragment key={`booklet-seq-${set.setId}`}>
+                    {/* SPREAD 1: Page 1 [Left] | Page 2 [Right] */}
+                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                      <div className="booklet-half-page booklet-left">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 1' : 'পৃষ্ঠা ১'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p1.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={false}
+                            hideSignature={true}
+                            startQuestionIndex={p1.startIndex}
+                            startCqIndex={p1.cqStartIndex}
+                            startSqIndex={p1.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p1.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={false}
+                            hideSignature={true}
+                            startQuestionIndex={p1.startIndex}
+                            startCqIndex={p1.cqStartIndex}
+                            startSqIndex={p1.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 1' : 'পৃষ্ঠা ১'}
+                          />
+                        )}
+                      </div>
+
+                      {showFoldGuide && (
+                        <div className="booklet-center-crease">
+                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
+                        </div>
+                      )}
+
+                      <div className="booklet-half-page booklet-right">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 2' : 'পৃষ্ঠা ২'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p2.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p2.startIndex}
+                            startCqIndex={p2.cqStartIndex}
+                            startSqIndex={p2.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p2.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p2.startIndex}
+                            startCqIndex={p2.cqStartIndex}
+                            startSqIndex={p2.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SPREAD 2: Page 3 [Left] | Page 4 [Right] */}
+                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                      <div className="booklet-half-page booklet-left">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 3' : 'পৃষ্ঠা ৩'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.title}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p3.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p3.startIndex}
+                            startCqIndex={p3.cqStartIndex}
+                            startSqIndex={p3.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p3.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={true}
+                            startQuestionIndex={p3.startIndex}
+                            startCqIndex={p3.cqStartIndex}
+                            startSqIndex={p3.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}
+                          />
+                        )}
+                      </div>
+
+                      {showFoldGuide && (
+                        <div className="booklet-center-crease">
+                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
+                        </div>
+                      )}
+
+                      <div className="booklet-half-page booklet-right">
+                        <div className="booklet-page-header-tag">
+                          <span>{language === 'en' ? 'PAGE 4' : 'পৃষ্ঠা ৪'}</span>
+                          <span className="text-[8px] opacity-80">{examInfo.set ? `সেট: ${examInfo.set}` : ''}</span>
+                        </div>
+                        {!showAnswers ? (
+                          <QuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p4.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={false}
+                            startQuestionIndex={p4.startIndex}
+                            startCqIndex={p4.cqStartIndex}
+                            startSqIndex={p4.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                          />
+                        ) : (
+                          <AnswerQuestionPaper
+                            examInfo={{ ...examInfo, set: set.setName }}
+                            questions={p4.questions}
+                            qrData={set.qrData}
+                            fontSize={objectiveFontSize}
+                            cqSqFontSize={cqSqFontSize}
+                            forcePageBreak={false}
+                            language={language}
+                            hideOMR={!showOMR}
+                            showDate={showDate}
+                            hideInstitute={hideInstitute}
+                            hideHeader={true}
+                            hideSignature={false}
+                            startQuestionIndex={p4.startIndex}
+                            startCqIndex={p4.cqStartIndex}
+                            startSqIndex={p4.sqStartIndex}
+                            pageNumberLabel={language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+
+              {/* OMR Sheets if requested */}
+              {showOMR && !showAnswers && nonEmptySets.map((set: any) => (
+                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} paperClass={paperClass} />
+              ))}
+            </>
           )}
 
         </div>
+
+        {/* Booklet & Paper Size Advisory Modal */}
+        {showBookletGuideModal && (
+          <BookletGuideModal
+            language={language}
+            paperSize={paperSize}
+            setPaperSize={handlePaperSizeChange}
+            layoutMode={layoutMode}
+            setLayoutMode={handleLayoutModeChange}
+            activeTab={activeGuideTab}
+            setActiveTab={setActiveGuideTab}
+            onClose={() => setShowBookletGuideModal(false)}
+          />
+        )}
+
       </div>
-    </MathJaxContext >
+    </MathJaxContext>
   );
 }
 
-// --- Refactored Sub-Components for Clarity ---
-
-const OMRPage = ({ set, examInfo, language, hideInstitute }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean }) => {
+// --- Sub-Component: OMR Page ---
+const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
   const [uniqueCode] = useState(() => uuidv4());
 
-  // Calculate max options count (either 4 or 5) based on actual question data
-  const mcqOptionsCount = React.useMemo(() => {
+  const mcqOptionsCount = useMemo(() => {
     if (!set.mcq || set.mcq.length === 0) return 4;
     const maxOptions = Math.max(...set.mcq.map((q: any) => q.options?.length || 0));
     return maxOptions > 4 ? 5 : 4;
   }, [set.mcq]);
 
   return (
-    <div className="print-page-container legal-paper omr-sheet-wrapper" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+    <div className={`print-page-container ${paperClass} omr-sheet-wrapper`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       <OMRSheet
         questions={set}
         qrData={set.qrData}
@@ -421,9 +1092,7 @@ const OMRPage = ({ set, examInfo, language, hideInstitute }: { set: any, examInf
   );
 };
 
-// You would move these into a separate file e.g. `app/print/exam/[id]/PrintPageComponents.tsx`
-// For demonstration, they are included here.
-
+// --- Sub-Component: PrintControls ---
 const PrintControls = ({
   language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers,
   objectiveFontSize, setObjectiveFontSize, cqSqFontSize, setCqSqFontSize,
@@ -431,71 +1100,184 @@ const PrintControls = ({
   hideInstitute, toggleHideInstitute, openEditInstituteModal,
   showEditInstituteModal, setShowEditInstituteModal,
   tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
-  handleSaveInstitute, handleResetInstitute, t
+  handleSaveInstitute, handleResetInstitute,
+  paperSize, setPaperSize, layoutMode, setLayoutMode,
+  showFoldGuide, toggleFoldGuide, openBookletGuide,
+  t
 }: any) => {
-  // If page break is off, keep font sizes in sync
   const updateGlobalFontSize = (delta: number) => {
     setObjectiveFontSize((prev: number) => Math.min(200, Math.max(50, prev + delta)));
     setCqSqFontSize((prev: number) => Math.min(200, Math.max(50, prev + delta)));
   };
 
+  const isBooklet = layoutMode === 'booklet_4page' || layoutMode === 'booklet_2up';
+
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2 print:hidden">
-      <div className="flex flex-col gap-2 bg-white/90 p-3 rounded-lg shadow-xl border border-gray-200 w-56">
+    <div className="fixed top-3 right-3 z-50 flex flex-col items-end gap-2 print:hidden">
+      <div className="flex flex-col gap-2.5 bg-white/95 backdrop-blur-md p-3.5 rounded-xl shadow-2xl border border-gray-300 w-64 sm:w-72 max-h-[92vh] overflow-y-auto text-xs">
+        
+        {/* Row 1: Language & Question/Answer toggle */}
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
-            className="flex-1 bg-gray-100 text-gray-800 px-2 py-2 rounded shadow hover:bg-gray-200 transition border border-gray-300 text-[10px] font-bold"
+            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-1.5 px-2 rounded-lg font-bold border border-gray-300 transition text-[11px]"
           >
             {language === 'bn' ? 'English' : 'বাংলা'}
           </button>
           <button
+            type="button"
             onClick={() => setShowAnswers(!showAnswers)}
-            className={`flex-1 px-2 py-2 rounded shadow transition text-[10px] font-bold ${showAnswers ? 'bg-orange-600 text-white' : 'bg-blue-600 text-white'}`}
+            className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition text-[11px] shadow-sm ${showAnswers ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
-            {showAnswers ? 'প্রশ্নপত্র' : 'উত্তরপত্র'}
+            {showAnswers ? 'উত্তরপত্র' : 'প্রশ্নপত্র'}
           </button>
         </div>
 
-        <div className="border-t border-gray-200 mt-1 pt-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-gray-600">পেজ ব্রেক (CQ):</span>
+        {/* Section: Paper Size & Booklet Setup */}
+        <div className="border-t border-gray-200 pt-2 space-y-2">
+          
+          {/* Paper Size Selector */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-gray-700 text-[11px]">
+                {language === 'en' ? 'Paper Size:' : 'পেপারের সাইজ:'}
+              </span>
+              <button
+                type="button"
+                onClick={openBookletGuide}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline flex items-center gap-0.5"
+                title="কোন পেপার সাইজটি সেরা তা জানতে ক্লিক করুন"
+              >
+                💡 {language === 'en' ? 'Which is Best?' : 'কোনটি সেরা?'}
+              </button>
+            </div>
+            <select
+              value={paperSize}
+              onChange={(e) => setPaperSize(e.target.value as any)}
+              className="w-full py-1.5 px-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-black"
+            >
+              <option value="a4">A4 Paper (Standard 210×297mm)</option>
+              <option value="a3">A3 Paper (🌟 Admission Booklet / ভর্তি সেরা)</option>
+              <option value="legal">Legal Paper (Long 8.5×14")</option>
+              <option value="letter">Letter Paper (8.5×11")</option>
+            </select>
+          </div>
+
+          {/* Print Layout / Booklet Mode Selection */}
+          <div>
+            <span className="block font-bold text-gray-700 mb-1 text-[11px]">
+              {language === 'en' ? 'Print Layout Mode:' : 'প্রিন্ট লেআউট মোড:'}
+            </span>
+            <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setLayoutMode('standard')}
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${layoutMode === 'standard' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+              >
+                {language === 'en' ? 'Standard (1-Up)' : 'স্ট্যান্ডার্ড (১-পেজ)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode('booklet_4page')}
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${layoutMode === 'booklet_4page' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                title="৪ পৃষ্ঠার ফোল্ডেবল বুকলেট (৪|১ ও ২|৩)"
+              >
+                {language === 'en' ? '4-Page Booklet' : '৪-পৃষ্ঠা বুকলেট'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode('booklet_2up')}
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${layoutMode === 'booklet_2up' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                title="ধারাবাহিক ২-পৃষ্ঠা পাশাপাশি স্প্রেড (১|২ ও ৩|৪)"
+              >
+                {language === 'en' ? '2-Up Spread' : '২-পেজ স্প্রেড'}
+              </button>
+            </div>
+          </div>
+
+          {/* Booklet Sub-Controls & Advice Card */}
+          {isBooklet && (
+            <div className="bg-indigo-50/80 border border-indigo-200 p-2 rounded-lg space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-indigo-900">
+                  {language === 'en' ? 'Center Fold Crease Line:' : 'মাঝে ভাঁজ রেখা (Fold Line):'}
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleFoldGuide}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${showFoldGuide ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                >
+                  {showFoldGuide ? (language === 'en' ? 'ON' : 'চালু') : (language === 'en' ? 'OFF' : 'বন্ধ')}
+                </button>
+              </div>
+
+              {/* Recommendation Callout */}
+              <div className="text-[10px] text-indigo-800 leading-tight bg-white p-1.5 rounded border border-indigo-100">
+                {paperSize === 'a3' ? (
+                  <span>🌟 <strong>A3 পেপার:</strong> ভাঁজ করলে ২টি পূর্ণাঙ্গ A4 পৃষ্ঠা হয়। ভর্তি পরীক্ষার প্রশ্ন ও ডায়াগ্রামের জন্য সবচেয়ে সেরা। কোনো স্ট্যাপলার লাগে না!</span>
+                ) : paperSize === 'a4' ? (
+                  <span>📄 <strong>A4 পেপার:</strong> সাধারণ প্রিন্টারে প্রিন্ট হয় (ভাঁজের পর A5 সাইজ)। ফন্ট সাইজ ৮৫% রাখা ভালো।</span>
+                ) : (
+                  <span>📜 <strong>Legal পেপার:</strong> ভাঁজের পর ৭ × ৮.৫ ইঞ্চি বুকলেট হয়।</span>
+                )}
+              </div>
+
+              {/* Button to open Guide Modal */}
+              <button
+                type="button"
+                onClick={openBookletGuide}
+                className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[10px] transition flex items-center justify-center gap-1 shadow-sm"
+              >
+                📖 {language === 'en' ? 'View Duplex & Folding Guide' : 'বুকলেট প্রিন্ট ও ভাঁজ নির্দেশিকা'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Section: Exam Options (CQ Break, OMR, Date, Institute) */}
+        <div className="border-t border-gray-200 pt-2 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'Page Break (CQ):' : 'পেজ ব্রেক (CQ):'}</span>
             <button
+              type="button"
               onClick={() => setForcePageBreak(!forcePageBreak)}
-              className={`px-3 py-1 rounded text-[10px] font-bold transition ${forcePageBreak ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition ${forcePageBreak ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               {forcePageBreak ? 'চালু' : 'বন্ধ'}
             </button>
           </div>
 
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'OMR Sheet:' : 'OMR শিট:'}</span>
             <button
+              type="button"
               onClick={() => setShowOMR(!showOMR)}
-              className={`px-3 py-1 rounded text-[10px] font-bold transition ${showOMR ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition ${showOMR ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               {showOMR ? (language === 'en' ? 'Show' : 'চালু') : (language === 'en' ? 'Hide' : 'বন্ধ')}
             </button>
           </div>
 
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'Show Date:' : 'তারিখ দেখান:'}</span>
             <button
+              type="button"
               onClick={() => setShowDate(!showDate)}
-              className={`px-3 py-1 rounded text-[10px] font-bold transition ${showDate ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition ${showDate ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               {showDate ? (language === 'en' ? 'Show' : 'চালু') : (language === 'en' ? 'Hide' : 'বন্ধ')}
             </button>
           </div>
 
           {/* Institute Customization Controls */}
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'Institute:' : 'প্রতিষ্ঠান:'}</span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={openEditInstituteModal}
-                className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold transition flex items-center gap-0.5 shadow-sm"
+                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold transition flex items-center gap-0.5 shadow-sm"
                 title={language === 'en' ? 'Edit Institute Name & Address' : 'প্রতিষ্ঠানের নাম ও ঠিকানা এডিট করুন'}
               >
                 ✏️ {language === 'en' ? 'Edit' : 'এডিট'}
@@ -503,35 +1285,38 @@ const PrintControls = ({
               <button
                 type="button"
                 onClick={toggleHideInstitute}
-                className={`px-2 py-1 rounded text-[10px] font-bold transition shadow-sm ${hideInstitute ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition shadow-sm ${hideInstitute ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}
               >
                 {hideInstitute ? (language === 'en' ? 'Hidden' : 'লুকানো') : (language === 'en' ? 'Visible' : 'দৃশ্যমান')}
               </button>
             </div>
           </div>
+        </div>
 
+        {/* Section: Font Size Scaling */}
+        <div className="border-t border-gray-200 pt-2 space-y-1.5">
           {!forcePageBreak ? (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold text-gray-600 underline">গ্লোবাল ফন্ট:</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-gray-700">গ্লোবাল ফন্ট: {objectiveFontSize}%</span>
               <div className="flex gap-1">
-                <button onClick={() => updateGlobalFontSize(-1)} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
-                <button onClick={() => updateGlobalFontSize(1)} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+                <button type="button" onClick={() => updateGlobalFontSize(-1)} className="w-7 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">-</button>
+                <button type="button" onClick={() => updateGlobalFontSize(1)} className="w-7 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">+</button>
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold text-gray-600">Objective ফন্ট:</span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-700">OBJ: {objectiveFontSize}%</span>
                 <div className="flex gap-1">
-                  <button onClick={() => setObjectiveFontSize((p: number) => Math.max(50, p - 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
-                  <button onClick={() => setObjectiveFontSize((p: number) => Math.min(200, p + 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+                  <button type="button" onClick={() => setObjectiveFontSize((p: number) => Math.max(50, p - 1))} className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">-</button>
+                  <button type="button" onClick={() => setObjectiveFontSize((p: number) => Math.min(200, p + 1))} className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">+</button>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold text-gray-600">CQ/SQ ফন্ট:</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-700">CQ/SQ: {cqSqFontSize}%</span>
                 <div className="flex gap-1">
-                  <button onClick={() => setCqSqFontSize((p: number) => Math.max(50, p - 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
-                  <button onClick={() => setCqSqFontSize((p: number) => Math.min(200, p + 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+                  <button type="button" onClick={() => setCqSqFontSize((p: number) => Math.max(50, p - 1))} className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">-</button>
+                  <button type="button" onClick={() => setCqSqFontSize((p: number) => Math.min(200, p + 1))} className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold text-xs">+</button>
                 </div>
               </div>
             </div>
@@ -610,16 +1395,20 @@ const PrintControls = ({
           </div>
         )}
 
+        {/* Print Button */}
         <button
+          type="button"
           onClick={onPrint}
           disabled={isPrinting || !isMathJaxReady}
-          className="w-full mt-2 bg-blue-600 text-white px-4 py-2 rounded shadow-lg hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-wait font-bold"
+          className="w-full mt-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-3 rounded-lg shadow-lg hover:from-blue-700 hover:to-indigo-700 transition disabled:from-blue-400 disabled:to-indigo-400 disabled:cursor-wait font-bold text-xs flex items-center justify-center gap-1.5"
         >
-          {isPrinting ? t.preparing : t.print}
+          <span>🖨️</span>
+          <span>{isPrinting ? t.preparing : t.print}</span>
         </button>
       </div>
+
       {isPrinting && !isMathJaxReady && (
-        <div className="text-[10px] text-blue-800 bg-blue-100 p-2 rounded-md shadow border border-blue-200 w-56">
+        <div className="text-[10px] text-blue-800 bg-blue-100 p-2 rounded-md shadow border border-blue-200 w-64 sm:w-72">
           {t.waiting}
         </div>
       )}
@@ -627,10 +1416,225 @@ const PrintControls = ({
   );
 };
 
+// --- Sub-Component: Comprehensive Booklet & Paper Size Advisory Modal ---
+const BookletGuideModal = ({
+  language, paperSize, setPaperSize, layoutMode, setLayoutMode, activeTab, setActiveTab, onClose
+}: any) => {
+  const isEn = language === 'en';
 
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:hidden animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-200 flex flex-col max-h-[90vh]">
+        
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">📖</span>
+            <div>
+              <h3 className="font-extrabold text-base leading-tight">
+                {isEn ? 'Booklet Print & Paper Size Guide' : 'বুকলেট প্রিন্টিং ও পেপার সাইজ নির্দেশিকা'}
+              </h3>
+              <p className="text-xs text-indigo-100">
+                {isEn ? 'How to print 4-page exams seamlessly without needing staples' : 'কোনো স্ট্যাপলার ছাড়াই সহজে ৪ পৃষ্ঠার ভর্তি ও মডেল টেস্ট বুকলেট তৈরির নিয়ম'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold flex items-center justify-center transition"
+          >
+            ✕
+          </button>
+        </div>
 
-// Replace Loader, PrintControls, SecurityFeatures with simple placeholders or remove their usage if not critical
-// For Loader, use a simple div
+        {/* Tab Switcher */}
+        <div className="flex border-b border-gray-200 bg-gray-50 px-4 pt-2 gap-2 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setActiveTab('paper_comparison')}
+            className={`pb-2.5 px-3 border-b-2 transition ${activeTab === 'paper_comparison' ? 'border-indigo-600 text-indigo-700 font-black' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            🌟 {isEn ? 'Which Paper Size is Best?' : 'কোন পেপার সাইজটি সেরা?'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('print_steps')}
+            className={`pb-2.5 px-3 border-b-2 transition ${activeTab === 'print_steps' ? 'border-indigo-600 text-indigo-700 font-black' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            🖨️ {isEn ? 'Duplex Print & Folding Steps' : 'ডুপ্লেক্স প্রিন্ট ও ভাঁজ করার ধাপ'}
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-5 overflow-y-auto space-y-4 text-xs text-gray-700 flex-1">
+          {activeTab === 'paper_comparison' ? (
+            <div className="space-y-4">
+              
+              {/* Option A: A3 (Recommended) */}
+              <div className={`p-4 rounded-xl border-2 transition ${paperSize === 'a3' ? 'border-indigo-600 bg-indigo-50/50' : 'border-gray-200 bg-white hover:border-indigo-300'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      🏆 {isEn ? 'Gold Standard for Admission' : 'ভর্তি পরীক্ষার জন্য সেরা (রেকমেন্ডেড)'}
+                    </span>
+                    <h4 className="text-sm font-extrabold text-gray-900 mt-1">
+                      A3 Paper (২৯৭ × ৪২০ মিমি - ল্যান্ডস্কেপ ফোল্ড)
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPaperSize('a3'); setLayoutMode('booklet_4page'); }}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${paperSize === 'a3' && layoutMode === 'booklet_4page' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border'}`}
+                  >
+                    {paperSize === 'a3' && layoutMode === 'booklet_4page' ? '✓ নির্বাচিত' : 'A3 বুকলেট নির্বাচন করুন'}
+                  </button>
+                </div>
+                <ul className="mt-2.5 space-y-1.5 list-disc list-inside text-gray-600 text-[11px] leading-relaxed">
+                  <li><strong>ভাঁজের পর সঠিক সাইজ:</strong> A3 পেপারকে মাঝে ভাঁজ করলে তৈরি হয় <strong>দুটি সম্পূর্ণ পূর্ণাঙ্গ A4 (২১০ × ২৯৭ মিমি) পৃষ্ঠা</strong>!</li>
+                  <li><strong>কেন সেরা:</strong> বুয়েট (BUET), ঢাকা বিশ্ববিদ্যালয় (DU), মেডিকেল ভর্তি পরীক্ষা ও শীর্ষ ক্যাডেট কলেজের ৪ পৃষ্ঠার প্রশ্নপত্র এই A3 পেপারেই মুদ্রিত হয়।</li>
+                  <li><strong>স্ট্যাপলার মুক্ত:</strong> একটি মাত্র শিটের এপিঠ-ওপিঠ প্রিন্ট হয়ে মাঝের রেখা বরাবর ভাঁজ করলেই চমৎকার ৪ পৃষ্ঠার প্রশ্ন বুকলেট হয়—কোনো স্ট্যাপলার লাগবে না।</li>
+                  <li><strong>১০০% স্বাভাবিক ফন্ট:</strong> কোনো ফন্ট বা জটিল গাণিতিক সমীকরণ ছোট করতে হয় না, ডায়াগ্রাম থাকে বড় ও সম্পূর্ণ স্পষ্ট।</li>
+                </ul>
+              </div>
+
+              {/* Option B: A4 (Standard Desktop Printers) */}
+              <div className={`p-4 rounded-xl border-2 transition ${paperSize === 'a4' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="bg-blue-100 text-blue-900 border border-blue-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      📄 {isEn ? 'Most Accessible' : 'সর্বাধিক সহজলভ্য (সাধারণ প্রিন্টার)'}
+                    </span>
+                    <h4 className="text-sm font-extrabold text-gray-900 mt-1">
+                      A4 Paper (২১০ × ২৯৭ মিমি - ল্যান্ডস্কেপ ফোল্ড)
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPaperSize('a4'); setLayoutMode('booklet_4page'); }}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${paperSize === 'a4' && layoutMode === 'booklet_4page' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border'}`}
+                  >
+                    {paperSize === 'a4' && layoutMode === 'booklet_4page' ? '✓ নির্বাচিত' : 'A4 বুকলেট নির্বাচন করুন'}
+                  </button>
+                </div>
+                <ul className="mt-2.5 space-y-1.5 list-disc list-inside text-gray-600 text-[11px] leading-relaxed">
+                  <li><strong>ভাঁজের পর সাইজ:</strong> A4 পেপারকে মাঝে ভাঁজ করলে তৈরি হয় <strong>দুটি A5 সাইজের পৃষ্ঠা (১৪৮ × ২১০ মিমি)</strong>।</li>
+                  <li><strong>সুবিধা:</strong> যে কোনো সাধারণ ডেস্কটপ / হোম প্রিন্টারে (Canon, Epson, HP, Brother) A4 পেপারে সরাসরি প্রিন্ট করা যায়।</li>
+                  <li><strong>পরামর্শ:</strong> A4 বুকলেটের ক্ষেত্রে কন্ট্রোলস থেকে ফন্ট সাইজ <strong>৮০% থেকে ৮৫%</strong> রাখা ভালো, যেন অপশনগুলো স্বচ্ছন্দে জায়গা পায়।</li>
+                </ul>
+              </div>
+
+              {/* Option C: Legal Paper */}
+              <div className={`p-4 rounded-xl border-2 transition ${paperSize === 'legal' ? 'border-emerald-600 bg-emerald-50/50' : 'border-gray-200 bg-white hover:border-emerald-300'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      📜 {isEn ? 'Coaching & Offset Center Favorite' : 'কোচিং ও ফটোকপি সেন্টারের পছন্দ'}
+                    </span>
+                    <h4 className="text-sm font-extrabold text-gray-900 mt-1">
+                      Legal Paper (৮.৫ × ১৪ ইঞ্চি)
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setPaperSize('legal'); setLayoutMode('booklet_4page'); }}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${paperSize === 'legal' && layoutMode === 'booklet_4page' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border'}`}
+                  >
+                    {paperSize === 'legal' && layoutMode === 'booklet_4page' ? '✓ নির্বাচিত' : 'Legal বুকলেট নির্বাচন করুন'}
+                  </button>
+                </div>
+                <ul className="mt-2.5 space-y-1.5 list-disc list-inside text-gray-600 text-[11px] leading-relaxed">
+                  <li>ভাঁজের পর তৈরি হয় ৭ × ৮.৫ ইঞ্চি পকেট বুকলেট। বাংলাদেশে ফটোকপি দোকানে অত্যন্ত সুলভ ও বহুল ব্যবহৃত।</li>
+                </ul>
+              </div>
+
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              
+              <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-xl text-blue-900 space-y-1">
+                <span className="font-extrabold text-xs">🖨️ ৪-পৃষ্ঠা বুকলেট কীভাবে কাজ করে?</span>
+                <p className="text-[11px] leading-relaxed">
+                  একটি মাত্র শিটের উভয় পিঠে (Double-sided / Duplex) প্রিন্ট করা হয়:
+                  <br />• <strong>শিট ১ (বহির্ভাগ / বাইরের পাতা):</strong> বামে পৃষ্ঠা ৪ (ব্যাক কভার) এবং ডানে পৃষ্ঠা ১ (কভার ও শুরু)।
+                  <br />• <strong>শিট ২ (অভ্যন্তরীণ স্প্রেড / ভেতরের পাতা):</strong> বামে পৃষ্ঠা ২ এবং ডানে পৃষ্ঠা ৩।
+                  <br />প্রিন্ট শেষে মাঝের রেখা বরাবর ভাঁজ করলেই তৈরি হয়ে যায় আসল ৪ পৃষ্ঠার পরীক্ষার বুকলেট!
+                </p>
+              </div>
+
+              {/* Step by step */}
+              <div className="space-y-2">
+                <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">১</span>
+                  <div>
+                    <strong className="text-gray-900">লেআউট নির্বাচন:</strong>
+                    <p className="text-gray-600 text-[11px]">প্রিন্ট কন্ট্রোলস থেকে <strong>'৪-পৃষ্ঠা বুকলেট'</strong> মোড নির্বাচন করুন।</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">২</span>
+                  <div>
+                    <strong className="text-gray-900">পেপার সাইজ:</strong>
+                    <p className="text-gray-600 text-[11px]">ভর্তি পরীক্ষার জন্য <strong>A3</strong> নির্বাচন করুন (অথবা সাধারণ প্রিন্টারের জন্য <strong>A4</strong>)।</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৩</span>
+                  <div>
+                    <strong className="text-gray-900">ডুপ্লেক্স / দুই পিঠে প্রিন্ট (গুরুত্বপূর্ণ):</strong>
+                    <p className="text-gray-600 text-[11px]">
+                      'প্রিন্ট করুন' বাটনে চাপলে ব্রাউজারের প্রিন্ট ডায়ালগ আসবে। সেখানে <strong>Two-sided (Duplex)</strong> চেকবক্সে টিক দিন।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৪</span>
+                  <div>
+                    <strong className="text-amber-900">জরুরি বাইন্ডিং সেটিং: "Flip on short edge"</strong>
+                    <p className="text-[11px] leading-relaxed">
+                      যেহেতু বুকলেট ল্যান্ডস্কেপ মোডে প্রিন্ট হয়, তাই প্রিন্টার সেটিংসে অবশ্যই <strong>"Flip on short edge" (শর্ট এজ ফ্লিপ)</strong> নির্বাচন করতে হবে। (ভুল করে 'Flip on long edge' দিলে পেছনের পাতা উল্টো আসবে)।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">৫</span>
+                  <div>
+                    <strong className="text-gray-900">মাঝে ভাঁজ করুন:</strong>
+                    <p className="text-gray-600 text-[11px]">
+                      প্রিন্ট বের হলে শিটের মাঝের ড্যাশ লাইন বরাবর ভাঁজ করুন। কোনো স্ট্যাপলারের কোনো প্রয়োজন নেই!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="bg-gray-50 border-t border-gray-200 p-3 flex justify-between items-center text-xs">
+          <div className="text-gray-500 font-semibold text-[11px]">
+            বর্তমান নির্বাচন: <span className="text-indigo-700 font-bold uppercase">{paperSize}</span> | <span className="text-indigo-700 font-bold">{layoutMode === 'booklet_4page' ? '৪-পৃষ্ঠা বুকলেট' : layoutMode === 'booklet_2up' ? '২-পেজ স্প্রেড' : 'স্ট্যান্ডার্ড'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition shadow-sm"
+          >
+            {isEn ? 'Close & Apply' : 'ঠিক আছে ও বন্ধ করুন'}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+// Simple div Loader placeholder
 const Loader = ({ message, isError = false }: { message: string, isError?: boolean }) => (
   <div className={`flex items-center justify-center min-h-screen text-lg ${isError ? 'text-red-500' : 'text-gray-700'}`}>{message}</div>
 );
