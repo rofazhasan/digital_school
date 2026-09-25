@@ -140,30 +140,35 @@
 
   /* MCQ Option Column Layouts */
   .options-grid-1 {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
     width: 100%;
   }
 
   .options-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.15rem 0.4rem;
+    gap: 0.12rem 0.65rem;
     align-items: start;
   }
 
   .options-grid-4 {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.1rem 0.3rem;
+    gap: 0.08rem 0.45rem;
     align-items: start;
   }
 
-  .options-grid-2>.option-item,
-  .options-grid-4>.option-item {
+  .options-grid-1 > .option-item,
+  .options-grid-2 > .option-item,
+  .options-grid-4 > .option-item {
     min-width: 0;
+    display: flex;
+    align-items: start;
+    gap: 0.22rem;
     overflow-wrap: break-word;
     word-break: break-word;
-    align-items: start;
   }
 
   /* Premium Section Headers */
@@ -346,27 +351,33 @@
 
 /* Global grid classes (also used on screen in print preview) */
 .options-grid-1 {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
   width: 100%;
 }
 
 .options-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.15rem 0.4rem;
+  gap: 0.12rem 0.65rem;
   align-items: start;
 }
 
 .options-grid-4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.1rem 0.3rem;
+  gap: 0.08rem 0.45rem;
   align-items: start;
 }
 
-.options-grid-2>.option-item,
-.options-grid-4>.option-item {
+.options-grid-1 > .option-item,
+.options-grid-2 > .option-item,
+.options-grid-4 > .option-item {
   min-width: 0;
+  display: flex;
+  align-items: start;
+  gap: 0.22rem;
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -534,11 +545,11 @@
   }
 
   .booklet-half-page .options-grid-2 {
-    gap: 0.08rem 0.35rem !important;
+    gap: 0.08rem 0.5rem !important;
   }
 
   .booklet-half-page .options-grid-4 {
-    gap: 0.04rem 0.25rem !important;
+    gap: 0.04rem 0.35rem !important;
   }
 
   .booklet-half-page .instruction-box {

@@ -239,6 +239,40 @@ const matchSubject = (questionSubject: string | undefined | null, targetSubjectN
   return false;
 };
 
+// --- Dynamic Option Grid Layout Calculator ---
+const getOptionsGridClass = (options: any[], fontSize?: number): string => {
+  if (!options || options.length === 0) return "options-grid-2";
+  const numFontSize = Number(fontSize) || 100;
+  const fontFactor = 100 / Math.max(65, numFontSize);
+
+  const lengths = options.map((opt: any) => (typeof opt === 'string' ? opt : opt.text || opt || '').length);
+  const maxOptLen = Math.max(...lengths, 0);
+  const totalOptLen = lengths.reduce((sum: number, len: number) => sum + len, 0);
+  const count = options.length;
+
+  // 2 options: True/False, Yes/No, etc.
+  if (count <= 2) {
+    return maxOptLen <= Math.round(28 * fontFactor) ? "options-grid-2" : "options-grid-1";
+  }
+
+  // 4 options standard MCQ: can fit in 1 single horizontal row (4 columns across)
+  const maxT4 = Math.round(11 * fontFactor);
+  const totalT4 = Math.round(42 * fontFactor);
+  if (count === 4 && maxOptLen <= maxT4 && totalOptLen <= totalT4) {
+    return "options-grid-4"; // 1 line
+  }
+
+  // Moderate options: can fit in 2 lines (2 rows x 2 columns)
+  const maxT2 = Math.round(32 * fontFactor);
+  const totalT2 = Math.round(120 * fontFactor);
+  if (maxOptLen <= maxT2 && totalOptLen <= totalT2) {
+    return "options-grid-2"; // 2 lines
+  }
+
+  // Truly long sentences: 4 lines (1 column per line)
+  return "options-grid-1"; // 4 lines
+};
+
 // Prestigious Print Section Header for Multi-Subject (MS) Exams
 const MSSubjectHeader = ({
   subject,
@@ -720,11 +754,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     const showSubjectHeader = isMS && isNewSubject;
 
                     const renderQuestionContent = () => {
-                    if (q.type === 'MCQ' || q.type === 'MC') {
-                      const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
-                      let gridClass = "options-grid-2"; // default: 2-col (standard BD exam format)
-                      if (maxOptLen <= 4) gridClass = "options-grid-4";  // very short: 4-col
-                      else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
+                      if (q.type === 'MCQ' || q.type === 'MC') {
+                        // Dynamic grid layout: 1 line (4-col), 2 lines (2-col), or 4 lines (1-col)
+                        const gridClass = getOptionsGridClass(q.options || [], fontSize);
 
                       return (
                         <div key={idx} className="mb-1.5 sm:mb-2 text-left question-block break-inside-avoid">
@@ -996,10 +1028,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                 if (idxL !== -1) correctAns = MCQ_LABELS_EN[idxL];
                               }
 
-                              const maxOptLen = (sub.options || []).reduce((max: number, opt: any) => Math.max(max, (typeof opt === 'string' ? opt : opt.text || opt || '').length), 0);
-                              let gridClass = "options-grid-2";
-                              if (maxOptLen <= 4) gridClass = "options-grid-4";
-                              else if (maxOptLen > 15) gridClass = "options-grid-1";
+                              const gridClass = getOptionsGridClass(sub.options || [], fontSize);
 
                               return (
                                 <div key={sIdx} className="mb-4 text-left border-l-2 border-red-200 pl-3 break-inside-avoid">
