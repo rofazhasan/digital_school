@@ -73,26 +73,26 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   hideInstitute = false,
 }) => {
   const totalQuestions = 100;
-  // Large bubbles enabled by full width
-  const answerBubbleSize = 22;
+  // Scaled bubbles to fit 100 questions perfectly on single A4 sheet
+  const answerBubbleSize = 20;
 
   // Render a vertical digit column (for horizontal arrangement)
-  const verticalField = (label: string, digits: number, size = 20) => (
-    <div className="flex flex-col items-center mx-2">
-      <div className="text-[10px] font-bold mb-1 uppercase tracking-wider">{label}</div>
-      <div className="flex flex-row gap-1 mb-1">
+  const verticalField = (label: string, digits: number, size = 18) => (
+    <div className="flex flex-col items-center mx-1.5">
+      <div className="text-[9.5px] font-bold mb-0.5 uppercase tracking-wider">{label}</div>
+      <div className="flex flex-row gap-0.5 mb-0.5">
         {Array.from({ length: digits }).map((_, idx) => (
-          <div key={idx} className="border border-black bg-white flex items-center justify-center font-bold" style={{ width: size, height: size + 6, fontSize: size * 0.7 }}></div>
+          <div key={idx} className="border border-black bg-white flex items-center justify-center font-bold" style={{ width: size, height: size + 3, fontSize: size * 0.7 }}></div>
         ))}
       </div>
-      <div className="flex flex-row gap-1 p-1 bg-white border border-black rounded-sm">
+      <div className="flex flex-row gap-0.5 p-0.5 bg-white border border-black rounded-sm">
         {Array.from({ length: digits }).map((_, idx) => (
-          <div key={idx} className="flex flex-col items-center gap-1">
+          <div key={idx} className="flex flex-col items-center gap-0.5">
             {DIGITS.map((d) => (
               <div
                 key={d}
-                className="rounded-full border border-black flex items-center justify-center text-[10px] font-bold hover:bg-black hover:text-white transition-colors"
-                style={{ width: size - 2, height: size - 2 }}
+                className="rounded-full border border-black flex items-center justify-center text-[9.5px] font-bold hover:bg-black hover:text-white transition-colors"
+                style={{ width: size - 1, height: size - 1 }}
               >{toBengaliNumerals(d)}</div>
             ))}
           </div>
@@ -105,11 +105,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   const renderMCQColumn = (startIdx: number, endIdx: number) => (
     <div className="flex flex-col w-full h-full">
       {/* Column Header */}
-      <div className="flex justify-between items-center border-b border-black bg-black text-white px-2 py-1 mb-1 rounded-t-sm">
-        <div className="text-[10px] font-bold w-6 text-center">NO</div>
+      <div className="flex justify-between items-center border-b border-black bg-black text-white px-2 py-0.5 mb-0.5 rounded-t-sm">
+        <div className="text-[9.5px] font-bold w-6 text-center">NO</div>
         <div className="flex-1 flex justify-around">
           {mcqOptionLabels.slice(0, mcqOptionsCount).map((l, i) => (
-            <div key={i} className="text-[10px] font-bold w-5 text-center">{l}</div>
+            <div key={i} className="text-[9.5px] font-bold w-5 text-center">{l}</div>
           ))}
         </div>
       </div>
@@ -292,41 +292,41 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <FiducialMarker id={3} size={40} className="absolute bottom-12 left-12" />
 
       {/* --- CONTENT CONTAINER --- */}
-      <div className="flex flex-col h-full mx-6 my-3 mb-2 border-[2px] border-black rounded-sm overflow-visible z-10 relative bg-white/50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+      <div className="flex flex-col h-full mx-3 my-1 mb-1 border-[1.5px] border-black rounded-sm overflow-visible z-10 relative bg-white/50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
 
         {/* HEADER - Top Down 1/3 */}
-        <header className="flex flex-col border-b-[2px] border-black bg-white">
-          <div className="flex justify-between items-center p-4 pb-2">
+        <header className="flex flex-col border-b-[1.5px] border-black bg-white">
+          <div className="flex justify-between items-center p-2 pb-1">
             {/* Balance the exam info on the right */}
-            <div className="w-[180px]" />
+            <div className="w-[160px]" />
 
             <div className="flex-1 flex flex-col items-center">
               <div className="text-center">
                 {!hideInstitute && (
                   <>
-                    <h1 className="text-2xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
-                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">{schoolAddress}</p>
+                    <h1 className="text-xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mt-0.5">{schoolAddress}</p>
                   </>
                 )}
-                <div className="inline-block bg-black text-white px-2 py-0.5 mt-2 rounded-sm">
-                  <h2 className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">OMR ANSWER SHEET</h2>
+                <div className="inline-block bg-black text-white px-2 py-0.2 mt-1 rounded-sm">
+                  <h2 className="text-[9.5px] font-black uppercase tracking-[0.18em] leading-none">OMR ANSWER SHEET</h2>
                 </div>
               </div>
             </div>
 
-            <div className="w-[180px] flex flex-col items-end">
-              <div className="text-xl font-black uppercase text-black mb-1">{examTitle}</div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+            <div className="w-[160px] flex flex-col items-end">
+              <div className="text-base font-black uppercase text-black mb-0.5">{examTitle}</div>
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
                   তারিখ: {toBengaliNumerals(examDate)}
                 </span>
                 {subjectName && (
-                  <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+                  <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
                     বিষয়: {subjectName}
                   </span>
                 )}
                 {objectiveTime && objectiveTime > 0 && (
-                  <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+                  <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
                     সময়: {formatBengaliDuration(objectiveTime)}
                   </span>
                 )}
@@ -335,72 +335,71 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           </div>
 
           {/* INSTRUCTIONS + SET CODE Middle Band */}
-          <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-t border-black">
-            <div className="text-[9px] font-medium leading-tight max-w-[40%]">
-              <p>• Use Black Ballpoint Pen only.</p>
-              <p>• Completely darken the bubble: ⬤</p>
+          <div className="flex justify-between items-center px-3 py-1 bg-gray-50 border-t border-black">
+            <div className="text-[8.5px] font-medium leading-tight max-w-[40%]">
+              <p>• Use Black Ballpoint Pen only. • Darken bubble completely: ⬤</p>
               <p>• Do not fold or crush this sheet.</p>
             </div>
 
             {/* CENTER SET CODE BOX */}
-            <div className="flex flex-col items-center border-[2px] border-black p-1 bg-white rounded shadow-sm">
-              <span className="text-[9px] font-black uppercase tracking-widest mb-1">SET CODE: {setName || 'A'}</span>
-              <div className="flex gap-1.5">
+            <div className="flex flex-col items-center border-[1.5px] border-black p-0.5 bg-white rounded shadow-2xs">
+              <span className="text-[8.5px] font-black uppercase tracking-widest mb-0.5">SET CODE: {setName || 'A'}</span>
+              <div className="flex gap-1">
                 {mcqOptionLabels.slice(0, 4).map(l => (
-                  <div key={l} className={`w-5 h-5 rounded-full border border-black flex items-center justify-center text-[9px] font-black ${l === setName ? 'bg-black text-white' : 'bg-white'}`}>{l}</div>
+                  <div key={l} className={`w-4.5 h-4.5 rounded-full border border-black flex items-center justify-center text-[8.5px] font-black ${l === setName ? 'bg-black text-white' : 'bg-white'}`}>{l}</div>
                 ))}
               </div>
             </div>
 
             {/* QR */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div className="text-right">
-                <p className="text-[10px] font-bold">Secured ID</p>
-                <p className="text-[9px] font-mono">{uniqueCode?.slice(0, 8)}</p>
+                <p className="text-[9px] font-bold">Secured ID</p>
+                <p className="text-[8px] font-mono">{uniqueCode?.slice(0, 8)}</p>
               </div>
-              <div className="border border-black p-1 bg-white">
-                <QRCode value={JSON.stringify(qrData)} size={55} />
+              <div className="border border-black p-0.5 bg-white">
+                <QRCode value={JSON.stringify(qrData)} size={42} />
               </div>
             </div>
           </div>
         </header>
 
         {/* MIDDLE BAND: STUDENT INFO (Horizontal) */}
-        <div className="flex flex-row justify-between items-stretch p-3 border-b-[2px] border-black bg-white gap-4">
+        <div className="flex flex-row justify-between items-stretch p-1.5 border-b-[1.5px] border-black bg-white gap-2">
           {/* Section 1: Roll No */}
-          <div className="flex-1 border border-black p-2 rounded-sm bg-gray-50/50 flex justify-center">
-            {verticalField('ROLL NO / রোল নম্বর', rollDigits, 20)}
+          <div className="flex-1 border border-black p-1 rounded-sm bg-gray-50/50 flex justify-center">
+            {verticalField('ROLL NO / রোল নম্বর', rollDigits, 17)}
           </div>
 
           {/* Section 2: Registration No (Placeholder) or Subject Code */}
-          <div className="flex-1 border border-black p-2 rounded-sm bg-gray-50/50 flex justify-center">
-            {verticalField('REGISTRATION NO', rollDigits, 20)}
+          <div className="flex-1 border border-black p-1 rounded-sm bg-gray-50/50 flex justify-center">
+            {verticalField('REGISTRATION NO', rollDigits, 17)}
           </div>
 
           {/* Section 3: Signatures */}
-          <div className="w-[180px] flex flex-col justify-between py-2">
-            <div className="border border-black p-2 h-[45%] bg-white rounded-sm relative">
-              <span className="absolute bottom-1 right-2 text-[8px] font-bold uppercase text-gray-500">Student's Signature</span>
+          <div className="w-[160px] flex flex-col justify-between py-1">
+            <div className="border border-black p-1 h-[46%] bg-white rounded-sm relative">
+              <span className="absolute bottom-0.5 right-1.5 text-[7.5px] font-bold uppercase text-gray-500">Student's Signature</span>
             </div>
-            <div className="border border-black p-2 h-[45%] bg-white rounded-sm relative">
-              <span className="absolute bottom-1 right-2 text-[8px] font-bold uppercase text-gray-500">Invigilator's Signature</span>
+            <div className="border border-black p-1 h-[46%] bg-white rounded-sm relative">
+              <span className="absolute bottom-0.5 right-1.5 text-[7.5px] font-bold uppercase text-gray-500">Invigilator's Signature</span>
             </div>
           </div>
         </div>
 
         {/* BOTTOM SECTION: QUESTION GRID (Full Width) */}
-        <div className="flex-1 p-3 bg-white">
-          <div className="grid grid-cols-4 gap-4 h-full">
+        <div className="flex-1 p-1.5 bg-white">
+          <div className="grid grid-cols-4 gap-2 h-full">
             {/* Column 1 */}
-            <div className="border border-black/50 p-1 h-full rounded-sm">
+            <div className="border border-black/50 p-0.5 h-full rounded-sm">
               {renderMCQColumn(0, 25)}
             </div>
             {/* Column 2 */}
-            <div className="border border-black/50 p-1 h-full rounded-sm">
+            <div className="border border-black/50 p-0.5 h-full rounded-sm">
               {renderMCQColumn(25, 50)}
             </div>
             {/* Column 3 */}
-            <div className="border border-black/50 p-1 h-full rounded-sm">
+            <div className="border border-black/50 p-0.5 h-full rounded-sm">
               {/* Mix regular MCQs and Special Types if needed */}
               {/* For now assuming std 100 questions flow, can inject types */}
               {renderMCQColumn(50, 75)}

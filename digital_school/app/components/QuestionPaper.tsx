@@ -238,7 +238,8 @@ const MSSubjectHeader = ({
   subject,
   isEn,
   questionRangeText,
-  optionalInstruction
+  optionalInstruction,
+  isContinued
 }: {
   subject: {
     name: string;
@@ -250,13 +251,16 @@ const MSSubjectHeader = ({
   isEn: boolean;
   questionRangeText?: string;
   optionalInstruction?: string;
+  isContinued?: boolean;
 }) => {
   return (
-    <div className="ms-subject-header my-1.5 break-inside-avoid border-y border-black bg-gray-100/90 py-0.5 px-2 text-black">
+    <div className="ms-subject-header my-1 break-inside-avoid border-y border-black bg-gray-100/90 py-0.5 px-2 text-black">
       <div className="flex items-center justify-between flex-wrap gap-1">
         <div className="flex items-center gap-1.5">
           <h3 className="text-xs sm:text-sm font-black tracking-tight uppercase">
-            {isEn ? `SUBJECT: ${subject.name}` : `বিষয়: ${subject.name}`}
+            {isEn
+              ? `SUBJECT: ${subject.name}${isContinued ? ' (CONTINUED)' : ''}`
+              : `বিষয়: ${subject.name}${isContinued ? ' (চলমান)' : ''}`}
           </h3>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold">
@@ -989,7 +993,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <MSSubjectHeader
                             subject={matchedSub}
                             isEn={isEn}
-                            questionRangeText={subjectQuestionRanges.get(q._canonicalSubject)}
+                            isContinued={idx === 0 && Boolean(startQuestionIndex && startQuestionIndex > 1)}
+                            questionRangeText={(() => {
+                              if (idx === 0 && startQuestionIndex && startQuestionIndex > 1) {
+                                const subQsThisPage = orderedObjective.filter((qObj: any) => (qObj._canonicalSubject || qObj.subject) === q._canonicalSubject).length;
+                                const endQNum = startQuestionIndex + subQsThisPage - 1;
+                                return isEn
+                                  ? `Questions: ${startQuestionIndex} - ${endQNum} (Cont.)`
+                                  : `প্রশ্ন: ${toBengaliNumerals(startQuestionIndex)} - ${toBengaliNumerals(endQNum)} (চলমান)`;
+                              }
+                              return subjectQuestionRanges.get(q._canonicalSubject);
+                            })()}
                             optionalInstruction={
                               !matchedSub.isMandatory && parsedSubjectsConfig?.requiredOptionalCount
                                 ? (isEn

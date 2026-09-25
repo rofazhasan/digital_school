@@ -82,7 +82,7 @@
 
 @media print {
   @page {
-    margin: 10mm;
+    margin: 6mm 8mm;
   }
 
   body {
@@ -502,17 +502,75 @@
 
 @media print {
   .booklet-sheet {
+    box-sizing: border-box !important;
+    width: 100% !important;
     height: 100vh !important;
     max-height: 100vh !important;
     overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid-page !important;
   }
 
   .booklet-half-page {
+    box-sizing: border-box !important;
     height: 100% !important;
     max-height: 100% !important;
     overflow: hidden !important;
+    font-size: 10px !important;
+    line-height: 1.32 !important;
+  }
+
+  /* Compact typography inside booklet mode */
+  .booklet-half-page .question-block {
+    margin-bottom: 0.12rem !important;
+    break-inside: avoid !important;
+  }
+
+  .booklet-half-page .mcq-container {
+    columns: 2 !important;
+    column-gap: 0.95rem !important;
+  }
+
+  .booklet-half-page .options-grid-2 {
+    gap: 0.08rem 0.35rem !important;
+  }
+
+  .booklet-half-page .options-grid-4 {
+    gap: 0.04rem 0.25rem !important;
+  }
+
+  .booklet-half-page .instruction-box {
+    padding: 2px 5px !important;
+    margin-bottom: 0.25rem !important;
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  .booklet-half-page .ms-subject-header {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    padding: 1.5px 5px !important;
+    font-size: 11px !important;
+  }
+
+  .booklet-half-page .ms-division-banner {
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
+    padding: 1.5px 5px !important;
+    font-size: 9.5px !important;
+  }
+
+  /* OMR Sheet Print Perfection: 100 questions on exactly 1 page */
+  .omr-sheet-wrapper {
+    height: 100% !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
   }
 }
 

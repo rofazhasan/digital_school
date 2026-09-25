@@ -23,40 +23,15 @@ const LANGS = {
 
 // --- Helper: Split an Exam Set into 4 Logical Pages for Booklet Printing ---
 function splitExamSetForBooklet(set: any, examInfo?: any) {
-  const allObj = (set.orderedObjective && set.orderedObjective.length > 0)
-    ? [...set.orderedObjective]
-    : [
-        ...(set.mcq || []),
-        ...(set.mc || []),
-        ...(set.int || []),
-        ...(set.ar || []),
-        ...(set.smcq || []),
-        ...(set.cma || []),
-        ...(set.mpc || []),
-        ...(set.dr || [])
-      ];
-
   const cqs = [...(set.cq || [])];
   const sqs = [...(set.sq || [])];
   const descriptives = [...(set.descriptive || [])];
   const mtfs = [...(set.mtf || [])];
 
-  const totalObj = allObj.length;
-  const totalWritten = cqs.length + sqs.length + descriptives.length + mtfs.length;
-
   const emptyQuestions = {
     mcq: [], mc: [], int: [], ar: [], cq: [], sq: [], mtf: [], descriptive: [],
     smcq: [], cma: [], mpc: [], dr: [], allObjective: []
   };
-
-  if (totalObj === 0 && totalWritten === 0) {
-    return [
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-    ];
-  }
 
   // Helper to package objective array into question format
   const makeObjQuestions = (arr: any[]) => ({
@@ -85,139 +60,138 @@ function splitExamSetForBooklet(set: any, examInfo?: any) {
     }
   }
 
-  // Group questions by subject
-  const subjectGroups: { name: string; questions: any[] }[] = [];
+  // Raw objective array
+  const rawObj = (set.orderedObjective && set.orderedObjective.length > 0)
+    ? [...set.orderedObjective]
+    : [
+        ...(set.mcq || []),
+        ...(set.mc || []),
+        ...(set.int || []),
+        ...(set.ar || []),
+        ...(set.smcq || []),
+        ...(set.cma || []),
+        ...(set.mpc || []),
+        ...(set.dr || [])
+      ];
+
+  // Helper to extract clean subject name
+  const getSubject = (q: any) => (q.subject || q.subjectName || q._canonicalSubject || '').trim();
+
+  // Order questions strictly by configured subjects (compulsory first, then optional)
+  let allObj: any[] = [];
   const configuredSubs: string[] = parsedConfig?.subjects?.map((s: any) => s.name) || [];
 
   if (configuredSubs.length > 0) {
-    configuredSubs.forEach((subName) => {
-      const qs = allObj.filter((q: any) => {
-        const qSub = (q.subject || q.subjectName || q._canonicalSubject || '').trim().toLowerCase();
+    const assignedIds = new Set<string>();
+    configuredSubs.forEach(subName => {
+      const qs = rawObj.filter(q => {
+        const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+        if (assignedIds.has(qId)) return false;
+        const qSub = getSubject(q).toLowerCase();
         return qSub === subName.trim().toLowerCase() || (qSub && subName.toLowerCase().includes(qSub));
       });
-      if (qs.length > 0) {
-        subjectGroups.push({ name: subName, questions: qs });
+      qs.forEach(q => {
+        const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+        assignedIds.add(qId);
+        allObj.push({ ...q, _canonicalSubject: subName });
+      });
+    });
+    // Add any remaining unassigned questions
+    rawObj.forEach(q => {
+      const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+      if (!assignedIds.has(qId)) {
+        allObj.push(q);
       }
     });
-    // Add any remaining questions not matched to configured subjects
-    const assignedIds = new Set(subjectGroups.flatMap(g => g.questions.map(q => q.id || q.q || q.questionText)));
-    const unassigned = allObj.filter(q => !assignedIds.has(q.id || q.q || q.questionText));
-    if (unassigned.length > 0) {
-      if (subjectGroups.length > 0) {
-        subjectGroups[subjectGroups.length - 1].questions.push(...unassigned);
-      } else {
-        subjectGroups.push({ name: 'General', questions: unassigned });
-      }
-    }
   } else {
-    // Detect subjects dynamically from question objects
-    allObj.forEach((q: any) => {
-      const sName = (q.subject || q.subjectName || q._canonicalSubject || '').trim();
-      if (sName) {
-        let group = subjectGroups.find(g => g.name.toLowerCase() === sName.toLowerCase());
-        if (!group) {
-          group = { name: sName, questions: [] };
-          subjectGroups.push(group);
-        }
-        group.questions.push(q);
-      }
-    });
+    allObj = rawObj;
   }
 
-  const isMultiSubject = subjectGroups.length >= 2;
+  const totalObj = allObj.length;
+  const totalWritten = cqs.length + sqs.length + descriptives.length + mtfs.length;
 
-  // =========================================================================
-  // SCENARIO 1: Multi-Subject Exam (Admission Standard: 4 Subjects -> 4 Pages)
-  // =========================================================================
-  if (isMultiSubject) {
-    // Case 1A: Exactly 4 Subjects -> 1 Subject per Page! (The Admission Test Standard)
-    if (subjectGroups.length === 4) {
-      return [
-        { questions: makeObjQuestions(subjectGroups[0].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
-        { questions: makeObjQuestions(subjectGroups[1].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
-        { questions: makeObjQuestions(subjectGroups[2].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name },
-        { questions: makeObjQuestions(subjectGroups[3].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[3].name }
-      ];
-    }
-
-    // Case 1B: 2 Subjects -> 2 Pages each! (Page 1+2 = Sub 1, Page 3+4 = Sub 2)
-    if (subjectGroups.length === 2) {
-      const s1 = subjectGroups[0].questions;
-      const s2 = subjectGroups[1].questions;
-      // Page 1 has header so give it ~42% of Sub 1
-      const s1P1Count = Math.max(1, Math.round(s1.length * 0.42));
-      const s1P1 = s1.slice(0, s1P1Count);
-      const s1P2 = s1.slice(s1P1Count);
-
-      const s2Half = Math.max(1, Math.round(s2.length * 0.5));
-      const s2P3 = s2.slice(0, s2Half);
-      const s2P4 = s2.slice(s2Half);
-
-      return [
-        { questions: makeObjQuestions(s1P1), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
-        { questions: makeObjQuestions(s1P2), startIndex: s1P1Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
-        { questions: makeObjQuestions(s2P3), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
-        { questions: makeObjQuestions(s2P4), startIndex: s2Half + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name }
-      ];
-    }
-
-    // Case 1C: 3 Subjects -> Sub 1 (P1), Sub 2 (P2), Sub 3 (P3 & P4)
-    if (subjectGroups.length === 3) {
-      const s3 = subjectGroups[2].questions;
-      const half = Math.max(1, Math.round(s3.length / 2));
-      return [
-        { questions: makeObjQuestions(subjectGroups[0].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[0].name },
-        { questions: makeObjQuestions(subjectGroups[1].questions), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[1].name },
-        { questions: makeObjQuestions(s3.slice(0, half)), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name },
-        { questions: makeObjQuestions(s3.slice(half)), startIndex: half + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: subjectGroups[2].name }
-      ];
-    }
-
-    // Case 1D: > 4 Subjects -> Distribute subjects cleanly without mid-subject breaks where possible
-    const bins: any[][] = [[], [], [], []];
-    const binNames: string[][] = [[], [], [], []];
-    let curBin = 0;
-    subjectGroups.forEach((sg, idx) => {
-      bins[curBin].push(...sg.questions);
-      binNames[curBin].push(sg.name);
-      if (curBin < 3 && idx < subjectGroups.length - 1) {
-        curBin++;
-      }
-    });
-
-    return bins.map((binQs, bIdx) => ({
-      questions: makeObjQuestions(binQs),
-      startIndex: 1,
-      cqStartIndex: 1,
-      sqStartIndex: 1,
-      subjectName: binNames[bIdx].join(', ')
-    }));
+  if (totalObj === 0 && totalWritten === 0) {
+    return [
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+      { questions: { ...emptyQuestions }, startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
+    ];
   }
 
   // =========================================================================
-  // SCENARIO 2: Single-Subject Pure Objective Exam (Height-Balanced Formula)
+  // PURE OBJECTIVE EXAM (Admission Standard: Krishi Guchho, BUET, DU, Medical)
+  // Capacity-Aware Pagination: Page 1 holds ~18-20% (due to cover header & instructions),
+  // Pages 2, 3, 4 hold ~27-28% each. Never overflows.
   // =========================================================================
   if (totalWritten === 0) {
-    // Page 1 has Exam Header + Instruction Box (~18-20% capacity)
-    // Pages 2, 3, 4 have 100% vertical space available (~27% each)
-    // Formula ensures p1 + p2 + p3 + p4 === totalObj exactly!
-    const p1Count = totalObj <= 8 ? Math.max(1, Math.floor(totalObj / 4)) : Math.max(1, Math.round(totalObj * 0.18));
-    const remaining = totalObj - p1Count;
-    const p2Count = Math.max(1, Math.round(remaining / 3));
-    const p3Count = Math.max(1, Math.round((remaining - p2Count) / 2));
-    const p4Count = Math.max(0, totalObj - p1Count - p2Count - p3Count);
+    // 1. Calculate ideal page capacities
+    const t1 = totalObj <= 8 ? Math.max(1, Math.floor(totalObj / 4)) : Math.max(1, Math.round(totalObj * 0.18));
+    const rem = totalObj - t1;
+    const t2 = Math.max(1, Math.round(rem / 3));
+    const t3 = Math.max(1, Math.round((rem - t2) / 2));
 
-    const p1Obj = allObj.slice(0, p1Count);
-    const p2Obj = allObj.slice(p1Count, p1Count + p2Count);
-    const p3Obj = allObj.slice(p1Count + p2Count, p1Count + p2Count + p3Count);
-    const p4Obj = allObj.slice(p1Count + p2Count + p3Count);
+    // 2. Find subject boundaries in the ordered stream
+    const subjectEndIndices: number[] = [];
+    for (let i = 0; i < allObj.length; i++) {
+      const curSub = getSubject(allObj[i]).toLowerCase();
+      const nextSub = i + 1 < allObj.length ? getSubject(allObj[i + 1]).toLowerCase() : null;
+      if (curSub !== nextSub) {
+        subjectEndIndices.push(i + 1); // 1-based index where subject ends
+      }
+    }
 
-    return [
-      { questions: makeObjQuestions(p1Obj), startIndex: 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: makeObjQuestions(p2Obj), startIndex: p1Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: makeObjQuestions(p3Obj), startIndex: p1Count + p2Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' },
-      { questions: makeObjQuestions(p4Obj), startIndex: p1Count + p2Count + p3Count + 1, cqStartIndex: 1, sqStartIndex: 1, subjectName: '' }
+    // 3. Find optimal split points snapping to subject boundaries when within safe margin
+    const ideals = [t1, t1 + t2, t1 + t2 + t3];
+    const splitPoints: number[] = [];
+
+    ideals.forEach((ideal, pIdx) => {
+      let best = ideal;
+      // For Page 1 (cover with header), never allow more than 20 questions (or 22% of total)
+      const maxA = pIdx === 0 ? Math.min(20, Math.max(t1, Math.round(totalObj * 0.22))) : (ideal + 3);
+      const minA = ideal - 3;
+
+      for (const sb of subjectEndIndices) {
+        if (sb >= minA && sb <= maxA) {
+          best = sb;
+          break;
+        }
+      }
+      splitPoints.push(best);
+    });
+
+    const slices = [
+      allObj.slice(0, splitPoints[0]),
+      allObj.slice(splitPoints[0], splitPoints[1]),
+      allObj.slice(splitPoints[1], splitPoints[2]),
+      allObj.slice(splitPoints[2])
     ];
+
+    return slices.map((pageQs, pIdx) => {
+      const prevQs = allObj.slice(0, pIdx === 0 ? 0 : splitPoints[pIdx - 1]);
+      const firstQ = pageQs[0];
+      const firstSub = firstQ ? getSubject(firstQ) : '';
+
+      // Count how many questions of firstSub were rendered before this page
+      const countBefore = firstSub
+        ? prevQs.filter(q => getSubject(q).toLowerCase() === firstSub.toLowerCase()).length
+        : prevQs.length;
+      const startIndex = countBefore + 1;
+
+      // Extract unique subjects on this page for the running header tag
+      const subs = [...new Set(pageQs.map(q => getSubject(q)).filter(Boolean))];
+      if (countBefore > 0 && subs.length > 0) {
+        subs[0] = `${subs[0]} (চলমান)`;
+      }
+
+      return {
+        questions: makeObjQuestions(pageQs),
+        startIndex,
+        cqStartIndex: 1,
+        sqStartIndex: 1,
+        subjectName: subs.join(' | ')
+      };
+    });
   }
 
   // =========================================================================
@@ -796,6 +770,9 @@ export default function PrintExamPage() {
                             pageNumberLabel=""
                           />
                         )}
+                        <div className="mt-auto pt-1 text-center border-t border-dashed border-gray-400 text-[8px] font-bold uppercase tracking-widest text-gray-600">
+                          {language === 'en' ? '— END OF QUESTION PAPER —' : '— সমাপ্ত (সকল প্রশ্নের উত্তর দেওয়া শেষ করুন) —'}
+                        </div>
                       </div>
 
                       {/* Center Fold Crease Line */}
@@ -1175,6 +1152,9 @@ export default function PrintExamPage() {
                             pageNumberLabel=""
                           />
                         )}
+                        <div className="mt-auto pt-1 text-center border-t border-dashed border-gray-400 text-[8px] font-bold uppercase tracking-widest text-gray-600">
+                          {language === 'en' ? '— END OF QUESTION PAPER —' : '— সমাপ্ত (সকল প্রশ্নের উত্তর দেওয়া শেষ করুন) —'}
+                        </div>
                       </div>
                     </div>
                   </React.Fragment>
