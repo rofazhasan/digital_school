@@ -813,6 +813,15 @@ export default function ExamsPage() {
                   <LayoutDashboard className="h-4 w-4 mr-1.5 text-slate-500" />
                   Dashboard
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/bulk-print')}
+                  className="rounded-xl border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 font-semibold text-blue-700 dark:text-blue-300 shadow-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all"
+                >
+                  <Printer className="h-4 w-4 mr-1.5 text-blue-600 dark:text-blue-400" />
+                  Bulk Print
+                </Button>
                 {userRole !== 'TEACHER' && (
                   <Button
                     onClick={handleCreate}
@@ -1237,6 +1246,14 @@ export default function ExamsPage() {
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
+                    size="sm"
+                    onClick={() => router.push(`/exams/bulk-print?ids=${selectedExams.join(',')}`)}
+                    className="h-8 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+                  >
+                    <Printer className="w-3.5 h-3.5 mr-1" />
+                    Bulk Print ({selectedExams.length})
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedExams([])}
@@ -1428,6 +1445,10 @@ export default function ExamsPage() {
                                   <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => window.open(`/exams/${exam.id}/print`, '_blank')}>
                                     <Printer className="w-4 h-4 text-violet-500" />
                                     <span>Print Exam & Cards</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/bulk-print?ids=${exam.id}`)}>
+                                    <Layers className="w-4 h-4 text-blue-500" />
+                                    <span>Open in Bulk Print Hub</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator className="my-1.5" />
                                   <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600 font-bold cursor-pointer" onClick={(e) => openDeleteDialog(exam, e)}>

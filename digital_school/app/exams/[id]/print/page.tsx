@@ -112,7 +112,7 @@ export function computeBookletSheets(totalLogicalPages: number): { sheets: Bookl
 }
 
 // --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page, 8-page, N-page) ---
-function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 4) {
+export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 4) {
   const cqs = [...(set.cq || [])];
   const sqs = [...(set.sq || [])];
   const descriptives = [...(set.descriptive || [])];
@@ -1283,7 +1283,7 @@ export default function PrintExamPage() {
 }
 
 // --- Sub-Component: OMR Page ---
-const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
+export const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
   const [uniqueCode] = useState(() => uuidv4());
 
   const mcqOptionsCount = useMemo(() => {
@@ -1641,7 +1641,7 @@ const PrintControls = ({
 };
 
 // --- Sub-Component: Comprehensive Booklet & Paper Size Advisory Modal ---
-const BookletGuideModal = ({
+export const BookletGuideModal = ({
   language, paperSize, setPaperSize, layoutMode, setLayoutMode, activeTab, setActiveTab, onClose
 }: any) => {
   const isEn = language === 'en';
