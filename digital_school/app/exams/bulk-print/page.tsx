@@ -10,7 +10,8 @@ import {
   Layers, Settings2, Sliders, ChevronDown, ChevronUp, MoveUp,
   MoveDown, Trash2, Eye, EyeOff, FileText, CheckCircle2,
   AlertCircle, RefreshCw, Sparkles, BookOpen, Calendar,
-  HelpCircle, ExternalLink, Minimize2, Maximize2, X
+  HelpCircle, ExternalLink, Minimize2, Maximize2, X,
+  Calculator, Users, Check, Building2, Stamp, Copy
 } from 'lucide-react';
 
 import { mathJaxConfig as globalMathJaxConfig } from '@/app/components/MathJaxConfig';
@@ -54,7 +55,6 @@ const LANGS = {
     bulkPrintHub: "বাল্ক এক্সাম প্রিন্ট ও PDF স্টুডিও",
     selectedExams: "টি এক্সাম নির্বাচিত",
     selectExamsToPrint: "প্রিন্ট করার জন্য এক্সাম নির্বাচন করুন",
-    loadSelected: "নির্বাচিত এক্সাম লোড করুন",
     noExamsSelected: "কোনো এক্সাম সিলেক্ট করা হয়নি",
     searchPlaceholder: "এক্সামের নাম, বিষয় বা ক্লাস দিয়ে খুঁজুন...",
     freshPagePerExam: "প্রতিটি এক্সাম নতুন পেজ থেকে শুরু হবে",
@@ -70,6 +70,9 @@ const LANGS = {
     compactPreset: "কমপ্যাক্ট (৮৫%)",
     standardPreset: "স্ট্যান্ডার্ড (১০০%)",
     largePreset: "লার্জ (১১৫%)",
+    pages: "পৃষ্ঠা",
+    sheets: "শিট",
+    duplexNote: "ডুপ্লেক্স / উভয় পৃষ্ঠায় প্রিন্ট",
   },
   en: {
     print: "Print All / Download PDF",
@@ -78,7 +81,6 @@ const LANGS = {
     bulkPrintHub: "Bulk Exam Print & PDF Studio",
     selectedExams: "Exams Selected",
     selectExamsToPrint: "Select Exams to Print",
-    loadSelected: "Load Selected Exams",
     noExamsSelected: "No exams selected yet",
     searchPlaceholder: "Search by exam title, subject or class...",
     freshPagePerExam: "Fresh Page per Exam (Page Break)",
@@ -94,6 +96,9 @@ const LANGS = {
     compactPreset: "Compact (85%)",
     standardPreset: "Standard (100%)",
     largePreset: "Large (115%)",
+    pages: "Pages",
+    sheets: "Sheets",
+    duplexNote: "Duplex / Both Sides Print",
   }
 };
 
@@ -120,13 +125,14 @@ function BulkPrintContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'selected' | 'unselected'>('all');
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
-  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState<number>(100);
 
   // Print Configuration Options
   const [language, setLanguage] = useState<'bn' | 'en'>('bn');
   const [outputType, setOutputType] = useState<'questions' | 'answers' | 'both'>('questions');
   const [paperSize, setPaperSize] = useState<'a4' | 'a3' | 'legal' | 'letter'>('a4');
   const [layoutMode, setLayoutMode] = useState<'standard' | 'booklet_4page' | 'booklet_2up'>('standard');
+  const [standardPagingMode, setStandardPagingMode] = useState<'paginated_bounds' | 'continuous_flow'>('paginated_bounds');
   const [examSeparation, setExamSeparation] = useState<'page_break' | 'continuous'>('page_break');
   const [setSelection, setSetSelection] = useState<'all' | 'first_only'>('all');
   const [showOMR, setShowOMR] = useState(false);
@@ -134,10 +140,25 @@ function BulkPrintContent() {
   const [showFoldGuide, setShowFoldGuide] = useState(true);
   const [showDate, setShowDate] = useState(true);
   const [showSignatures, setShowSignatures] = useState(true);
+  const [spacingDensity, setSpacingDensity] = useState<'compact' | 'standard' | 'spacious'>('standard');
+
+  // Institute Customization State (Persistent)
   const [hideInstitute, setHideInstitute] = useState(false);
   const [globalSchoolName, setGlobalSchoolName] = useState('');
   const [globalSchoolAddress, setGlobalSchoolAddress] = useState('');
+  const [showWatermark, setShowWatermark] = useState(true);
+  const [customWatermarkText, setCustomWatermarkText] = useState('');
   const [showGlobalInstituteModal, setShowGlobalInstituteModal] = useState(false);
+
+  // Modal Temp State
+  const [tempSchoolName, setTempSchoolName] = useState('');
+  const [tempSchoolAddress, setTempSchoolAddress] = useState('');
+  const [tempWatermarkText, setTempWatermarkText] = useState('');
+  const [instituteSaveSuccess, setInstituteSaveSuccess] = useState(false);
+
+  // Student Print Calculator State
+  const [studentBatchCount, setStudentBatchCount] = useState<number>(50);
+  const [showCalculator, setShowCalculator] = useState(false);
 
   // Font Scaling
   const [objectiveFontSize, setObjectiveFontSize] = useState(100);
@@ -162,20 +183,50 @@ function BulkPrintContent() {
     }
   }, [searchParams]);
 
-  // Persist / restore layout preferences
+  // Persist / restore layout preferences & institute settings from localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const savedPaper = localStorage.getItem('bulk_print_paper_size');
       if (savedPaper) setPaperSize(savedPaper as any);
+
       const savedLayout = localStorage.getItem('bulk_print_layout_mode');
       if (savedLayout) setLayoutMode(savedLayout as any);
+
+      const savedPaging = localStorage.getItem('bulk_print_standard_paging');
+      if (savedPaging) setStandardPagingMode(savedPaging as any);
+
       const savedLang = localStorage.getItem('bulk_print_lang');
       if (savedLang) setLanguage(savedLang as any);
+
       const savedSep = localStorage.getItem('bulk_print_separation');
       if (savedSep) setExamSeparation(savedSep as any);
+
+      const savedDensity = localStorage.getItem('bulk_print_density');
+      if (savedDensity) setSpacingDensity(savedDensity as any);
+
+      const savedName = localStorage.getItem('bulk_custom_school_name');
+      if (savedName) setGlobalSchoolName(savedName);
+
+      const savedAddress = localStorage.getItem('bulk_custom_school_address');
+      if (savedAddress) setGlobalSchoolAddress(savedAddress);
+
+      const savedWatermark = localStorage.getItem('bulk_custom_watermark');
+      if (savedWatermark) setCustomWatermarkText(savedWatermark);
+
+      const savedShowWatermark = localStorage.getItem('bulk_show_watermark');
+      if (savedShowWatermark !== null) setShowWatermark(savedShowWatermark === 'true');
+
+      const savedHideInstitute = localStorage.getItem('bulk_hide_institute');
+      if (savedHideInstitute !== null) setHideInstitute(savedHideInstitute === 'true');
+
+      const savedObjFont = localStorage.getItem('bulk_obj_font_size');
+      if (savedObjFont) setObjectiveFontSize(Number(savedObjFont));
+
+      const savedCqFont = localStorage.getItem('bulk_cq_font_size');
+      if (savedCqFont) setCqSqFontSize(Number(savedCqFont));
     } catch (e) {
-      console.error(e);
+      console.error('Error restoring bulk print preferences', e);
     }
   }, []);
 
@@ -316,6 +367,58 @@ function BulkPrintContent() {
     return () => clearInterval(interval);
   }, []);
 
+  // Open Institute Modal with current active values
+  const handleOpenInstituteModal = () => {
+    setTempSchoolName(globalSchoolName);
+    setTempSchoolAddress(globalSchoolAddress);
+    setTempWatermarkText(customWatermarkText);
+    setInstituteSaveSuccess(false);
+    setShowGlobalInstituteModal(true);
+  };
+
+  // Save Institute Changes to state and localStorage
+  const handleSaveInstituteChanges = () => {
+    setGlobalSchoolName(tempSchoolName);
+    setGlobalSchoolAddress(tempSchoolAddress);
+    setCustomWatermarkText(tempWatermarkText);
+
+    try {
+      localStorage.setItem('bulk_custom_school_name', tempSchoolName);
+      localStorage.setItem('bulk_custom_school_address', tempSchoolAddress);
+      localStorage.setItem('bulk_custom_watermark', tempWatermarkText);
+      localStorage.setItem('bulk_show_watermark', String(showWatermark));
+      localStorage.setItem('bulk_hide_institute', String(hideInstitute));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setInstituteSaveSuccess(true);
+    setTimeout(() => {
+      setShowGlobalInstituteModal(false);
+      setInstituteSaveSuccess(false);
+    }, 600);
+  };
+
+  // Reset Institute to default values
+  const handleResetInstituteDefaults = () => {
+    setTempSchoolName('');
+    setTempSchoolAddress('');
+    setTempWatermarkText('');
+    setGlobalSchoolName('');
+    setGlobalSchoolAddress('');
+    setCustomWatermarkText('');
+    setHideInstitute(false);
+
+    try {
+      localStorage.removeItem('bulk_custom_school_name');
+      localStorage.removeItem('bulk_custom_school_address');
+      localStorage.removeItem('bulk_custom_watermark');
+      localStorage.removeItem('bulk_hide_institute');
+    } catch (e) {}
+
+    setShowGlobalInstituteModal(false);
+  };
+
   // Filtered exams list in the selector drawer
   const filteredExamsList = useMemo(() => {
     return allExamsList.filter(item => {
@@ -360,20 +463,6 @@ function BulkPrintContent() {
     setSelectedExamIds([]);
   };
 
-  // Invert selection among filtered
-  const handleInvertFiltered = () => {
-    const filteredIds = filteredExamsList.map(e => e.id);
-    setSelectedExamIds(prev => {
-      const newSelected = [...prev];
-      filteredIds.forEach(id => {
-        const idx = newSelected.indexOf(id);
-        if (idx > -1) newSelected.splice(idx, 1);
-        else newSelected.push(id);
-      });
-      return newSelected;
-    });
-  };
-
   // Move exam up in print order
   const moveExamOrder = (index: number, direction: 'up' | 'down') => {
     setSelectedExamIds(prev => {
@@ -391,6 +480,136 @@ function BulkPrintContent() {
   const removeSelectedExam = (id: string) => {
     setSelectedExamIds(prev => prev.filter(x => x !== id));
   };
+
+  // Resolved list of loaded exams in the user-specified sequence
+  const orderedLoadedExams = useMemo(() => {
+    return selectedExamIds
+      .map(id => loadedExamsMap[id])
+      .filter((ex): ex is LoadedExamData => Boolean(ex));
+  }, [selectedExamIds, loadedExamsMap]);
+
+  // =========================================================================
+  // PRECISE REAL-TIME PRINT PAGE & SHEET BUDGET CALCULATOR
+  // =========================================================================
+  const printMetrics = useMemo(() => {
+    let totalLogicalPages = 0;
+    let totalPhysicalSheets = 0;
+    let totalQuestions = 0;
+    let totalMarks = 0;
+
+    const examBreakdowns: Array<{
+      id: string;
+      title: string;
+      logicalPages: number;
+      sheets: number;
+      setsCount: number;
+      questionsCount: number;
+      omrSheets: number;
+    }> = [];
+
+    orderedLoadedExams.forEach((examData) => {
+      const { sets, examInfo } = examData;
+      const effectiveInfo = {
+        ...examInfo,
+        schoolName: globalSchoolName !== '' ? globalSchoolName : examInfo?.schoolName,
+      };
+
+      const nonEmptySets = (sets || []).filter(
+        (set: any) => (
+          set.mcq?.length || set.mc?.length || set.int?.length ||
+          set.ar?.length || set.cq?.length || set.sq?.length ||
+          set.mtf?.length || set.descriptive?.length || set.orderedObjective?.length
+        )
+      );
+
+      const targetSets = setSelection === 'first_only' ? nonEmptySets.slice(0, 1) : nonEmptySets;
+      let examPages = 0;
+      let examSheets = 0;
+      let examQuestions = 0;
+
+      targetSets.forEach((set: any) => {
+        const mcqCount = set.mcq?.length || set.orderedObjective?.length || 0;
+        const cqCount = set.cq?.length || 0;
+        const sqCount = set.sq?.length || 0;
+        const totalQ = mcqCount + cqCount + sqCount;
+        examQuestions += totalQ;
+
+        if (layoutMode === 'booklet_4page') {
+          // Booklet Imposition: exact multiple of 4 pages
+          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+          const { N, sheets } = computeBookletSheets(logicalPages.length);
+          examPages += N;
+          examSheets += sheets.length;
+        } else if (layoutMode === 'booklet_2up') {
+          // 2-Up Sequential Spread: 2 pages per sheet
+          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+          examPages += logicalPages.length;
+          examSheets += Math.ceil(logicalPages.length / 2);
+        } else {
+          // Standard Multi-Page Mode
+          if (standardPagingMode === 'paginated_bounds') {
+            const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+            examPages += logicalPages.length;
+            examSheets += Math.ceil(logicalPages.length / 2);
+          } else {
+            // Continuous single long container (estimated by questions count and font scaling)
+            const pagesEst = Math.max(1, Math.ceil((totalQ * (objectiveFontSize / 100)) / 28));
+            examPages += pagesEst;
+            examSheets += Math.ceil(pagesEst / 2);
+          }
+        }
+
+        // If answers are included in 'both' mode, double question paper pages
+        if (outputType === 'both') {
+          examPages *= 2;
+          examSheets *= 2;
+        }
+      });
+
+      // OMR sheets (1 per set if enabled)
+      const omrSheetsCount = showOMR && outputType !== 'answers' ? targetSets.length : 0;
+      examPages += omrSheetsCount;
+      examSheets += omrSheetsCount;
+
+      totalLogicalPages += examPages;
+      totalPhysicalSheets += examSheets;
+      totalQuestions += examQuestions;
+      totalMarks += (examInfo?.totalMarks || 0);
+
+      examBreakdowns.push({
+        id: examData.id,
+        title: examInfo?.title || 'Exam',
+        logicalPages: examPages,
+        sheets: examSheets,
+        setsCount: targetSets.length,
+        questionsCount: examQuestions,
+        omrSheets: omrSheetsCount
+      });
+    });
+
+    const studentsRequirement = studentBatchCount > 0 ? totalPhysicalSheets * studentBatchCount : 0;
+    const reamsRequirement = (studentsRequirement / 500).toFixed(1);
+
+    return {
+      totalLogicalPages,
+      totalPhysicalSheets,
+      totalQuestions,
+      totalMarks,
+      examBreakdowns,
+      studentsRequirement,
+      reamsRequirement
+    };
+  }, [
+    orderedLoadedExams,
+    layoutMode,
+    standardPagingMode,
+    setSelection,
+    outputType,
+    showOMR,
+    objectiveFontSize,
+    globalSchoolName,
+    studentBatchCount
+  ]);
 
   // Print execution with react-to-print
   // @ts-ignore
@@ -430,31 +649,7 @@ function BulkPrintContent() {
   const t = LANGS[language];
   const paperClass = paperSize === 'legal' ? 'legal-paper' : paperSize === 'a3' ? 'a3-paper' : paperSize === 'letter' ? 'letter-paper' : 'a4-paper';
   const isBooklet = layoutMode === 'booklet_4page' || layoutMode === 'booklet_2up';
-
-  // Resolved list of loaded exams in the user-specified sequence
-  const orderedLoadedExams = useMemo(() => {
-    return selectedExamIds
-      .map(id => loadedExamsMap[id])
-      .filter((ex): ex is LoadedExamData => Boolean(ex));
-  }, [selectedExamIds, loadedExamsMap]);
-
-  // Total question count calculation across all loaded exams
-  const totalStats = useMemo(() => {
-    let totalQuestions = 0;
-    let totalMarks = 0;
-    orderedLoadedExams.forEach(ex => {
-      const sets = ex.sets || [];
-      const firstSet = sets[0];
-      if (firstSet) {
-        const mcqCount = firstSet.mcq?.length || firstSet.orderedObjective?.length || 0;
-        const cqCount = firstSet.cq?.length || 0;
-        const sqCount = firstSet.sq?.length || 0;
-        totalQuestions += (mcqCount + cqCount + sqCount);
-      }
-      totalMarks += (ex.examInfo?.totalMarks || 0);
-    });
-    return { totalQuestions, totalMarks };
-  }, [orderedLoadedExams]);
+  const densityClass = spacingDensity === 'compact' ? 'compact-exam-density' : spacingDensity === 'spacious' ? 'spacious-exam-density' : '';
 
   return (
     <MathJaxContext config={mathJaxConfig}>
@@ -473,9 +668,11 @@ function BulkPrintContent() {
                   : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
               };
               margin: ${
-                isBooklet
-                  ? (paperSize === 'a3' ? '8mm' : '5mm')
-                  : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
+                spacingDensity === 'compact'
+                  ? '4mm'
+                  : isBooklet
+                    ? (paperSize === 'a3' ? '8mm' : '5mm')
+                    : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
               };
             }
             body {
@@ -483,13 +680,34 @@ function BulkPrintContent() {
               print-color-adjust: exact !important;
               background: white !important;
             }
+            .bulk-watermark-overlay {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              font-size: 7.5rem;
+              color: rgba(0, 0, 0, 0.035) !important;
+              font-weight: 900;
+              letter-spacing: 0.1em;
+              white-space: nowrap;
+              pointer-events: none;
+              z-index: 0;
+              text-transform: uppercase;
+              user-select: none;
+            }
+            .compact-exam-density .question-paper-container {
+              line-height: 1.35 !important;
+            }
+            .compact-exam-density .question-item {
+              margin-bottom: 0.25rem !important;
+            }
           }
         ` }} />
 
         {/* =========================================================================
             TOP NAV BAR (Header)
            ========================================================================= */}
-        <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between print:hidden">
+        <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/exams')}
@@ -499,27 +717,63 @@ function BulkPrintContent() {
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-white flex items-center gap-1.5">
                   <Printer className="w-4 h-4 text-blue-400" />
                   {t.bulkPrintHub}
                 </h1>
+                
+                {/* Selected Exams Badge */}
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   {selectedExamIds.length} {t.selectedExams}
                 </span>
-                {totalStats.totalQuestions > 0 && (
-                  <span className="hidden md:inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {totalStats.totalQuestions} Questions
+
+                {/* EXACT LIVE PAGE BUDGET BADGE */}
+                {printMetrics.totalPhysicalSheets > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-xs">
+                    <FileText className="w-3 h-3 text-amber-400" />
+                    <span>{printMetrics.totalPhysicalSheets} Sheets ({printMetrics.totalLogicalPages} Pages)</span>
                   </span>
                 )}
+
+                {/* Active Custom Institute Pill */}
+                {globalSchoolName ? (
+                  <button
+                    onClick={handleOpenInstituteModal}
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 transition flex items-center gap-1"
+                    title="Click to edit custom institution header"
+                  >
+                    <Building2 className="w-3 h-3 text-purple-400" />
+                    <span className="max-w-[130px] truncate">{globalSchoolName}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleOpenInstituteModal}
+                    className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 hover:text-slate-200 transition flex items-center gap-1"
+                  >
+                    <Building2 className="w-3 h-3" />
+                    <span>Default Institute</span>
+                  </button>
+                )}
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">
-                Professional typeset examination bundle with universal booklet imposition & zero overflow
-              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Student Paper Budget Calculator Button */}
+            <button
+              onClick={() => setShowCalculator(prev => !prev)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition border ${
+                showCalculator
+                  ? 'bg-amber-600/30 text-amber-300 border-amber-500/50'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title="Calculate paper reams & sheets required for student cohorts"
+            >
+              <Calculator className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Paper Budget</span>
+            </button>
+
             {/* Drawer Toggle */}
             <button
               onClick={() => setIsDrawerOpen(prev => !prev)}
@@ -530,7 +784,7 @@ function BulkPrintContent() {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{isDrawerOpen ? 'Hide Selector' : 'Select Exams'}</span>
+              <span>{isDrawerOpen ? 'Hide Drawer' : 'Select Exams'}</span>
               <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">
                 {selectedExamIds.length}
               </span>
@@ -561,6 +815,43 @@ function BulkPrintContent() {
         </header>
 
         {/* =========================================================================
+            STUDENT BATCH PAPER BUDGET CALCULATOR DROPDOWN (Interactive)
+           ========================================================================= */}
+        {showCalculator && (
+          <div className="bg-amber-950/40 border-b border-amber-800/60 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-amber-200 flex-wrap gap-3 print:hidden animate-fade-in">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                <Users className="w-4 h-4 text-amber-400" />
+                <span>Student Cohort Calculator:</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-amber-200/80">Batch Size:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  value={studentBatchCount}
+                  onChange={(e) => setStudentBatchCount(Math.max(1, Number(e.target.value)))}
+                  className="w-20 px-2 py-0.5 rounded-lg bg-slate-900 border border-amber-700 text-amber-100 font-mono font-bold text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <span>students</span>
+              </div>
+              <div className="h-4 w-px bg-amber-800/80 hidden sm:block" />
+              <div className="flex items-center gap-2">
+                <span>Sheets per student: <strong className="text-white font-mono">{printMetrics.totalPhysicalSheets}</strong></span>
+                <span>• Total Reams: <strong className="text-amber-300 font-mono">{printMetrics.reamsRequirement}</strong> (~{printMetrics.studentsRequirement} sheets)</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowCalculator(false)}
+              className="text-amber-400 hover:text-amber-200 font-bold text-xs"
+            >
+              ✕ Close
+            </button>
+          </div>
+        )}
+
+        {/* =========================================================================
             MAIN WORKSPACE: Sidebar Drawer + Main Canvas
            ========================================================================= */}
         <div className="flex-1 flex overflow-hidden relative">
@@ -575,7 +866,7 @@ function BulkPrintContent() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                     <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                    Exam Selection Drawer
+                    Exams Selector ({selectedExamIds.length})
                   </h2>
                   <div className="flex items-center gap-1">
                     <button
@@ -631,32 +922,41 @@ function BulkPrintContent() {
                 </div>
               </div>
 
-              {/* Selected Sequence Re-order Section (if selected exams exist) */}
+              {/* Selected Sequence Re-order Section with Per-Exam Page Badges */}
               {selectedExamIds.length > 0 && (
                 <div className="bg-slate-900/90 border-b border-slate-800 p-2.5">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300 mb-1.5">
                     <span className="flex items-center gap-1 text-blue-400">
                       <MoveUp className="w-3 h-3" /> Print Sequence ({selectedExamIds.length})
                     </span>
-                    <span className="text-[10px] text-slate-500">Order controls page sequence</span>
+                    <span className="text-[10px] text-amber-400 font-mono font-bold">
+                      {printMetrics.totalPhysicalSheets} Sheets Total
+                    </span>
                   </div>
-                  <div className="max-h-32 overflow-y-auto space-y-1 pr-1 text-xs">
+                  <div className="max-h-36 overflow-y-auto space-y-1 pr-1 text-xs">
                     {selectedExamIds.map((id, idx) => {
                       const examItem = allExamsList.find(e => e.id === id);
+                      const breakdown = printMetrics.examBreakdowns.find(b => b.id === id);
+
                       return (
                         <div
                           key={`ordered-${id}`}
                           className="flex items-center justify-between bg-slate-950 p-1.5 rounded-lg border border-slate-800 text-[11px]"
                         >
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 font-mono text-[9px] flex items-center justify-center flex-shrink-0 font-bold">
                               {idx + 1}
                             </span>
                             <span className="truncate text-slate-200 font-medium">
                               {examItem?.title || id}
                             </span>
+                            {breakdown && (
+                              <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-blue-900/50 text-blue-300 border border-blue-800 flex-shrink-0">
+                                {breakdown.logicalPages}p • {breakdown.sheets}s
+                              </span>
+                            )}
                           </div>
-                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
                             <button
                               onClick={() => moveExamOrder(idx, 'up')}
                               disabled={idx === 0}
@@ -702,7 +1002,7 @@ function BulkPrintContent() {
                 ) : (
                   filteredExamsList.map(item => {
                     const isSelected = selectedExamIds.includes(item.id);
-                    const isLoaded = Boolean(loadedExamsMap[item.id]);
+                    const breakdown = printMetrics.examBreakdowns.find(b => b.id === item.id);
 
                     return (
                       <div
@@ -746,6 +1046,11 @@ function BulkPrintContent() {
                               {item.duration > 0 && (
                                 <span>{item.duration} Mins</span>
                               )}
+                              {breakdown && (
+                                <span className="text-amber-400 font-mono font-bold bg-amber-950/60 border border-amber-800/60 px-1 rounded">
+                                  {breakdown.logicalPages}p • {breakdown.sheets}s
+                                </span>
+                              )}
                             </div>
                           </div>
                           {isSelected && (
@@ -768,7 +1073,7 @@ function BulkPrintContent() {
           <main className="flex-1 flex flex-col h-[calc(100vh-53px)] overflow-hidden bg-slate-900">
             
             {/* Top Toolbar: Settings & Controls */}
-            <div className="bg-slate-950/80 border-b border-slate-800 p-3 flex items-center justify-between flex-wrap gap-2 text-xs print:hidden">
+            <div className="bg-slate-950/90 border-b border-slate-800 p-2.5 sm:p-3 flex items-center justify-between flex-wrap gap-2 text-xs print:hidden">
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Paper Size */}
                 <div className="flex items-center gap-1.5">
@@ -782,8 +1087,8 @@ function BulkPrintContent() {
                     }}
                     className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="a4">A4 (Standard)</option>
-                    <option value="a3">A3 (🌟 Admission Booklet)</option>
+                    <option value="a4">A4 (Standard 210×297mm)</option>
+                    <option value="a3">A3 (🌟 Admission Test Booklet)</option>
                     <option value="legal">Legal (Long 8.5×14")</option>
                     <option value="letter">Letter (8.5×11")</option>
                   </select>
@@ -807,6 +1112,43 @@ function BulkPrintContent() {
                   </select>
                 </div>
 
+                {/* Standard Paging Mode (Only when Standard layout is active) */}
+                {layoutMode === 'standard' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400 font-medium">Pagination:</span>
+                    <select
+                      value={standardPagingMode}
+                      onChange={(e) => {
+                        const v = e.target.value as any;
+                        setStandardPagingMode(v);
+                        try { localStorage.setItem('bulk_print_standard_paging', v); } catch (err) {}
+                      }}
+                      className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="paginated_bounds">Discrete Bounded Pages (No Cutting)</option>
+                      <option value="continuous_flow">Continuous Flow (Vertical)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Space Density (Compact vs Standard vs Spacious) */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-medium">Density:</span>
+                  <select
+                    value={spacingDensity}
+                    onChange={(e) => {
+                      const v = e.target.value as any;
+                      setSpacingDensity(v);
+                      try { localStorage.setItem('bulk_print_density', v); } catch (err) {}
+                    }}
+                    className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="compact">Compact (⚡ Space Saver)</option>
+                    <option value="standard">Balanced (Standard Exam)</option>
+                    <option value="spacious">Spacious (Readable)</option>
+                  </select>
+                </div>
+
                 {/* Separation Mode */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-400 font-medium">Separation:</span>
@@ -819,8 +1161,8 @@ function BulkPrintContent() {
                     }}
                     className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="page_break">Fresh Page per Exam (Recommended)</option>
-                    <option value="continuous">Continuous Flow (Save Paper)</option>
+                    <option value="page_break">Fresh Sheet per Exam</option>
+                    <option value="continuous">Continuous Flow</option>
                   </select>
                 </div>
 
@@ -853,7 +1195,7 @@ function BulkPrintContent() {
                 </div>
               </div>
 
-              {/* Right Side Options: OMR, Font Presets, Booklet Guide */}
+              {/* Right Side Options: OMR, Booklet Guide, Institute Edit */}
               <div className="flex items-center gap-2 flex-wrap">
                 {/* OMR Toggle */}
                 <button
@@ -879,17 +1221,17 @@ function BulkPrintContent() {
 
                 {/* Institute Customization Modal Trigger */}
                 <button
-                  onClick={() => setShowGlobalInstituteModal(true)}
-                  className="px-2 py-1 rounded-lg text-xs font-semibold text-slate-300 bg-slate-900 border border-slate-700 hover:bg-slate-800 transition flex items-center gap-1"
+                  onClick={handleOpenInstituteModal}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-100 bg-indigo-600 hover:bg-indigo-500 shadow-xs transition flex items-center gap-1"
                 >
-                  <Settings2 className="w-3.5 h-3.5" />
-                  <span>Institute</span>
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Edit Institute</span>
                 </button>
               </div>
             </div>
 
             {/* Secondary Toolbar: Font Scaling & Toggles */}
-            <div className="bg-slate-950/50 border-b border-slate-800/80 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2 print:hidden">
+            <div className="bg-slate-950/70 border-b border-slate-800/80 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2 print:hidden">
               <div className="flex items-center gap-4 flex-wrap">
                 {/* MCQ Font Size */}
                 <div className="flex items-center gap-1.5">
@@ -899,7 +1241,11 @@ function BulkPrintContent() {
                     min={60}
                     max={150}
                     value={objectiveFontSize}
-                    onChange={(e) => setObjectiveFontSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setObjectiveFontSize(v);
+                      try { localStorage.setItem('bulk_obj_font_size', String(v)); } catch (err) {}
+                    }}
                     className="w-16 accent-blue-500"
                   />
                   <span className="font-mono text-slate-200">{objectiveFontSize}%</span>
@@ -913,7 +1259,11 @@ function BulkPrintContent() {
                     min={60}
                     max={150}
                     value={cqSqFontSize}
-                    onChange={(e) => setCqSqFontSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setCqSqFontSize(v);
+                      try { localStorage.setItem('bulk_cq_font_size', String(v)); } catch (err) {}
+                    }}
                     className="w-16 accent-blue-500"
                   />
                   <span className="font-mono text-slate-200">{cqSqFontSize}%</span>
@@ -922,13 +1272,27 @@ function BulkPrintContent() {
                 {/* Presets */}
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => { setObjectiveFontSize(85); setCqSqFontSize(85); }}
+                    onClick={() => {
+                      setObjectiveFontSize(85);
+                      setCqSqFontSize(85);
+                      try {
+                        localStorage.setItem('bulk_obj_font_size', '85');
+                        localStorage.setItem('bulk_cq_font_size', '85');
+                      } catch (err) {}
+                    }}
                     className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
                   >
                     Compact (85%)
                   </button>
                   <button
-                    onClick={() => { setObjectiveFontSize(100); setCqSqFontSize(100); }}
+                    onClick={() => {
+                      setObjectiveFontSize(100);
+                      setCqSqFontSize(100);
+                      try {
+                        localStorage.setItem('bulk_obj_font_size', '100');
+                        localStorage.setItem('bulk_cq_font_size', '100');
+                      } catch (err) {}
+                    }}
                     className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
                   >
                     Reset (100%)
@@ -959,8 +1323,23 @@ function BulkPrintContent() {
                 <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200">
                   <input
                     type="checkbox"
+                    checked={showWatermark}
+                    onChange={(e) => {
+                      setShowWatermark(e.target.checked);
+                      try { localStorage.setItem('bulk_show_watermark', String(e.target.checked)); } catch (err) {}
+                    }}
+                    className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0"
+                  />
+                  <span>Watermark</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200">
+                  <input
+                    type="checkbox"
                     checked={hideInstitute}
-                    onChange={(e) => setHideInstitute(e.target.checked)}
+                    onChange={(e) => {
+                      setHideInstitute(e.target.checked);
+                      try { localStorage.setItem('bulk_hide_institute', String(e.target.checked)); } catch (err) {}
+                    }}
                     className="rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-0"
                   />
                   <span>Hide Institute</span>
@@ -987,7 +1366,7 @@ function BulkPrintContent() {
             )}
 
             {/* Canvas Area: Displays the Full Print Bundle */}
-            <div className="flex-1 overflow-y-auto bg-slate-900/90 p-4 sm:p-8 flex justify-center">
+            <div className={`flex-1 overflow-y-auto bg-slate-900/90 p-4 sm:p-8 flex justify-center ${densityClass}`}>
               {selectedExamIds.length === 0 ? (
                 <div className="flex flex-col items-center justify-center my-auto p-8 rounded-2xl bg-slate-950/60 border border-slate-800 max-w-md text-center">
                   <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3">
@@ -1017,14 +1396,21 @@ function BulkPrintContent() {
                    ============================================================= */
                 <div
                   ref={printRef}
-                  className="bulk-print-container print:w-full space-y-8 print:space-y-0"
+                  className="bulk-print-container print:w-full space-y-8 print:space-y-0 relative"
                   style={{ fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif" }}
                 >
+                  {/* Security Watermark Overlay across pages if enabled */}
+                  {showWatermark && !hideInstitute && (customWatermarkText || globalSchoolName) && (
+                    <div className="bulk-watermark-overlay print-only">
+                      {customWatermarkText || globalSchoolName}
+                    </div>
+                  )}
+
                   {orderedLoadedExams.map((examData, examIndex) => {
                     const isLastExam = examIndex === orderedLoadedExams.length - 1;
                     const { sets } = examData;
                     
-                    // Effective exam info (with optional global institute override)
+                    // Effective exam info (with custom institute info override applied)
                     const examInfo = {
                       ...examData.examInfo,
                       schoolName: globalSchoolName !== '' ? globalSchoolName : examData.examInfo?.schoolName,
@@ -1057,53 +1443,140 @@ function BulkPrintContent() {
                            ======================================================= */}
                         {layoutMode === 'standard' && (
                           <>
-                            {targetSets.map((set: any) => (
-                              <React.Fragment key={`std-${examData.id}-${set.setId}`}>
-                                {(outputType === 'questions' || outputType === 'both') && (
-                                  <div className={`print-page-container ${paperClass}`}>
-                                    <QuestionPaper
-                                      examInfo={{ ...examInfo, set: set.setName }}
-                                      questions={set}
-                                      qrData={set.qrData}
-                                      fontSize={objectiveFontSize}
-                                      cqSqFontSize={cqSqFontSize}
-                                      forcePageBreak={false}
-                                      language={language}
-                                      hideOMR={!showOMR}
-                                      showDate={showDate}
-                                      hideInstitute={hideInstitute}
-                                      hideHeader={false}
-                                      hideSignature={!showSignatures}
-                                      startQuestionIndex={1}
-                                      startCqIndex={1}
-                                      startSqIndex={1}
-                                    />
-                                  </div>
-                                )}
+                            {targetSets.map((set: any) => {
+                              // If Bounded Paginated Mode is chosen, split into exact pages with zero clipping
+                              if (standardPagingMode === 'paginated_bounds') {
+                                const pages = splitExamSetForBooklet(set, examInfo, 4);
+                                const totalPages = pages.length;
 
-                                {(outputType === 'answers' || outputType === 'both') && (
-                                  <div className={`print-page-container ${paperClass}`} style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
-                                    <AnswerQuestionPaper
-                                      examInfo={{ ...examInfo, set: set.setName }}
-                                      questions={set}
-                                      qrData={set.qrData}
-                                      fontSize={objectiveFontSize}
-                                      cqSqFontSize={cqSqFontSize}
-                                      forcePageBreak={false}
-                                      language={language}
-                                      hideOMR={!showOMR}
-                                      showDate={showDate}
-                                      hideInstitute={hideInstitute}
-                                      hideHeader={false}
-                                      hideSignature={!showSignatures}
-                                      startQuestionIndex={1}
-                                      startCqIndex={1}
-                                      startSqIndex={1}
-                                    />
-                                  </div>
-                                )}
-                              </React.Fragment>
-                            ))}
+                                return (
+                                  <React.Fragment key={`std-paginated-${examData.id}-${set.setId}`}>
+                                    {pages.map((p, pIdx) => {
+                                      const pageNum = pIdx + 1;
+                                      const isPage1 = pageNum === 1;
+                                      const isFinalPage = pageNum === totalPages;
+
+                                      return (
+                                        <div
+                                          key={`page-${examData.id}-${pageNum}`}
+                                          className={`print-page-container ${paperClass}`}
+                                          style={{ pageBreakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'always' : 'auto', breakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'page' : 'auto' }}
+                                        >
+                                          {/* Running Header on subsequent pages */}
+                                          {!isPage1 && (
+                                            <div className="flex justify-between items-center text-xs font-bold border-b border-black pb-1 mb-2 text-gray-800">
+                                              <span>{!hideInstitute ? (examInfo.schoolName || '') : ''}</span>
+                                              <span>{p.subjectName ? `[${p.subjectName}] ${examInfo.title}` : examInfo.title}</span>
+                                              <span className="border border-black px-1.5 py-0.5 rounded text-[10px] bg-gray-50">
+                                                {language === 'en' ? `Page ${pageNum} of ${totalPages}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} / ${toBengaliNumerals(totalPages)}`}
+                                              </span>
+                                            </div>
+                                          )}
+
+                                          {outputType !== 'answers' ? (
+                                            <QuestionPaper
+                                              examInfo={{ ...examInfo, set: set.setName }}
+                                              questions={p.questions}
+                                              qrData={set.qrData}
+                                              fontSize={objectiveFontSize}
+                                              cqSqFontSize={cqSqFontSize}
+                                              forcePageBreak={false}
+                                              language={language}
+                                              hideOMR={!showOMR}
+                                              showDate={showDate}
+                                              hideInstitute={hideInstitute}
+                                              hideHeader={!isPage1}
+                                              hideSignature={!isFinalPage}
+                                              startQuestionIndex={p.startIndex}
+                                              startCqIndex={p.cqStartIndex}
+                                              startSqIndex={p.sqStartIndex}
+                                              pageNumberLabel=""
+                                            />
+                                          ) : (
+                                            <AnswerQuestionPaper
+                                              examInfo={{ ...examInfo, set: set.setName }}
+                                              questions={p.questions}
+                                              qrData={set.qrData}
+                                              fontSize={objectiveFontSize}
+                                              cqSqFontSize={cqSqFontSize}
+                                              forcePageBreak={false}
+                                              language={language}
+                                              hideOMR={!showOMR}
+                                              showDate={showDate}
+                                              hideInstitute={hideInstitute}
+                                              hideHeader={!isPage1}
+                                              hideSignature={!isFinalPage}
+                                              startQuestionIndex={p.startIndex}
+                                              startCqIndex={p.cqStartIndex}
+                                              startSqIndex={p.sqStartIndex}
+                                              pageNumberLabel=""
+                                            />
+                                          )}
+
+                                          {/* End of Exam Tag on final page */}
+                                          {isFinalPage && (
+                                            <div className="text-center font-bold text-[10px] uppercase tracking-wider text-gray-500 border-t border-black/30 pt-1 mt-2">
+                                              {language === 'en'
+                                                ? `— End of Exam: ${examInfo.title} —`
+                                                : `— সমাপ্ত: ${examInfo.title} —`}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </React.Fragment>
+                                );
+                              }
+
+                              // Otherwise, standard continuous container
+                              return (
+                                <React.Fragment key={`std-${examData.id}-${set.setId}`}>
+                                  {(outputType === 'questions' || outputType === 'both') && (
+                                    <div className={`print-page-container ${paperClass}`}>
+                                      <QuestionPaper
+                                        examInfo={{ ...examInfo, set: set.setName }}
+                                        questions={set}
+                                        qrData={set.qrData}
+                                        fontSize={objectiveFontSize}
+                                        cqSqFontSize={cqSqFontSize}
+                                        forcePageBreak={false}
+                                        language={language}
+                                        hideOMR={!showOMR}
+                                        showDate={showDate}
+                                        hideInstitute={hideInstitute}
+                                        hideHeader={false}
+                                        hideSignature={!showSignatures}
+                                        startQuestionIndex={1}
+                                        startCqIndex={1}
+                                        startSqIndex={1}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {(outputType === 'answers' || outputType === 'both') && (
+                                    <div className={`print-page-container ${paperClass}`} style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
+                                      <AnswerQuestionPaper
+                                        examInfo={{ ...examInfo, set: set.setName }}
+                                        questions={set}
+                                        qrData={set.qrData}
+                                        fontSize={objectiveFontSize}
+                                        cqSqFontSize={cqSqFontSize}
+                                        forcePageBreak={false}
+                                        language={language}
+                                        hideOMR={!showOMR}
+                                        showDate={showDate}
+                                        hideInstitute={hideInstitute}
+                                        hideHeader={false}
+                                        hideSignature={!showSignatures}
+                                        startQuestionIndex={1}
+                                        startCqIndex={1}
+                                        startSqIndex={1}
+                                      />
+                                    </div>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
                           </>
                         )}
 
@@ -1144,7 +1617,7 @@ function BulkPrintContent() {
                                             : examInfo.title}
                                       </span>
                                       <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">
-                                        {language === 'en' ? `Page ${pageNum}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)}`}
+                                        {language === 'en' ? `Page ${pageNum} of ${totalPages}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} / ${toBengaliNumerals(totalPages)}`}
                                       </span>
                                     </div>
 
@@ -1433,67 +1906,132 @@ function BulkPrintContent() {
         </div>
 
         {/* =========================================================================
-            MODAL: GLOBAL INSTITUTE OVERRIDE
+            MODAL: COMPREHENSIVE INSTITUTE CUSTOMIZATION & PERSISTENCE
            ========================================================================= */}
         {showGlobalInstituteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:hidden">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-4 text-slate-100">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="font-bold text-sm flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-blue-400" />
-                  Institute Header Customization
-                </h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 print:hidden animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-lg w-full p-5 space-y-4 text-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-white">
+                      Custom Institute & Watermark Studio
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Overrides institute headers & security watermark across all selected exams
+                    </p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowGlobalInstituteModal(false)}
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs">
+              {instituteSaveSuccess && (
+                <div className="bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 p-2.5 rounded-xl text-xs flex items-center gap-2 font-bold animate-fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>Custom institution info saved & applied successfully!</span>
+                </div>
+              )}
+
+              <div className="space-y-3.5 text-xs">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
-                    Override Institution Name (Optional):
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Institution Name (শিক্ষা প্রতিষ্ঠানের নাম):
                   </label>
                   <input
                     type="text"
-                    value={globalSchoolName}
-                    onChange={(e) => setGlobalSchoolName(e.target.value)}
-                    placeholder="Leave empty to use each exam's default name"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={tempSchoolName}
+                    onChange={(e) => setTempSchoolName(e.target.value)}
+                    placeholder="e.g. Dhaka Residential Model College / মতিঝিল আইডিয়াল স্কুল"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    Leave empty to use each individual exam's original school name
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Institution Address (প্রতিষ্ঠানের ঠিকানা):
+                  </label>
+                  <input
+                    type="text"
+                    value={tempSchoolAddress}
+                    onChange={(e) => setTempSchoolAddress(e.target.value)}
+                    placeholder="e.g. Mirpur Road, Mohammadpur, Dhaka-1207"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
-                    Override Institution Address (Optional):
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Custom Watermark Text (জলছাপ):
                   </label>
                   <input
                     type="text"
-                    value={globalSchoolAddress}
-                    onChange={(e) => setGlobalSchoolAddress(e.target.value)}
-                    placeholder="Leave empty to use each exam's default address"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={tempWatermarkText}
+                    onChange={(e) => setTempWatermarkText(e.target.value)}
+                    placeholder="e.g. CONFIDENTIAL / গোপনীয় / প্রতিষ্ঠানের নাম"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    Appears faintly across all printed question pages for anti-leak security
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2">
+                <div className="pt-1 border-t border-slate-800 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={showWatermark}
+                      onChange={(e) => setShowWatermark(e.target.checked)}
+                      className="rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0"
+                    />
+                    <span className="font-semibold">Enable Security Watermark on Printed Pages</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={hideInstitute}
+                      onChange={(e) => setHideInstitute(e.target.checked)}
+                      className="rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0"
+                    />
+                    <span className="font-semibold">Hide Institute Information Completely</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-800">
                   <button
-                    onClick={() => {
-                      setGlobalSchoolName('');
-                      setGlobalSchoolAddress('');
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                    type="button"
+                    onClick={handleResetInstituteDefaults}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
                   >
                     Reset Defaults
                   </button>
-                  <button
-                    onClick={() => setShowGlobalInstituteModal(false)}
-                    className="flex-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
-                  >
-                    Apply Changes
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowGlobalInstituteModal(false)}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 font-semibold text-xs transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveInstituteChanges}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-blue-600/30 transition flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save & Apply Changes</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
