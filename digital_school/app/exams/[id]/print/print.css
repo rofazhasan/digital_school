@@ -545,7 +545,7 @@
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
-    font-size: 10px !important;
+    font-size: 10px;
     line-height: 1.32 !important;
   }
 
@@ -580,6 +580,7 @@
   .booklet-half-page .mcq-container {
     columns: 2 !important;
     column-gap: 0.95rem !important;
+    column-fill: balance !important;
   }
 
   .booklet-half-page .options-grid-2 {

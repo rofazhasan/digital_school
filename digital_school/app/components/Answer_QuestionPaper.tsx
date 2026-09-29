@@ -638,13 +638,12 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
         ref={ref}
         className="answer-paper-container bg-white relative overflow-hidden"
         style={{
-          fontFamily: isEn ? "'Bookman Old Style', 'Georgia', serif" : "'ExamFont', 'Noto Serif Bengali', Georgia, serif",
-          fontSize: fontSize ? `${fontSize}%` : '100%'
+          fontFamily: isEn ? "'Bookman Old Style', 'Georgia', serif" : "'ExamFont', 'Noto Serif Bengali', Georgia, serif"
         }}
       >
         {!hideInstitute && examInfo.schoolName && <div className="watermark print-only">{examInfo.schoolName}</div>}
 
-        <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
+        <div>
           {!hideHeader ? (
             <Header
               examInfo={examInfo}

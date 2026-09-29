@@ -106,6 +106,46 @@ const LANGS = {
   }
 };
 
+// Calculate optimal page count dynamically based on question volume, layout mode, and font scaling
+function getOptimalPageCount(
+  set: any,
+  examInfo: any,
+  layoutMode: string,
+  fontSize: number = 100,
+  cqSqFontSize: number = 100
+): number {
+  const objCount = (set.mcq?.length || 0) + (set.orderedObjective?.length || 0) + (set.mc?.length || 0) + (set.int?.length || 0) + (set.ar?.length || 0);
+  const cqCount = set.cq?.length || 0;
+  const sqCount = set.sq?.length || 0;
+  const descCount = (set.descriptive?.length || 0) + (set.mtf?.length || 0);
+
+  const fontScale = Math.max(0.5, (fontSize || 100) / 100);
+  const cqScale = Math.max(0.5, (cqSqFontSize || 100) / 100);
+
+  // 1 CQ is roughly ~8-9 MCQs in visual height; 1 SQ is ~3.5 MCQs; 1 Desc is ~8 MCQs
+  const estimatedUnits = (objCount * fontScale) + ((cqCount * 8.5 + sqCount * 3.5 + descCount * 8) * cqScale);
+
+  if (layoutMode === 'booklet_4page') {
+    // 4-page signature booklet (multiple of 4)
+    if (estimatedUnits > 135) return 8;
+    return 4;
+  }
+
+  if (layoutMode === 'booklet_2up') {
+    if (estimatedUnits <= 36) return 2;
+    if (estimatedUnits <= 80) return 4;
+    return Math.max(2, Math.ceil(estimatedUnits / 26));
+  }
+
+  // Standard portrait mode (A4, Letter, Legal)
+  // Page 1 holds ~18 question units due to header; Subsequent pages hold ~28 question units
+  if (estimatedUnits <= 18) return 1;
+  if (estimatedUnits <= 46) return 2;
+  if (estimatedUnits <= 74) return 3;
+  if (estimatedUnits <= 104) return 4;
+  return Math.max(1, Math.ceil((estimatedUnits - 18) / 28) + 1);
+}
+
 // --- Inner Component that consumes useSearchParams ---
 function BulkPrintContent() {
   const router = useRouter();
@@ -615,7 +655,13 @@ function BulkPrintContent() {
 
         if (layoutMode === 'booklet_4page') {
           // Booklet Imposition: exact multiple of 4 pages
-          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
+            fontSize: objectiveFontSize,
+            cqSqFontSize,
+            layoutMode,
+            hideInstitute
+          });
           const { N, sheets } = computeBookletSheets(logicalPages.length);
           examPages += N;
           examSheets += sheets.length;
@@ -630,7 +676,13 @@ function BulkPrintContent() {
           });
         } else if (layoutMode === 'booklet_2up') {
           // 2-Up Sequential Spread: 2 pages per sheet
-          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+          const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
+            fontSize: objectiveFontSize,
+            cqSqFontSize,
+            layoutMode,
+            hideInstitute
+          });
           examPages += logicalPages.length;
           const sCount = Math.ceil(logicalPages.length / 2);
           examSheets += sCount;
@@ -646,7 +698,13 @@ function BulkPrintContent() {
         } else {
           // Standard Multi-Page Mode
           if (standardPagingMode === 'paginated_bounds') {
-            const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
+            const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+            const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
+              fontSize: objectiveFontSize,
+              cqSqFontSize,
+              layoutMode,
+              hideInstitute
+            });
             examPages += logicalPages.length;
             const sCount = Math.ceil(logicalPages.length / 2);
             examSheets += sCount;
@@ -1481,13 +1539,25 @@ function BulkPrintContent() {
 
             {/* Secondary Toolbar: Font Scaling & Canvas Zoom */}
             <div className="bg-slate-950/70 border-b border-slate-800/80 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2 print:hidden">
-              <div className="flex items-center gap-4 flex-wrap">
-                {/* MCQ Font Size */}
-                <div className="flex items-center gap-1.5">
-                  <span>MCQ Font:</span>
+              <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+                {/* MCQ Font Size with - and + */}
+                <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1">
+                  <span className="text-slate-300 font-medium">MCQ Font:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const v = Math.max(50, objectiveFontSize - 2);
+                      setObjectiveFontSize(v);
+                      try { localStorage.setItem('bulk_obj_font_size', String(v)); } catch (err) {}
+                    }}
+                    className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-xs"
+                    title="Decrease MCQ Font (-2%)"
+                  >
+                    -
+                  </button>
                   <input
                     type="range"
-                    min={60}
+                    min={50}
                     max={150}
                     value={objectiveFontSize}
                     onChange={(e) => {
@@ -1495,17 +1565,41 @@ function BulkPrintContent() {
                       setObjectiveFontSize(v);
                       try { localStorage.setItem('bulk_obj_font_size', String(v)); } catch (err) {}
                     }}
-                    className="w-16 accent-blue-500"
+                    className="w-16 accent-blue-500 cursor-pointer"
                   />
-                  <span className="font-mono text-slate-200">{objectiveFontSize}%</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const v = Math.min(160, objectiveFontSize + 2);
+                      setObjectiveFontSize(v);
+                      try { localStorage.setItem('bulk_obj_font_size', String(v)); } catch (err) {}
+                    }}
+                    className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-xs"
+                    title="Increase MCQ Font (+2%)"
+                  >
+                    +
+                  </button>
+                  <span className="font-mono text-blue-400 font-semibold min-w-[36px] text-right">{objectiveFontSize}%</span>
                 </div>
 
-                {/* CQ Font Size */}
-                <div className="flex items-center gap-1.5">
-                  <span>CQ Font:</span>
+                {/* CQ Font Size with - and + */}
+                <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1">
+                  <span className="text-slate-300 font-medium">CQ Font:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const v = Math.max(50, cqSqFontSize - 2);
+                      setCqSqFontSize(v);
+                      try { localStorage.setItem('bulk_cq_font_size', String(v)); } catch (err) {}
+                    }}
+                    className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-xs"
+                    title="Decrease CQ Font (-2%)"
+                  >
+                    -
+                  </button>
                   <input
                     type="range"
-                    min={60}
+                    min={50}
                     max={150}
                     value={cqSqFontSize}
                     onChange={(e) => {
@@ -1513,9 +1607,21 @@ function BulkPrintContent() {
                       setCqSqFontSize(v);
                       try { localStorage.setItem('bulk_cq_font_size', String(v)); } catch (err) {}
                     }}
-                    className="w-16 accent-blue-500"
+                    className="w-16 accent-blue-500 cursor-pointer"
                   />
-                  <span className="font-mono text-slate-200">{cqSqFontSize}%</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const v = Math.min(160, cqSqFontSize + 2);
+                      setCqSqFontSize(v);
+                      try { localStorage.setItem('bulk_cq_font_size', String(v)); } catch (err) {}
+                    }}
+                    className="w-5 h-5 flex items-center justify-center rounded bg-slate-800 hover:bg-blue-600 text-white font-bold text-xs transition-colors shadow-xs"
+                    title="Increase CQ Font (+2%)"
+                  >
+                    +
+                  </button>
+                  <span className="font-mono text-blue-400 font-semibold min-w-[36px] text-right">{cqSqFontSize}%</span>
                 </div>
 
                 {/* Presets */}
@@ -1529,7 +1635,7 @@ function BulkPrintContent() {
                         localStorage.setItem('bulk_cq_font_size', '85');
                       } catch (err) {}
                     }}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors"
                   >
                     Compact (85%)
                   </button>
@@ -1542,9 +1648,22 @@ function BulkPrintContent() {
                         localStorage.setItem('bulk_cq_font_size', '100');
                       } catch (err) {}
                     }}
-                    className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px]"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors"
                   >
                     Reset (100%)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setObjectiveFontSize(115);
+                      setCqSqFontSize(115);
+                      try {
+                        localStorage.setItem('bulk_obj_font_size', '115');
+                        localStorage.setItem('bulk_cq_font_size', '115');
+                      } catch (err) {}
+                    }}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-medium transition-colors"
+                  >
+                    Large (115%)
                   </button>
                 </div>
               </div>
@@ -1724,7 +1843,13 @@ function BulkPrintContent() {
                             {targetSets.map((set: any) => {
                               // If Bounded Paginated Mode is chosen, split into exact pages with zero clipping
                               if (standardPagingMode === 'paginated_bounds') {
-                                const pages = splitExamSetForBooklet(set, examInfo, 4);
+                                const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+                                const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
+                                  fontSize: objectiveFontSize,
+                                  cqSqFontSize,
+                                  layoutMode,
+                                  hideInstitute
+                                });
                                 const totalPages = pages.length;
 
                                 return (
@@ -1865,7 +1990,13 @@ function BulkPrintContent() {
                         {layoutMode === 'booklet_4page' && (
                           <>
                             {targetSets.map((set: any) => {
-                              const pages = splitExamSetForBooklet(set, examInfo);
+                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+                              const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
+                                fontSize: objectiveFontSize,
+                                cqSqFontSize,
+                                layoutMode,
+                                hideInstitute
+                              });
                               const totalPages = pages.length;
                               const { sheets } = computeBookletSheets(totalPages);
 
@@ -1998,7 +2129,14 @@ function BulkPrintContent() {
                         {layoutMode === 'booklet_2up' && (
                           <>
                             {targetSets.map((set: any) => {
-                              const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo);
+                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize);
+                              const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
+                                fontSize: objectiveFontSize,
+                                cqSqFontSize,
+                                layoutMode,
+                                hideInstitute
+                              });
+                              const [p1, p2, p3, p4] = pages;
                               return (
                                 <React.Fragment key={`seq2up-${examData.id}-${set.setId}`}>
                                   {/* Spread 1: Page 1 | Page 2 */}

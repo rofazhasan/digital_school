@@ -112,7 +112,17 @@ export function computeBookletSheets(totalLogicalPages: number): { sheets: Bookl
 }
 
 // --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page, 8-page, N-page) ---
-export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 4) {
+export function splitExamSetForBooklet(
+  set: any,
+  examInfo?: any,
+  targetPages: number = 4,
+  options?: {
+    fontSize?: number;
+    cqSqFontSize?: number;
+    layoutMode?: string;
+    hideInstitute?: boolean;
+  }
+) {
   const cqs = [...(set.cq || [])];
   const sqs = [...(set.sq || [])];
   const descriptives = [...(set.descriptive || [])];
@@ -213,7 +223,9 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
   // Dynamic weight-based pagination across targetPages pages
   // =========================================================================
   if (totalWritten === 0) {
-    const computeQuestionWeight = (q: any): number => {
+    const fontFactor = Math.max(0.5, (options?.fontSize || 100) / 100);
+
+    const computeQuestionWeight = (q: any, idx: number): number => {
       let w = 1.0;
       const textLen = getCleanVisualLength(q.q || q.questionText || '');
       if (textLen > 180) w += 0.5;
@@ -242,16 +254,25 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
       if (q.image || q.imageUrl) {
         w += 2.0;
       }
-      return w;
+
+      // Add extra weight for subject switch headers
+      const curSub = getSubject(q).toLowerCase();
+      const prevSub = idx > 0 ? getSubject(allObj[idx - 1]).toLowerCase() : null;
+      if (curSub && curSub !== prevSub) {
+        w += 2.5;
+      }
+
+      return w * fontFactor;
     };
 
     const weights = allObj.map(computeQuestionWeight);
     const totalWeight = weights.reduce((a, b) => a + b, 0);
 
     // Page 1 has cover header (Title, Institute, Time, Marks, Guidelines),
-    // taking ~18-20% height, so its capacity factor is ~0.82.
-    // Subsequent pages have full capacity (1.0).
-    const capFactors = [0.82];
+    // taking ~35-40% height if Institute is shown, or ~28-32% if Institute is hidden.
+    // Real capacity factor is ~0.60 (or ~0.70 without institute).
+    const p1Cap = options?.hideInstitute ? 0.70 : 0.60;
+    const capFactors = [p1Cap];
     for (let i = 1; i < targetPages; i++) capFactors.push(1.0);
     const sumFactors = capFactors.reduce((a, b) => a + b, 0);
     const targetWeights = capFactors.map(f => (f / sumFactors) * totalWeight);
@@ -300,11 +321,11 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
         }
       }
 
-      // Check if there is an adjacent subject boundary within +-1 question that is well-balanced
+      // Check if there is an adjacent subject boundary within +-2 questions that is well-balanced
       for (const sb of subjectEndIndices) {
-        if (sb >= minIdx && sb <= maxIdx && Math.abs(sb - bestIdx) <= 1) {
+        if (sb >= minIdx && sb <= maxIdx && Math.abs(sb - bestIdx) <= 2) {
           const sbDiff = Math.abs(cumW[sb] - targetW);
-          if (sbDiff <= minDiff * 1.08) {
+          if (sbDiff <= minDiff * 1.12) {
             bestIdx = sb;
             break;
           }
@@ -354,9 +375,21 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
   // SCENARIO 2: Mixed Objective + Written (CQ / SQ / Descriptive)
   // =========================================================================
   if (totalObj > 0 && totalWritten > 0) {
-    const halfPages = Math.floor(targetPages / 2);
-    const objPagesCount = halfPages;
-    const wrtPagesCount = targetPages - halfPages;
+    const fontFactor = Math.max(0.5, (options?.fontSize || 100) / 100);
+    const cqFontFactor = Math.max(0.5, (options?.cqSqFontSize || 100) / 100);
+
+    const totalObjUnits = totalObj * fontFactor;
+    const totalWrtUnits = (
+      cqs.length * 8.5 +
+      sqs.length * 3.5 +
+      descriptives.length * 8.0 +
+      mtfs.length * 4.0
+    ) * cqFontFactor;
+    const totalUnits = totalObjUnits + totalWrtUnits;
+
+    // Distribute pages proportionally instead of hardcoded 50/50 split
+    let objPagesCount = Math.max(1, Math.min(targetPages - 1, Math.round((totalObjUnits / totalUnits) * targetPages)));
+    let wrtPagesCount = targetPages - objPagesCount;
 
     const objChunkSize = Math.ceil(totalObj / objPagesCount);
     const objPages: any[] = [];
@@ -377,7 +410,7 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
     descriptives.forEach(q => allWritten.push({ ...q, _kind: 'desc' }));
     mtfs.forEach(q => allWritten.push({ ...q, _kind: 'mtf' }));
 
-    const wrtChunkSize = Math.ceil(allWritten.length / wrtPagesCount);
+    const wrtChunkSize = Math.max(1, Math.ceil(allWritten.length / wrtPagesCount));
     const wrtPages: any[] = [];
     for (let i = 0; i < wrtPagesCount; i++) {
       const pageW = allWritten.slice(i * wrtChunkSize, (i + 1) * wrtChunkSize);
@@ -409,15 +442,16 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
   mtfs.forEach(q => allWritten.push({ ...q, _kind: 'mtf' }));
 
   const wTotal = allWritten.length;
-  const p1WCount = Math.max(1, Math.round(wTotal * (targetPages === 6 ? 0.14 : 0.20)));
+  const effectivePages = Math.max(1, Math.min(targetPages, Math.max(1, Math.ceil(wTotal / 3))));
+  const p1WCount = Math.max(1, Math.round(wTotal * (effectivePages === 1 ? 1.0 : (options?.hideInstitute ? 0.35 : 0.28))));
   const wRem = wTotal - p1WCount;
-  const otherPages = targetPages - 1;
-  const otherCount = Math.ceil(wRem / otherPages);
+  const otherPages = effectivePages - 1;
+  const otherCount = otherPages > 0 ? Math.ceil(wRem / otherPages) : 0;
 
   const writtenPages: any[] = [];
   let wPrev = 0;
-  for (let i = 0; i < targetPages; i++) {
-    const end = i === 0 ? p1WCount : (i === targetPages - 1 ? wTotal : Math.min(wTotal, p1WCount + i * otherCount));
+  for (let i = 0; i < effectivePages; i++) {
+    const end = i === 0 ? p1WCount : (i === effectivePages - 1 ? wTotal : Math.min(wTotal, p1WCount + i * otherCount));
     const sliceW = allWritten.slice(wPrev, end);
     wPrev = end;
     writtenPages.push({
@@ -435,6 +469,7 @@ export function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: nu
     });
   }
 
+  // If targetPages was specified higher and needed, ensure we do not leave completely empty trailing pages
   return writtenPages;
 }
 
