@@ -21,6 +21,13 @@ const LANGS = {
   en: { print: "Print", pdf: "Download PDF", preparing: "Preparing...", waiting: "Waiting for Math to render..." }
 };
 
+// Helper to convert Arabic digits (0-9) to Bengali digits (০-৯)
+export const toBengaliNumerals = (input: string | number | undefined | null): string => {
+  if (input === undefined || input === null) return '';
+  const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  return String(input).replace(/[0-9]/g, (w) => bengaliDigits[+w]);
+};
+
 // Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
 export const getCleanVisualLength = (text: string): number => {
   if (!text) return 0;
