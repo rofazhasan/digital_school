@@ -664,7 +664,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     return (
       <div
         ref={ref}
-        className="question-paper-container bg-white relative overflow-hidden"
+        className="question-paper-container bg-white relative overflow-visible print:overflow-visible"
         style={{
           fontFamily: isEn ? "'Bookman Old Style', 'Georgia', serif" : "'ExamFont', 'Noto Serif Bengali', Georgia, serif",
           fontSize: fontSize ? `${fontSize}%` : '100%'
@@ -825,7 +825,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                   <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                     {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
                                     <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
-                                    <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
+                                    <span className="flex-1" style={{ minWidth: 0 }}><Text>{typeof opt === 'string' ? opt : opt.text || ''}</Text></span>
                                   </div>
                                 ))}
                               </div>
