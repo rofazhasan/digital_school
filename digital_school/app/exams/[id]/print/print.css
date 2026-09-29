@@ -530,9 +530,8 @@
   .booklet-sheet {
     box-sizing: border-box !important;
     width: 100% !important;
-    height: 100% !important;
-    max-height: calc(100vh - 12mm) !important;
-    overflow: hidden !important;
+    min-height: 100% !important;
+    overflow: visible !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
@@ -541,9 +540,8 @@
 
   .booklet-half-page {
     box-sizing: border-box !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow: hidden !important;
+    min-height: 100% !important;
+    overflow: visible !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
@@ -555,7 +553,7 @@
   .booklet-half-page > .answer-paper-container {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .booklet-end-banner {

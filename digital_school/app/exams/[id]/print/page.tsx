@@ -21,7 +21,90 @@ const LANGS = {
   en: { print: "Print", pdf: "Download PDF", preparing: "Preparing...", waiting: "Waiting for Math to render..." }
 };
 
-// --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page or 6-page) ---
+// Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
+export const getCleanVisualLength = (text: string): number => {
+  if (!text) return 0;
+  let clean = text
+    .replace(/\$\$[\s\S]*?\$\$/g, (m) => m.slice(2, -2).replace(/\\[a-zA-Z]+/g, 'X').slice(0, 15))
+    .replace(/\$([^\$]+)\$/g, (_, inner) => {
+      let math = inner
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\pm/g, '±')
+        .replace(/\\le(q)?/g, '≤')
+        .replace(/\\ge(q)?/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\omega/g, 'ω')
+        .replace(/\\Delta/g, 'Δ')
+        .replace(/\\circ/g, '°')
+        .replace(/\\[a-zA-Z]+/g, '')
+        .replace(/[{}^_]/g, '');
+      return math;
+    })
+    .replace(/\\\(|\\\)/g, '')
+    .trim();
+
+  return clean.length;
+};
+
+// --- Booklet Imposition Sheet Representation ---
+export interface BookletSheet {
+  sheetNumber: number;
+  front: {
+    leftPageNum: number;
+    rightPageNum: number;
+  };
+  back: {
+    leftPageNum: number;
+    rightPageNum: number;
+  };
+}
+
+/**
+ * Universal Booklet Imposition Algorithm for N pages (where N is a multiple of 4).
+ * Front: right | left
+ * Back:  left + 1 | right - 1
+ * left += 2, right -= 2
+ * Perfect for 4-page, 8-page, 12-page, 16-page, 20-page, etc.
+ */
+export function computeBookletSheets(totalLogicalPages: number): { sheets: BookletSheet[]; N: number } {
+  const N = Math.max(4, Math.ceil(totalLogicalPages / 4) * 4);
+  const numSheets = N / 4;
+  const sheets: BookletSheet[] = [];
+  let left = 1;
+  let right = N;
+
+  for (let s = 1; s <= numSheets; s++) {
+    sheets.push({
+      sheetNumber: s,
+      front: {
+        leftPageNum: right,
+        rightPageNum: left,
+      },
+      back: {
+        leftPageNum: left + 1,
+        rightPageNum: right - 1,
+      },
+    });
+    left += 2;
+    right -= 2;
+  }
+
+  return { sheets, N };
+}
+
+// --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page, 8-page, N-page) ---
 function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 4) {
   const cqs = [...(set.cq || [])];
   const sqs = [...(set.sq || [])];
@@ -125,24 +208,25 @@ function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 
   if (totalWritten === 0) {
     const computeQuestionWeight = (q: any): number => {
       let w = 1.0;
-      const textLen = (q.q || q.questionText || '').length;
-      if (textLen > 140) w += 0.35;
-      else if (textLen > 70) w += 0.15;
+      const textLen = getCleanVisualLength(q.q || q.questionText || '');
+      if (textLen > 180) w += 0.5;
+      else if (textLen > 90) w += 0.25;
+      else if (textLen > 50) w += 0.1;
 
       const opts = q.options || [];
-      const lengths = opts.map((o: any) => (typeof o === 'string' ? o : o.text || o || '').length);
+      const lengths = opts.map((o: any) => getCleanVisualLength(typeof o === 'string' ? o : o.text || o || ''));
       const maxOpt = Math.max(...lengths, 0);
       const totOpt = lengths.reduce((sum: number, l: number) => sum + l, 0);
 
       if (opts.length <= 2) {
-        w += 0.25;
+        w += 0.2;
       } else if (opts.length === 4) {
         if (maxOpt <= 12 && totOpt <= 45) {
-          w += 0.25; // 1 horizontal row
-        } else if (maxOpt <= 32 && totOpt <= 120) {
-          w += 0.65; // 2 rows
+          w += 0.25; // 1 horizontal row (4-col)
+        } else if (maxOpt <= 34 && totOpt <= 125) {
+          w += 0.65; // 2 rows (2-col)
         } else {
-          w += 1.35; // 4 rows
+          w += 1.35; // 4 rows (1-col)
         }
       } else {
         w += 0.7;
@@ -158,10 +242,9 @@ function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 
     const totalWeight = weights.reduce((a, b) => a + b, 0);
 
     // Page 1 has cover header (Title, Institute, Time, Marks, Guidelines),
-    // taking ~16-18% height, so its capacity factor is ~0.86 (4-page) or ~0.82 (6-page).
+    // taking ~18-20% height, so its capacity factor is ~0.82.
     // Subsequent pages have full capacity (1.0).
-    const capFactor1 = targetPages === 6 ? 0.82 : 0.86;
-    const capFactors = [capFactor1];
+    const capFactors = [0.82];
     for (let i = 1; i < targetPages; i++) capFactors.push(1.0);
     const sumFactors = capFactors.reduce((a, b) => a + b, 0);
     const targetWeights = capFactors.map(f => (f / sumFactors) * totalWeight);
@@ -171,6 +254,12 @@ function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 
     for (let i = 0; i < targetPages - 1; i++) {
       curT += targetWeights[i];
       cumTargets.push(curT);
+    }
+
+    // Cumulative weights array
+    const cumW: number[] = [0];
+    for (let i = 0; i < totalObj; i++) {
+      cumW.push(cumW[i] + weights[i]);
     }
 
     // Find subject boundaries (1-based indices where a subject ends)
@@ -183,27 +272,40 @@ function splitExamSetForBooklet(set: any, examInfo?: any, targetPages: number = 
       }
     }
 
-    // Compute split points
-    let cumW = 0;
-    let tIdx = 0;
+    // Strictly monotonic split points with look-ahead and capacity constraints
+    const minQsPerPage = Math.max(1, Math.floor(totalObj / (targetPages * 2)));
     const splitPoints: number[] = [];
-    for (let i = 0; i < allObj.length; i++) {
-      cumW += weights[i];
-      if (tIdx < cumTargets.length && cumW >= cumTargets[tIdx]) {
-        let best = i + 1;
-        // Snap to subject boundary ONLY if it is extremely close (+- 1 question)
-        for (const sb of subjectEndIndices) {
-          if (Math.abs(sb - best) <= 1) {
-            best = sb;
+    let lastSplit = 0;
+
+    for (let k = 0; k < targetPages - 1; k++) {
+      const targetW = cumTargets[k];
+      const minIdx = lastSplit + minQsPerPage;
+      const maxIdx = totalObj - (targetPages - 1 - k) * minQsPerPage;
+
+      let bestIdx = minIdx;
+      let minDiff = Infinity;
+
+      for (let j = minIdx; j <= maxIdx; j++) {
+        const diff = Math.abs(cumW[j] - targetW);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestIdx = j;
+        }
+      }
+
+      // Check if there is an adjacent subject boundary within +-1 question that is well-balanced
+      for (const sb of subjectEndIndices) {
+        if (sb >= minIdx && sb <= maxIdx && Math.abs(sb - bestIdx) <= 1) {
+          const sbDiff = Math.abs(cumW[sb] - targetW);
+          if (sbDiff <= minDiff * 1.08) {
+            bestIdx = sb;
             break;
           }
         }
-        splitPoints.push(best);
-        tIdx++;
       }
-    }
-    while (splitPoints.length < targetPages - 1) {
-      splitPoints.push(Math.round(((splitPoints.length + 1) / targetPages) * totalObj));
+
+      splitPoints.push(bestIdx);
+      lastSplit = bestIdx;
     }
 
     const slices: any[][] = [];
@@ -762,565 +864,168 @@ export default function PrintExamPage() {
           )}
 
           {/* ==============================================================
-              CASE 2: 4-PAGE BOOKLET IMPOSITION (OUTER 4|1, INNER 2|3)
+              CASE 2: UNIVERSAL BOOKLET IMPOSITION (N-PAGES, N MULTIPLE OF 4)
+              Front: right | left
+              Back:  left + 1 | right - 1
+              left += 2, right -= 2
              ============================================================== */}
-          {layoutMode === 'booklet_4page' && (
+          {(layoutMode === 'booklet' || layoutMode === 'booklet_4page' || layoutMode === 'booklet_6page') && (
             <>
               {nonEmptySets.map((set: any) => {
-                const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo, 4);
+                const targetPages = 4;
+                const logicalPages = splitExamSetForBooklet(set, examInfo, targetPages);
+                const { sheets, N } = computeBookletSheets(logicalPages.length);
+
+                const renderHalfPage = (pageNum: number, side: 'left' | 'right') => {
+                  const p = logicalPages[pageNum - 1];
+                  const isCover = pageNum === 1;
+                  const isBackCover = pageNum === N;
+
+                  if (!p) {
+                    return (
+                      <div className={`booklet-half-page booklet-${side}`}>
+                        <div className="booklet-page-header-tag">
+                          <span>{examInfo.title}</span>
+                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">
+                            {language === 'en' ? `Page ${pageNum} (Blank)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} (খসড়া)`}
+                          </span>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center text-gray-400 text-xs italic">
+                          {language === 'en' ? 'Blank page for rough work / calculations' : 'খসড়া কাজের জন্য নির্ধারিত ফাঁকা পৃষ্ঠা'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className={`booklet-half-page booklet-${side}`}>
+                      <div className="booklet-page-header-tag">
+                        <span>
+                          {isCover
+                            ? examInfo.title
+                            : p.subjectName
+                              ? (language === 'en' ? `SUBJECT: ${p.subjectName}` : `বিষয়: ${p.subjectName}`)
+                              : examInfo.title}
+                        </span>
+                        <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">
+                          {isCover
+                            ? (language === 'en' ? 'Page 1 (Front Cover)' : 'পৃষ্ঠা ১ (কভার)')
+                            : isBackCover
+                              ? (language === 'en' ? `Page ${pageNum} (Back Cover)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} (শেষ পাতা)`)
+                              : (language === 'en' ? `Page ${pageNum}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)}`)}
+                        </span>
+                      </div>
+
+                      {!showAnswers ? (
+                        <QuestionPaper
+                          examInfo={{ ...examInfo, set: set.setName }}
+                          questions={p.questions}
+                          qrData={set.qrData}
+                          fontSize={objectiveFontSize}
+                          cqSqFontSize={cqSqFontSize}
+                          forcePageBreak={false}
+                          language={language}
+                          hideOMR={!showOMR}
+                          showDate={showDate}
+                          hideInstitute={hideInstitute}
+                          hideHeader={!isCover}
+                          hideSignature={!isBackCover}
+                          startQuestionIndex={p.startIndex}
+                          startCqIndex={p.cqStartIndex}
+                          startSqIndex={p.sqStartIndex}
+                          pageNumberLabel=""
+                        />
+                      ) : (
+                        <AnswerQuestionPaper
+                          examInfo={{ ...examInfo, set: set.setName }}
+                          questions={p.questions}
+                          qrData={set.qrData}
+                          fontSize={objectiveFontSize}
+                          cqSqFontSize={cqSqFontSize}
+                          forcePageBreak={false}
+                          language={language}
+                          hideOMR={!showOMR}
+                          showDate={showDate}
+                          hideInstitute={hideInstitute}
+                          hideHeader={!isCover}
+                          hideSignature={!isBackCover}
+                          startQuestionIndex={p.startIndex}
+                          startCqIndex={p.cqStartIndex}
+                          startSqIndex={p.sqStartIndex}
+                          pageNumberLabel=""
+                        />
+                      )}
+
+                      {isBackCover && (
+                        <div className="booklet-end-banner">
+                          {language === 'en'
+                            ? '— END OF QUESTION PAPER —'
+                            : '— সমাপ্ত (সকল প্রশ্নের উত্তর দেওয়া শেষ করুন) —'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+
                 return (
                   <React.Fragment key={`booklet-imposed-${set.setId}`}>
-                    {/* SHEET 1: OUTER SPREAD (Side 1) -> Left: Page 4 (Back) | Right: Page 1 (Front) */}
-                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      {/* Left Column: Page 4 (Back Cover & Final Questions) */}
-                      <div className="booklet-half-page booklet-left">
-                        <div className="booklet-page-header-tag">
-                          <span>{p4.subjectName ? (language === 'en' ? `SUBJECT: ${p4.subjectName}` : `বিষয়: ${p4.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 4 (Back Cover)' : 'পৃষ্ঠা ৪ (শেষ পাতা)'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p4.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={false}
-                            startQuestionIndex={p4.startIndex}
-                            startCqIndex={p4.cqStartIndex}
-                            startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p4.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={false}
-                            startQuestionIndex={p4.startIndex}
-                            startCqIndex={p4.cqStartIndex}
-                            startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                        <div className="booklet-end-banner">
-                          {language === 'en' ? '— END OF QUESTION PAPER —' : '— সমাপ্ত (সকল প্রশ্নের উত্তর দেওয়া শেষ করুন) —'}
-                        </div>
-                      </div>
+                    {sheets.map((sheet) => (
+                      <React.Fragment key={`sheet-${sheet.sheetNumber}`}>
+                        {/* FRONT SPREAD: Outer side [ Page right | Page left ] */}
+                        <div
+                          className={`print-page-container booklet-sheet ${paperClass}`}
+                          style={{ pageBreakAfter: 'always' }}
+                        >
+                          {renderHalfPage(sheet.front.leftPageNum, 'left')}
 
-                      {/* Center Fold Crease Line */}
-                      {showFoldGuide && (
-                        <div className="booklet-center-crease">
-                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
-                        </div>
-                      )}
+                          {showFoldGuide && (
+                            <div className="booklet-center-crease">
+                              <span className="booklet-fold-badge">
+                                ✂ {language === 'en'
+                                  ? `SHEET ${sheet.sheetNumber} (FRONT: ${sheet.front.leftPageNum} | ${sheet.front.rightPageNum})`
+                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} (পৃষ্ঠা ${toBengaliNumerals(sheet.front.leftPageNum)} ও ${toBengaliNumerals(sheet.front.rightPageNum)})`}
+                              </span>
+                            </div>
+                          )}
 
-                      {/* Right Column: Page 1 (Front Cover & Initial Questions) */}
-                      <div className="booklet-half-page booklet-right">
-                        <div className="booklet-page-header-tag">
-                          <span>{examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 1 (Front Cover)' : 'পৃষ্ঠা ১ (কভার)'}</span>
+                          {renderHalfPage(sheet.front.rightPageNum, 'right')}
                         </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p1.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={false}
-                            hideSignature={true}
-                            startQuestionIndex={p1.startIndex}
-                            startCqIndex={p1.cqStartIndex}
-                            startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p1.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={false}
-                            hideSignature={true}
-                            startQuestionIndex={p1.startIndex}
-                            startCqIndex={p1.cqStartIndex}
-                            startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-                    </div>
 
-                    {/* SHEET 2: INNER SPREAD (Side 2) -> Left: Page 2 | Right: Page 3 */}
-                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      {/* Left Column: Page 2 (Inside Left) */}
-                      <div className="booklet-half-page booklet-left">
-                        <div className="booklet-page-header-tag">
-                          <span>{p2.subjectName ? (language === 'en' ? `SUBJECT: ${p2.subjectName}` : `বিষয়: ${p2.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p2.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p2.startIndex}
-                            startCqIndex={p2.cqStartIndex}
-                            startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p2.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p2.startIndex}
-                            startCqIndex={p2.cqStartIndex}
-                            startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
+                        {/* BACK SPREAD: Inner side [ Page left + 1 | Page right - 1 ] */}
+                        <div
+                          className={`print-page-container booklet-sheet ${paperClass}`}
+                          style={{ pageBreakAfter: 'always' }}
+                        >
+                          {renderHalfPage(sheet.back.leftPageNum, 'left')}
 
-                      {/* Center Fold Crease Line */}
-                      {showFoldGuide && (
-                        <div className="booklet-center-crease">
-                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'FOLD HERE' : 'মাঝে ভাঁজ করুন'}</span>
-                        </div>
-                      )}
+                          {showFoldGuide && (
+                            <div className="booklet-center-crease">
+                              <span className="booklet-fold-badge">
+                                ✂ {language === 'en'
+                                  ? `SHEET ${sheet.sheetNumber} (BACK: ${sheet.back.leftPageNum} | ${sheet.back.rightPageNum})`
+                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} (পৃষ্ঠা ${toBengaliNumerals(sheet.back.leftPageNum)} ও ${toBengaliNumerals(sheet.back.rightPageNum)})`}
+                              </span>
+                            </div>
+                          )}
 
-                      {/* Right Column: Page 3 (Inside Right) */}
-                      <div className="booklet-half-page booklet-right">
-                        <div className="booklet-page-header-tag">
-                          <span>{p3.subjectName ? (language === 'en' ? `SUBJECT: ${p3.subjectName}` : `বিষয়: ${p3.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}</span>
+                          {renderHalfPage(sheet.back.rightPageNum, 'right')}
                         </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p3.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p3.startIndex}
-                            startCqIndex={p3.cqStartIndex}
-                            startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p3.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p3.startIndex}
-                            startCqIndex={p3.cqStartIndex}
-                            startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-                    </div>
+                      </React.Fragment>
+                    ))}
                   </React.Fragment>
                 );
               })}
 
               {/* OMR Sheets if requested */}
               {showOMR && !showAnswers && nonEmptySets.map((set: any) => (
-                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} paperClass={paperClass} />
-              ))}
-            </>
-          )}
-
-          {/* ==============================================================
-              CASE 3: 6-PAGE BOOKLET IMPOSITION (SHEET 1: 6|1, SHEET 2: 2|5, SHEET 3: 3|4)
-             ============================================================== */}
-          {layoutMode === 'booklet_6page' && (
-            <>
-              {nonEmptySets.map((set: any) => {
-                const [p1, p2, p3, p4, p5, p6] = splitExamSetForBooklet(set, examInfo, 6);
-                return (
-                  <React.Fragment key={`booklet-6page-${set.setId}`}>
-                    {/* SHEET 1: OUTER SPREAD -> Left: Page 6 (Back Cover) | Right: Page 1 (Front Cover) */}
-                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      {/* Left Column: Page 6 (Back Cover & Final Questions) */}
-                      <div className="booklet-half-page booklet-left">
-                        <div className="booklet-page-header-tag">
-                          <span>{p6?.subjectName ? (language === 'en' ? `SUBJECT: ${p6.subjectName}` : `বিষয়: ${p6.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 6 (Back Cover)' : 'পৃষ্ঠা ৬ (শেষ পাতা)'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p6.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={false}
-                            startQuestionIndex={p6.startIndex}
-                            startCqIndex={p6.cqStartIndex}
-                            startSqIndex={p6.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p6.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={false}
-                            startQuestionIndex={p6.startIndex}
-                            startCqIndex={p6.cqStartIndex}
-                            startSqIndex={p6.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                        <div className="booklet-end-banner">
-                          {language === 'en' ? '— END OF QUESTION PAPER —' : '— সমাপ্ত (সকল প্রশ্নের উত্তর দেওয়া শেষ করুন) —'}
-                        </div>
-                      </div>
-
-                      {/* Center Fold Crease Line */}
-                      {showFoldGuide && (
-                        <div className="booklet-center-crease">
-                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'SHEET 1 (PAGES 6 & 1)' : 'শিট ১ (পৃষ্ঠা ৬ ও ১)'}</span>
-                        </div>
-                      )}
-
-                      {/* Right Column: Page 1 (Front Cover & Initial Questions) */}
-                      <div className="booklet-half-page booklet-right">
-                        <div className="booklet-page-header-tag">
-                          <span>{examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 1 (Front Cover)' : 'পৃষ্ঠা ১ (কভার)'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p1.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={false}
-                            hideSignature={true}
-                            startQuestionIndex={p1.startIndex}
-                            startCqIndex={p1.cqStartIndex}
-                            startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p1.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={false}
-                            hideSignature={true}
-                            startQuestionIndex={p1.startIndex}
-                            startCqIndex={p1.cqStartIndex}
-                            startSqIndex={p1.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SHEET 2: MIDDLE SPREAD -> Left: Page 2 | Right: Page 5 */}
-                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      {/* Left Column: Page 2 */}
-                      <div className="booklet-half-page booklet-left">
-                        <div className="booklet-page-header-tag">
-                          <span>{p2?.subjectName ? (language === 'en' ? `SUBJECT: ${p2.subjectName}` : `বিষয়: ${p2.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 2' : 'পৃষ্ঠা ২'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p2.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p2.startIndex}
-                            startCqIndex={p2.cqStartIndex}
-                            startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p2.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p2.startIndex}
-                            startCqIndex={p2.cqStartIndex}
-                            startSqIndex={p2.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-
-                      {/* Center Fold Crease Line */}
-                      {showFoldGuide && (
-                        <div className="booklet-center-crease">
-                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'SHEET 2 (PAGES 2 & 5)' : 'শিট ২ (পৃষ্ঠা ২ ও ৫)'}</span>
-                        </div>
-                      )}
-
-                      {/* Right Column: Page 5 */}
-                      <div className="booklet-half-page booklet-right">
-                        <div className="booklet-page-header-tag">
-                          <span>{p5?.subjectName ? (language === 'en' ? `SUBJECT: ${p5.subjectName}` : `বিষয়: ${p5.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 5' : 'পৃষ্ঠা ৫'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p5.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p5.startIndex}
-                            startCqIndex={p5.cqStartIndex}
-                            startSqIndex={p5.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p5.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p5.startIndex}
-                            startCqIndex={p5.cqStartIndex}
-                            startSqIndex={p5.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SHEET 3: CENTER FOLD SPREAD -> Left: Page 3 | Right: Page 4 */}
-                    <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      {/* Left Column: Page 3 */}
-                      <div className="booklet-half-page booklet-left">
-                        <div className="booklet-page-header-tag">
-                          <span>{p3?.subjectName ? (language === 'en' ? `SUBJECT: ${p3.subjectName}` : `বিষয়: ${p3.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 3' : 'পৃষ্ঠা ৩'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p3.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p3.startIndex}
-                            startCqIndex={p3.cqStartIndex}
-                            startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p3.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p3.startIndex}
-                            startCqIndex={p3.cqStartIndex}
-                            startSqIndex={p3.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-
-                      {/* Center Fold Crease Line */}
-                      {showFoldGuide && (
-                        <div className="booklet-center-crease">
-                          <span className="booklet-fold-badge">✂ {language === 'en' ? 'SHEET 3 (CENTER FOLD - PAGES 3 & 4)' : 'শিট ৩ (মাঝের পাতা ৩ ও ৪)'}</span>
-                        </div>
-                      )}
-
-                      {/* Right Column: Page 4 */}
-                      <div className="booklet-half-page booklet-right">
-                        <div className="booklet-page-header-tag">
-                          <span>{p4?.subjectName ? (language === 'en' ? `SUBJECT: ${p4.subjectName}` : `বিষয়: ${p4.subjectName}`) : examInfo.title}</span>
-                          <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">{language === 'en' ? 'Page 4' : 'পৃষ্ঠা ৪'}</span>
-                        </div>
-                        {!showAnswers ? (
-                          <QuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p4.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p4.startIndex}
-                            startCqIndex={p4.cqStartIndex}
-                            startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        ) : (
-                          <AnswerQuestionPaper
-                            examInfo={{ ...examInfo, set: set.setName }}
-                            questions={p4.questions}
-                            qrData={set.qrData}
-                            fontSize={objectiveFontSize}
-                            cqSqFontSize={cqSqFontSize}
-                            forcePageBreak={false}
-                            language={language}
-                            hideOMR={!showOMR}
-                            showDate={showDate}
-                            hideInstitute={hideInstitute}
-                            hideHeader={true}
-                            hideSignature={true}
-                            startQuestionIndex={p4.startIndex}
-                            startCqIndex={p4.cqStartIndex}
-                            startSqIndex={p4.sqStartIndex}
-                            pageNumberLabel=""
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-
-              {/* OMR Sheets if requested */}
-              {showOMR && !showAnswers && nonEmptySets.map((set: any) => (
-                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} hideInstitute={hideInstitute} paperClass={paperClass} />
+                <OMRPage
+                  key={`omr-${set.setId}`}
+                  set={set}
+                  examInfo={examInfo}
+                  language={language}
+                  hideInstitute={hideInstitute}
+                  paperClass={paperClass}
+                />
               ))}
             </>
           )}
@@ -1683,37 +1388,29 @@ const PrintControls = ({
             <span className="block font-bold text-gray-700 mb-1 text-[11px]">
               {language === 'en' ? 'Print Layout Mode:' : 'প্রিন্ট লেআউট মোড:'}
             </span>
-            <div className="grid grid-cols-4 gap-1 bg-gray-100 p-1 rounded-lg">
+            <div className="grid grid-cols-3 gap-1.5 bg-gray-100 p-1 rounded-lg">
               <button
                 type="button"
                 onClick={() => setLayoutMode('standard')}
-                className={`py-1.5 px-0.5 rounded font-bold text-[9px] transition text-center leading-tight ${layoutMode === 'standard' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${layoutMode === 'standard' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
               >
-                {language === 'en' ? 'Standard' : '১-পেজ'}
+                {language === 'en' ? 'Standard' : '১-পেজ (খাড়া)'}
               </button>
               <button
                 type="button"
                 onClick={() => setLayoutMode('booklet_4page')}
-                className={`py-1.5 px-0.5 rounded font-bold text-[9px] transition text-center leading-tight ${layoutMode === 'booklet_4page' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
-                title="৪ পৃষ্ঠার ফোল্ডেবল বুকলেট (৪|১ ও ২|৩)"
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${(layoutMode === 'booklet_4page' || (layoutMode as any) === 'booklet' || (layoutMode as any) === 'booklet_6page') ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                title="ফোল্ডেবল বুকলেট ইম্পোজিশন (ডুপ্লেক্স ভাঁজ)"
               >
-                {language === 'en' ? '4P Booklet' : '৪-পৃষ্ঠা'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLayoutMode('booklet_6page')}
-                className={`py-1.5 px-0.5 rounded font-bold text-[9px] transition text-center leading-tight ${layoutMode === 'booklet_6page' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
-                title="৬ পৃষ্ঠার নেস্টেড বুকলেট (৬|১, ২|৫, ৩|৪)"
-              >
-                {language === 'en' ? '6P Booklet' : '৬-পৃষ্ঠা'}
+                {language === 'en' ? 'Booklet (Imposed)' : 'বুকলেট (ইম্পোজড)'}
               </button>
               <button
                 type="button"
                 onClick={() => setLayoutMode('booklet_2up')}
-                className={`py-1.5 px-0.5 rounded font-bold text-[9px] transition text-center leading-tight ${layoutMode === 'booklet_2up' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+                className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${layoutMode === 'booklet_2up' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
                 title="ধারাবাহিক ২-পৃষ্ঠা পাশাপাশি স্প্রেড"
               >
-                {language === 'en' ? '2-Up Spread' : '২-পেজ'}
+                {language === 'en' ? '2-Up Spread' : '২-পেজ পাশাপাশি'}
               </button>
             </div>
           </div>
@@ -1736,10 +1433,8 @@ const PrintControls = ({
 
               {/* Recommendation Callout */}
               <div className="text-[10px] text-indigo-800 leading-tight bg-white p-1.5 rounded border border-indigo-100">
-                {layoutMode === 'booklet_6page' ? (
-                  <span>📑 <strong>৬-পৃষ্ঠা বুকলেট:</strong> শিট ১ (৬ ও ১) • শিট ২ (২ ও ৫) • শিট ৩ (৩ ও ৪)। ৩ শিট ক্রমানুসারে নেস্টেড ভাঁজ।</span>
-                ) : layoutMode === 'booklet_4page' ? (
-                  <span>📖 <strong>৪-পৃষ্ঠা বুকলেট:</strong> শিট ১ (৪ ও ১) • শিট ২ (২ ও ৩)। মাঝে ভাঁজ করলেই পারফেক্ট বুকলেট।</span>
+                {(layoutMode === 'booklet_4page' || (layoutMode as any) === 'booklet' || (layoutMode as any) === 'booklet_6page') ? (
+                  <span>📖 <strong>বুকলেট ইম্পোজিশন (Booklet Imposition):</strong> ডুপ্লেক্স প্রিন্টের পর মাঝে ভাঁজ/স্ট্যাপল করলেই ক্রমানুসারে (১, ২, ৩, ৪...) পারফেক্ট বুকলেট তৈরি হবে।</span>
                 ) : (
                   <span>📑 <strong>২-পেজ স্প্রেড:</strong> ধারাবাহিক ২-পৃষ্ঠা পাশাপাশি স্প্রেড (১|২, ৩|৪)।</span>
                 )}
@@ -2138,7 +1833,7 @@ const BookletGuideModal = ({
         {/* Modal Footer */}
         <div className="bg-gray-50 border-t border-gray-200 p-3 flex justify-between items-center text-xs">
           <div className="text-gray-500 font-semibold text-[11px]">
-            বর্তমান নির্বাচন: <span className="text-indigo-700 font-bold uppercase">{paperSize}</span> | <span className="text-indigo-700 font-bold">{layoutMode === 'booklet_4page' ? '৪-পৃষ্ঠা বুকলেট' : layoutMode === 'booklet_6page' ? '৬-পৃষ্ঠা বুকলেট' : layoutMode === 'booklet_2up' ? '২-পেজ স্প্রেড' : 'স্ট্যান্ডার্ড'}</span>
+            বর্তমান নির্বাচন: <span className="text-indigo-700 font-bold uppercase">{paperSize}</span> | <span className="text-indigo-700 font-bold">{(layoutMode === 'booklet_4page' || (layoutMode as any) === 'booklet' || (layoutMode as any) === 'booklet_6page') ? 'বুকলেট ইম্পোজিশন' : layoutMode === 'booklet_2up' ? '২-পেজ স্প্রেড' : 'স্ট্যান্ডার্ড'}</span>
           </div>
           <button
             type="button"

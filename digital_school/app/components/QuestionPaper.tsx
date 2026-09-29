@@ -233,15 +233,53 @@ const matchSubject = (questionSubject: string | undefined | null, targetSubjectN
   return false;
 };
 
+// Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
+export const getCleanVisualLength = (text: string): number => {
+  if (!text) return 0;
+  let clean = text
+    .replace(/\$\$[\s\S]*?\$\$/g, (m) => m.slice(2, -2).replace(/\\[a-zA-Z]+/g, 'X').slice(0, 15))
+    .replace(/\$([^\$]+)\$/g, (_, inner) => {
+      let math = inner
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\pm/g, '±')
+        .replace(/\\le(q)?/g, '≤')
+        .replace(/\\ge(q)?/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\omega/g, 'ω')
+        .replace(/\\Delta/g, 'Δ')
+        .replace(/\\circ/g, '°')
+        .replace(/\\[a-zA-Z]+/g, '')
+        .replace(/[{}^_]/g, '');
+      return math;
+    })
+    .replace(/\\\(|\\\)/g, '')
+    .trim();
+
+  return clean.length;
+};
+
 // --- Dynamic Option Grid Layout Calculator ---
 // Dynamically optimizes space: 1 line (4-col) for short, 2 lines (2-col) for moderate, 4 lines (1-col) for sentences.
 // Scales thresholds dynamically as font size becomes smaller to maximize page space.
+// Normalizes LaTeX math expressions so formulas don't artificially blow up character counts.
 export const getOptionsGridClass = (options: any[], fontSize?: number): string => {
   if (!options || options.length === 0) return "options-grid-2";
   const numFontSize = Number(fontSize) || 100;
-  const fontFactor = 100 / Math.max(65, numFontSize);
+  const fontFactor = 100 / Math.max(60, numFontSize);
 
-  const lengths = options.map((opt: any) => (typeof opt === 'string' ? opt : opt.text || opt || '').length);
+  const lengths = options.map((opt: any) => getCleanVisualLength(typeof opt === 'string' ? opt : opt.text || opt || ''));
   const maxOptLen = Math.max(...lengths, 0);
   const totalOptLen = lengths.reduce((sum: number, len: number) => sum + len, 0);
   const count = options.length;
@@ -259,8 +297,8 @@ export const getOptionsGridClass = (options: any[], fontSize?: number): string =
   }
 
   // Moderate options: can fit in 2 lines (2 rows x 2 columns)
-  const maxT2 = Math.round(32 * fontFactor);
-  const totalT2 = Math.round(120 * fontFactor);
+  const maxT2 = Math.round(34 * fontFactor);
+  const totalT2 = Math.round(125 * fontFactor);
   if (maxOptLen <= maxT2 && totalOptLen <= totalT2) {
     return "options-grid-2"; // 2 lines
   }
