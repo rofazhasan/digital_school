@@ -11,7 +11,9 @@ import {
   MoveDown, Trash2, Eye, EyeOff, FileText, CheckCircle2,
   AlertCircle, RefreshCw, Sparkles, BookOpen, Calendar,
   HelpCircle, ExternalLink, Minimize2, Maximize2, X,
-  Calculator, Users, Check, Building2, Stamp, Copy
+  Calculator, Users, Check, Building2, Stamp, Copy,
+  ZoomIn, ZoomOut, RotateCcw, SlidersHorizontal, ArrowUpDown,
+  CheckCheck, HardDriveDownload, Cpu
 } from 'lucide-react';
 
 import { mathJaxConfig as globalMathJaxConfig } from '@/app/components/MathJaxConfig';
@@ -49,14 +51,15 @@ interface LoadedExamData {
 
 const LANGS = {
   bn: {
-    print: "প্রিন্ট করুন / PDF ডাউনলোড",
+    print: "সরাসরি প্রিন্ট করুন (প্রিন্টার ড্রাইভার)",
+    pdfDownload: "PDF ডাউনলোড করুন",
     preparing: "প্রস্তুত করা হচ্ছে...",
     waiting: "ম্যাথ ও ফন্ট রেন্ডারিং চলছে...",
     bulkPrintHub: "বাল্ক এক্সাম প্রিন্ট ও PDF স্টুডিও",
     selectedExams: "টি এক্সাম নির্বাচিত",
     selectExamsToPrint: "প্রিন্ট করার জন্য এক্সাম নির্বাচন করুন",
     noExamsSelected: "কোনো এক্সাম সিলেক্ট করা হয়নি",
-    searchPlaceholder: "এক্সামের নাম, বিষয় বা ক্লাস দিয়ে খুঁজুন...",
+    searchPlaceholder: "নাম, বিষয়, শ্রেণি বা কোড দিয়ে খুঁজুন...",
     freshPagePerExam: "প্রতিটি এক্সাম নতুন পেজ থেকে শুরু হবে",
     continuousFlow: "ধারাবাহিক প্রিন্ট (কাগজ বাঁচানো মোড)",
     questionPapersOnly: "শুধুমাত্র প্রশ্নপত্র",
@@ -75,14 +78,15 @@ const LANGS = {
     duplexNote: "ডুপ্লেক্স / উভয় পৃষ্ঠায় প্রিন্ট",
   },
   en: {
-    print: "Print All / Download PDF",
-    preparing: "Preparing Print Bundle...",
+    print: "Direct Print (System Driver - No Download)",
+    pdfDownload: "Download PDF File",
+    preparing: "Preparing Print Spooler...",
     waiting: "Waiting for MathJax & Fonts to render...",
     bulkPrintHub: "Bulk Exam Print & PDF Studio",
     selectedExams: "Exams Selected",
     selectExamsToPrint: "Select Exams to Print",
     noExamsSelected: "No exams selected yet",
-    searchPlaceholder: "Search by exam title, subject or class...",
+    searchPlaceholder: "Search by title, subject, grade or ID...",
     freshPagePerExam: "Fresh Page per Exam (Page Break)",
     continuousFlow: "Continuous Flow (Save Paper)",
     questionPapersOnly: "Question Papers Only",
@@ -124,6 +128,11 @@ function BulkPrintContent() {
   // Filtering & UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'selected' | 'unselected'>('all');
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'title_asc' | 'title_desc' | 'marks_desc'>('date_desc');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [previewZoom, setPreviewZoom] = useState<number>(100);
 
@@ -159,6 +168,9 @@ function BulkPrintContent() {
   // Student Print Calculator State
   const [studentBatchCount, setStudentBatchCount] = useState<number>(50);
   const [showCalculator, setShowCalculator] = useState(false);
+
+  // Printer Driver Guide Modal
+  const [showDriverGuideModal, setShowDriverGuideModal] = useState(false);
 
   // Font Scaling
   const [objectiveFontSize, setObjectiveFontSize] = useState(100);
@@ -419,24 +431,82 @@ function BulkPrintContent() {
     setShowGlobalInstituteModal(false);
   };
 
-  // Filtered exams list in the selector drawer
-  const filteredExamsList = useMemo(() => {
-    return allExamsList.filter(item => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch = !q ||
-        item.title?.toLowerCase().includes(q) ||
-        item.subject?.toLowerCase().includes(q) ||
-        item.class?.toLowerCase().includes(q) ||
-        item.id.toLowerCase().includes(q);
+  // Extract unique subjects, classes, and types for filters
+  const filterOptions = useMemo(() => {
+    const subjects = new Set<string>();
+    const classes = new Set<string>();
+    const types = new Set<string>();
 
-      if (!matchesSearch) return false;
-
-      const isSelected = selectedExamIds.includes(item.id);
-      if (filterType === 'selected') return isSelected;
-      if (filterType === 'unselected') return !isSelected;
-      return true;
+    allExamsList.forEach(e => {
+      if (e.subject) subjects.add(e.subject.trim());
+      if (e.class) classes.add(e.class.trim());
+      if (e.type) types.add(e.type.trim());
     });
-  }, [allExamsList, searchQuery, filterType, selectedExamIds]);
+
+    return {
+      subjects: Array.from(subjects).sort(),
+      classes: Array.from(classes).sort(),
+      types: Array.from(types).sort()
+    };
+  }, [allExamsList]);
+
+  // Enhanced Filtered & Sorted exams list in the selector drawer
+  const filteredExamsList = useMemo(() => {
+    return allExamsList
+      .filter(item => {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesSearch = !q ||
+          item.title?.toLowerCase().includes(q) ||
+          item.subject?.toLowerCase().includes(q) ||
+          item.class?.toLowerCase().includes(q) ||
+          item.id.toLowerCase().includes(q);
+
+        if (!matchesSearch) return false;
+
+        const isSelected = selectedExamIds.includes(item.id);
+        if (filterType === 'selected') return isSelected;
+        if (filterType === 'unselected') return !isSelected;
+
+        if (selectedSubject !== 'all' && item.subject?.trim().toLowerCase() !== selectedSubject.toLowerCase()) {
+          return false;
+        }
+        if (selectedClass !== 'all' && item.class?.trim().toLowerCase() !== selectedClass.toLowerCase()) {
+          return false;
+        }
+        if (selectedType !== 'all' && item.type?.trim().toLowerCase() !== selectedType.toLowerCase()) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'date_desc') {
+          return new Date(b.date || b.examDate || 0).getTime() - new Date(a.date || a.examDate || 0).getTime();
+        }
+        if (sortBy === 'date_asc') {
+          return new Date(a.date || a.examDate || 0).getTime() - new Date(b.date || b.examDate || 0).getTime();
+        }
+        if (sortBy === 'title_asc') {
+          return (a.title || '').localeCompare(b.title || '');
+        }
+        if (sortBy === 'title_desc') {
+          return (b.title || '').localeCompare(a.title || '');
+        }
+        if (sortBy === 'marks_desc') {
+          return (b.totalMarks || 0) - (a.totalMarks || 0);
+        }
+        return 0;
+      });
+  }, [
+    allExamsList,
+    searchQuery,
+    filterType,
+    selectedExamIds,
+    selectedSubject,
+    selectedClass,
+    selectedType,
+    sortBy
+  ]);
 
   // Toggle selection of a single exam
   const toggleExamSelection = (id: string) => {
@@ -507,6 +577,15 @@ function BulkPrintContent() {
       omrSheets: number;
     }> = [];
 
+    const sheetNavigationItems: Array<{
+      sheetIndex: number;
+      examTitle: string;
+      label: string;
+      elementId: string;
+    }> = [];
+
+    let currentSheetCounter = 1;
+
     orderedLoadedExams.forEach((examData) => {
       const { sets, examInfo } = examData;
       const effectiveInfo = {
@@ -540,22 +619,58 @@ function BulkPrintContent() {
           const { N, sheets } = computeBookletSheets(logicalPages.length);
           examPages += N;
           examSheets += sheets.length;
+
+          sheets.forEach((sh, shIdx) => {
+            sheetNavigationItems.push({
+              sheetIndex: currentSheetCounter++,
+              examTitle: effectiveInfo?.title || 'Exam',
+              label: `Sheet ${sh.sheetNumber} (${sh.front.leftPageNum}|${sh.front.rightPageNum})`,
+              elementId: `sheet-${examData.id}-${sh.sheetNumber}`
+            });
+          });
         } else if (layoutMode === 'booklet_2up') {
           // 2-Up Sequential Spread: 2 pages per sheet
           const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
           examPages += logicalPages.length;
-          examSheets += Math.ceil(logicalPages.length / 2);
+          const sCount = Math.ceil(logicalPages.length / 2);
+          examSheets += sCount;
+
+          for (let i = 1; i <= sCount; i++) {
+            sheetNavigationItems.push({
+              sheetIndex: currentSheetCounter++,
+              examTitle: effectiveInfo?.title || 'Exam',
+              label: `Spread ${i} (${i * 2 - 1}|${i * 2})`,
+              elementId: `seq2up-${examData.id}-${set.setId}`
+            });
+          }
         } else {
           // Standard Multi-Page Mode
           if (standardPagingMode === 'paginated_bounds') {
             const logicalPages = splitExamSetForBooklet(set, effectiveInfo, 4);
             examPages += logicalPages.length;
-            examSheets += Math.ceil(logicalPages.length / 2);
+            const sCount = Math.ceil(logicalPages.length / 2);
+            examSheets += sCount;
+
+            for (let i = 1; i <= logicalPages.length; i++) {
+              sheetNavigationItems.push({
+                sheetIndex: currentSheetCounter++,
+                examTitle: effectiveInfo?.title || 'Exam',
+                label: `Page ${i}`,
+                elementId: `page-${examData.id}-${i}`
+              });
+            }
           } else {
-            // Continuous single long container (estimated by questions count and font scaling)
+            // Continuous single long container
             const pagesEst = Math.max(1, Math.ceil((totalQ * (objectiveFontSize / 100)) / 28));
             examPages += pagesEst;
             examSheets += Math.ceil(pagesEst / 2);
+
+            sheetNavigationItems.push({
+              sheetIndex: currentSheetCounter++,
+              examTitle: effectiveInfo?.title || 'Exam',
+              label: `Exam ${examData.id.slice(0, 4)}`,
+              elementId: `std-${examData.id}-${set.setId}`
+            });
           }
         }
 
@@ -596,6 +711,7 @@ function BulkPrintContent() {
       totalQuestions,
       totalMarks,
       examBreakdowns,
+      sheetNavigationItems,
       studentsRequirement,
       reamsRequirement
     };
@@ -611,10 +727,14 @@ function BulkPrintContent() {
     studentBatchCount
   ]);
 
-  // Print execution with react-to-print
+  // =========================================================================
+  // DIRECT IN-BROWSER PRINTER DRIVER & PDF GENERATION (NO DOWNLOAD REQUIRED)
+  // Dispatches directly to the system's physical printer spooler
+  // =========================================================================
   // @ts-ignore
-  const handlePrint = useReactToPrint({
+  const handleDirectPrint = useReactToPrint({
     contentRef: printRef,
+    content: () => printRef.current,
     documentTitle: `bulk-print-${selectedExamIds.length}-exams`,
     onBeforeGetContent: async () => {
       setIsPrinting(true);
@@ -650,6 +770,14 @@ function BulkPrintContent() {
   const paperClass = paperSize === 'legal' ? 'legal-paper' : paperSize === 'a3' ? 'a3-paper' : paperSize === 'letter' ? 'letter-paper' : 'a4-paper';
   const isBooklet = layoutMode === 'booklet_4page' || layoutMode === 'booklet_2up';
   const densityClass = spacingDensity === 'compact' ? 'compact-exam-density' : spacingDensity === 'spacious' ? 'spacious-exam-density' : '';
+
+  // Scroll smoothly to a specific sheet element
+  const scrollToSheetElement = (elementId: string) => {
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <MathJaxContext config={mathJaxConfig}>
@@ -774,6 +902,16 @@ function BulkPrintContent() {
               <span className="hidden sm:inline">Paper Budget</span>
             </button>
 
+            {/* Direct Driver Setup Info Button */}
+            <button
+              onClick={() => setShowDriverGuideModal(true)}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 transition flex items-center gap-1"
+              title="Printer driver setup instructions: Duplex, scaling, paper trays"
+            >
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden md:inline">Driver Setup</span>
+            </button>
+
             {/* Drawer Toggle */}
             <button
               onClick={() => setIsDrawerOpen(prev => !prev)}
@@ -802,11 +940,23 @@ function BulkPrintContent() {
               {language === 'bn' ? 'English' : 'বাংলা'}
             </button>
 
-            {/* Print Action Button */}
+            {/* DIRECT PRINTER DRIVER ACTION BUTTON (No Download Required) */}
             <button
-              onClick={handlePrint}
+              onClick={() => {
+                try {
+                  if (typeof handleDirectPrint === 'function') {
+                    handleDirectPrint();
+                  } else {
+                    window.print();
+                  }
+                } catch (e) {
+                  console.warn('Direct printer driver fallback to window.print:', e);
+                  window.print();
+                }
+              }}
               disabled={isPrinting || orderedLoadedExams.length === 0 || loadingExamsStatus.isLoading}
-              className="px-4 py-1.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/30 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-1.5 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white shadow-lg shadow-emerald-600/30 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title="Prints directly to your connected physical printer driver without saving files"
             >
               <Printer className="w-4 h-4" />
               <span>{isPrinting ? t.preparing : t.print}</span>
@@ -857,7 +1007,7 @@ function BulkPrintContent() {
         <div className="flex-1 flex overflow-hidden relative">
           
           {/* -----------------------------------------------------------------------
-              LEFT: EXAM SELECTOR & MANAGEMENT DRAWER (Collapsible)
+              LEFT: POWER EXAM SELECTOR & MANAGEMENT DRAWER (Collapsible with Advanced Filters)
              ----------------------------------------------------------------------- */}
           {isDrawerOpen && (
             <aside className="w-80 sm:w-96 flex-shrink-0 bg-slate-950 border-r border-slate-800 flex flex-col h-[calc(100vh-53px)] z-30 print:hidden animate-fade-in">
@@ -872,12 +1022,14 @@ function BulkPrintContent() {
                     <button
                       onClick={handleSelectAllFiltered}
                       className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                      title="Select all currently visible exams"
                     >
                       Select All
                     </button>
                     <button
                       onClick={handleDeselectAll}
                       className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-400 transition"
+                      title="Clear all selections"
                     >
                       Clear
                     </button>
@@ -892,7 +1044,7 @@ function BulkPrintContent() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t.searchPlaceholder}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   {searchQuery && (
                     <button
@@ -904,7 +1056,7 @@ function BulkPrintContent() {
                   )}
                 </div>
 
-                {/* Filter Chips */}
+                {/* Filter Chips & Advanced Filter Toggle */}
                 <div className="flex items-center gap-1.5 text-[11px]">
                   {(['all', 'selected', 'unselected'] as const).map(mode => (
                     <button
@@ -919,7 +1071,104 @@ function BulkPrintContent() {
                       {mode === 'all' ? `All (${allExamsList.length})` : mode === 'selected' ? `Selected (${selectedExamIds.length})` : 'Unselected'}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setShowAdvancedFilters(prev => !prev)}
+                    className={`p-1.5 rounded-lg border transition ${
+                      showAdvancedFilters || selectedSubject !== 'all' || selectedClass !== 'all'
+                        ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                    title="Toggle Advanced Filters (Subject, Class, Sorting)"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                  </button>
                 </div>
+
+                {/* ADVANCED MULTI-DIMENSIONAL FILTERS */}
+                {showAdvancedFilters && (
+                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2 text-[11px] animate-fade-in">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Filter by Subject */}
+                      <div>
+                        <label className="text-slate-400 font-semibold block mb-0.5">Subject:</label>
+                        <select
+                          value={selectedSubject}
+                          onChange={(e) => setSelectedSubject(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded px-1.5 py-1 text-xs"
+                        >
+                          <option value="all">All Subjects</option>
+                          {filterOptions.subjects.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Filter by Class */}
+                      <div>
+                        <label className="text-slate-400 font-semibold block mb-0.5">Class / Grade:</label>
+                        <select
+                          value={selectedClass}
+                          onChange={(e) => setSelectedClass(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded px-1.5 py-1 text-xs"
+                        >
+                          <option value="all">All Classes</option>
+                          {filterOptions.classes.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Filter by Type */}
+                      <div>
+                        <label className="text-slate-400 font-semibold block mb-0.5">Exam Type:</label>
+                        <select
+                          value={selectedType}
+                          onChange={(e) => setSelectedType(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded px-1.5 py-1 text-xs"
+                        >
+                          <option value="all">All Types</option>
+                          {filterOptions.types.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Sort Order */}
+                      <div>
+                        <label className="text-slate-400 font-semibold block mb-0.5">Sort By:</label>
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded px-1.5 py-1 text-xs"
+                        >
+                          <option value="date_desc">Newest First</option>
+                          <option value="date_asc">Oldest First</option>
+                          <option value="title_asc">Title (A-Z)</option>
+                          <option value="title_desc">Title (Z-A)</option>
+                          <option value="marks_desc">Highest Marks</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Reset Filter Button */}
+                    {(selectedSubject !== 'all' || selectedClass !== 'all' || selectedType !== 'all') && (
+                      <div className="flex justify-end pt-1 border-t border-slate-800">
+                        <button
+                          onClick={() => {
+                            setSelectedSubject('all');
+                            setSelectedClass('all');
+                            setSelectedType('all');
+                          }}
+                          className="text-[10px] text-blue-400 hover:text-blue-300 font-bold"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Selected Sequence Re-order Section with Per-Exam Page Badges */}
@@ -1230,7 +1479,7 @@ function BulkPrintContent() {
               </div>
             </div>
 
-            {/* Secondary Toolbar: Font Scaling & Toggles */}
+            {/* Secondary Toolbar: Font Scaling & Canvas Zoom */}
             <div className="bg-slate-950/70 border-b border-slate-800/80 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2 print:hidden">
               <div className="flex items-center gap-4 flex-wrap">
                 {/* MCQ Font Size */}
@@ -1300,8 +1549,34 @@ function BulkPrintContent() {
                 </div>
               </div>
 
-              {/* Toggles */}
+              {/* Canvas Zoom & Visual Inspection Controls */}
               <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 text-[10px] bg-slate-900 border border-slate-700 rounded-lg px-2 py-0.5">
+                  <span className="text-slate-400">Zoom:</span>
+                  <button
+                    onClick={() => setPreviewZoom(prev => Math.max(50, prev - 15))}
+                    className="p-0.5 hover:text-white"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut className="w-3 h-3" />
+                  </button>
+                  <span className="font-mono text-slate-200 font-bold px-1">{previewZoom}%</span>
+                  <button
+                    onClick={() => setPreviewZoom(prev => Math.min(150, prev + 15))}
+                    className="p-0.5 hover:text-white"
+                    title="Zoom In"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom(100)}
+                    className="text-[9px] text-blue-400 hover:text-blue-300 pl-1 font-bold"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Toggles */}
                 <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200">
                   <input
                     type="checkbox"
@@ -1366,7 +1641,7 @@ function BulkPrintContent() {
             )}
 
             {/* Canvas Area: Displays the Full Print Bundle */}
-            <div className={`flex-1 overflow-y-auto bg-slate-900/90 p-4 sm:p-8 flex justify-center ${densityClass}`}>
+            <div className={`flex-1 overflow-y-auto bg-slate-900/90 p-4 sm:p-8 flex flex-col items-center ${densityClass}`}>
               {selectedExamIds.length === 0 ? (
                 <div className="flex flex-col items-center justify-center my-auto p-8 rounded-2xl bg-slate-950/60 border border-slate-800 max-w-md text-center">
                   <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3">
@@ -1376,7 +1651,7 @@ function BulkPrintContent() {
                     {t.noExamsSelected}
                   </h3>
                   <p className="text-xs text-slate-400 mb-4">
-                    Open the Exam Selection Drawer on the left, search and pick multiple exams to generate a unified, publication-grade print bundle.
+                    Open the Exam Selection Drawer on the left, filter by subject or class, and pick multiple exams to generate a unified, publication-grade print bundle.
                   </p>
                   <button
                     onClick={() => setIsDrawerOpen(true)}
@@ -1396,8 +1671,11 @@ function BulkPrintContent() {
                    ============================================================= */
                 <div
                   ref={printRef}
-                  className="bulk-print-container print:w-full space-y-8 print:space-y-0 relative"
-                  style={{ fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif" }}
+                  className="bulk-print-container print:w-full space-y-8 print:space-y-0 relative transition-transform duration-200 origin-top"
+                  style={{
+                    fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif",
+                    transform: previewZoom !== 100 ? `scale(${previewZoom / 100})` : 'none'
+                  }}
                 >
                   {/* Security Watermark Overlay across pages if enabled */}
                   {showWatermark && !hideInstitute && (customWatermarkText || globalSchoolName) && (
@@ -1459,6 +1737,7 @@ function BulkPrintContent() {
                                       return (
                                         <div
                                           key={`page-${examData.id}-${pageNum}`}
+                                          id={`page-${examData.id}-${pageNum}`}
                                           className={`print-page-container ${paperClass}`}
                                           style={{ pageBreakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'always' : 'auto', breakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'page' : 'auto' }}
                                         >
@@ -1532,7 +1811,7 @@ function BulkPrintContent() {
                               return (
                                 <React.Fragment key={`std-${examData.id}-${set.setId}`}>
                                   {(outputType === 'questions' || outputType === 'both') && (
-                                    <div className={`print-page-container ${paperClass}`}>
+                                    <div id={`std-${examData.id}-${set.setId}`} className={`print-page-container ${paperClass}`}>
                                       <QuestionPaper
                                         examInfo={{ ...examInfo, set: set.setName }}
                                         questions={set}
@@ -1677,7 +1956,7 @@ function BulkPrintContent() {
                                   {sheets.map(sheet => (
                                     <React.Fragment key={`sheet-${examData.id}-${sheet.sheetNumber}`}>
                                       {/* FRONT SPREAD */}
-                                      <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
+                                      <div id={`sheet-${examData.id}-${sheet.sheetNumber}`} className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
                                         {renderHalfPage(sheet.front.leftPageNum, 'left')}
                                         {showFoldGuide && (
                                           <div className="booklet-center-crease">
@@ -1723,7 +2002,7 @@ function BulkPrintContent() {
                               return (
                                 <React.Fragment key={`seq2up-${examData.id}-${set.setId}`}>
                                   {/* Spread 1: Page 1 | Page 2 */}
-                                  <div className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
+                                  <div id={`seq2up-${examData.id}-${set.setId}`} className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
                                     <div className="booklet-half-page booklet-left">
                                       <div className="booklet-page-header-tag">
                                         <span>{examInfo.title}</span>
@@ -1902,6 +2181,46 @@ function BulkPrintContent() {
                 </div>
               )}
             </div>
+
+            {/* =====================================================================
+                BOTTOM FLOATING SHEET NAVIGATOR STRIP (Jump to any Sheet / Page)
+               ===================================================================== */}
+            {printMetrics.sheetNavigationItems.length > 0 && (
+              <div className="bg-slate-950/95 border-t border-slate-800 px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto text-[11px] print:hidden">
+                <div className="flex items-center gap-1.5 flex-shrink-0 text-slate-400 font-semibold">
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Jump to Sheet:</span>
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+                  {printMetrics.sheetNavigationItems.map((item) => (
+                    <button
+                      key={item.sheetIndex}
+                      onClick={() => scrollToSheetElement(item.elementId)}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-blue-500 hover:bg-slate-800 text-slate-300 font-medium whitespace-nowrap transition flex items-center gap-1"
+                      title={`Jump to ${item.examTitle} - ${item.label}`}
+                    >
+                      <span className="w-3.5 h-3.5 rounded-full bg-slate-800 text-slate-400 text-[9px] font-mono flex items-center justify-center font-bold">
+                        {item.sheetIndex}
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      if (printRef.current) {
+                        printRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    title="Jump to Top"
+                  >
+                    <MoveUp className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
           </main>
         </div>
 
@@ -2033,6 +2352,80 @@ function BulkPrintContent() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            MODAL: PRINTER DRIVER & HARDWARE SPOOLER SETUP GUIDE
+           ========================================================================= */}
+        {showDriverGuideModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 print:hidden animate-fade-in">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-lg w-full p-5 space-y-4 text-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-white">
+                      Physical Printer Driver Setup Guide
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Print directly to HP, Canon, Brother, Epson or Xerox without downloading
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDriverGuideModal(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300">
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                  <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <span>1. Destination Selection</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    When the print dialog opens, look at the <strong>Destination</strong> dropdown. Select your connected physical printer (e.g. <em>Brother HL-L2320D, Canon LBP2900, HP LaserJet</em>) instead of "Save as PDF" to print instantly.
+                  </p>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                  <div className="font-bold text-blue-400 flex items-center gap-1.5">
+                    <span>2. Duplex (Two-Sided) Configuration</span>
+                  </div>
+                  <ul className="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
+                    <li>
+                      <strong>For Booklet Mode (A3 / A4):</strong> Choose <strong className="text-white">"Flip on Short Edge"</strong> (বা খাটো প্রান্তে উল্টানো). This ensures the back cover and inside pages read right-side-up when folded!
+                    </li>
+                    <li>
+                      <strong>For Standard Mode:</strong> Choose <strong className="text-white">"Flip on Long Edge"</strong>.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                  <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                    <span>3. Quality & Scaling Settings</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Set <strong>Scale</strong> to <strong>100% (Default)</strong> and check the box for <strong>"Background Graphics"</strong> so tables, watermarks, and Bengali mathematical equations render with rich contrast.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => setShowDriverGuideModal(false)}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+                >
+                  Got It
+                </button>
               </div>
             </div>
           </div>
