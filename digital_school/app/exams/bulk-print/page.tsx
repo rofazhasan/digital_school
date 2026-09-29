@@ -186,24 +186,46 @@ function BulkPrintContent() {
       setIsFetchingList(true);
       try {
         const res = await fetch('/api/exams?limit=1000');
+        let rawList: any[] = [];
         if (res.ok) {
           const json = await res.json();
-          const items: ExamListItem[] = (json.exams || json.data || json || []).map((ex: any) => ({
-            id: ex.id,
-            title: ex.title || ex.name || 'Untitled Exam',
-            subject: ex.subject || ex.subjectName || '',
-            class: ex.class || ex.grade || '',
-            grade: ex.grade || '',
-            date: ex.date || ex.examDate || '',
-            examDate: ex.examDate || ex.date || '',
-            totalMarks: ex.totalMarks || 0,
-            duration: ex.duration || 0,
-            type: ex.type || '',
-            isPublished: ex.isPublished ?? true
-          }));
-          if (isMounted) {
-            setAllExamsList(items);
+          if (Array.isArray(json)) {
+            rawList = json;
+          } else if (Array.isArray(json.exams)) {
+            rawList = json.exams;
+          } else if (Array.isArray(json.data?.exams)) {
+            rawList = json.data.exams;
+          } else if (Array.isArray(json.data)) {
+            rawList = json.data;
           }
+        }
+
+        // Fallback to localStorage cache if API returned empty array or failed
+        if (rawList.length === 0 && typeof window !== 'undefined') {
+          try {
+            const cached = localStorage.getItem('cached_admin_exams');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed)) rawList = parsed;
+            }
+          } catch (e) {}
+        }
+
+        const items: ExamListItem[] = rawList.map((ex: any) => ({
+          id: ex.id,
+          title: ex.title || ex.name || 'Untitled Exam',
+          subject: ex.subject || ex.class?.name || ex.subjectName || '',
+          class: ex.class?.name || ex.class || ex.grade || '',
+          grade: ex.grade || '',
+          date: ex.date || ex.examDate || '',
+          examDate: ex.examDate || ex.date || '',
+          totalMarks: ex.totalMarks || 0,
+          duration: ex.duration || 0,
+          type: ex.type || '',
+          isPublished: ex.isPublished ?? true
+        }));
+        if (isMounted) {
+          setAllExamsList(items);
         }
       } catch (err) {
         console.error('Failed to fetch exams list for bulk print', err);
