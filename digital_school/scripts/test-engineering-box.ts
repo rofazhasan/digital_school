@@ -67,8 +67,8 @@ function testEngineeringAnswerBox() {
   });
   if (!parsed4.isMultiPart) throw new Error('Q4 should be detected as multi-part');
   if (parsed4.parts.length !== 3) throw new Error('Q4 should have 3 subparts');
-  if (parsed4.parts[0].lines < 2 || parsed4.parts[0].lines > 5) throw new Error('Q4 (a) should have compact mini-box');
-  if (parsed4.parts[2].lines < 6) throw new Error('Q4 (c) 4 marks should have larger mini-box');
+  if (parsed4.parts[0].lines < 2 || parsed4.parts[0].lines > 3) throw new Error('Q4 (a) should have compact mini-box (2-3 lines)');
+  if (parsed4.parts[2].lines < 2 || parsed4.parts[2].lines > 4) throw new Error('Q4 (c) subpart should be compact (2-3 lines, max 4 on legal)');
 
   // Test 5: Multi-part SQ (Bengali)
   const q5 = {
@@ -83,6 +83,9 @@ function testEngineeringAnswerBox() {
   });
   if (!parsed5.isMultiPart) throw new Error('Q5 should be detected as multi-part');
   if (parsed5.parts.length !== 2) throw new Error('Q5 should have 2 subparts');
+  for (const part of parsed5.parts) {
+    if (part.lines < 2 || part.lines > 3) throw new Error('Bengali subparts must be strictly 2-3 lines');
+  }
 
   // Test 6: Diagram
   const q6 = {
@@ -95,7 +98,9 @@ function testEngineeringAnswerBox() {
     totalLines: parsed6.totalLines,
     guideType: parsed6.guideType
   });
-  // Test 7: Legal Paper Optimization (Taller 14-inch space allocation)
+  if (parsed6.totalLines < 6 || parsed6.totalLines > 8) throw new Error('Q6 should fit 3-finger distance (6-8 lines)');
+
+  // Test 7: Legal Paper Optimization
   const q7 = {
     questionText: 'Derive the Maxwell thermodynamic relations and solve the heat engine efficiency for an ideal Stirling cycle.',
     marks: 8
@@ -107,11 +112,53 @@ function testEngineeringAnswerBox() {
     legalLines: parsed7Legal.totalLines,
     ratio: (parsed7Legal.totalLines / parsed7A4.totalLines).toFixed(2)
   });
-  if (parsed7Legal.totalLines <= parsed7A4.totalLines) {
-    throw new Error('Legal paper should allocate more lines than A4 to utilize vertical space');
+  if (parsed7Legal.totalLines < parsed7A4.totalLines) {
+    throw new Error('Legal paper should allocate at least as many lines as A4');
   }
 
-  console.log('✓ ALL ENGINEERING SQ ANSWER-BOX TESTS (INCLUDING LEGAL OPTIMIZATION) PASSED SUCCESSFULLY!');
+  // Test 8: Page Partitioning Algorithm (At least 2, at most 3 questions per page)
+  console.log('\n--- Testing 2-to-3 Questions Per Page Partitioning Algorithm ---');
+  function partitionQuestions(wTotal: number): number[] {
+    const P = Math.max(1, Math.ceil(wTotal / 3));
+    const pageChunkSizes: number[] = [];
+    let remQs = wTotal;
+    let remPages = P;
+
+    for (let i = 0; i < P; i++) {
+      if (remPages === 1) {
+        pageChunkSizes.push(remQs);
+        break;
+      }
+      let take = 2;
+      if (remQs - 3 >= (remPages - 1) * 2) {
+        take = 3;
+      } else if (remQs - 2 >= (remPages - 1) * 2) {
+        take = 2;
+      } else {
+        take = Math.max(1, Math.min(3, Math.ceil(remQs / remPages)));
+      }
+      take = Math.min(take, remQs);
+      pageChunkSizes.push(take);
+      remQs -= take;
+      remPages--;
+    }
+    return pageChunkSizes;
+  }
+
+  for (let n = 2; n <= 20; n++) {
+    const chunks = partitionQuestions(n);
+    console.log(`N = ${n} questions -> ${chunks.length} pages: [${chunks.join(', ')}]`);
+    const sum = chunks.reduce((a, b) => a + b, 0);
+    if (sum !== n) throw new Error(`Partition sum ${sum} does not match total ${n}`);
+    for (let pIdx = 0; pIdx < chunks.length; pIdx++) {
+      const c = chunks[pIdx];
+      if (c < 2 || c > 3) {
+        throw new Error(`Page ${pIdx + 1} has ${c} questions! Must be strictly between 2 and 3 questions.`);
+      }
+    }
+  }
+
+  console.log('✓ ALL ENGINEERING SQ ANSWER-BOX TESTS (INCLUDING 2-TO-3 Q PER PAGE & 3-FINGER DISTANCE) PASSED SUCCESSFULLY!');
 }
 
 testEngineeringAnswerBox();

@@ -181,53 +181,51 @@ export function calculateSqLines(
   const m = Math.max(1, marks || 2);
   let lines: number;
 
-  switch (classification) {
-    case 'definition':
-      lines = Math.max(3, m * 1.5);
-      break;
-    case 'short_explanation':
-      lines = Math.max(5, m * 2.0);
-      break;
-    case 'comparison':
-      lines = Math.max(6, m * 2.0);
-      break;
-    case 'numerical':
-      lines = Math.max(8, m * 2.5);
-      break;
-    case 'derivation':
-      lines = Math.max(10, m * 3.0);
-      break;
-    case 'proof':
-      lines = Math.max(12, m * 3.0);
-      break;
-    case 'diagram': {
-      const baseLines = 2 + (m * 1.5);
-      lines = Math.max(10, baseLines + 5);
-      break;
+  // Three-finger distance rule:
+  // Standalone questions get 3 to 8 lines (~20mm to ~55mm, roughly 3 fingers height)
+  // Subparts get ultra-compact 2 to 3 lines so multi-part questions fit tightly on pages
+  if (options?.isSubPart) {
+    // Subpart mini-box: more small and optimized
+    if (m <= 1) lines = 2;
+    else if (m === 2) lines = 2.5;
+    else lines = 3;
+  } else {
+    // Standalone SQ box: ~3 fingers distance
+    switch (classification) {
+      case 'definition':
+        lines = Math.min(4, Math.max(3, m * 1.5));
+        break;
+      case 'short_explanation':
+      case 'comparison':
+        lines = Math.min(6, Math.max(4, m * 1.5));
+        break;
+      case 'numerical':
+      case 'derivation':
+      case 'proof':
+      case 'design':
+      case 'code':
+        lines = Math.min(8, Math.max(6, 2 + m * 1.2));
+        break;
+      case 'diagram':
+        lines = Math.min(8, Math.max(6, 4 + m * 1.0));
+        break;
+      default:
+        lines = Math.min(7, Math.max(3, 2 + m * 1.2));
+        break;
     }
-    case 'code':
-      lines = Math.max(10, m * 2.5);
-      break;
-    case 'design':
-      lines = Math.max(12, m * 3.0);
-      break;
-    default:
-      lines = 2 + (m * 1.5);
-      break;
   }
 
-  // Legal paper optimization: Legal pages (14in / 355.6mm) have ~20% more vertical space than A4 (297mm).
-  // Expand line allocation so students have abundant working space and zero vacant paper.
+  // Legal paper optimization: Legal pages (14in / 355.6mm) have ~20% more vertical space
   if (options?.paperSize === 'legal') {
-    lines = lines * 1.22;
+    lines = lines * 1.15;
   }
 
   // Bounds clamping:
-  // For subparts: 2 to 18 lines (up to 20 on legal)
-  // For standalone questions: 3 to 28 lines (up to 35 on legal)
+  // For subparts: strictly 2 to 3 lines (max 4 on legal)
+  // For standalone questions: strictly 3 to 8 lines (max 9 on legal)
   const isLegal = options?.paperSize === 'legal';
   const minLines = options?.isSubPart ? 2 : 3;
-  const maxLines = options?.isSubPart ? (isLegal ? 20 : 16) : (isLegal ? 35 : 28);
+  const maxLines = options?.isSubPart ? (isLegal ? 4 : 3) : (isLegal ? 9 : 8);
   let clamped = Math.min(maxLines, Math.max(minLines, Math.round(lines)));
 
   if (options?.userScale && options.userScale !== 1) {

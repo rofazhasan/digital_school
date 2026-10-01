@@ -29,9 +29,8 @@ export const EngineeringAnswerBox: React.FC<EngineeringAnswerBoxProps> = ({
   const effectiveLines = Math.max(2, lines);
   const effectiveScale = Math.max(0.75, Math.min(1.4, boxScale || 1.0));
   
-  // On Legal paper (14in tall), line height is slightly more generous (7.2mm)
-  // On standard A4 paper (297mm tall), line height is standard 6.8mm
-  const baseLineHeightMm = (isLegal ? 7.2 : 6.8) * effectiveScale;
+  // Standard handwriting scale: 6.6mm (standard A4) / 7.0mm (Legal) for ~3-finger distance
+  const baseLineHeightMm = (isLegal ? 7.0 : 6.6) * effectiveScale;
   const minHeightMm = Math.round(effectiveLines * baseLineHeightMm);
 
   return (

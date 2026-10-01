@@ -469,8 +469,73 @@ export function splitExamSetForBooklet(
   const isLegal = options?.paperSize === 'legal';
   const p1Cap = options?.hideInstitute ? (isLegal ? 34 : 26) : (isLegal ? 28 : 20);
   const otherCap = isLegal ? 38 : 28;
+
+  const writtenPages: any[] = [];
+
+  if (options?.engineeringExamBoxes && wTotal > 0) {
+    // STRICT RULE: At least 2 questions, at most 3 questions per page
+    // Total pages required so every page has 2 or 3 questions:
+    let P = Math.max(1, Math.ceil(wTotal / 3));
+    if (options?.layoutMode === 'booklet_4page') {
+      P = Math.max(4, Math.ceil(P / 4) * 4);
+    } else if (targetPages && targetPages > P) {
+      P = Math.min(targetPages, Math.max(P, Math.ceil(wTotal / 2)));
+    }
+
+    const pageChunkSizes: number[] = [];
+    let remQs = wTotal;
+    let remPages = P;
+
+    for (let i = 0; i < P; i++) {
+      if (remPages === 1) {
+        pageChunkSizes.push(remQs);
+        break;
+      }
+      let take = 2;
+      if (remQs - 3 >= (remPages - 1) * 2) {
+        take = 3;
+      } else if (remQs - 2 >= (remPages - 1) * 1) {
+        take = 2;
+      } else {
+        take = Math.max(1, Math.min(3, remQs));
+      }
+      take = Math.min(take, remQs);
+      pageChunkSizes.push(take);
+      remQs -= take;
+      remPages--;
+    }
+
+    let wCursor = 0;
+    for (let i = 0; i < pageChunkSizes.length; i++) {
+      const chunkSize = pageChunkSizes[i];
+      const sliceW = allWritten.slice(wCursor, wCursor + chunkSize);
+      wCursor += chunkSize;
+      const pageCqs = sliceW.filter(q => q._kind === 'cq');
+      const pageSqs = sliceW.filter(q => q._kind === 'sq');
+      const prevW = writtenPages[i - 1];
+      const cqStart = i === 0 ? 1 : prevW.cqStartIndex + prevW.questions.cq.length;
+      const sqStart = i === 0 ? 1 : prevW.sqStartIndex + prevW.questions.sq.length;
+
+      writtenPages.push({
+        questions: {
+          mcq: [], mc: [], int: [], ar: [], smcq: [], cma: [], mpc: [], dr: [], allObjective: [],
+          cq: pageCqs,
+          sq: pageSqs,
+          descriptive: sliceW.filter(q => q._kind === 'desc'),
+          mtf: sliceW.filter(q => q._kind === 'mtf')
+        },
+        startIndex: 1,
+        cqStartIndex: cqStart,
+        sqStartIndex: sqStart,
+        subjectName: ''
+      });
+    }
+
+    return writtenPages;
+  }
+
   const estimatedPages = totalWrittenUnits <= p1Cap ? 1 : Math.max(2, Math.ceil((totalWrittenUnits - p1Cap) / otherCap) + 1);
-  const effectivePages = Math.max(1, Math.min(targetPages, Math.max(estimatedPages, Math.ceil(wTotal / (options?.engineeringExamBoxes ? 2 : 3)))));
+  const effectivePages = Math.max(1, Math.min(targetPages, estimatedPages));
 
   const p1Ratio = effectivePages === 1 ? 1.0 : (options?.hideInstitute ? 0.35 : 0.28);
   const p1WCount = Math.max(1, Math.round(wTotal * p1Ratio));
@@ -478,7 +543,6 @@ export function splitExamSetForBooklet(
   const otherPages = effectivePages - 1;
   const otherCount = otherPages > 0 ? Math.ceil(wRem / otherPages) : 0;
 
-  const writtenPages: any[] = [];
   let wPrev = 0;
   for (let i = 0; i < effectivePages; i++) {
     const end = i === 0 ? p1WCount : (i === effectivePages - 1 ? wTotal : Math.min(wTotal, p1WCount + i * otherCount));
@@ -908,40 +972,105 @@ export default function PrintExamPage() {
               {!showAnswers ? (
                 // Question Papers (Standard)
                 <>
-                  {nonEmptySets.map((set: any) => (
-                    <div key={set.setId} className={`print-page-container ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
-                      <QuestionPaper
-                        examInfo={{ ...examInfo, set: set.setName }}
-                        questions={{
-                          mcq: set.mcq || [],
-                          mc: set.mc || [],
-                          int: set.int || [],
-                          ar: set.ar || [],
-                          cq: set.cq || [],
-                          sq: set.sq || [],
-                          mtf: set.mtf || [],
-                          descriptive: set.descriptive || [],
-                          smcq: set.smcq || [],
-                          cma: set.cma || [],
-                          mpc: set.mpc || [],
-                          dr: set.dr || [],
-                          allObjective: set.orderedObjective || []
-                        }}
-                        qrData={set.qrData}
-                        fontSize={objectiveFontSize}
-                        cqSqFontSize={cqSqFontSize}
-                        forcePageBreak={forcePageBreak}
-                        language={language}
-                        hideOMR={!showOMR}
-                        showDate={showDate}
-                        hideInstitute={hideInstitute}
-                        engineeringExamBoxes={engineeringExamBoxes}
-                        engineeringBoxScale={engineeringBoxScale}
-                        engineeringBoxStyle={engineeringBoxStyle}
-                        paperSize={paperSize}
-                      />
-                    </div>
-                  ))}
+                  {nonEmptySets.map((set: any) => {
+                    if (engineeringExamBoxes && Array.isArray(set.sq) && set.sq.length > 0) {
+                      const targetPages = Math.max(1, Math.ceil(set.sq.length / 3));
+                      const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
+                        fontSize: objectiveFontSize,
+                        cqSqFontSize,
+                        layoutMode,
+                        hideInstitute,
+                        engineeringExamBoxes,
+                        engineeringBoxScale,
+                        paperSize
+                      });
+                      const totalPages = pages.length;
+
+                      return (
+                        <React.Fragment key={`eng-single-${set.setId}`}>
+                          {pages.map((p, pIdx) => {
+                            const isPage1 = pIdx === 0;
+                            const isLastPage = pIdx === totalPages - 1;
+                            return (
+                              <div
+                                key={`page-${set.setId}-${pIdx + 1}`}
+                                className={`print-page-container ${paperClass} engineering-page-mode`}
+                                style={{ pageBreakAfter: isLastPage ? 'auto' : 'always' }}
+                              >
+                                {!isPage1 && (
+                                  <div className="flex justify-between items-center text-xs font-bold border-b border-black pb-1 mb-2 text-gray-800">
+                                    <span>{!hideInstitute ? (examInfo.schoolName || '') : ''}</span>
+                                    <span>{examInfo.title}</span>
+                                    <span className="border border-black px-1.5 py-0.5 rounded text-[10px] bg-gray-50">
+                                      {language === 'en' ? `Page ${pIdx + 1} of ${totalPages}` : `পৃষ্ঠা ${toBengaliNumerals(pIdx + 1)} / ${toBengaliNumerals(totalPages)}`}
+                                    </span>
+                                  </div>
+                                )}
+                                <QuestionPaper
+                                  examInfo={{ ...examInfo, set: set.setName }}
+                                  questions={p.questions}
+                                  qrData={set.qrData}
+                                  fontSize={objectiveFontSize}
+                                  cqSqFontSize={cqSqFontSize}
+                                  forcePageBreak={forcePageBreak}
+                                  language={language}
+                                  hideOMR={!showOMR}
+                                  showDate={showDate}
+                                  hideInstitute={hideInstitute}
+                                  hideHeader={!isPage1}
+                                  hideSignature={!isLastPage}
+                                  startQuestionIndex={p.startIndex}
+                                  startCqIndex={p.cqStartIndex}
+                                  startSqIndex={p.sqStartIndex}
+                                  pageNumberLabel=""
+                                  engineeringExamBoxes={engineeringExamBoxes}
+                                  engineeringBoxScale={engineeringBoxScale}
+                                  engineeringBoxStyle={engineeringBoxStyle}
+                                  paperSize={paperSize}
+                                />
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    }
+
+                    // Otherwise normal continuous printing when engineeringExamBoxes is OFF (preserves original layout)
+                    return (
+                      <div key={set.setId} className={`print-page-container ${paperClass}`} style={{ pageBreakAfter: 'always' }}>
+                        <QuestionPaper
+                          examInfo={{ ...examInfo, set: set.setName }}
+                          questions={{
+                            mcq: set.mcq || [],
+                            mc: set.mc || [],
+                            int: set.int || [],
+                            ar: set.ar || [],
+                            cq: set.cq || [],
+                            sq: set.sq || [],
+                            mtf: set.mtf || [],
+                            descriptive: set.descriptive || [],
+                            smcq: set.smcq || [],
+                            cma: set.cma || [],
+                            mpc: set.mpc || [],
+                            dr: set.dr || [],
+                            allObjective: set.orderedObjective || []
+                          }}
+                          qrData={set.qrData}
+                          fontSize={objectiveFontSize}
+                          cqSqFontSize={cqSqFontSize}
+                          forcePageBreak={forcePageBreak}
+                          language={language}
+                          hideOMR={!showOMR}
+                          showDate={showDate}
+                          hideInstitute={hideInstitute}
+                          engineeringExamBoxes={engineeringExamBoxes}
+                          engineeringBoxScale={engineeringBoxScale}
+                          engineeringBoxStyle={engineeringBoxStyle}
+                          paperSize={paperSize}
+                        />
+                      </div>
+                    );
+                  })}
 
                   {/* Render OMR Sheets only for question papers if showOMR is true */}
                   {showOMR && nonEmptySets.map((set: any) => (

@@ -133,6 +133,19 @@ function getOptimalPageCount(
   // 1 CQ is roughly ~8-9 MCQs in visual height; 1 SQ is ~3.5 MCQs; 1 Desc is ~8 MCQs
   const estimatedUnits = (objCount * fontScale) + ((cqCount * 8.5 + sqUnits + descCount * 8) * cqScale);
 
+  // STRICT RULE FOR ENGINEERING EXAM BOXES: At least 2, at most 3 questions per page
+  const totalWritten = sqCount + cqCount + descCount;
+  if (engineeringExamBoxes && totalWritten > 0 && objCount === 0) {
+    const requiredPages = Math.max(1, Math.ceil(totalWritten / 3));
+    if (layoutMode === 'booklet_4page') {
+      return Math.max(4, Math.ceil(requiredPages / 4) * 4);
+    }
+    if (layoutMode === 'booklet_2up') {
+      return Math.max(2, Math.ceil(requiredPages / 2) * 2);
+    }
+    return requiredPages;
+  }
+
   if (layoutMode === 'booklet_4page') {
     if (paperSize === 'legal') {
       if (estimatedUnits > 165) return 8;
@@ -744,7 +757,7 @@ function BulkPrintContent() {
           }
         } else {
           // Standard Multi-Page Mode
-          if (standardPagingMode === 'paginated_bounds') {
+          if (standardPagingMode === 'paginated_bounds' || engineeringExamBoxes) {
             const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
             const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
               fontSize: objectiveFontSize,
@@ -1956,7 +1969,7 @@ function BulkPrintContent() {
                           <>
                             {targetSets.map((set: any) => {
                               // If Bounded Paginated Mode is chosen, split into exact pages with zero clipping
-                              if (standardPagingMode === 'paginated_bounds') {
+                              if (standardPagingMode === 'paginated_bounds' || engineeringExamBoxes) {
                                 const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
                                 const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
                                   fontSize: objectiveFontSize,
@@ -1980,7 +1993,7 @@ function BulkPrintContent() {
                                         <div
                                           key={`page-${examData.id}-${pageNum}`}
                                           id={`page-${examData.id}-${pageNum}`}
-                                          className={`print-page-container ${paperClass}`}
+                                          className={`print-page-container ${paperClass} ${engineeringExamBoxes ? 'engineering-page-mode' : ''}`}
                                           style={{ pageBreakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'always' : 'auto', breakAfter: (!isFinalPage || (examSeparation === 'page_break' && !isLastExam)) ? 'page' : 'auto' }}
                                         >
                                           {/* Running Header on subsequent pages */}
