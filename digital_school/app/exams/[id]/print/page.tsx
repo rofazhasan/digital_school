@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useReactToPrint } from 'react-to-print';
 import { MathJaxContext } from 'better-react-mathjax';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,6 +12,7 @@ import Head from 'next/head';
 import QuestionPaper from '../../../components/QuestionPaper';
 import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper';
 import OMRSheet from '../../../components/OMRSheet';
+import { estimateSqVisualUnits } from '@/utils/engineeringAnswerBox';
 
 import "./print.css";
 
@@ -121,6 +122,8 @@ export function splitExamSetForBooklet(
     cqSqFontSize?: number;
     layoutMode?: string;
     hideInstitute?: boolean;
+    engineeringExamBoxes?: boolean;
+    engineeringBoxScale?: number;
   }
 ) {
   const cqs = [...(set.cq || [])];
@@ -378,10 +381,14 @@ export function splitExamSetForBooklet(
     const fontFactor = Math.max(0.5, (options?.fontSize || 100) / 100);
     const cqFontFactor = Math.max(0.5, (options?.cqSqFontSize || 100) / 100);
 
+    const sqUnits = options?.engineeringExamBoxes
+      ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale), 0)
+      : sqs.length * 3.5;
+
     const totalObjUnits = totalObj * fontFactor;
     const totalWrtUnits = (
       cqs.length * 8.5 +
-      sqs.length * 3.5 +
+      sqUnits +
       descriptives.length * 8.0 +
       mtfs.length * 4.0
     ) * cqFontFactor;
@@ -414,17 +421,23 @@ export function splitExamSetForBooklet(
     const wrtPages: any[] = [];
     for (let i = 0; i < wrtPagesCount; i++) {
       const pageW = allWritten.slice(i * wrtChunkSize, (i + 1) * wrtChunkSize);
+      const pageCqs = pageW.filter(q => q._kind === 'cq');
+      const pageSqs = pageW.filter(q => q._kind === 'sq');
+      const prevWrt = wrtPages[i - 1];
+      const cqStart = i === 0 ? 1 : prevWrt.cqStartIndex + prevWrt.questions.cq.length;
+      const sqStart = i === 0 ? 1 : prevWrt.sqStartIndex + prevWrt.questions.sq.length;
+
       wrtPages.push({
         questions: {
           mcq: [], mc: [], int: [], ar: [], smcq: [], cma: [], mpc: [], dr: [], allObjective: [],
-          cq: pageW.filter(q => q._kind === 'cq'),
-          sq: pageW.filter(q => q._kind === 'sq'),
+          cq: pageCqs,
+          sq: pageSqs,
           descriptive: pageW.filter(q => q._kind === 'desc'),
           mtf: pageW.filter(q => q._kind === 'mtf')
         },
         startIndex: totalObj + 1,
-        cqStartIndex: (i * wrtChunkSize) + 1,
-        sqStartIndex: 1,
+        cqStartIndex: cqStart,
+        sqStartIndex: sqStart,
         subjectName: ''
       });
     }
@@ -442,8 +455,23 @@ export function splitExamSetForBooklet(
   mtfs.forEach(q => allWritten.push({ ...q, _kind: 'mtf' }));
 
   const wTotal = allWritten.length;
-  const effectivePages = Math.max(1, Math.min(targetPages, Math.max(1, Math.ceil(wTotal / 3))));
-  const p1WCount = Math.max(1, Math.round(wTotal * (effectivePages === 1 ? 1.0 : (options?.hideInstitute ? 0.35 : 0.28))));
+  const sqTotalUnits = options?.engineeringExamBoxes
+    ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale), 0)
+    : sqs.length * 3.5;
+  const totalWrittenUnits = (
+    cqs.length * 8.5 +
+    sqTotalUnits +
+    descriptives.length * 8.0 +
+    mtfs.length * 4.0
+  );
+
+  const p1Cap = options?.hideInstitute ? 26 : 20;
+  const otherCap = 28;
+  const estimatedPages = totalWrittenUnits <= p1Cap ? 1 : Math.max(2, Math.ceil((totalWrittenUnits - p1Cap) / otherCap) + 1);
+  const effectivePages = Math.max(1, Math.min(targetPages, Math.max(estimatedPages, Math.ceil(wTotal / (options?.engineeringExamBoxes ? 2 : 3)))));
+
+  const p1Ratio = effectivePages === 1 ? 1.0 : (options?.hideInstitute ? 0.35 : 0.28);
+  const p1WCount = Math.max(1, Math.round(wTotal * p1Ratio));
   const wRem = wTotal - p1WCount;
   const otherPages = effectivePages - 1;
   const otherCount = otherPages > 0 ? Math.ceil(wRem / otherPages) : 0;
@@ -454,17 +482,23 @@ export function splitExamSetForBooklet(
     const end = i === 0 ? p1WCount : (i === effectivePages - 1 ? wTotal : Math.min(wTotal, p1WCount + i * otherCount));
     const sliceW = allWritten.slice(wPrev, end);
     wPrev = end;
+    const pageCqs = sliceW.filter(q => q._kind === 'cq');
+    const pageSqs = sliceW.filter(q => q._kind === 'sq');
+    const prevW = writtenPages[i - 1];
+    const cqStart = i === 0 ? 1 : prevW.cqStartIndex + prevW.questions.cq.length;
+    const sqStart = i === 0 ? 1 : prevW.sqStartIndex + prevW.questions.sq.length;
+
     writtenPages.push({
       questions: {
         mcq: [], mc: [], int: [], ar: [], smcq: [], cma: [], mpc: [], dr: [], allObjective: [],
-        cq: sliceW.filter(q => q._kind === 'cq'),
-        sq: sliceW.filter(q => q._kind === 'sq'),
+        cq: pageCqs,
+        sq: pageSqs,
         descriptive: sliceW.filter(q => q._kind === 'desc'),
         mtf: sliceW.filter(q => q._kind === 'mtf')
       },
       startIndex: 1,
-      cqStartIndex: (i === 0 ? 1 : writtenPages[i-1].cqStartIndex + writtenPages[i-1].questions.cq.length),
-      sqStartIndex: 1,
+      cqStartIndex: cqStart,
+      sqStartIndex: sqStart,
       subjectName: ''
     });
   }
@@ -493,6 +527,9 @@ export default function PrintExamPage() {
   const [forcePageBreak, setForcePageBreak] = useState(false);
   const [showOMR, setShowOMR] = useState(true);
   const [showDate, setShowDate] = useState(true);
+  const [engineeringExamBoxes, setEngineeringExamBoxes] = useState(false);
+  const [engineeringBoxScale, setEngineeringBoxScale] = useState(1.0);
+  const [engineeringBoxStyle, setEngineeringBoxStyle] = useState<'ruled' | 'blank' | 'grid'>('ruled');
   const printRef = useRef<HTMLDivElement>(null);
 
   // Paper Size & Booklet Options State
@@ -520,6 +557,21 @@ export default function PrintExamPage() {
       if (savedLayout) setLayoutMode(savedLayout as any);
       const savedFold = localStorage.getItem('print_show_fold_guide');
       if (savedFold !== null) setShowFoldGuide(savedFold === 'true');
+
+      const savedEngBoxes = localStorage.getItem('print_engineering_boxes');
+      if (savedEngBoxes !== null) setEngineeringExamBoxes(savedEngBoxes === 'true');
+      const savedEngScale = localStorage.getItem('print_engineering_box_scale');
+      if (savedEngScale) setEngineeringBoxScale(Number(savedEngScale));
+      const savedEngStyle = localStorage.getItem('print_engineering_box_style');
+      if (savedEngStyle) setEngineeringBoxStyle(savedEngStyle as any);
+
+      // Also check URL search parameter
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('engineeringBoxes') === 'true' || urlParams.get('engineeringExam') === 'true') {
+          setEngineeringExamBoxes(true);
+        }
+      }
 
       if (examId) {
         const savedHide = localStorage.getItem(`print_hide_institute_${examId}`);
@@ -788,6 +840,21 @@ export default function PrintExamPage() {
           showFoldGuide={showFoldGuide}
           toggleFoldGuide={toggleFoldGuide}
           openBookletGuide={() => setShowBookletGuideModal(true)}
+          engineeringExamBoxes={engineeringExamBoxes}
+          setEngineeringExamBoxes={(val: boolean) => {
+            setEngineeringExamBoxes(val);
+            try { localStorage.setItem('print_engineering_boxes', String(val)); } catch (e) {}
+          }}
+          engineeringBoxScale={engineeringBoxScale}
+          setEngineeringBoxScale={(val: number) => {
+            setEngineeringBoxScale(val);
+            try { localStorage.setItem('print_engineering_box_scale', String(val)); } catch (e) {}
+          }}
+          engineeringBoxStyle={engineeringBoxStyle}
+          setEngineeringBoxStyle={(val: 'ruled' | 'blank' | 'grid') => {
+            setEngineeringBoxStyle(val);
+            try { localStorage.setItem('print_engineering_box_style', val); } catch (e) {}
+          }}
           t={t}
         />
 
@@ -820,6 +887,12 @@ export default function PrintExamPage() {
           <span className="bg-gray-100 text-gray-800 border border-gray-300 px-3 py-0.5 rounded-full text-[10px] font-bold">
             ফন্ট: OBJ {objectiveFontSize}% | CQ/SQ {cqSqFontSize}%
           </span>
+
+          {engineeringExamBoxes && (
+            <span className="bg-indigo-100 text-indigo-900 border border-indigo-300 px-3 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 shadow-sm">
+              📐 ইঞ্জিনিয়ারিং উত্তর বক্স: চালু ({engineeringBoxStyle === 'ruled' ? 'রুল টানা' : engineeringBoxStyle === 'grid' ? 'গ্রিড' : 'ফাঁকা'}, {engineeringBoxScale === 0.85 ? 'কম্প্যাক্ট' : engineeringBoxScale === 1.2 ? 'প্রশস্ত' : 'স্বাভাবিক'})
+            </span>
+          )}
         </div>
 
         {/* Main Printable Content Container */}
@@ -860,6 +933,9 @@ export default function PrintExamPage() {
                         hideOMR={!showOMR}
                         showDate={showDate}
                         hideInstitute={hideInstitute}
+                        engineeringExamBoxes={engineeringExamBoxes}
+                        engineeringBoxScale={engineeringBoxScale}
+                        engineeringBoxStyle={engineeringBoxStyle}
                       />
                     </div>
                   ))}
@@ -915,7 +991,14 @@ export default function PrintExamPage() {
             <>
               {nonEmptySets.map((set: any) => {
                 const targetPages = 4;
-                const logicalPages = splitExamSetForBooklet(set, examInfo, targetPages);
+                const logicalPages = splitExamSetForBooklet(set, examInfo, targetPages, {
+                  fontSize: objectiveFontSize,
+                  cqSqFontSize,
+                  layoutMode,
+                  hideInstitute,
+                  engineeringExamBoxes,
+                  engineeringBoxScale
+                });
                 const { sheets, N } = computeBookletSheets(logicalPages.length);
 
                 const renderHalfPage = (pageNum: number, side: 'left' | 'right') => {
@@ -976,6 +1059,9 @@ export default function PrintExamPage() {
                           startCqIndex={p.cqStartIndex}
                           startSqIndex={p.sqStartIndex}
                           pageNumberLabel=""
+                          engineeringExamBoxes={engineeringExamBoxes}
+                          engineeringBoxScale={engineeringBoxScale}
+                          engineeringBoxStyle={engineeringBoxStyle}
                         />
                       ) : (
                         <AnswerQuestionPaper
@@ -1078,7 +1164,14 @@ export default function PrintExamPage() {
           {layoutMode === 'booklet_2up' && (
             <>
               {nonEmptySets.map((set: any) => {
-                const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo);
+                const [p1, p2, p3, p4] = splitExamSetForBooklet(set, examInfo, 4, {
+                  fontSize: objectiveFontSize,
+                  cqSqFontSize,
+                  layoutMode,
+                  hideInstitute,
+                  engineeringExamBoxes,
+                  engineeringBoxScale
+                });
                 return (
                   <React.Fragment key={`booklet-seq-${set.setId}`}>
                     {/* SPREAD 1: Page 1 [Left] | Page 2 [Right] */}
@@ -1106,6 +1199,9 @@ export default function PrintExamPage() {
                             startCqIndex={p1.cqStartIndex}
                             startSqIndex={p1.sqStartIndex}
                             pageNumberLabel=""
+                            engineeringExamBoxes={engineeringExamBoxes}
+                            engineeringBoxScale={engineeringBoxScale}
+                            engineeringBoxStyle={engineeringBoxStyle}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1158,6 +1254,9 @@ export default function PrintExamPage() {
                             startCqIndex={p2.cqStartIndex}
                             startSqIndex={p2.sqStartIndex}
                             pageNumberLabel=""
+                            engineeringExamBoxes={engineeringExamBoxes}
+                            engineeringBoxScale={engineeringBoxScale}
+                            engineeringBoxStyle={engineeringBoxStyle}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1207,6 +1306,9 @@ export default function PrintExamPage() {
                             startCqIndex={p3.cqStartIndex}
                             startSqIndex={p3.sqStartIndex}
                             pageNumberLabel=""
+                            engineeringExamBoxes={engineeringExamBoxes}
+                            engineeringBoxScale={engineeringBoxScale}
+                            engineeringBoxStyle={engineeringBoxStyle}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1259,6 +1361,9 @@ export default function PrintExamPage() {
                             startCqIndex={p4.cqStartIndex}
                             startSqIndex={p4.sqStartIndex}
                             pageNumberLabel=""
+                            engineeringExamBoxes={engineeringExamBoxes}
+                            engineeringBoxScale={engineeringBoxScale}
+                            engineeringBoxStyle={engineeringBoxStyle}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1364,6 +1469,9 @@ const PrintControls = ({
   handleSaveInstitute, handleResetInstitute,
   paperSize, setPaperSize, layoutMode, setLayoutMode,
   showFoldGuide, toggleFoldGuide, openBookletGuide,
+  engineeringExamBoxes, setEngineeringExamBoxes,
+  engineeringBoxScale, setEngineeringBoxScale,
+  engineeringBoxStyle, setEngineeringBoxStyle,
   t
 }: any) => {
   const updateGlobalFontSize = (delta: number) => {
@@ -1549,6 +1657,82 @@ const PrintControls = ({
                 {hideInstitute ? (language === 'en' ? 'Hidden' : 'লুকানো') : (language === 'en' ? 'Visible' : 'দৃশ্যমান')}
               </button>
             </div>
+          </div>
+
+          {/* Engineering Exam SQ Answer Boxes */}
+          <div className="border-t border-gray-200/80 pt-2 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-gray-800 flex items-center gap-1">
+                  📐 {language === 'en' ? 'Engineering SQ Boxes:' : 'ইঞ্জিনিয়ারিং উত্তর বক্স (SQ):'}
+                </span>
+                <span className="text-[8.5px] text-gray-500 leading-tight">
+                  {language === 'en' ? 'Designated student answer area' : 'প্রশ্নেই উত্তর লেখার বক্স (বুয়েট স্টাইল)'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEngineeringExamBoxes(!engineeringExamBoxes)}
+                className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition shadow-xs ${
+                  engineeringExamBoxes ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {engineeringExamBoxes ? (language === 'en' ? 'ON' : 'চালু') : (language === 'en' ? 'OFF' : 'বন্ধ')}
+              </button>
+            </div>
+
+            {engineeringExamBoxes && (
+              <div className="bg-indigo-50/70 border border-indigo-200 rounded p-2 space-y-1.5 text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-900">{language === 'en' ? 'Box Style:' : 'বক্সের ধরন:'}</span>
+                  <select
+                    value={engineeringBoxStyle}
+                    onChange={(e) => setEngineeringBoxStyle(e.target.value as any)}
+                    className="bg-white border border-indigo-300 rounded px-1.5 py-0.5 text-[9.5px] font-medium text-gray-800 focus:outline-none"
+                  >
+                    <option value="ruled">{language === 'en' ? 'Ruled Lines (Exam Script)' : 'রুল টানা (পরীক্ষার খাতা)'}</option>
+                    <option value="blank">{language === 'en' ? 'Plain Box (Blank)' : 'ফাঁকা বক্স (Blank)'}</option>
+                    <option value="grid">{language === 'en' ? 'Engineering Grid' : 'ইঞ্জিনিয়ারিং গ্রিড'}</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-900">{language === 'en' ? 'Box Height / Scale:' : 'বক্সের উচ্চতা:'}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEngineeringBoxScale(0.85)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        engineeringBoxScale === 0.85 ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-indigo-200'
+                      }`}
+                      title="Compact (Space-saver)"
+                    >
+                      {language === 'en' ? 'Compact' : 'কম্প্যাক্ট'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEngineeringBoxScale(1.0)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        engineeringBoxScale === 1.0 ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-indigo-200'
+                      }`}
+                      title="Standard"
+                    >
+                      {language === 'en' ? 'Standard' : 'স্বাভাবিক'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEngineeringBoxScale(1.2)}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        engineeringBoxScale === 1.2 ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border border-indigo-200'
+                      }`}
+                      title="Spacious"
+                    >
+                      {language === 'en' ? 'Spacious' : 'প্রশস্ত'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

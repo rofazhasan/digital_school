@@ -622,6 +622,15 @@
     page-break-inside: avoid !important;
     break-inside: avoid-page !important;
   }
+
+  /* Engineering Exam SQ Answer Boxes: Never split boxes across page breaks */
+  .engineering-sq-item,
+  .engineering-subpart-item,
+  .engineering-answer-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    -webkit-column-break-inside: avoid !important;
+  }
 }
 
 @media screen {

@@ -6,6 +6,8 @@ import Latex from 'react-latex';
 import { cleanupMath } from '@/lib/utils';
 import { toBengaliNumerals, formatBengaliDuration, toRoman } from '@/utils/numeralConverter';
 import { BeautifulChart } from "@/app/components/BeautifulChart";
+import { EngineeringAnswerBox } from "@/app/components/EngineeringAnswerBox";
+import { parseSqQuestion } from "@/utils/engineeringAnswerBox";
 
 
 // --- TYPES ---
@@ -119,6 +121,9 @@ interface QuestionPaperProps {
   startCqIndex?: number;
   startSqIndex?: number;
   pageNumberLabel?: string;
+  engineeringExamBoxes?: boolean;
+  engineeringBoxScale?: number;
+  engineeringBoxStyle?: 'ruled' | 'blank' | 'grid';
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -448,7 +453,8 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lan
 const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
   ({
     examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate, hideInstitute = false,
-    hideHeader = false, hideSignature = false, startQuestionIndex = 1, startCqIndex = 1, startSqIndex = 1, pageNumberLabel
+    hideHeader = false, hideSignature = false, startQuestionIndex = 1, startCqIndex = 1, startSqIndex = 1, pageNumberLabel,
+    engineeringExamBoxes = false, engineeringBoxScale = 1.0, engineeringBoxStyle = 'ruled'
   }, ref) => {
     const lang = language || 'bn';
     const isEn = lang === 'en';
@@ -1246,14 +1252,81 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               isEn={isEn}
                             />
                           )}
-                          <div className="mb-3 text-left sq-question">
-                            <div className="flex items-start">
-                              <span className="font-bold mr-2">{isEn ? ((startSqIndex || 1) + idx) : toBengaliNumerals((startSqIndex || 1) + idx)}.</span>
-                              <div className="flex-1">
-                                <Text>{`${q.questionText} [${isEn ? (q.marks || '?') : toBengaliNumerals(q.marks || '?')}]`}</Text>
+                          {engineeringExamBoxes ? (
+                            (() => {
+                              const parsed = parseSqQuestion(q, engineeringBoxScale);
+                              const qNum = (startSqIndex || 1) + idx;
+                              const numStr = isEn ? qNum : toBengaliNumerals(qNum);
+                              return (
+                                <div className="mb-4 text-left sq-question engineering-sq-item break-inside-avoid">
+                                  {parsed.isMultiPart ? (
+                                    <>
+                                      <div className="flex items-start mb-1.5 font-bold text-gray-900">
+                                        <span className="font-bold mr-2 text-sm">{numStr}.</span>
+                                        <div className="flex-1 text-sm">
+                                          <Text>{parsed.stem || q.questionText}</Text>
+                                          {q.marks && !parsed.parts.some(p => p.marks) && (
+                                            <span className="font-bold ml-1.5">[{isEn ? q.marks : toBengaliNumerals(q.marks)}]</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-3 pl-2 sm:pl-3 border-l-2 border-slate-300 ml-1">
+                                        {parsed.parts.map((part, pIdx) => (
+                                          <div key={pIdx} className="engineering-subpart-item break-inside-avoid">
+                                            <div className="flex items-start text-xs font-semibold text-gray-800 mb-1">
+                                              <span className="font-bold mr-1.5 text-slate-900">{part.label}</span>
+                                              <div className="flex-1">
+                                                <Text>{part.text}</Text>
+                                                {part.marks && (
+                                                  <span className="font-bold ml-1 text-slate-700">[{isEn ? part.marks : toBengaliNumerals(part.marks)}]</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <EngineeringAnswerBox
+                                              lines={part.lines}
+                                              marks={part.marks || 1}
+                                              classification={part.classification}
+                                              guideType={part.guideType}
+                                              isEn={isEn}
+                                              boxStyle={engineeringBoxStyle}
+                                              boxScale={engineeringBoxScale}
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-start mb-1 text-sm font-bold text-gray-900">
+                                        <span className="font-bold mr-2">{numStr}.</span>
+                                        <div className="flex-1">
+                                          <Text>{`${q.questionText} [${isEn ? (q.marks || '?') : toBengaliNumerals(q.marks || '?')}]`}</Text>
+                                        </div>
+                                      </div>
+                                      <EngineeringAnswerBox
+                                        lines={parsed.totalLines}
+                                        marks={q.marks || 2}
+                                        classification={parsed.overallClassification}
+                                        guideType={parsed.guideType}
+                                        isEn={isEn}
+                                        boxStyle={engineeringBoxStyle}
+                                        boxScale={engineeringBoxScale}
+                                      />
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <div className="mb-3 text-left sq-question">
+                              <div className="flex items-start">
+                                <span className="font-bold mr-2">{isEn ? ((startSqIndex || 1) + idx) : toBengaliNumerals((startSqIndex || 1) + idx)}.</span>
+                                <div className="flex-1">
+                                  <Text>{`${q.questionText} [${isEn ? (q.marks || '?') : toBengaliNumerals(q.marks || '?')}]`}</Text>
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          )}
                         </React.Fragment>
                       );
                     })}
