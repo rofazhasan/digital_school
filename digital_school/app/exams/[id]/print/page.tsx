@@ -124,6 +124,7 @@ export function splitExamSetForBooklet(
     hideInstitute?: boolean;
     engineeringExamBoxes?: boolean;
     engineeringBoxScale?: number;
+    paperSize?: 'legal' | 'a4' | 'letter' | 'a3';
   }
 ) {
   const cqs = [...(set.cq || [])];
@@ -382,7 +383,7 @@ export function splitExamSetForBooklet(
     const cqFontFactor = Math.max(0.5, (options?.cqSqFontSize || 100) / 100);
 
     const sqUnits = options?.engineeringExamBoxes
-      ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale), 0)
+      ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale, options?.paperSize), 0)
       : sqs.length * 3.5;
 
     const totalObjUnits = totalObj * fontFactor;
@@ -456,7 +457,7 @@ export function splitExamSetForBooklet(
 
   const wTotal = allWritten.length;
   const sqTotalUnits = options?.engineeringExamBoxes
-    ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale), 0)
+    ? sqs.reduce((sum, q) => sum + estimateSqVisualUnits(q, options?.engineeringBoxScale, options?.paperSize), 0)
     : sqs.length * 3.5;
   const totalWrittenUnits = (
     cqs.length * 8.5 +
@@ -465,8 +466,9 @@ export function splitExamSetForBooklet(
     mtfs.length * 4.0
   );
 
-  const p1Cap = options?.hideInstitute ? 26 : 20;
-  const otherCap = 28;
+  const isLegal = options?.paperSize === 'legal';
+  const p1Cap = options?.hideInstitute ? (isLegal ? 34 : 26) : (isLegal ? 28 : 20);
+  const otherCap = isLegal ? 38 : 28;
   const estimatedPages = totalWrittenUnits <= p1Cap ? 1 : Math.max(2, Math.ceil((totalWrittenUnits - p1Cap) / otherCap) + 1);
   const effectivePages = Math.max(1, Math.min(targetPages, Math.max(estimatedPages, Math.ceil(wTotal / (options?.engineeringExamBoxes ? 2 : 3)))));
 
@@ -936,6 +938,7 @@ export default function PrintExamPage() {
                         engineeringExamBoxes={engineeringExamBoxes}
                         engineeringBoxScale={engineeringBoxScale}
                         engineeringBoxStyle={engineeringBoxStyle}
+                        paperSize={paperSize}
                       />
                     </div>
                   ))}
@@ -997,7 +1000,8 @@ export default function PrintExamPage() {
                   layoutMode,
                   hideInstitute,
                   engineeringExamBoxes,
-                  engineeringBoxScale
+                  engineeringBoxScale,
+                  paperSize
                 });
                 const { sheets, N } = computeBookletSheets(logicalPages.length);
 
@@ -1062,6 +1066,7 @@ export default function PrintExamPage() {
                           engineeringExamBoxes={engineeringExamBoxes}
                           engineeringBoxScale={engineeringBoxScale}
                           engineeringBoxStyle={engineeringBoxStyle}
+                          paperSize={paperSize}
                         />
                       ) : (
                         <AnswerQuestionPaper
@@ -1170,7 +1175,8 @@ export default function PrintExamPage() {
                   layoutMode,
                   hideInstitute,
                   engineeringExamBoxes,
-                  engineeringBoxScale
+                  engineeringBoxScale,
+                  paperSize
                 });
                 return (
                   <React.Fragment key={`booklet-seq-${set.setId}`}>
@@ -1202,6 +1208,7 @@ export default function PrintExamPage() {
                             engineeringExamBoxes={engineeringExamBoxes}
                             engineeringBoxScale={engineeringBoxScale}
                             engineeringBoxStyle={engineeringBoxStyle}
+                            paperSize={paperSize}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1257,6 +1264,7 @@ export default function PrintExamPage() {
                             engineeringExamBoxes={engineeringExamBoxes}
                             engineeringBoxScale={engineeringBoxScale}
                             engineeringBoxStyle={engineeringBoxStyle}
+                            paperSize={paperSize}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1309,6 +1317,7 @@ export default function PrintExamPage() {
                             engineeringExamBoxes={engineeringExamBoxes}
                             engineeringBoxScale={engineeringBoxScale}
                             engineeringBoxStyle={engineeringBoxStyle}
+                            paperSize={paperSize}
                           />
                         ) : (
                           <AnswerQuestionPaper
@@ -1364,6 +1373,7 @@ export default function PrintExamPage() {
                             engineeringExamBoxes={engineeringExamBoxes}
                             engineeringBoxScale={engineeringBoxScale}
                             engineeringBoxStyle={engineeringBoxStyle}
+                            paperSize={paperSize}
                           />
                         ) : (
                           <AnswerQuestionPaper

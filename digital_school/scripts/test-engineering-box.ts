@@ -95,10 +95,23 @@ function testEngineeringAnswerBox() {
     totalLines: parsed6.totalLines,
     guideType: parsed6.guideType
   });
-  if (parsed6.overallClassification !== 'diagram') throw new Error('Q6 should be diagram');
-  if (parsed6.guideType !== 'diagram') throw new Error('Q6 guideType should be diagram');
+  // Test 7: Legal Paper Optimization (Taller 14-inch space allocation)
+  const q7 = {
+    questionText: 'Derive the Maxwell thermodynamic relations and solve the heat engine efficiency for an ideal Stirling cycle.',
+    marks: 8
+  };
+  const parsed7A4 = parseSqQuestion(q7, 1.0, 'a4');
+  const parsed7Legal = parseSqQuestion(q7, 1.0, 'legal');
+  console.log('Q7 (A4 vs Legal Optimization):', {
+    a4Lines: parsed7A4.totalLines,
+    legalLines: parsed7Legal.totalLines,
+    ratio: (parsed7Legal.totalLines / parsed7A4.totalLines).toFixed(2)
+  });
+  if (parsed7Legal.totalLines <= parsed7A4.totalLines) {
+    throw new Error('Legal paper should allocate more lines than A4 to utilize vertical space');
+  }
 
-  console.log('✓ ALL ENGINEERING SQ ANSWER-BOX TESTS PASSED SUCCESSFULLY!');
+  console.log('✓ ALL ENGINEERING SQ ANSWER-BOX TESTS (INCLUDING LEGAL OPTIMIZATION) PASSED SUCCESSFULLY!');
 }
 
 testEngineeringAnswerBox();

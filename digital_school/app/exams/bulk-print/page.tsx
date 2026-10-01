@@ -107,7 +107,7 @@ const LANGS = {
   }
 };
 
-// Calculate optimal page count dynamically based on question volume, layout mode, and font scaling
+// Calculate optimal page count dynamically based on question volume, layout mode, font scaling, and paper size (Legal vs A4)
 function getOptimalPageCount(
   set: any,
   examInfo: any,
@@ -115,7 +115,8 @@ function getOptimalPageCount(
   fontSize: number = 100,
   cqSqFontSize: number = 100,
   engineeringExamBoxes: boolean = false,
-  engineeringBoxScale: number = 1.0
+  engineeringBoxScale: number = 1.0,
+  paperSize: string = 'a4'
 ): number {
   const objCount = (set.mcq?.length || 0) + (set.orderedObjective?.length || 0) + (set.mc?.length || 0) + (set.int?.length || 0) + (set.ar?.length || 0);
   const cqCount = set.cq?.length || 0;
@@ -126,26 +127,42 @@ function getOptimalPageCount(
   const cqScale = Math.max(0.5, (cqSqFontSize || 100) / 100);
 
   const sqUnits = (engineeringExamBoxes && Array.isArray(set.sq) && set.sq.length > 0)
-    ? set.sq.reduce((sum: number, q: any) => sum + estimateSqVisualUnits(q, engineeringBoxScale), 0)
+    ? set.sq.reduce((sum: number, q: any) => sum + estimateSqVisualUnits(q, engineeringBoxScale, paperSize as any), 0)
     : (sqCount * 3.5);
 
   // 1 CQ is roughly ~8-9 MCQs in visual height; 1 SQ is ~3.5 MCQs; 1 Desc is ~8 MCQs
   const estimatedUnits = (objCount * fontScale) + ((cqCount * 8.5 + sqUnits + descCount * 8) * cqScale);
 
   if (layoutMode === 'booklet_4page') {
-    // 4-page signature booklet (multiple of 4)
+    if (paperSize === 'legal') {
+      if (estimatedUnits > 165) return 8;
+      return 4;
+    }
     if (estimatedUnits > 135) return 8;
     return 4;
   }
 
   if (layoutMode === 'booklet_2up') {
+    if (paperSize === 'legal') {
+      if (estimatedUnits <= 46) return 2;
+      if (estimatedUnits <= 100) return 4;
+      return Math.max(2, Math.ceil(estimatedUnits / 32));
+    }
     if (estimatedUnits <= 36) return 2;
     if (estimatedUnits <= 80) return 4;
     return Math.max(2, Math.ceil(estimatedUnits / 26));
   }
 
-  // Standard portrait mode (A4, Letter, Legal)
-  // Page 1 holds ~18 question units due to header; Subsequent pages hold ~28 question units
+  // Legal paper has 14in (355.6mm) height vs A4 (297mm) -> ~25% more usable space
+  if (paperSize === 'legal') {
+    if (estimatedUnits <= 26) return 1;
+    if (estimatedUnits <= 64) return 2;
+    if (estimatedUnits <= 102) return 3;
+    if (estimatedUnits <= 140) return 4;
+    return Math.max(1, Math.ceil((estimatedUnits - 26) / 38) + 1);
+  }
+
+  // Standard portrait mode (A4, Letter)
   if (estimatedUnits <= 18) return 1;
   if (estimatedUnits <= 46) return 2;
   if (estimatedUnits <= 74) return 3;
@@ -679,14 +696,15 @@ function BulkPrintContent() {
 
         if (layoutMode === 'booklet_4page') {
           // Booklet Imposition: exact multiple of 4 pages
-          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
           const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
             fontSize: objectiveFontSize,
             cqSqFontSize,
             layoutMode,
             hideInstitute,
             engineeringExamBoxes,
-            engineeringBoxScale
+            engineeringBoxScale,
+            paperSize
           });
           const { N, sheets } = computeBookletSheets(logicalPages.length);
           examPages += N;
@@ -702,14 +720,15 @@ function BulkPrintContent() {
           });
         } else if (layoutMode === 'booklet_2up') {
           // 2-Up Sequential Spread: 2 pages per sheet
-          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+          const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
           const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
             fontSize: objectiveFontSize,
             cqSqFontSize,
             layoutMode,
             hideInstitute,
             engineeringExamBoxes,
-            engineeringBoxScale
+            engineeringBoxScale,
+            paperSize
           });
           examPages += logicalPages.length;
           const sCount = Math.ceil(logicalPages.length / 2);
@@ -726,14 +745,15 @@ function BulkPrintContent() {
         } else {
           // Standard Multi-Page Mode
           if (standardPagingMode === 'paginated_bounds') {
-            const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+            const targetPages = getOptimalPageCount(set, effectiveInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
             const logicalPages = splitExamSetForBooklet(set, effectiveInfo, targetPages, {
               fontSize: objectiveFontSize,
               cqSqFontSize,
               layoutMode,
               hideInstitute,
               engineeringExamBoxes,
-              engineeringBoxScale
+              engineeringBoxScale,
+              paperSize
             });
             examPages += logicalPages.length;
             const sCount = Math.ceil(logicalPages.length / 2);
@@ -1937,14 +1957,15 @@ function BulkPrintContent() {
                             {targetSets.map((set: any) => {
                               // If Bounded Paginated Mode is chosen, split into exact pages with zero clipping
                               if (standardPagingMode === 'paginated_bounds') {
-                                const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+                                const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
                                 const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
                                   fontSize: objectiveFontSize,
                                   cqSqFontSize,
                                   layoutMode,
                                   hideInstitute,
                                   engineeringExamBoxes,
-                                  engineeringBoxScale
+                                  engineeringBoxScale,
+                                  paperSize
                                 });
                                 const totalPages = pages.length;
 
@@ -1994,6 +2015,7 @@ function BulkPrintContent() {
                                               engineeringExamBoxes={engineeringExamBoxes}
                                               engineeringBoxScale={engineeringBoxScale}
                                               engineeringBoxStyle={engineeringBoxStyle}
+                                              paperSize={paperSize}
                                             />
                                           ) : (
                                             <AnswerQuestionPaper
@@ -2055,6 +2077,7 @@ function BulkPrintContent() {
                                         engineeringExamBoxes={engineeringExamBoxes}
                                         engineeringBoxScale={engineeringBoxScale}
                                         engineeringBoxStyle={engineeringBoxStyle}
+                                        paperSize={paperSize}
                                       />
                                     </div>
                                   )}
@@ -2092,14 +2115,15 @@ function BulkPrintContent() {
                         {layoutMode === 'booklet_4page' && (
                           <>
                             {targetSets.map((set: any) => {
-                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
                               const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
                                 fontSize: objectiveFontSize,
                                 cqSqFontSize,
                                 layoutMode,
                                 hideInstitute,
                                 engineeringExamBoxes,
-                                engineeringBoxScale
+                                engineeringBoxScale,
+                                paperSize
                               });
                               const totalPages = pages.length;
                               const { sheets } = computeBookletSheets(totalPages);
@@ -2156,6 +2180,7 @@ function BulkPrintContent() {
                                         engineeringExamBoxes={engineeringExamBoxes}
                                         engineeringBoxScale={engineeringBoxScale}
                                         engineeringBoxStyle={engineeringBoxStyle}
+                                        paperSize={paperSize}
                                       />
                                     ) : (
                                       <AnswerQuestionPaper
@@ -2236,14 +2261,15 @@ function BulkPrintContent() {
                         {layoutMode === 'booklet_2up' && (
                           <>
                             {targetSets.map((set: any) => {
-                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale);
+                              const targetPages = getOptimalPageCount(set, examInfo, layoutMode, objectiveFontSize, cqSqFontSize, engineeringExamBoxes, engineeringBoxScale, paperSize);
                               const pages = splitExamSetForBooklet(set, examInfo, targetPages, {
                                 fontSize: objectiveFontSize,
                                 cqSqFontSize,
                                 layoutMode,
                                 hideInstitute,
                                 engineeringExamBoxes,
-                                engineeringBoxScale
+                                engineeringBoxScale,
+                                paperSize
                               });
                               const [p1, p2, p3, p4] = pages;
                               return (
@@ -2277,6 +2303,7 @@ function BulkPrintContent() {
                                         engineeringExamBoxes={engineeringExamBoxes}
                                         engineeringBoxScale={engineeringBoxScale}
                                         engineeringBoxStyle={engineeringBoxStyle}
+                                        paperSize={paperSize}
                                       />
                                     </div>
 
@@ -2313,6 +2340,7 @@ function BulkPrintContent() {
                                         engineeringExamBoxes={engineeringExamBoxes}
                                         engineeringBoxScale={engineeringBoxScale}
                                         engineeringBoxStyle={engineeringBoxStyle}
+                                        paperSize={paperSize}
                                       />
                                     </div>
                                   </div>
@@ -2346,6 +2374,7 @@ function BulkPrintContent() {
                                         engineeringExamBoxes={engineeringExamBoxes}
                                         engineeringBoxScale={engineeringBoxScale}
                                         engineeringBoxStyle={engineeringBoxStyle}
+                                        paperSize={paperSize}
                                       />
                                     </div>
 

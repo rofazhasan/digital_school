@@ -43,6 +43,8 @@ export interface ParsedSq {
 export interface BoxCalculationOptions {
   isSubPart?: boolean;
   userScale?: number; // 0.85 (compact), 1.0 (standard), 1.2 (spacious)
+  paperSize?: 'legal' | 'a4' | 'letter' | 'a3';
+  availableHeightMm?: number;
 }
 
 /**
@@ -169,6 +171,7 @@ export function classifySqQuestion(
  * Follows the practical formula:
  *   base_lines = 2 + (marks * 1.5)
  *   with question-type specific baselines & bounds clamping.
+ *   On Legal paper (14-inch), scales lines by ~1.20x to maximize usable paper space.
  */
 export function calculateSqLines(
   classification: SqClassification,
@@ -213,11 +216,18 @@ export function calculateSqLines(
       break;
   }
 
+  // Legal paper optimization: Legal pages (14in / 355.6mm) have ~20% more vertical space than A4 (297mm).
+  // Expand line allocation so students have abundant working space and zero vacant paper.
+  if (options?.paperSize === 'legal') {
+    lines = lines * 1.22;
+  }
+
   // Bounds clamping:
-  // For subparts: 2 to 14 lines
-  // For standalone questions: 3 to 25 lines
+  // For subparts: 2 to 18 lines (up to 20 on legal)
+  // For standalone questions: 3 to 28 lines (up to 35 on legal)
+  const isLegal = options?.paperSize === 'legal';
   const minLines = options?.isSubPart ? 2 : 3;
-  const maxLines = options?.isSubPart ? 14 : 25;
+  const maxLines = options?.isSubPart ? (isLegal ? 20 : 16) : (isLegal ? 35 : 28);
   let clamped = Math.min(maxLines, Math.max(minLines, Math.round(lines)));
 
   if (options?.userScale && options.userScale !== 1) {
@@ -227,11 +237,17 @@ export function calculateSqLines(
   return clamped;
 }
 
+
+
 /**
  * Parses a question to check for multi-part structure (e.g. (a), (b), (c) or (ক), (খ), (গ)).
  * If multi-part, separates the introductory stem and generates mini-boxes per subpart.
  */
-export function parseSqQuestion(q: any, userScale: number = 1.0): ParsedSq {
+export function parseSqQuestion(
+  q: any,
+  userScale: number = 1.0,
+  paperSize?: 'legal' | 'a4' | 'letter' | 'a3'
+): ParsedSq {
   const rawText = (q?.questionText || q?.q || '').trim();
   const totalMarks = Number(q?.marks) || 2;
 
@@ -242,7 +258,7 @@ export function parseSqQuestion(q: any, userScale: number = 1.0): ParsedSq {
       const pText = (sub.text || sub.questionText || sub.q || '').trim();
       const pMarks = Number(sub.marks) || Math.max(1, Math.round(totalMarks / explicitSubs.length));
       const cls = classifySqQuestion(pText, pMarks);
-      const lines = calculateSqLines(cls.type, pMarks, { isSubPart: true, userScale });
+      const lines = calculateSqLines(cls.type, pMarks, { isSubPart: true, userScale, paperSize });
       const label = sub.label || `(${String.fromCharCode(97 + idx)})`;
       return {
         partIndex: idx + 1,
@@ -299,7 +315,7 @@ export function parseSqQuestion(q: any, userScale: number = 1.0): ParsedSq {
 
       const assignedMarks = partMarks || Math.max(1, Math.round(totalMarks / matches.length));
       const cls = classifySqQuestion(partText, assignedMarks);
-      const lines = calculateSqLines(cls.type, assignedMarks, { isSubPart: true, userScale });
+      const lines = calculateSqLines(cls.type, assignedMarks, { isSubPart: true, userScale, paperSize });
 
       parts.push({
         partIndex: i + 1,
@@ -327,7 +343,7 @@ export function parseSqQuestion(q: any, userScale: number = 1.0): ParsedSq {
 
   // 3. Standalone Single Question
   const cls = classifySqQuestion(rawText, totalMarks);
-  const lines = calculateSqLines(cls.type, totalMarks, { isSubPart: false, userScale });
+  const lines = calculateSqLines(cls.type, totalMarks, { isSubPart: false, userScale, paperSize });
 
   return {
     isMultiPart: false,
@@ -352,11 +368,15 @@ export function parseSqQuestion(q: any, userScale: number = 1.0): ParsedSq {
 /**
  * Estimates visual units for pagination when engineering answer boxes are enabled.
  * 1 standard question unit is ~25-28px.
- * A question header is ~1.5 units; each answer line is ~0.65 units; box borders/padding ~1 unit.
+ * On Legal paper, accounts for the 14in vertical height budget.
  */
-export function estimateSqVisualUnits(q: any, scale: number = 1.0): number {
-  const parsed = parseSqQuestion(q, scale);
+export function estimateSqVisualUnits(
+  q: any,
+  scale: number = 1.0,
+  paperSize?: 'legal' | 'a4' | 'letter' | 'a3'
+): number {
+  const parsed = parseSqQuestion(q, scale, paperSize);
   const boxUnits = parsed.totalLines * 0.65;
-  const paddingUnits = parsed.isMultiPart ? parsed.parts.length * 1.2 + 1.0 : 1.5;
+  const paddingUnits = parsed.isMultiPart ? parsed.parts.length * 1.0 + 0.8 : 1.2;
   return 1.5 + boxUnits + paddingUnits;
 }

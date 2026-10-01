@@ -124,6 +124,7 @@ interface QuestionPaperProps {
   engineeringExamBoxes?: boolean;
   engineeringBoxScale?: number;
   engineeringBoxStyle?: 'ruled' | 'blank' | 'grid';
+  paperSize?: 'legal' | 'a4' | 'letter' | 'a3';
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -454,7 +455,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
   ({
     examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate, hideInstitute = false,
     hideHeader = false, hideSignature = false, startQuestionIndex = 1, startCqIndex = 1, startSqIndex = 1, pageNumberLabel,
-    engineeringExamBoxes = false, engineeringBoxScale = 1.0, engineeringBoxStyle = 'ruled'
+    engineeringExamBoxes = false, engineeringBoxScale = 1.0, engineeringBoxStyle = 'ruled', paperSize = 'a4'
   }, ref) => {
     const lang = language || 'bn';
     const isEn = lang === 'en';
@@ -670,7 +671,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     return (
       <div
         ref={ref}
-        className="question-paper-container bg-white relative overflow-visible print:overflow-visible"
+        className={`question-paper-container bg-white relative overflow-visible print:overflow-visible ${engineeringExamBoxes ? 'flex flex-col flex-1 h-full min-h-full justify-between' : ''}`}
         style={{
           fontFamily: isEn ? "'Bookman Old Style', 'Georgia', serif" : "'ExamFont', 'Noto Serif Bengali', Georgia, serif"
         }}
@@ -1240,7 +1241,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       )}
                     </div>
                   </div>
-                  <div>
+                  <div className={engineeringExamBoxes ? "engineering-sq-container flex flex-col flex-1 h-full justify-between gap-3" : ""}>
                     {sqs.map((q, idx) => {
                       const showSqSubjectHeader = isMS && q.subject && (idx === 0 || sqs[idx - 1]?.subject !== q.subject);
                       const matchedSqSub = q.subject ? (configuredSubjects.find((s: any) => matchSubject(q.subject, s.name)) || { name: q.subject, isMandatory: true, totalMarks: 0 }) : null;
@@ -1254,14 +1255,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           )}
                           {engineeringExamBoxes ? (
                             (() => {
-                              const parsed = parseSqQuestion(q, engineeringBoxScale);
+                              const parsed = parseSqQuestion(q, engineeringBoxScale, paperSize);
                               const qNum = (startSqIndex || 1) + idx;
                               const numStr = isEn ? qNum : toBengaliNumerals(qNum);
                               return (
-                                <div className="mb-4 text-left sq-question engineering-sq-item break-inside-avoid">
+                                <div
+                                  className="mb-3 text-left sq-question engineering-sq-item break-inside-avoid flex flex-col flex-1"
+                                  style={{ flexGrow: Math.max(1, parsed.totalLines || 2) }}
+                                >
                                   {parsed.isMultiPart ? (
                                     <>
-                                      <div className="flex items-start mb-1.5 font-bold text-gray-900">
+                                      <div className="flex items-start mb-1 font-bold text-gray-900">
                                         <span className="font-bold mr-2 text-sm">{numStr}.</span>
                                         <div className="flex-1 text-sm">
                                           <Text>{parsed.stem || q.questionText}</Text>
@@ -1270,10 +1274,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                           )}
                                         </div>
                                       </div>
-                                      <div className="space-y-3 pl-2 sm:pl-3 border-l-2 border-slate-300 ml-1">
+                                      <div className="flex flex-col flex-1 space-y-2 pl-2 sm:pl-3 border-l-2 border-slate-300 ml-1">
                                         {parsed.parts.map((part, pIdx) => (
-                                          <div key={pIdx} className="engineering-subpart-item break-inside-avoid">
-                                            <div className="flex items-start text-xs font-semibold text-gray-800 mb-1">
+                                          <div
+                                            key={pIdx}
+                                            className="engineering-subpart-item break-inside-avoid flex flex-col flex-1"
+                                            style={{ flexGrow: Math.max(1, part.marks || 1) }}
+                                          >
+                                            <div className="flex items-start text-xs font-semibold text-gray-800 mb-0.5">
                                               <span className="font-bold mr-1.5 text-slate-900">{part.label}</span>
                                               <div className="flex-1">
                                                 <Text>{part.text}</Text>
@@ -1290,6 +1298,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                               isEn={isEn}
                                               boxStyle={engineeringBoxStyle}
                                               boxScale={engineeringBoxScale}
+                                              paperSize={paperSize}
+                                              className="flex-1"
                                             />
                                           </div>
                                         ))}
@@ -1311,6 +1321,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                         isEn={isEn}
                                         boxStyle={engineeringBoxStyle}
                                         boxScale={engineeringBoxScale}
+                                        paperSize={paperSize}
+                                        className="flex-1"
                                       />
                                     </>
                                   )}
