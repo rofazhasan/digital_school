@@ -7,7 +7,8 @@ import {
   CheckCircle2, XCircle, Award, BarChart3, Settings2, Sliders,
   Users, Check, Building2, BookOpen, GraduationCap, ChevronRight,
   Search, Eye, EyeOff, FileSpreadsheet, RefreshCw, Star, Info,
-  AlertTriangle, CheckSquare, Square
+  AlertTriangle, CheckSquare, Square, Filter, ChevronDown, Sparkles,
+  ArrowUpDown, ListOrdered, Calendar, FileText, X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,17 +42,17 @@ interface StudentItem {
   roll: string;
   registrationNo?: string;
   email?: string;
-  image?: string | null;
+  avatar?: string | null;
 }
 
 interface ExamItem {
   id: string;
   name: string;
-  subject: string;
-  date: string;
+  subject?: string;
+  date?: string;
   totalMarks: number;
-  passMarks: number;
-  classId: string;
+  passMarks?: number;
+  classId?: string;
   cqSubsections?: any;
   hasCQ: boolean;
   hasSQ: boolean;
@@ -61,6 +62,14 @@ interface ExamItem {
   sqMax: number;
   descMax: number;
   objMax: number;
+}
+
+interface AvailableExamBasic {
+  id: string;
+  name: string;
+  date?: string;
+  totalMarks: number;
+  passMarks?: number;
 }
 
 interface ManualSubject {
@@ -112,11 +121,18 @@ function BulkResultContent() {
 
   // Loading & Data State
   const [loading, setLoading] = useState(true);
+  const [isRefreshingExams, setIsRefreshingExams] = useState(false);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [allStudents, setAllStudents] = useState<StudentItem[]>([]);
-  const [availableExams, setAvailableExams] = useState<ExamItem[]>([]);
+  
+  // All available exams for the class (lightweight metadata)
+  const [availableExams, setAvailableExams] = useState<AvailableExamBasic[]>([]);
+  // Processed exams loaded with question structures & results from API
+  const [loadedProcessedExams, setLoadedProcessedExams] = useState<ExamItem[]>([]);
+  // Currently selected exam IDs
   const [selectedExamIds, setSelectedExamIds] = useState<string[]>([]);
+  
   const [resultsData, setResultsData] = useState<Record<string, Record<string, any>>>({});
   const [instituteData, setInstituteData] = useState<any>(null);
 
@@ -129,9 +145,19 @@ function BulkResultContent() {
   const [publicationDate, setPublicationDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [candidateCountOverride, setCandidateCountOverride] = useState<string>("");
 
+  // Exam Filtering & Selection State
+  const [examSearchQuery, setExamSearchQuery] = useState("");
+  const [examFilterTab, setExamFilterTab] = useState<"all" | "selected" | "unselected">("all");
+  const [isExamSelectorModalOpen, setIsExamSelectorModalOpen] = useState(false);
+
   // Selected students filter ('ALL' or array of studentIds)
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<"ALL" | string[]>("ALL");
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentStatusFilter, setStudentStatusFilter] = useState<"ALL" | "PASSED" | "FAILED" | "APLUS">("ALL");
+  const [studentSortBy, setStudentSortBy] = useState<"MERIT" | "ROLL_ASC" | "NAME_ASC" | "GPA_DESC" | "MARKS_DESC">("MERIT");
+
+  // Print Pagination State (Default 15 students per sheet)
+  const [printStudentsPerPage, setPrintStudentsPerPage] = useState<number | "all">(15);
 
   // Breakdown Column Visibility Toggle
   const [showComponentBreakdown, setShowComponentBreakdown] = useState(true);
@@ -163,7 +189,11 @@ function BulkResultContent() {
   // Fetch Data on mount or when class/exams change
   const fetchData = async (classId?: string, examIds?: string[]) => {
     try {
-      setLoading(true);
+      if (examIds && examIds.length > 0) {
+        setIsRefreshingExams(true);
+      } else {
+        setLoading(true);
+      }
       const params = new URLSearchParams();
       if (classId) params.set("classId", classId);
       if (examIds && examIds.length > 0) params.set("examIds", examIds.join(","));
@@ -177,7 +207,10 @@ function BulkResultContent() {
         setSelectedClassId(data.selectedClassId);
       }
       setAllStudents(data.students || []);
-      setAvailableExams(data.exams || []);
+      
+      const allClassExams: AvailableExamBasic[] = data.availableExams || data.exams || [];
+      setAvailableExams(allClassExams);
+      setLoadedProcessedExams(data.exams || []);
       setResultsData(data.results || {});
 
       if (data.institute) {
@@ -190,8 +223,10 @@ function BulkResultContent() {
         }
       }
 
-      // Default select all exams if no specific examIds passed
-      if (!examIds || examIds.length === 0) {
+      // Default select active exams from response
+      if (data.requestedExamIds && data.requestedExamIds.length > 0) {
+        setSelectedExamIds(data.requestedExamIds);
+      } else if (!examIds || examIds.length === 0) {
         const ids = (data.exams || []).map((e: any) => e.id);
         setSelectedExamIds(ids);
       } else {
@@ -202,6 +237,7 @@ function BulkResultContent() {
       toast.error(err.message || "Failed to load results data");
     } finally {
       setLoading(false);
+      setIsRefreshingExams(false);
     }
   };
 
@@ -225,6 +261,64 @@ function BulkResultContent() {
     fetchData(newClassId, undefined);
   };
 
+  // Check if user has selected exams whose results aren't loaded in memory yet
+  const hasUnloadedSelectedExams = useMemo(() => {
+    const loadedSet = new Set(loadedProcessedExams.map(e => e.id));
+    return selectedExamIds.some(id => !loadedSet.has(id));
+  }, [selectedExamIds, loadedProcessedExams]);
+
+  const handleApplyExamSelection = () => {
+    if (selectedExamIds.length === 0) {
+      toast.warning("Please select at least 1 exam");
+      return;
+    }
+    fetchData(selectedClassId, selectedExamIds);
+    setIsExamSelectorModalOpen(false);
+    toast.success(`Calculating results for ${selectedExamIds.length} exams...`);
+  };
+
+  // Filtered available exams list for selection
+  const filteredAvailableExams = useMemo(() => {
+    let list = availableExams;
+    if (examFilterTab === "selected") {
+      list = list.filter(e => selectedExamIds.includes(e.id));
+    } else if (examFilterTab === "unselected") {
+      list = list.filter(e => !selectedExamIds.includes(e.id));
+    }
+    if (examSearchQuery.trim()) {
+      const q = examSearchQuery.toLowerCase();
+      list = list.filter(e => e.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [availableExams, selectedExamIds, examFilterTab, examSearchQuery]);
+
+  // Selected Exam Objects with complete section metadata
+  const activeExams: ExamItem[] = useMemo(() => {
+    return selectedExamIds.map(id => {
+      const full = loadedProcessedExams.find(e => e.id === id);
+      if (full) return full;
+      const basic = availableExams.find(e => e.id === id);
+      return {
+        id,
+        name: basic?.name || "Exam",
+        subject: basic?.name || "",
+        date: basic?.date || "",
+        totalMarks: basic?.totalMarks || 100,
+        passMarks: basic?.passMarks || 33,
+        classId: selectedClassId,
+        cqSubsections: null,
+        hasCQ: true,
+        hasSQ: false,
+        hasDescriptive: false,
+        hasObjective: true,
+        cqMax: 70,
+        sqMax: 0,
+        descMax: 0,
+        objMax: 30
+      };
+    });
+  }, [selectedExamIds, loadedProcessedExams, availableExams, selectedClassId]);
+
   // Filtered Students list based on search and selection
   const displayedStudents = useMemo(() => {
     let list = allStudents;
@@ -242,20 +336,6 @@ function BulkResultContent() {
     }
     return list;
   }, [allStudents, selectedStudentFilter, studentSearchQuery]);
-
-  // Selected Exam Objects
-  const activeExams = useMemo(() => {
-    return availableExams.filter(e => selectedExamIds.includes(e.id));
-  }, [availableExams, selectedExamIds]);
-
-  // Global Check: Does ANY active exam contain CQ, SQ, Descriptive, Objective?
-  const globalColumnCapabilities = useMemo(() => {
-    const hasCQ = activeExams.some(e => e.hasCQ);
-    const hasSQ = activeExams.some(e => e.hasSQ);
-    const hasDescriptive = activeExams.some(e => e.hasDescriptive);
-    const hasObjective = activeExams.some(e => e.hasObjective);
-    return { hasCQ, hasSQ, hasDescriptive, hasObjective };
-  }, [activeExams]);
 
   // Handle Add Subject Group (e.g. Bangla 1st + 2nd)
   const handleCreateGroup = () => {
@@ -346,11 +426,7 @@ function BulkResultContent() {
   // Implements Bangladesh Education Board GPA & 4th Subject Rule
   const computedStudentRows = useMemo(() => {
     return displayedStudents.map(student => {
-      // 1. Map of Subject Marks:
-      // We will organize subjects by grouped and standalone
       const groupedExamIdsSet = new Set(subjectGroups.flatMap(g => g.examIds));
-
-      // Standalone exams (not in any joint group)
       const standaloneExams = activeExams.filter(e => !groupedExamIdsSet.has(e.id));
 
       interface EvaluatedSubject {
@@ -482,9 +558,6 @@ function BulkResultContent() {
       });
 
       // D. Overall GPA & Result Computation according to Bangladesh 4th Subject Rule:
-      // - Compulsory subjects: fail in any compulsory subject => overall F
-      // - Optional subjects: fail in optional => does NOT cause overall fail
-      // - Optional subjects: if GP > 2.0 => extra GP = (GP - 2.0) added to numerator
       const compulsorySubjects = subjectResults.filter(s => !s.isOptional);
       const optionalSubjects = subjectResults.filter(s => s.isOptional);
 
@@ -554,8 +627,7 @@ function BulkResultContent() {
     });
   }, [displayedStudents, activeExams, resultsData, subjectGroups, optionalSubjectIds, manualSubjects]);
 
-  // Ranking & Sorting Logic:
-  // "which student good in gpa overall come first then if gpa same then whole marks if marks same then indiviual mark precentage"
+  // Ranking & Sorting Logic
   const rankedStudentRows = useMemo(() => {
     const list = [...computedStudentRows];
 
@@ -583,9 +655,8 @@ function BulkResultContent() {
       return Number(a.student.roll || 0) - Number(b.student.roll || 0);
     });
 
-    // Assign Merit Position
     let currentRank = 1;
-    return list.map((item, idx) => {
+    return list.map((item) => {
       let meritText = "";
       if (item.status === "PASSED") {
         meritText = `${currentRank++}`;
@@ -598,6 +669,60 @@ function BulkResultContent() {
       };
     });
   }, [computedStudentRows]);
+
+  // Filtered & Sorted Student Rows for on-screen inspection
+  const filteredAndSortedStudentRows = useMemo(() => {
+    let list = [...rankedStudentRows];
+
+    if (studentStatusFilter === "PASSED") {
+      list = list.filter(r => r.status === "PASSED");
+    } else if (studentStatusFilter === "FAILED") {
+      list = list.filter(r => r.status === "FAILED");
+    } else if (studentStatusFilter === "APLUS") {
+      list = list.filter(r => r.finalGPA >= 5.0);
+    }
+
+    if (studentSortBy === "ROLL_ASC") {
+      list.sort((a, b) => Number(a.student.roll || 0) - Number(b.student.roll || 0));
+    } else if (studentSortBy === "NAME_ASC") {
+      list.sort((a, b) => a.student.name.localeCompare(b.student.name));
+    } else if (studentSortBy === "GPA_DESC") {
+      list.sort((a, b) => b.finalGPA - a.finalGPA || b.grandTotalEarned - a.grandTotalEarned);
+    } else if (studentSortBy === "MARKS_DESC") {
+      list.sort((a, b) => b.grandTotalEarned - a.grandTotalEarned || b.finalGPA - a.finalGPA);
+    }
+
+    return list;
+  }, [rankedStudentRows, studentStatusFilter, studentSortBy]);
+
+  // Executive Analytics Summary
+  const analyticsSummary = useMemo(() => {
+    const total = rankedStudentRows.length;
+    if (total === 0) {
+      return { total: 0, passed: 0, failed: 0, passRate: 0, aPlusCount: 0, avgGpa: "0.00", topScorer: null };
+    }
+    const passed = rankedStudentRows.filter(r => r.status === "PASSED").length;
+    const failed = total - passed;
+    const passRate = ((passed / total) * 100).toFixed(1);
+    const aPlusCount = rankedStudentRows.filter(r => r.finalGPA >= 5.0).length;
+    const avgGpa = (rankedStudentRows.reduce((sum, r) => sum + r.finalGPA, 0) / total).toFixed(2);
+    const topScorer = rankedStudentRows[0] || null;
+
+    return { total, passed, failed, passRate, aPlusCount, avgGpa, topScorer };
+  }, [rankedStudentRows]);
+
+  // Print Pagination Engine: divides students into chunks for crisp print pages
+  const printableSheetPages = useMemo(() => {
+    if (printStudentsPerPage === "all" || printStudentsPerPage <= 0) {
+      return [rankedStudentRows];
+    }
+    const pages: (typeof rankedStudentRows)[] = [];
+    const perPage = Number(printStudentsPerPage);
+    for (let i = 0; i < rankedStudentRows.length; i += perPage) {
+      pages.push(rankedStudentRows.slice(i, i + perPage));
+    }
+    return pages.length > 0 ? pages : [[]];
+  }, [rankedStudentRows, printStudentsPerPage]);
 
   // Print Function
   const handlePrint = () => {
@@ -615,6 +740,7 @@ function BulkResultContent() {
       "Roll",
       "Student Name",
       ...activeExams.map(e => `${e.name} (${e.totalMarks})`),
+      ...manualSubjects.map(m => `${m.name} (${m.totalMarks})`),
       "Total Marks",
       "Percentage",
       "GPA",
@@ -627,11 +753,16 @@ function BulkResultContent() {
         const sub = row.subjectResults.find(s => s.id === e.id);
         return sub ? sub.totalEarned : 0;
       });
+      const manualMarks = manualSubjects.map(m => {
+        const sub = row.subjectResults.find(s => s.id === m.id);
+        return sub ? sub.totalEarned : 0;
+      });
       return [
         row.meritPosition,
         row.student.roll,
         `"${row.student.name}"`,
         ...examMarks,
+        ...manualMarks,
         row.grandTotalEarned,
         `${row.grandPercentage.toFixed(1)}%`,
         row.finalGPA.toFixed(2),
@@ -652,10 +783,13 @@ function BulkResultContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 font-sans pb-24 print:bg-white print:p-0">
-      {/* Top Navigation Bar (Hidden in Print) */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800 print:hidden shadow-xs">
-        <div className="max-w-7xl 2xl:max-w-[96vw] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 font-sans pb-24 print:bg-white print:p-0 print:m-0">
+      
+      {/* ========================================================================= */}
+      {/* 1. TOP NAVIGATION BAR (HIDDEN IN PRINT)                                    */}
+      {/* ========================================================================= */}
+      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800 print:hidden shadow-xs">
+        <div className="max-w-7xl 2xl:max-w-[97vw] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -666,26 +800,52 @@ function BulkResultContent() {
               <ArrowLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             </Button>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-black text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 bg-clip-text text-transparent">
-                  Bulk Result & Marksheet Studio
+                  Bulk Result & Broadsheet Studio
                 </span>
                 <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40">
                   Board Standard GPA
                 </Badge>
+                {isRefreshingExams && (
+                  <Badge className="bg-blue-600 text-white text-[10px] animate-pulse">
+                    Updating Exams...
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground hidden sm:block">
-                বাল্ক রেজাল্ট শিট, কম্বাইন্ড গ্রেডিং, ৪র্থ বিষয় ও প্রফেশনাল মার্কশিট
+                ট্যাবুলেশন শিট, প্রফেশনাল মার্কশিট, যৌথ বিষয় ও ৪র্থ বিষয় সমন্বিত স্বয়ংক্রিয় রেজাল্ট
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Print Pagination selector */}
+            <div className="hidden md:flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl text-xs">
+              <Printer className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[11px] text-muted-foreground font-semibold">Print:</span>
+              <Select
+                value={String(printStudentsPerPage)}
+                onValueChange={(val) => setPrintStudentsPerPage(val === "all" ? "all" : Number(val))}
+              >
+                <SelectTrigger className="h-7 text-xs font-bold border-none bg-transparent shadow-none px-1.5 focus:ring-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="10">10 / Sheet</SelectItem>
+                  <SelectItem value="12">12 / Sheet</SelectItem>
+                  <SelectItem value="15">15 / Sheet (Standard)</SelectItem>
+                  <SelectItem value="20">20 / Sheet (Compact)</SelectItem>
+                  <SelectItem value="all">Continuous (No Paging)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportCSV}
-              className="rounded-xl border-slate-200 dark:border-slate-800 font-semibold shadow-xs hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="rounded-xl border-slate-200 dark:border-slate-800 font-semibold shadow-xs hover:bg-slate-100 dark:hover:bg-slate-800 text-xs h-9"
             >
               <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />
               <span className="hidden sm:inline">Export CSV</span>
@@ -696,18 +856,22 @@ function BulkResultContent() {
               className="rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 active:scale-95 transition-all text-xs h-9 px-4"
             >
               <Printer className="w-4 h-4 mr-1.5" />
-              <span>Print / PDF</span>
+              <span>Print Broadsheet</span>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl 2xl:max-w-[96vw] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6 print:p-0 print:max-w-none print:m-0">
+      {/* ========================================================================= */}
+      {/* 2. MAIN CONTROLS & EXAM SELECTION (SCREEN ONLY)                           */}
+      {/* ========================================================================= */}
+      <main className="max-w-7xl 2xl:max-w-[97vw] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6 print:hidden">
         
-        {/* Controls Card (Hidden in Print) */}
-        <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xs print:hidden">
+        {/* Controls Card */}
+        <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
           <CardContent className="p-4 sm:p-5 space-y-4">
+            
+            {/* Top Row: Class, Student Selection, Title, Quick Actions */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               
               {/* Class Selector */}
@@ -734,7 +898,7 @@ function BulkResultContent() {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-emerald-500" />
-                  Students (শিক্ষার্থী)
+                  Students Scope (শিক্ষার্থী)
                 </label>
                 <Select
                   value={selectedStudentFilter === "ALL" ? "ALL" : "SELECTED"}
@@ -751,13 +915,13 @@ function BulkResultContent() {
                       All Students ({allStudents.length})
                     </SelectItem>
                     <SelectItem value="SELECTED" className="cursor-pointer font-medium">
-                      Selected Students ({displayedStudents.length}/{allStudents.length})
+                      Filtered Selection ({displayedStudents.length}/{allStudents.length})
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Marksheet Title */}
+              {/* Examination Title */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-purple-500" />
@@ -771,7 +935,7 @@ function BulkResultContent() {
                 />
               </div>
 
-              {/* Quick Actions & Modal Triggers */}
+              {/* Action Modals: Subject Group & Manual Subjects */}
               <div className="space-y-1.5 flex flex-col justify-end">
                 <div className="flex items-center gap-2">
                   <Button
@@ -796,19 +960,75 @@ function BulkResultContent() {
               </div>
             </div>
 
-            {/* Exam Selector Checkboxes */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-                  Select Exams to Include ({selectedExamIds.length}/{availableExams.length})
-                </span>
-                <div className="flex items-center gap-2">
+            {/* Bottom Row: Enhanced Exam Filtering & Selection System */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              
+              {/* Filter Bar Controls */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-blue-600" />
+                    Exams to Include ({selectedExamIds.length}/{availableExams.length})
+                  </span>
+
+                  {/* Filter Tabs: All, Selected, Unselected */}
+                  <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                    <button
+                      onClick={() => setExamFilterTab("all")}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition-all ${examFilterTab === "all" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+                    >
+                      All ({availableExams.length})
+                    </button>
+                    <button
+                      onClick={() => setExamFilterTab("selected")}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition-all ${examFilterTab === "selected" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+                    >
+                      Selected ({selectedExamIds.length})
+                    </button>
+                    <button
+                      onClick={() => setExamFilterTab("unselected")}
+                      className={`px-2.5 py-1 rounded-md font-semibold transition-all ${examFilterTab === "unselected" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+                    >
+                      Unselected ({availableExams.length - selectedExamIds.length})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Exam Quick Presets & Search */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Real-time search */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={examSearchQuery}
+                      onChange={(e) => setExamSearchQuery(e.target.value)}
+                      placeholder="Search exam..."
+                      className="pl-8 h-7 text-xs w-36 sm:w-44 rounded-lg bg-slate-50 dark:bg-slate-800/60"
+                    />
+                    {examSearchQuery && (
+                      <button
+                        onClick={() => setExamSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Preset Buttons */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedExamIds(availableExams.slice(0, 5).map(e => e.id))}
+                    className="h-7 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 px-2 rounded-lg"
+                  >
+                    Latest 5
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedExamIds(availableExams.map(e => e.id))}
-                    className="h-7 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/50 px-2 rounded-lg"
+                    className="h-7 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 px-2 rounded-lg"
                   >
                     Select All
                   </Button>
@@ -818,8 +1038,21 @@ function BulkResultContent() {
                     onClick={() => setSelectedExamIds([])}
                     className="h-7 text-xs font-semibold text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800 px-2 rounded-lg"
                   >
-                    Deselect All
+                    Clear
                   </Button>
+
+                  {/* Manage / Browse Dialog Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsExamSelectorModalOpen(true)}
+                    className="h-7 text-xs font-bold border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 px-2.5 rounded-lg"
+                  >
+                    <Sliders className="w-3.5 h-3.5 mr-1" />
+                    Browse All
+                  </Button>
+
+                  {/* Breakdown Column Visibility */}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -827,64 +1060,159 @@ function BulkResultContent() {
                     className={`h-7 text-xs font-bold px-2 rounded-lg ${showComponentBreakdown ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' : 'text-slate-500'}`}
                   >
                     {showComponentBreakdown ? <Eye className="w-3.5 h-3.5 mr-1" /> : <EyeOff className="w-3.5 h-3.5 mr-1" />}
-                    {showComponentBreakdown ? "Hide Breakdown" : "Show Breakdown"}
+                    {showComponentBreakdown ? "Breakdown ON" : "Breakdown OFF"}
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-1 scrollbar-thin">
-                {availableExams.map(exam => {
-                  const isChecked = selectedExamIds.includes(exam.id);
-                  const isOpt = optionalSubjectIds.includes(exam.id);
-                  return (
-                    <div
-                      key={exam.id}
-                      onClick={() => {
-                        setSelectedExamIds(prev =>
-                          isChecked ? prev.filter(id => id !== exam.id) : [...prev, exam.id]
-                        );
-                      }}
-                      className={`cursor-pointer px-3 py-1.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-2 select-none ${
-                        isChecked
-                          ? "bg-blue-50/90 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-200 shadow-xs"
-                          : "bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-500 opacity-60 hover:opacity-100"
-                      }`}
-                    >
-                      {isChecked ? (
-                        <CheckSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      ) : (
-                        <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      )}
-                      <span className="font-bold">{exam.name}</span>
-                      <span className="text-[10px] text-muted-foreground">({exam.totalMarks}M)</span>
-                      
-                      {/* 4th Subject Toggle Pill */}
-                      {isChecked && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleOptionalSubject(exam.id);
-                          }}
-                          title={isOpt ? "Click to make compulsory" : "Click to mark as 4th/Optional subject"}
-                          className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase transition-all ${
-                            isOpt
-                              ? "bg-amber-500 text-white shadow-xs"
-                              : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-amber-200"
-                          }`}
-                        >
-                          {isOpt ? "★ 4th Sub" : "+ 4th"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+              {/* Dynamic Notification when selection needs reloading */}
+              {hasUnloadedSelectedExams && (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-200">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>You selected new exams. Click apply to fetch their evaluated marks.</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleApplyExamSelection}
+                    className="h-7 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-xs"
+                  >
+                    Apply & Recalculate
+                  </Button>
+                </div>
+              )}
+
+              {/* Exam Chips List */}
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1.5 rounded-xl bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                {filteredAvailableExams.length === 0 ? (
+                  <div className="text-xs text-muted-foreground p-3 text-center w-full">
+                    কোনো পরীক্ষা পাওয়া যায়নি (No exams match filter)
+                  </div>
+                ) : (
+                  filteredAvailableExams.map(exam => {
+                    const isChecked = selectedExamIds.includes(exam.id);
+                    const isOpt = optionalSubjectIds.includes(exam.id);
+                    return (
+                      <div
+                        key={exam.id}
+                        onClick={() => {
+                          setSelectedExamIds(prev =>
+                            isChecked ? prev.filter(id => id !== exam.id) : [...prev, exam.id]
+                          );
+                        }}
+                        className={`cursor-pointer px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-2 select-none ${
+                          isChecked
+                            ? "bg-blue-50/90 dark:bg-blue-950/50 border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-100 shadow-xs"
+                            : "bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500 opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        )}
+                        <span className="font-bold text-[12px]">{exam.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">({exam.totalMarks}M)</span>
+                        
+                        {/* 4th Subject Toggle Pill */}
+                        {isChecked && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleOptionalSubject(exam.id);
+                            }}
+                            title={isOpt ? "Click to make compulsory" : "Click to mark as 4th/Optional subject"}
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase transition-all ${
+                              isOpt
+                                ? "bg-amber-500 text-white shadow-xs"
+                                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-amber-200"
+                            }`}
+                          >
+                            {isOpt ? "★ 4th Sub" : "+ 4th"}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* View Mode Tabs (Hidden in Print) */}
-        <div className="flex items-center justify-between gap-4 print:hidden">
+        {/* ========================================================================= */}
+        {/* 3. EXECUTIVE ANALYTICS SUMMARY CARDS                                      */}
+        {/* ========================================================================= */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Candidates</span>
+                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                  {analyticsSummary.total}
+                </p>
+                <span className="text-[11px] text-slate-500 font-medium">{displayedStudents.length} evaluated</span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600">
+                <Users className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pass Rate</span>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                  {analyticsSummary.passRate}%
+                </p>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {analyticsSummary.passed} Passed • {analyticsSummary.failed} Failed
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">A+ (GPA 5.0) Achievers</span>
+                <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
+                  {analyticsSummary.aPlusCount}
+                </p>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Avg GPA: <strong>{analyticsSummary.avgGpa}</strong>
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600">
+                <Award className="w-5 h-5" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Top Achiever</span>
+                <p className="text-base font-black text-amber-600 dark:text-amber-400 mt-1 truncate max-w-[150px]">
+                  {analyticsSummary.topScorer ? analyticsSummary.topScorer.student.name : "N/A"}
+                </p>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Roll {analyticsSummary.topScorer?.student.roll} • GPA {analyticsSummary.topScorer?.finalGPA.toFixed(2)}
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600">
+                <Star className="w-5 h-5 fill-amber-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* View Mode Tabs Navigation */}
+        <div className="flex items-center justify-between gap-4">
           <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <TabsList className="rounded-xl p-1 bg-slate-100 dark:bg-slate-800">
@@ -930,118 +1258,110 @@ function BulkResultContent() {
         </div>
 
         {/* ========================================================================= */}
-        {/* TAB 1: TABULATION SHEET (BROADSHEET VIEW)                                  */}
+        {/* TAB 1: TABULATION SHEET (SCREEN PREVIEW)                                   */}
         {/* ========================================================================= */}
         {activeTab === "tabulation" && (
-          <div className="tabulation-sheet-wrapper print:block">
+          <div className="space-y-4">
             
-            {/* Direct Edit Guidance Banner (Hidden in Print) */}
-            <div className="flex items-center justify-between gap-2 px-3 py-1.5 mb-3 rounded-lg bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 text-[11px] text-blue-700 dark:text-blue-300 print:hidden">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span><strong>Directly Editable Header:</strong> Click on any field below (Institution Name, Subtitle, Exam Title, Class, Year, Date, Total Candidates) to edit directly on the sheet.</span>
-              </span>
-              <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wider hidden sm:inline">Live Preview & Print</span>
-            </div>
-
-            {/* Formal Institutional Print Header - Directly Editable In-Place */}
-            <div className="text-center space-y-1.5 mb-6 border-b-2 border-slate-900 dark:border-white pb-4">
-              {/* Institution Name */}
-              <div className="relative inline-block w-full max-w-3xl mx-auto">
-                <input
-                  type="text"
-                  value={institutionName}
-                  onChange={(e) => setInstitutionName(e.target.value)}
-                  placeholder="DIGITAL SCHOOL ACADEMY"
-                  title="Click to edit Institution Name"
-                  className="header-editable-input w-full text-center text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all duration-150 print:border-none print:p-0 print:m-0 print:text-black"
-                />
+            {/* Live Editable Institutional Header Card */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-4">
+              
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 text-[11px] text-blue-700 dark:text-blue-300">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span><strong>Live Editable Header:</strong> Click any header field below (Institution, Subtitle, Exam, Class, Year, Date) to modify directly before printing.</span>
+                </span>
+                <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wider hidden sm:inline">Broadsheet Header</span>
               </div>
 
-              {/* Subtitle / Approval */}
-              <div className="relative inline-block w-full max-w-2xl mx-auto">
-                <input
-                  type="text"
-                  value={institutionSubtitle}
-                  onChange={(e) => setInstitutionSubtitle(e.target.value)}
-                  placeholder="Approved by Ministry of Education & Secondary Education Board"
-                  title="Click to edit Subtitle / Approval"
-                  className="header-editable-input w-full text-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all duration-150 print:border-none print:p-0 print:m-0 print:text-slate-700"
-                />
-              </div>
-
-              {/* Exam Title Pill */}
-              <div className="pt-1.5 flex justify-center">
-                <div className="inline-flex items-center px-4 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm print:bg-slate-900 print:text-white">
+              {/* Institution Name, Subtitle, and Pill */}
+              <div className="text-center space-y-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+                <div className="relative inline-block w-full max-w-3xl mx-auto">
                   <input
                     type="text"
-                    value={marksheetTitle}
-                    onChange={(e) => setMarksheetTitle(e.target.value)}
-                    placeholder="বার্ষিক পরীক্ষা ২০২৬ / Annual Examination 2026"
-                    title="Click to edit Examination Title"
-                    className="header-editable-input text-center text-xs sm:text-sm font-black uppercase tracking-wider bg-transparent border-none outline-none text-white dark:text-slate-900 print:text-white min-w-[280px] sm:min-w-[420px]"
+                    value={institutionName}
+                    onChange={(e) => setInstitutionName(e.target.value)}
+                    placeholder="DIGITAL SCHOOL ACADEMY"
+                    title="Click to edit Institution Name"
+                    className="w-full text-center text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all"
                   />
+                </div>
+
+                <div className="relative inline-block w-full max-w-2xl mx-auto">
+                  <input
+                    type="text"
+                    value={institutionSubtitle}
+                    onChange={(e) => setInstitutionSubtitle(e.target.value)}
+                    placeholder="Approved by Ministry of Education & Secondary Education Board"
+                    title="Click to edit Subtitle"
+                    className="w-full text-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="pt-1.5 flex justify-center">
+                  <div className="inline-flex items-center px-4 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm">
+                    <input
+                      type="text"
+                      value={marksheetTitle}
+                      onChange={(e) => setMarksheetTitle(e.target.value)}
+                      placeholder="বার্ষিক পরীক্ষা ২০২৬ / Annual Examination 2026"
+                      title="Click to edit Examination Title"
+                      className="text-center text-xs sm:text-sm font-black uppercase tracking-wider bg-transparent border-none outline-none text-white dark:text-slate-900 min-w-[280px] sm:min-w-[420px]"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Meta Info Bar: Class, Session/Year, Date, Total Candidates */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold pt-3 px-2 text-slate-700 dark:text-slate-300 print:text-black">
-                {/* 1. Class */}
-                <div className="flex items-center gap-1">
-                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Class:</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-semibold">Class:</span>
                   <input
                     type="text"
                     value={customClassName}
                     onChange={(e) => setCustomClassName(e.target.value)}
                     placeholder={classes.find(c => c.id === selectedClassId)?.name || "All"}
-                    title="Click to edit Class name"
-                    className="header-editable-input w-full font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 print:border-none print:p-0 print:text-black"
+                    className="w-full font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 focus:border-primary rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200"
                   />
                 </div>
 
-                {/* 2. Session / Year */}
-                <div className="flex items-center justify-start sm:justify-center gap-1">
-                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Session / Year:</span>
+                <div className="flex items-center justify-start sm:justify-center gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-semibold">Session/Year:</span>
                   <input
                     type="text"
                     value={academicYear}
                     onChange={(e) => setAcademicYear(e.target.value)}
                     placeholder="2026"
-                    title="Click to edit Session / Year"
-                    className="header-editable-input w-24 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center print:border-none print:p-0 print:text-black"
+                    className="w-24 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 focus:border-primary rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center"
                   />
                 </div>
 
-                {/* 3. Date */}
-                <div className="flex items-center justify-start sm:justify-center gap-1">
-                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Date:</span>
+                <div className="flex items-center justify-start sm:justify-center gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-semibold">Date:</span>
                   <input
                     type="text"
                     value={publicationDate}
                     onChange={(e) => setPublicationDate(e.target.value)}
                     placeholder="2026-10-03"
-                    title="Click to edit Date"
-                    className="header-editable-input w-28 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center print:border-none print:p-0 print:text-black"
+                    className="w-28 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 focus:border-primary rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center"
                   />
                 </div>
 
-                {/* 4. Total Candidates */}
-                <div className="flex items-center justify-start sm:justify-end gap-1">
-                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Total Candidates:</span>
+                <div className="flex items-center justify-start sm:justify-end gap-1.5">
+                  <span className="shrink-0 text-slate-500 font-semibold">Candidates:</span>
                   <input
                     type="text"
                     value={candidateCountOverride !== "" ? candidateCountOverride : String(rankedStudentRows.length)}
                     onChange={(e) => setCandidateCountOverride(e.target.value)}
                     placeholder={String(rankedStudentRows.length)}
-                    title="Click to edit Total Candidates count"
-                    className="header-editable-input w-16 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-right print:border-none print:p-0 print:text-black"
+                    className="w-16 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 focus:border-primary rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-right"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Bangladesh Education Board Grading System Legend */}
-            <div className="mb-4 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-[10px] print:border-slate-400">
+            {/* Board Grading Scale Legend */}
+            <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[10px]">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">Board Grading Scale:</span>
                 <span className="font-mono">80-100: A+ (5.00)</span>
@@ -1055,19 +1375,92 @@ function BulkResultContent() {
               </div>
             </div>
 
-            {/* Broadsheet Tabulation Table */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 print:border-slate-900 print:shadow-none">
+            {/* Student Table Filter & Sort Controls */}
+            <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+              
+              {/* Status Tabs: All, Passed, Failed, A+ */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button
+                  size="sm"
+                  variant={studentStatusFilter === "ALL" ? "default" : "outline"}
+                  onClick={() => setStudentStatusFilter("ALL")}
+                  className={`h-7 text-xs font-semibold rounded-lg ${studentStatusFilter === "ALL" ? "bg-slate-900 text-white" : ""}`}
+                >
+                  All ({rankedStudentRows.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={studentStatusFilter === "PASSED" ? "default" : "outline"}
+                  onClick={() => setStudentStatusFilter("PASSED")}
+                  className={`h-7 text-xs font-semibold rounded-lg ${studentStatusFilter === "PASSED" ? "bg-emerald-600 text-white" : "text-emerald-600"}`}
+                >
+                  Passed ({rankedStudentRows.filter(r => r.status === "PASSED").length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={studentStatusFilter === "FAILED" ? "default" : "outline"}
+                  onClick={() => setStudentStatusFilter("FAILED")}
+                  className={`h-7 text-xs font-semibold rounded-lg ${studentStatusFilter === "FAILED" ? "bg-rose-600 text-white" : "text-rose-600"}`}
+                >
+                  Failed ({rankedStudentRows.filter(r => r.status === "FAILED").length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={studentStatusFilter === "APLUS" ? "default" : "outline"}
+                  onClick={() => setStudentStatusFilter("APLUS")}
+                  className={`h-7 text-xs font-semibold rounded-lg ${studentStatusFilter === "APLUS" ? "bg-purple-600 text-white" : "text-purple-600"}`}
+                >
+                  A+ (GPA 5.0) ({rankedStudentRows.filter(r => r.finalGPA >= 5.0).length})
+                </Button>
+              </div>
+
+              {/* Student Search & Sorting Dropdown */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                    placeholder="Search student or roll..."
+                    className="pl-8 h-7 text-xs w-44 rounded-lg bg-slate-50 dark:bg-slate-800"
+                  />
+                  {studentSearchQuery && (
+                    <button
+                      onClick={() => setStudentSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <Select value={studentSortBy} onValueChange={(val: any) => setStudentSortBy(val)}>
+                  <SelectTrigger className="h-7 text-xs w-36 font-semibold rounded-lg">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="MERIT">Rank / Merit</SelectItem>
+                    <SelectItem value="ROLL_ASC">Roll (Ascending)</SelectItem>
+                    <SelectItem value="NAME_ASC">Name (A-Z)</SelectItem>
+                    <SelectItem value="GPA_DESC">Highest GPA</SelectItem>
+                    <SelectItem value="MARKS_DESC">Total Marks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Screen Broadsheet Tabulation Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  {/* Top Level Headers */}
-                  <tr className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700 print:bg-slate-200 print:border-slate-900">
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 w-12 print:border-slate-900">
+                  <tr className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-700">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 w-12">
                       Merit
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 w-14 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 w-14">
                       Roll
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black border-r border-slate-200 dark:border-slate-700 min-w-[140px] print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black border-r border-slate-200 dark:border-slate-700 min-w-[140px]">
                       Student Name
                     </th>
 
@@ -1085,7 +1478,7 @@ function BulkResultContent() {
                         <th
                           key={exam.id}
                           colSpan={subCols}
-                          className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900"
+                          className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700"
                         >
                           <div className="flex items-center justify-center gap-1">
                             <span>{exam.name}</span>
@@ -1107,7 +1500,7 @@ function BulkResultContent() {
                         <th
                           key={m.id}
                           colSpan={3}
-                          className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-950/20 print:border-slate-900"
+                          className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-950/20"
                         >
                           <div className="flex items-center justify-center gap-1">
                             <span>{m.name}</span>
@@ -1119,211 +1512,206 @@ function BulkResultContent() {
                     })}
 
                     {/* Grand Summary Headers */}
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-slate-200/50 dark:bg-slate-800/50 w-16 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-slate-200/50 dark:bg-slate-800/50 w-16">
                       Total Marks
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-slate-200/50 dark:bg-slate-800/50 w-14 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-slate-200/50 dark:bg-slate-800/50 w-14">
                       (%)
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-emerald-100/50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 w-16 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-emerald-100/50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 w-16">
                       GPA
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-emerald-100/50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 w-14 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center border-r border-slate-200 dark:border-slate-700 bg-emerald-100/50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 w-14">
                       Grade
                     </th>
-                    <th rowSpan={2} className="p-2.5 font-black text-center w-16 print:border-slate-900">
+                    <th rowSpan={2} className="p-2.5 font-black text-center w-16">
                       Status
                     </th>
                   </tr>
 
                   {/* Sub Headers for Breakdowns */}
-                  <tr className="bg-slate-50 dark:bg-slate-800/40 text-[10px] text-slate-600 dark:text-slate-400 border-b border-slate-300 dark:border-slate-700 print:border-slate-900">
+                  <tr className="bg-slate-50 dark:bg-slate-800/40 text-[10px] text-slate-600 dark:text-slate-400 border-b border-slate-300 dark:border-slate-700">
                     {activeExams.map(exam => (
                       <React.Fragment key={exam.id}>
-                        {showComponentBreakdown && exam.hasCQ && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">CQ</th>}
-                        {showComponentBreakdown && exam.hasSQ && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">SQ</th>}
-                        {showComponentBreakdown && exam.hasDescriptive && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">Desc</th>}
-                        {showComponentBreakdown && exam.hasObjective && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">Obj</th>}
-                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900">Tot</th>
-                        <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">GP</th>
-                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900">LG</th>
+                        {showComponentBreakdown && exam.hasCQ && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">CQ</th>}
+                        {showComponentBreakdown && exam.hasSQ && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">SQ</th>}
+                        {showComponentBreakdown && exam.hasDescriptive && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">Desc</th>}
+                        {showComponentBreakdown && exam.hasObjective && <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">Obj</th>}
+                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700">Tot</th>
+                        <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">GP</th>
+                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700">LG</th>
                       </React.Fragment>
                     ))}
 
                     {manualSubjects.map(m => (
                       <React.Fragment key={m.id}>
-                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900">Tot</th>
-                        <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700 print:border-slate-900">GP</th>
-                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900">LG</th>
+                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700">Tot</th>
+                        <th className="p-1.5 text-center border-r border-slate-200 dark:border-slate-700">GP</th>
+                        <th className="p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700">LG</th>
                       </React.Fragment>
                     ))}
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 print:divide-slate-900 font-mono">
-                  {rankedStudentRows.map((row, rIdx) => {
-                    const isEven = rIdx % 2 === 0;
-                    const isFailed = row.status === "FAILED";
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
+                  {filteredAndSortedStudentRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={25} className="p-8 text-center text-sm font-semibold text-muted-foreground">
+                        কোনো ফলাফল পাওয়া যায়নি (No results match criteria)
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedStudentRows.map((row, rIdx) => {
+                      const isEven = rIdx % 2 === 0;
+                      const isFailed = row.status === "FAILED";
 
-                    return (
-                      <tr
-                        key={row.student.id}
-                        className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
-                          isEven ? "bg-white dark:bg-slate-900" : "bg-slate-50/40 dark:bg-slate-800/20"
-                        } ${isFailed ? "bg-rose-50/20 dark:bg-rose-950/10" : ""}`}
-                      >
-                        {/* Merit */}
-                        <td className="p-2 text-center font-black border-r border-slate-200 dark:border-slate-700 print:border-slate-900">
-                          {row.meritPosition === "1" ? (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-slate-900 font-black text-xs shadow-xs">
-                              1
-                            </span>
-                          ) : row.meritPosition === "2" ? (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-900 font-black text-xs">
-                              2
-                            </span>
-                          ) : row.meritPosition === "3" ? (
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs">
-                              3
-                            </span>
-                          ) : (
-                            row.meritPosition
-                          )}
-                        </td>
+                      return (
+                        <tr
+                          key={row.student.id}
+                          className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
+                            isEven ? "bg-white dark:bg-slate-900" : "bg-slate-50/40 dark:bg-slate-800/20"
+                          } ${isFailed ? "bg-rose-50/20 dark:bg-rose-950/10" : ""}`}
+                        >
+                          {/* Merit */}
+                          <td className="p-2 text-center font-black border-r border-slate-200 dark:border-slate-700">
+                            {row.meritPosition === "1" ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-slate-900 font-black text-xs shadow-xs">
+                                1
+                              </span>
+                            ) : row.meritPosition === "2" ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-900 font-black text-xs">
+                                2
+                              </span>
+                            ) : row.meritPosition === "3" ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs">
+                                3
+                              </span>
+                            ) : (
+                              row.meritPosition
+                            )}
+                          </td>
 
-                        {/* Roll */}
-                        <td className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 print:border-slate-900">
-                          {row.student.roll}
-                        </td>
+                          {/* Roll */}
+                          <td className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700">
+                            {row.student.roll}
+                          </td>
 
-                        {/* Student Name */}
-                        <td className="p-2 font-sans font-bold border-r border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 print:border-slate-900">
-                          {row.student.name}
-                        </td>
+                          {/* Student Name */}
+                          <td className="p-2 font-sans font-bold border-r border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+                            {row.student.name}
+                          </td>
 
-                        {/* Exam Marks Columns */}
-                        {activeExams.map(exam => {
-                          const sub = row.subjectResults.find(s => s.id === exam.id);
-                          const earned = sub ? sub.totalEarned : 0;
-                          const gp = sub ? sub.gp : 0;
-                          const lg = sub ? sub.grade : "F";
-                          const isSubFail = gp === 0;
+                          {/* Exam Marks Columns */}
+                          {activeExams.map(exam => {
+                            const sub = row.subjectResults.find(s => s.id === exam.id);
+                            const earned = sub ? sub.totalEarned : 0;
+                            const gp = sub ? sub.gp : 0;
+                            const lg = sub ? sub.grade : "F";
+                            const isSubFail = gp === 0;
 
-                          return (
-                            <React.Fragment key={exam.id}>
-                              {showComponentBreakdown && exam.hasCQ && (
-                                <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground print:border-slate-900">
-                                  {sub ? sub.cqMarks : 0}
+                            return (
+                              <React.Fragment key={exam.id}>
+                                {showComponentBreakdown && exam.hasCQ && (
+                                  <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground">
+                                    {sub ? sub.cqMarks : 0}
+                                  </td>
+                                )}
+                                {showComponentBreakdown && exam.hasSQ && (
+                                  <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground">
+                                    {sub ? sub.sqMarks : 0}
+                                  </td>
+                                )}
+                                {showComponentBreakdown && exam.hasDescriptive && (
+                                  <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground">
+                                    {sub ? sub.descMarks : 0}
+                                  </td>
+                                )}
+                                {showComponentBreakdown && exam.hasObjective && (
+                                  <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground">
+                                    {sub ? sub.objMarks : 0}
+                                  </td>
+                                )}
+
+                                <td className={`p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                                  {earned}
                                 </td>
-                              )}
-                              {showComponentBreakdown && exam.hasSQ && (
-                                <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground print:border-slate-900">
-                                  {sub ? sub.sqMarks : 0}
+                                <td className={`p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 font-bold' : ''}`}>
+                                  {gp.toFixed(1)}
                                 </td>
-                              )}
-                              {showComponentBreakdown && exam.hasDescriptive && (
-                                <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground print:border-slate-900">
-                                  {sub ? sub.descMarks : 0}
+                                <td className={`p-1.5 text-center font-black border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : lg === 'A+' ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  {lg}
                                 </td>
-                              )}
-                              {showComponentBreakdown && exam.hasObjective && (
-                                <td className="p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 text-muted-foreground print:border-slate-900">
-                                  {sub ? sub.objMarks : 0}
+                              </React.Fragment>
+                            );
+                          })}
+
+                          {/* Manual Subjects Marks Columns */}
+                          {manualSubjects.map(m => {
+                            const sub = row.subjectResults.find(s => s.id === m.id);
+                            const earned = sub ? sub.totalEarned : 0;
+                            const gp = sub ? sub.gp : 0;
+                            const lg = sub ? sub.grade : "F";
+                            const isSubFail = gp === 0;
+
+                            return (
+                              <React.Fragment key={m.id}>
+                                <td className={`p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : ''}`}>
+                                  {earned}
                                 </td>
-                              )}
+                                <td className={`p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 font-bold' : ''}`}>
+                                  {gp.toFixed(1)}
+                                </td>
+                                <td className={`p-1.5 text-center font-black border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  {lg}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
 
-                              <td className={`p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100'} print:border-slate-900`}>
-                                {earned}
-                              </td>
-                              <td className={`p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 font-bold' : ''} print:border-slate-900`}>
-                                {gp.toFixed(1)}
-                              </td>
-                              <td className={`p-1.5 text-center font-black border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : lg === 'A+' ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'} print:border-slate-900`}>
-                                {lg}
-                              </td>
-                            </React.Fragment>
-                          );
-                        })}
+                          {/* Total Marks */}
+                          <td className="p-2 text-center font-black border-r border-slate-200 dark:border-slate-700 bg-slate-100/40 dark:bg-slate-800/40">
+                            {row.grandTotalEarned}
+                          </td>
 
-                        {/* Manual Subjects Marks Columns */}
-                        {manualSubjects.map(m => {
-                          const sub = row.subjectResults.find(s => s.id === m.id);
-                          const earned = sub ? sub.totalEarned : 0;
-                          const gp = sub ? sub.gp : 0;
-                          const lg = sub ? sub.grade : "F";
-                          const isSubFail = gp === 0;
+                          {/* Percentage */}
+                          <td className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {row.grandPercentage.toFixed(1)}%
+                          </td>
 
-                          return (
-                            <React.Fragment key={m.id}>
-                              <td className={`p-1.5 text-center font-bold border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : ''} print:border-slate-900`}>
-                                {earned}
-                              </td>
-                              <td className={`p-1.5 text-center text-[11px] border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600 font-bold' : ''} print:border-slate-900`}>
-                                {gp.toFixed(1)}
-                              </td>
-                              <td className={`p-1.5 text-center font-black border-r border-slate-200 dark:border-slate-700 ${isSubFail ? 'text-rose-600' : 'text-slate-700 dark:text-slate-300'} print:border-slate-900`}>
-                                {lg}
-                              </td>
-                            </React.Fragment>
-                          );
-                        })}
+                          {/* Overall GPA */}
+                          <td className={`p-2 text-center font-black text-sm border-r border-slate-200 dark:border-slate-700 ${
+                            row.status === 'FAILED'
+                              ? 'text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30'
+                              : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30'
+                          }`}>
+                            {row.finalGPA.toFixed(2)}
+                          </td>
 
-                        {/* Total Marks */}
-                        <td className="p-2 text-center font-black border-r border-slate-200 dark:border-slate-700 bg-slate-100/40 dark:bg-slate-800/40 print:border-slate-900">
-                          {row.grandTotalEarned}
-                        </td>
+                          {/* Overall Grade */}
+                          <td className={`p-2 text-center font-black border-r border-slate-200 dark:border-slate-700 ${
+                            row.status === 'FAILED' ? 'text-rose-600' : 'text-emerald-600'
+                          }`}>
+                            {row.finalGrade}
+                          </td>
 
-                        {/* Percentage */}
-                        <td className="p-2 text-center font-bold border-r border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 print:border-slate-900">
-                          {row.grandPercentage.toFixed(1)}%
-                        </td>
-
-                        {/* Overall GPA */}
-                        <td className={`p-2 text-center font-black text-sm border-r border-slate-200 dark:border-slate-700 ${
-                          row.status === 'FAILED'
-                            ? 'text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/30'
-                            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30'
-                        } print:border-slate-900`}>
-                          {row.finalGPA.toFixed(2)}
-                        </td>
-
-                        {/* Overall Grade */}
-                        <td className={`p-2 text-center font-black border-r border-slate-200 dark:border-slate-700 ${
-                          row.status === 'FAILED' ? 'text-rose-600' : 'text-emerald-600'
-                        } print:border-slate-900`}>
-                          {row.finalGrade}
-                        </td>
-
-                        {/* Status Badge */}
-                        <td className="p-2 text-center font-sans font-bold print:border-slate-900">
-                          {row.status === "PASSED" ? (
-                            <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">
-                              PASS
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                              FAIL
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          {/* Status Badge */}
+                          <td className="p-2 text-center font-sans font-bold">
+                            {row.status === "PASSED" ? (
+                              <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">
+                                PASS
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                FAIL
+                              </Badge>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
-            </div>
-
-            {/* Official Signatures Block for Print */}
-            <div className="hidden print:grid grid-cols-3 gap-8 pt-16 text-center text-xs font-bold text-slate-800">
-              <div className="border-t border-slate-900 pt-2">
-                Prepared & Verified by
-              </div>
-              <div className="border-t border-slate-900 pt-2">
-                Class Teacher
-              </div>
-              <div className="border-t border-slate-900 pt-2">
-                Headmaster / Principal
-              </div>
             </div>
           </div>
         )}
@@ -1496,8 +1884,7 @@ function BulkResultContent() {
         {/* TAB 3: CONFIGURATION & MANUAL SUBJECTS                                    */}
         {/* ========================================================================= */}
         {activeTab === "config" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:hidden">
-            {/* Sheet Header Information Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 md:col-span-2">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-2">
@@ -1699,10 +2086,335 @@ function BulkResultContent() {
       </main>
 
       {/* ========================================================================= */}
-      {/* MODALS                                                                    */}
+      {/* 4. DEDICATED HIGH-PRECISION PRINT ENGINE (PAGINATED & HIGH-CONTRAST)       */}
+      {/* ========================================================================= */}
+      <div className="hidden print:block w-full">
+        {printableSheetPages.map((pageStudents, pageIdx) => (
+          <div
+            key={pageIdx}
+            className="printable-page-sheet print-page-break w-full p-0 m-0"
+          >
+            {/* Page Header */}
+            <div className="text-center space-y-1 mb-2">
+              <h1 className="text-2xl font-black uppercase tracking-tight text-black m-0 p-0 leading-tight">
+                {institutionName || "DIGITAL SCHOOL ACADEMY"}
+              </h1>
+              <p className="text-[10pt] font-semibold text-slate-800 m-0 p-0 leading-tight">
+                {institutionSubtitle || "Approved by Ministry of Education & Secondary Education Board"}
+              </p>
+              
+              <div className="pt-1 pb-0.5">
+                <span className="inline-block px-4 py-0.5 border border-black font-black text-[10pt] uppercase tracking-wider bg-slate-100 text-black">
+                  {marksheetTitle}
+                </span>
+              </div>
+
+              {/* Meta bar */}
+              <div className="flex items-center justify-between text-[8.5pt] font-bold border-b border-black pb-1 pt-1 text-black">
+                <span>Class: <strong>{customClassName || "All"}</strong></span>
+                <span>Session / Year: <strong>{academicYear}</strong></span>
+                <span>Date: <strong>{publicationDate}</strong></span>
+                <span>Total Candidates: <strong>{candidateCountOverride || rankedStudentRows.length}</strong></span>
+                <span>Sheet: <strong>Page {pageIdx + 1} of {printableSheetPages.length}</strong></span>
+              </div>
+
+              {/* Board Grading Scale */}
+              <div className="flex items-center justify-between text-[7.5pt] font-mono text-black border-b border-black py-0.5">
+                <span className="font-bold font-sans">BOARD SCALE:</span>
+                <span>80-100: A+ (5.0)</span>
+                <span>70-79: A (4.0)</span>
+                <span>60-69: A- (3.5)</span>
+                <span>50-59: B (3.0)</span>
+                <span>40-49: C (2.0)</span>
+                <span>33-39: D (1.0)</span>
+                <span className="font-bold text-black">0-32: F (0.0)</span>
+                <span className="italic font-sans">★ 4th Sub: GP &gt; 2.0 added</span>
+              </div>
+            </div>
+
+            {/* Print Table */}
+            <div className="w-full flex-1">
+              <table className="print-table w-full text-left">
+                <thead>
+                  <tr>
+                    <th rowSpan={2} className="w-8">Merit</th>
+                    <th rowSpan={2} className="w-10">Roll</th>
+                    <th rowSpan={2} className="min-w-[130px] text-left">Student Name</th>
+
+                    {/* Subject Headers */}
+                    {activeExams.map(exam => {
+                      const isOpt = optionalSubjectIds.includes(exam.id);
+                      const subCols = (showComponentBreakdown ? 1 : 0) * (
+                        (exam.hasCQ ? 1 : 0) +
+                        (exam.hasSQ ? 1 : 0) +
+                        (exam.hasDescriptive ? 1 : 0) +
+                        (exam.hasObjective ? 1 : 0)
+                      ) + 3;
+
+                      return (
+                        <th
+                          key={exam.id}
+                          colSpan={subCols}
+                          className="text-center font-bold"
+                        >
+                          <div>{exam.name}{isOpt ? " (4th)" : ""}</div>
+                          <div className="text-[7pt] font-normal">({exam.totalMarks}M)</div>
+                        </th>
+                      );
+                    })}
+
+                    {/* Manual Subjects */}
+                    {manualSubjects.map(m => (
+                      <th
+                        key={m.id}
+                        colSpan={3}
+                        className="text-center font-bold"
+                      >
+                        <div>{m.name}{m.isOptional ? " (4th)" : ""}</div>
+                        <div className="text-[7pt] font-normal">({m.totalMarks}M)</div>
+                      </th>
+                    ))}
+
+                    <th rowSpan={2} className="w-12">Total</th>
+                    <th rowSpan={2} className="w-10">%</th>
+                    <th rowSpan={2} className="w-12">GPA</th>
+                    <th rowSpan={2} className="w-10">Grade</th>
+                    <th rowSpan={2} className="w-12">Status</th>
+                  </tr>
+
+                  {/* Sub Header for breakdown */}
+                  <tr>
+                    {activeExams.map(exam => (
+                      <React.Fragment key={exam.id}>
+                        {showComponentBreakdown && exam.hasCQ && <th className="text-[7pt]">CQ</th>}
+                        {showComponentBreakdown && exam.hasSQ && <th className="text-[7pt]">SQ</th>}
+                        {showComponentBreakdown && exam.hasDescriptive && <th className="text-[7pt]">Desc</th>}
+                        {showComponentBreakdown && exam.hasObjective && <th className="text-[7pt]">Obj</th>}
+                        <th className="text-[7.5pt] font-bold">Tot</th>
+                        <th className="text-[7.5pt]">GP</th>
+                        <th className="text-[7.5pt] font-bold">LG</th>
+                      </React.Fragment>
+                    ))}
+
+                    {manualSubjects.map(m => (
+                      <React.Fragment key={m.id}>
+                        <th className="text-[7.5pt] font-bold">Tot</th>
+                        <th className="text-[7.5pt]">GP</th>
+                        <th className="text-[7.5pt] font-bold">LG</th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {pageStudents.map((row) => {
+                    const isFailed = row.status === "FAILED";
+                    return (
+                      <tr key={row.student.id}>
+                        <td className="font-black text-center">{row.meritPosition}</td>
+                        <td className="font-bold text-center">{row.student.roll}</td>
+                        <td className="font-bold text-left">{row.student.name}</td>
+
+                        {/* Exam Marks */}
+                        {activeExams.map(exam => {
+                          const sub = row.subjectResults.find(s => s.id === exam.id);
+                          const earned = sub ? sub.totalEarned : 0;
+                          const gp = sub ? sub.gp : 0;
+                          const lg = sub ? sub.grade : "F";
+                          const isSubFail = gp === 0;
+
+                          return (
+                            <React.Fragment key={exam.id}>
+                              {showComponentBreakdown && exam.hasCQ && (
+                                <td className="text-[7.5pt]">{sub ? sub.cqMarks : 0}</td>
+                              )}
+                              {showComponentBreakdown && exam.hasSQ && (
+                                <td className="text-[7.5pt]">{sub ? sub.sqMarks : 0}</td>
+                              )}
+                              {showComponentBreakdown && exam.hasDescriptive && (
+                                <td className="text-[7.5pt]">{sub ? sub.descMarks : 0}</td>
+                              )}
+                              {showComponentBreakdown && exam.hasObjective && (
+                                <td className="text-[7.5pt]">{sub ? sub.objMarks : 0}</td>
+                              )}
+                              <td className={`font-bold ${isSubFail ? 'text-black underline' : ''}`}>{earned}</td>
+                              <td className="text-[7.5pt]">{gp.toFixed(1)}</td>
+                              <td className="font-bold text-[8pt]">{lg}</td>
+                            </React.Fragment>
+                          );
+                        })}
+
+                        {/* Manual Subjects Marks */}
+                        {manualSubjects.map(m => {
+                          const sub = row.subjectResults.find(s => s.id === m.id);
+                          const earned = sub ? sub.totalEarned : 0;
+                          const gp = sub ? sub.gp : 0;
+                          const lg = sub ? sub.grade : "F";
+
+                          return (
+                            <React.Fragment key={m.id}>
+                              <td className="font-bold">{earned}</td>
+                              <td className="text-[7.5pt]">{gp.toFixed(1)}</td>
+                              <td className="font-bold text-[8pt]">{lg}</td>
+                            </React.Fragment>
+                          );
+                        })}
+
+                        <td className="font-black">{row.grandTotalEarned}</td>
+                        <td className="font-bold">{row.grandPercentage.toFixed(1)}%</td>
+                        <td className="font-black text-[9pt]">{row.finalGPA.toFixed(2)}</td>
+                        <td className="font-black text-[9pt]">{row.finalGrade}</td>
+                        <td className="font-black text-[8pt]">
+                          {row.status === "PASSED" ? "PASS" : "FAIL"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Official Signatures Block on EVERY Sheet */}
+            <div className="grid grid-cols-3 gap-12 pt-8 pb-2 text-center text-[9pt] font-bold text-black">
+              <div className="border-t border-black pt-1">
+                Prepared & Verified by
+              </div>
+              <div className="border-t border-black pt-1">
+                Class Teacher
+              </div>
+              <div className="border-t border-black pt-1">
+                Headmaster / Principal
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 5. INTERACTIVE MODALS                                                      */}
       {/* ========================================================================= */}
 
-      {/* 1. Add Subject Group Modal */}
+      {/* Modal 1: Advanced Exam Browser & Batch Selector */}
+      <Dialog open={isExamSelectorModalOpen} onOpenChange={setIsExamSelectorModalOpen}>
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-blue-600" />
+                Manage Exams for Marksheet
+              </span>
+              <span className="text-xs font-semibold text-muted-foreground mr-6">
+                Selected: {selectedExamIds.length} / {availableExams.length}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Search, filter, and choose which examinations should be compiled into this broadsheet.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Quick Search & Batch Controls */}
+          <div className="py-2 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={examSearchQuery}
+                  onChange={(e) => setExamSearchQuery(e.target.value)}
+                  placeholder="Filter exams by subject or title..."
+                  className="pl-9 h-9 text-xs rounded-xl"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedExamIds(availableExams.map(e => e.id))}
+                  className="h-8 text-xs font-semibold rounded-lg"
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedExamIds([])}
+                  className="h-8 text-xs font-semibold rounded-lg"
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+
+            {/* Exams Table in Modal */}
+            <div className="max-h-72 overflow-y-auto border rounded-xl divide-y text-xs">
+              {filteredAvailableExams.map(exam => {
+                const isSelected = selectedExamIds.includes(exam.id);
+                const isOpt = optionalSubjectIds.includes(exam.id);
+                return (
+                  <div
+                    key={exam.id}
+                    onClick={() => {
+                      setSelectedExamIds(prev =>
+                        isSelected ? prev.filter(id => id !== exam.id) : [...prev, exam.id]
+                      );
+                    }}
+                    className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${
+                      isSelected ? "bg-blue-50/60 dark:bg-blue-950/30" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isSelected ? (
+                        <CheckSquare className="w-4 h-4 text-blue-600 shrink-0" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                      )}
+                      <div>
+                        <span className="font-bold text-sm text-foreground">{exam.name}</span>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                          <span>Total: <strong>{exam.totalMarks} Marks</strong></span>
+                          {exam.date && <span>• Date: {exam.date.split("T")[0]}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {isSelected && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => toggleOptionalSubject(exam.id)}
+                          className={`h-7 text-[10px] font-bold px-2 rounded-lg ${
+                            isOpt ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {isOpt ? "★ 4th Subject" : "Make 4th Sub"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsExamSelectorModalOpen(false)}
+              className="rounded-xl text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApplyExamSelection}
+              className="rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Apply Selection & Recalculate ({selectedExamIds.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 2: Add Subject Group Modal */}
       <Dialog open={isGroupModalOpen} onOpenChange={setIsGroupModalOpen}>
         <DialogContent className="rounded-2xl max-w-md">
           <DialogHeader>
@@ -1711,7 +2423,7 @@ function BulkResultContent() {
               যৌথ বিষয় গ্রুপ তৈরি করুন (Subject Group)
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              একাধিক পত্র বা বিষয় একত্রিত করে একক বিষয় হিসেবে মার্কশিটে প্রদর্শনের জন্য গ্রুপ তৈরি করুন।
+              বাংলা ১ম ও ২য় পত্রের মতো বিষয়গুলো একত্রিত করে একক বিষয় হিসেবে মার্কশিটে প্রদর্শনের জন্য গ্রুপ তৈরি করুন।
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1743,7 +2455,7 @@ function BulkResultContent() {
                         );
                       }}
                       className={`p-2 rounded-lg text-xs font-medium cursor-pointer flex items-center justify-between ${
-                        isChecked ? "bg-purple-100 text-purple-900 font-bold" : "hover:bg-slate-100"
+                        isChecked ? "bg-purple-100 dark:bg-purple-950/60 text-purple-900 dark:text-purple-200 font-bold" : "hover:bg-slate-100 dark:hover:bg-slate-800"
                       }`}
                     >
                       <span>{e.name}</span>
@@ -1765,7 +2477,7 @@ function BulkResultContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 2. Add Manual Subject Modal */}
+      {/* Modal 3: Add Manual Subject Modal */}
       <Dialog open={isManualSubjectModalOpen} onOpenChange={setIsManualSubjectModalOpen}>
         <DialogContent className="rounded-2xl max-w-md">
           <DialogHeader>
@@ -1833,7 +2545,7 @@ function BulkResultContent() {
         </DialogContent>
       </Dialog>
 
-      {/* 3. Manual Marks Quick-Entry Modal */}
+      {/* Modal 4: Manual Marks Quick-Entry Modal */}
       {marksEntrySubjectId && (
         <Dialog open={!!marksEntrySubjectId} onOpenChange={() => setMarksEntrySubjectId(null)}>
           <DialogContent className="rounded-2xl max-w-lg max-h-[85vh] flex flex-col">
@@ -1879,37 +2591,66 @@ function BulkResultContent() {
         </Dialog>
       )}
 
-      {/* Print Specific Styles */}
+      {/* ========================================================================= */}
+      {/* 6. ADVANCED PRINT STYLES                                                  */}
+      {/* ========================================================================= */}
       <style jsx global>{`
         @media print {
           @page {
             size: landscape;
-            margin: 8mm;
+            margin: 6mm 5mm 6mm 5mm;
           }
-          body {
-            background: white !important;
-            color: black !important;
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-          .page-break-after-always {
-            page-break-after: always;
-            break-after: page;
+          html, body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .print\\:hidden {
             display: none !important;
           }
-          .tabulation-sheet-wrapper {
-            width: 100% !important;
+          .print\\:block {
+            display: block !important;
           }
-          .header-editable-input {
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            color: inherit !important;
+          .print-page-break {
+            page-break-after: always !important;
+            break-after: page !important;
+            break-inside: avoid !important;
+          }
+          .print-page-break:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+          .printable-page-sheet {
+            box-sizing: border-box !important;
+            min-height: 98vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            padding: 2mm 0 !important;
+            page-break-inside: avoid !important;
+          }
+          .print-table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+            font-size: 8pt !important;
+          }
+          .print-table th, .print-table td {
+            border: 1px solid #111111 !important;
+            padding: 2.5px 3.5px !important;
+            text-align: center !important;
+            color: #000000 !important;
+            line-height: 1.15 !important;
+          }
+          .print-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: 800 !important;
+          }
+          .print-table td.text-left {
+            text-align: left !important;
           }
         }
       `}</style>
@@ -1919,7 +2660,7 @@ function BulkResultContent() {
 
 export default function BulkResultPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-sm font-semibold">Loading Bulk Result Hub...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-sm font-semibold">Loading Bulk Result Studio...</div>}>
       <BulkResultContent />
     </Suspense>
   );

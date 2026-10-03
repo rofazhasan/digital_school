@@ -95,17 +95,33 @@ export async function GET(req: NextRequest) {
       }));
     }
 
-    // Fetch exams for this class
-    const examWhere: any = {};
+    // Fetch lightweight list of all available exams for this class so teacher can easily search, filter, and pick
+    let availableClassExams: any[] = [];
     if (classId) {
-      examWhere.classId = classId;
-    }
-    if (requestedExamIds.length > 0) {
-      examWhere.id = { in: requestedExamIds };
+      availableClassExams = await prisma.exam.findMany({
+        where: { classId },
+        select: {
+          id: true,
+          name: true,
+          date: true,
+          totalMarks: true,
+          passMarks: true,
+          cqTotalQuestions: true,
+          sqTotalQuestions: true
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }]
+      });
     }
 
-    const rawExams = await prisma.exam.findMany({
-      where: examWhere,
+    // Target exam IDs to load results for:
+    // If requestedExamIds were given, use them; otherwise default to top 8 most recent exams for snappy load
+    const activeExamIds = requestedExamIds.length > 0
+      ? requestedExamIds
+      : availableClassExams.slice(0, 8).map(e => e.id);
+
+    // Fetch active exams with metadata only (avoiding heavy generatedSet / questions payloads)
+    const rawExams = activeExamIds.length > 0 ? await prisma.exam.findMany({
+      where: { id: { in: activeExamIds } },
       select: {
         id: true,
         name: true,
@@ -117,108 +133,13 @@ export async function GET(req: NextRequest) {
         cqRequiredQuestions: true,
         sqTotalQuestions: true,
         sqRequiredQuestions: true,
-        cqSubsections: true,
-        generatedSet: true,
-        examSets: {
-          select: {
-            id: true,
-            name: true,
-            questionsJson: true
-          }
-        }
+        cqSubsections: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }]
-    });
-
-    // Also get all available exams for this class so teacher can pick and choose
-    let availableClassExams: any[] = [];
-    if (classId) {
-      availableClassExams = await prisma.exam.findMany({
-        where: { classId },
-        select: {
-          id: true,
-          name: true,
-          date: true,
-          totalMarks: true,
-          passMarks: true
-        },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }]
-      });
-    }
-
-    // Target exam IDs to load results for:
-    // If requestedExamIds were given, use them; otherwise use all exams found for the class
-    const activeExamIds = requestedExamIds.length > 0
-      ? requestedExamIds
-      : rawExams.map(e => e.id);
-
-    // Process exams and determine question type presence (CQ, SQ, Descriptive, Objective)
-    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc'];
-
-    const processedExams = rawExams.map(exam => {
-      const allQuestions: any[] = [];
-      if (Array.isArray(exam.generatedSet)) {
-        exam.generatedSet.forEach((s: any) => {
-          if (Array.isArray(s?.questions)) allQuestions.push(...s.questions);
-          else if (s?.type || s?.questionType) allQuestions.push(s);
-        });
-      } else if (exam.generatedSet && Array.isArray((exam.generatedSet as any).questions)) {
-        allQuestions.push(...(exam.generatedSet as any).questions);
-      }
-
-      if (allQuestions.length === 0 && exam.examSets && exam.examSets.length > 0) {
-        exam.examSets.forEach((es: any) => {
-          if (es.questionsJson) {
-            try {
-              const parsed = typeof es.questionsJson === 'string' ? JSON.parse(es.questionsJson) : es.questionsJson;
-              if (Array.isArray(parsed)) allQuestions.push(...parsed);
-            } catch {}
-          }
-        });
-      }
-
-      const hasCQ = (exam.cqTotalQuestions ?? 0) > 0 || allQuestions.some((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
-      const hasSQ = (exam.sqTotalQuestions ?? 0) > 0 || allQuestions.some((q: any) => (q.type || q.questionType || '').toLowerCase() === 'sq');
-      const hasDescriptive = allQuestions.some((q: any) => (q.type || q.questionType || '').toLowerCase() === 'descriptive');
-      const hasObjective = allQuestions.some((q: any) => objectiveTypes.includes((q.type || q.questionType || '').toLowerCase())) || (!hasCQ && !hasSQ && !hasDescriptive);
-
-      // Estimate max marks per section
-      let cqMax = 0;
-      let sqMax = 0;
-      let descMax = 0;
-      let objMax = 0;
-
-      allQuestions.forEach((q: any) => {
-        const type = (q.type || q.questionType || '').toLowerCase();
-        const m = Number(q.marks) || 1;
-        if (type === 'cq') cqMax += m;
-        else if (type === 'sq') sqMax += m;
-        else if (type === 'descriptive') descMax += m;
-        else if (objectiveTypes.includes(type)) objMax += m;
-      });
-
-      return {
-        id: exam.id,
-        name: exam.name,
-        subject: (exam as any).subject || exam.name || 'General',
-        date: exam.date,
-        totalMarks: exam.totalMarks,
-        passMarks: exam.passMarks || 33,
-        classId: exam.classId,
-        cqSubsections: exam.cqSubsections,
-        hasCQ,
-        hasSQ,
-        hasDescriptive,
-        hasObjective,
-        cqMax,
-        sqMax,
-        descMax,
-        objMax
-      };
-    });
+    }) : [];
 
     // Fetch Results for the active exams
-    const results = await prisma.result.findMany({
+    const results = activeExamIds.length > 0 ? await prisma.result.findMany({
       where: {
         examId: { in: activeExamIds }
       },
@@ -234,10 +155,42 @@ export async function GET(req: NextRequest) {
         grade: true,
         isPublished: true
       }
+    }) : [];
+
+    // Process exams and determine question type presence (CQ, SQ, Objective) without heavy question tree queries
+    const processedExams = rawExams.map(exam => {
+      const examResults = results.filter(r => r.examId === exam.id);
+      const hasResultCQ = examResults.some(r => (r.cqMarks ?? 0) > 0);
+      const hasResultSQ = examResults.some(r => (r.sqMarks ?? 0) > 0);
+      const hasResultMCQ = examResults.some(r => (r.mcqMarks ?? 0) > 0);
+
+      const hasCQ = (exam.cqTotalQuestions ?? 0) > 0 || (exam.cqRequiredQuestions ?? 0) > 0 || hasResultCQ;
+      const hasSQ = (exam.sqTotalQuestions ?? 0) > 0 || (exam.sqRequiredQuestions ?? 0) > 0 || hasResultSQ;
+      const hasDescriptive = false;
+      const hasObjective = hasResultMCQ || (!hasCQ && !hasSQ) || ((exam.totalMarks || 100) > ((exam.cqTotalQuestions ?? 0) * 10 + (exam.sqTotalQuestions ?? 0) * 2));
+
+      return {
+        id: exam.id,
+        name: exam.name,
+        subject: (exam as any).subject || exam.name || 'General',
+        date: exam.date,
+        totalMarks: exam.totalMarks,
+        passMarks: exam.passMarks || 33,
+        classId: exam.classId,
+        cqSubsections: exam.cqSubsections,
+        hasCQ,
+        hasSQ,
+        hasDescriptive,
+        hasObjective,
+        cqMax: (exam.cqRequiredQuestions || exam.cqTotalQuestions || 0) * 10,
+        sqMax: (exam.sqRequiredQuestions || exam.sqTotalQuestions || 0) * 2,
+        descMax: 0,
+        objMax: Math.max(0, (exam.totalMarks || 100) - ((exam.cqRequiredQuestions || exam.cqTotalQuestions || 0) * 10 + (exam.sqRequiredQuestions || exam.sqTotalQuestions || 0) * 2))
+      };
     });
 
-    // Fetch Submissions to extract descriptive marks and fallback marks
-    const submissions = await prisma.examSubmission.findMany({
+    // Fetch Submissions without heavy answers JSON payload for blazing fast response
+    const submissions = activeExamIds.length > 0 ? await prisma.examSubmission.findMany({
       where: {
         examId: { in: activeExamIds }
       },
@@ -245,12 +198,11 @@ export async function GET(req: NextRequest) {
         id: true,
         examId: true,
         studentId: true,
-        answers: true,
         status: true,
         score: true,
         evaluatedAt: true
       }
-    });
+    }) : [];
 
     // Build Student-Exam Result Map
     // Structure: { [studentId]: { [examId]: { mcqMarks, cqMarks, sqMarks, descMarks, total, percentage, grade } } }
@@ -272,27 +224,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Enrich with submission data and calculate descriptive marks if present
+    // Enrich with submission fallback if no result record was generated
     submissions.forEach(sub => {
       if (!studentResultsMap[sub.studentId]) {
         studentResultsMap[sub.studentId] = {};
       }
 
-      let descMarks = 0;
-      const answers = (sub.answers as Record<string, any>) || {};
-
-      // Sum up descriptive marks from answers keys ending with _marks or _desc_*_marks
-      Object.keys(answers).forEach(k => {
-        if (k.includes('_desc_') && k.endsWith('_marks') && typeof answers[k] === 'number') {
-          descMarks += answers[k];
-        }
-      });
-
       const existing = studentResultsMap[sub.studentId][sub.examId];
-      if (existing) {
-        existing.descMarks = descMarks;
-      } else {
-        // Fallback if no result record was generated
+      if (!existing && sub.score != null) {
         const exam = processedExams.find(e => e.id === sub.examId);
         const passMark = getPassPercentage(exam?.passMarks, exam?.totalMarks);
         const totalMarks = exam?.totalMarks || 100;
@@ -302,9 +241,9 @@ export async function GET(req: NextRequest) {
 
         studentResultsMap[sub.studentId][sub.examId] = {
           mcqMarks: 0,
-          cqMarks: 0,
+          cqMarks: earned,
           sqMarks: 0,
-          descMarks: descMarks,
+          descMarks: 0,
           total: earned,
           percentage: pct,
           grade: grade,
