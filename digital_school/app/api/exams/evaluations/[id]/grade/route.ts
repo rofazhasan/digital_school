@@ -96,11 +96,26 @@ export async function POST(
 
     // Use centralized evaluation logic to recalculate total score and marks by type
     const { evaluateSubmission } = await import("@/lib/exam-logic");
-    const { totalScore, mcqMarks, cqMarks, sqMarks } = await evaluateSubmission(
+    const { calculateGrade, calculatePercentage } = await import("@/lib/utils");
+    const evaluation = await evaluateSubmission(
       { ...submission, answers: updatedAnswers as any },
       exam,
-      exam.examSets
+      exam.examSets,
+      false
     ) as any;
+
+    const totalScore = evaluation.totalScore ?? 0;
+    const mcqMarks = evaluation.mcqMarks ?? 0;
+    const cqMarks = evaluation.cqMarks ?? 0;
+    const sqMarks = evaluation.sqMarks ?? 0;
+
+    const passMark = Number(exam.passMarks) || 33;
+    const computedPercentage = exam.totalMarks > 0
+      ? calculatePercentage(totalScore, exam.totalMarks)
+      : (evaluation.percentage || 0);
+    const computedGrade = evaluation.grade === 'F (Disqualified)'
+      ? 'F (Disqualified)'
+      : calculateGrade(computedPercentage, passMark);
 
     await prisma.examSubmission.update({
       where: {
@@ -116,12 +131,12 @@ export async function POST(
       }
     });
 
-    console.log(`📊 Recalculated Results - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalScore}`);
+    console.log(`📊 Recalculated Results - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalScore}, Pct: ${computedPercentage}%, Grade: ${computedGrade}`);
 
     console.log(`💾 Saving Result - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalScore}`);
 
     try {
-      // Update or create Result record
+      // Update or create Result record with updated percentage and grade
       const result = await prisma.result.upsert({
         where: {
           studentId_examId: {
@@ -133,7 +148,9 @@ export async function POST(
           total: totalScore,
           mcqMarks: mcqMarks,
           cqMarks: cqMarks,
-          sqMarks: sqMarks
+          sqMarks: sqMarks,
+          percentage: computedPercentage,
+          grade: computedGrade
           // isPublished status is preserved from existing record
         },
         create: {
@@ -143,6 +160,8 @@ export async function POST(
           mcqMarks: mcqMarks,
           cqMarks: cqMarks,
           sqMarks: sqMarks,
+          percentage: computedPercentage,
+          grade: computedGrade,
           isPublished: false
         }
       });
@@ -150,7 +169,9 @@ export async function POST(
       console.log(`✅ Result saved successfully:`, {
         id: result.id,
         mcqMarks: result.mcqMarks,
-        total: result.total
+        total: result.total,
+        percentage: result.percentage,
+        grade: result.grade
       });
 
       // Verify the result was saved correctly
@@ -165,7 +186,9 @@ export async function POST(
 
       console.log(`🔍 Verification - Saved result:`, {
         mcqMarks: savedResult?.mcqMarks,
-        total: savedResult?.total
+        total: savedResult?.total,
+        percentage: savedResult?.percentage,
+        grade: savedResult?.grade
       });
 
     } catch (error) {
@@ -194,7 +217,17 @@ export async function POST(
       console.log('Review status updated to UNDER_REVIEW');
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      result: {
+        total: totalScore,
+        mcqMarks,
+        cqMarks,
+        sqMarks,
+        percentage: computedPercentage,
+        grade: computedGrade
+      }
+    });
   } catch (error) {
     console.error("Error updating marks:", error);
     return NextResponse.json({ error: "Failed to update marks" }, { status: 500 });

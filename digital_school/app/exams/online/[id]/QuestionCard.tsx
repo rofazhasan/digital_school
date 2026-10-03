@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { Check, Upload, X, Camera as CameraIcon, Tag } from "lucide-react";
+import { Check, Upload, X, Camera as CameraIcon, Tag, Layers } from "lucide-react";
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
@@ -56,7 +56,9 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     matchSubject,
     fontSize,
     attemptedOptionalSubjects,
-    triggerOptionalNotice
+    triggerOptionalNotice,
+    hasCqSubsections,
+    getCqSubsectionForQuestion
   } = useExamContext();
 
   const questions = exam.questions || [];
@@ -185,6 +187,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
   const userAnswer = effectiveAnswer;
   const showResult = submitted && result;
 
+  const cqSub = (type === 'cq' && hasCqSubsections) ? getCqSubsectionForQuestion(question) : null;
+
   const getTextSize = (base: string) => {
     if (fontSize === 'lg') return base === 'text-base' ? 'text-lg' : 'text-xl';
     if (fontSize === 'xl') return base === 'text-base' ? 'text-xl' : 'text-2xl';
@@ -193,7 +197,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
 
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-sm border border-border bg-card rounded-2xl overflow-hidden font-exam-online">
-        <CardContent className="p-6 md:p-8">
+        <CardContent className="p-4 sm:p-6 md:p-8 max-w-full">
 
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
@@ -217,6 +221,22 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                   )}
                 </Badge>
               )}
+              {cqSub && (
+                <Badge className="font-bold text-xs shadow-xs px-2.5 py-1 flex items-center gap-1.5 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 border border-blue-400/30">
+                  <Layers className="w-3 h-3" />
+                  <span>{cqSub.name}</span>
+                  {cqSub.requiredQuestions > 0 && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-200">
+                      কমপক্ষে {toBengaliNumerals(cqSub.requiredQuestions)}টি আবশ্যক
+                    </span>
+                  )}
+                </Badge>
+              )}
+              {!cqSub && !isMS && (exam?.cqRequiredQuestions || 0) > 0 && type === 'cq' && (
+                <Badge variant="outline" className="text-xs font-semibold text-primary border-primary/40 bg-primary/5">
+                  যেকোনো {toBengaliNumerals(exam.cqRequiredQuestions)}টি
+                </Badge>
+              )}
               <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border uppercase">
                 {type.toUpperCase()}
               </Badge>
@@ -237,7 +257,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
           </div>
 
           {/* Question Text */}
-          <div className={`prose prose-indigo dark:prose-invert max-w-none text-foreground/90 font-medium leading-relaxed mb-8 text-left ${getTextSize('text-base md:text-xl')}`}>
+          <div className={`prose prose-indigo dark:prose-invert max-w-none text-foreground/90 font-medium leading-relaxed mb-8 text-left max-w-full overflow-x-auto touch-pan-x ${getTextSize('text-base md:text-xl')}`}>
             {type === "ar" ? (
               <div className="space-y-4">
                 <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex flex-col gap-2">

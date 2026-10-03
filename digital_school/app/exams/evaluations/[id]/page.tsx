@@ -2937,6 +2937,25 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         return;
       }
 
+      const resData = await response.json().catch(() => null);
+      if (resData?.result && exam && currentStudent) {
+        const studentIndex = (exam?.submissions?.findIndex(s => s?.student?.id === currentStudent?.student?.id) ?? -1);
+        if (studentIndex !== -1) {
+          const updatedSubmissions = [...(exam?.submissions || [])];
+          if (updatedSubmissions?.[studentIndex]) {
+            updatedSubmissions[studentIndex] = {
+              ...updatedSubmissions[studentIndex],
+              earnedMarks: resData.result.total,
+              result: {
+                ...updatedSubmissions[studentIndex].result,
+                ...resData.result
+              }
+            };
+            setExam({ ...exam, submissions: updatedSubmissions });
+          }
+        }
+      }
+
       // Success - no toast to avoid delays, UI already updated optimistically
       if (marks === maxMarks) {
         triggerGradingHaptic('CORRECT');
@@ -3794,6 +3813,16 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                             {(currentStudent?.result?.grade?.includes('Disqualified') || (currentStudent?.answers as any)?._isDisqualified) && (
                               <Badge variant="destructive" className="bg-red-600 text-white font-bold text-xs shadow-xs px-2.5 py-0.5">
                                 পরীক্ষা বাতিল (Disqualified)
+                              </Badge>
+                            )}
+                            {currentStudent?.result?.grade && !currentStudent?.result?.grade?.includes('Disqualified') && (
+                              <Badge variant="outline" className={cn(
+                                "font-bold text-xs px-2.5 py-0.5",
+                                currentStudent.result.grade === 'F'
+                                  ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
+                                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                              )}>
+                                Grade: {currentStudent.result.grade}
                               </Badge>
                             )}
                           </div>

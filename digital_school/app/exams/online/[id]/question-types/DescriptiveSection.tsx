@@ -393,8 +393,8 @@ export const DescriptiveSection = ({
 
                         {/* ── TABLE ── */}
                         {part.subType === 'table' && (
-                            <div className="overflow-x-auto rounded-xl border border-border mt-4">
-                                <table className="w-full text-sm">
+                            <div className="table-responsive-wrapper overflow-x-auto max-w-full touch-pan-x rounded-xl border border-border mt-4">
+                                <table className="w-full min-w-full text-sm">
                                     <thead className="bg-muted/50 border-b border-border">
                                         <tr>
                                             {(part.tableHeaders || []).map((h: string, hi: number) => (

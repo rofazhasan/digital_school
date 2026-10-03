@@ -530,15 +530,35 @@ export async function GET(
         ...submission,
         status: isSuspended ? 'SUSPENDED' : submission.status
       },
-      result: (result && (result.isPublished || isTeacher)) ? {
-        ...result,
-        source,
-        setName,
-        grade: result.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(result.percentage || 0, Number(exam.passMarks) || 33),
-        gpa: calculateGPA(result.percentage || 0, Number(exam.passMarks) || 33),
-        rank: rankCount + 1,
-        status: isSuspended ? 'SUSPENDED' : (result as any).status
-      } : (result ? { isPublished: false } : null),
+      result: (result && (result.isPublished || isTeacher)) ? (() => {
+        const passMark = Number(exam.passMarks) || 33;
+        const computedPercentage = exam.totalMarks > 0
+          ? calculatePercentage(result.total, exam.totalMarks)
+          : (result.percentage || 0);
+        const computedGrade = result.grade === 'F (Disqualified)'
+          ? 'F (Disqualified)'
+          : calculateGrade(computedPercentage, passMark);
+        const computedGpa = calculateGPA(computedPercentage, passMark);
+
+        // Self-heal stale result records in database asynchronously
+        if (result.percentage !== computedPercentage || result.grade !== computedGrade) {
+          prisma.result.update({
+            where: { id: result.id },
+            data: { percentage: computedPercentage, grade: computedGrade }
+          }).catch(err => console.error("Self-heal result update error:", err));
+        }
+
+        return {
+          ...result,
+          source,
+          setName,
+          percentage: computedPercentage,
+          grade: computedGrade,
+          gpa: computedGpa,
+          rank: rankCount + 1,
+          status: isSuspended ? 'SUSPENDED' : (result as any).status
+        };
+      })() : (result ? { isPublished: false } : null),
       reviewRequest,
       questions: processedQuestions,
       statistics: {

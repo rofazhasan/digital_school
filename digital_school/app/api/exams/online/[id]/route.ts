@@ -403,6 +403,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
       cqRequiredQuestions: exam.cqRequiredQuestions,
+      cqSubsections: exam.cqSubsections || null,
       sqTotalQuestions: exam.sqTotalQuestions,
       sqRequiredQuestions: exam.sqRequiredQuestions,
       mcqNegativeMarking: exam.mcqNegativeMarking,

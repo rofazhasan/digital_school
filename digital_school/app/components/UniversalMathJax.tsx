@@ -270,6 +270,19 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         return text;
     }, [processedText]);
 
+    // Ensure HTML tables are responsive and wrapped in a scrollable container for small screens
+    const finalHtml = useMemo(() => {
+        let html = renderedText;
+        if (html && html.includes('<table') && !html.includes('table-responsive-wrapper')) {
+            html = html.replace(/<table([\s\S]*?)<\/table>/gi, (match) => {
+                return `<div class="table-responsive-wrapper w-full max-w-full overflow-x-auto my-3 -mx-0.5 px-0.5 touch-pan-x rounded-xl border border-border/60 shadow-xs">${match}</div>`;
+            });
+        }
+        return html;
+    }, [renderedText]);
+
+    const hasTable = useMemo(() => Boolean(finalHtml && finalHtml.includes('<table')), [finalHtml]);
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss, safely guarded
@@ -291,12 +304,12 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         } catch (e) {}
     }, [renderedText, cacheVersion]);
 
-    if (inline) {
+    if (inline && !hasTable) {
         return (
             <span 
                 ref={containerRef as any}
-                className="inline-block whitespace-pre-line" 
-                dangerouslySetInnerHTML={{ __html: renderedText }} 
+                className="inline-block whitespace-pre-line max-w-full" 
+                dangerouslySetInnerHTML={{ __html: finalHtml }} 
             />
         );
     }
@@ -304,8 +317,8 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     return (
         <div 
             ref={containerRef}
-            className="block whitespace-pre-line" 
-            dangerouslySetInnerHTML={{ __html: renderedText }} 
+            className={`block max-w-full ${hasTable ? '' : 'whitespace-pre-line'}`} 
+            dangerouslySetInnerHTML={{ __html: finalHtml }} 
         />
     );
 }

@@ -450,6 +450,43 @@ mjx-container svg text {
   font-family: inherit !important;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                 Responsive Online Exam Tables (Small Screens)              */
+/* -------------------------------------------------------------------------- */
+
+.font-exam-online table,
+.prose table,
+.table-responsive-wrapper table {
+  width: 100% !important;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.table-responsive-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fallback: any direct table inside prose or font-exam-online scrolls horizontally */
+.font-exam-online :not(.table-responsive-wrapper) > table,
+.prose :not(.table-responsive-wrapper) > table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.font-exam-online table th,
+.font-exam-online table td,
+.prose table th,
+.prose table td {
+  padding: 0.5rem 0.75rem;
+  min-width: fit-content;
+}
+
 /* Line Clamp */
 .line-clamp-1 {
   display: -webkit-box;

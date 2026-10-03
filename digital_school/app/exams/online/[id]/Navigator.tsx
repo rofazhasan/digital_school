@@ -59,7 +59,7 @@ const NavButton = memo(({
 NavButton.displayName = 'NavButton';
 
 const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
-  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions, isMS, msSubjects, matchSubject } = useExamContext();
+  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions, isMS, msSubjects, matchSubject, exam, cqSubsections, hasCqSubsections } = useExamContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const questionList = sortedQuestions || questions || [];
@@ -157,11 +157,37 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
             ))
           ) : (
             <>
-              {/* Render CQ Group */}
-              {groupedQuestions?.creative?.length > 0 && renderGroup("Creative (CQ)", groupedQuestions.creative, 0)}
+              {/* Render CQ Group: partitioned if multiple subsections exist, otherwise standard unified view */}
+              {hasCqSubsections ? (
+                cqSubsections.map((sub: any, subIdx: number) => {
+                  const subCqs = (groupedQuestions?.creative || []).slice(sub.startIndex - 1, sub.endIndex);
+                  if (subCqs.length === 0) return null;
+                  const reqText = sub.requiredQuestions > 0 ? ` • কমপক্ষে ${toBengaliNumerals(sub.requiredQuestions)}টি` : '';
+                  const title = `${sub.name || `বিভাগ ${toBengaliNumerals(subIdx + 1)}`}${reqText}`;
+                  return (
+                    <React.Fragment key={subIdx}>
+                      {renderGroup(title, subCqs, sub.startIndex - 1)}
+                    </React.Fragment>
+                  );
+                })
+              ) : (
+                groupedQuestions?.creative?.length > 0 && renderGroup(
+                  (exam?.cqRequiredQuestions && exam?.cqRequiredQuestions > 0)
+                    ? `Creative (CQ) • যেকোনো ${toBengaliNumerals(exam.cqRequiredQuestions)}টি`
+                    : "Creative (CQ)",
+                  groupedQuestions.creative,
+                  0
+                )
+              )}
 
               {/* Render SQ Group */}
-              {groupedQuestions?.short?.length > 0 && renderGroup("Short (SQ)", groupedQuestions.short, 0)}
+              {groupedQuestions?.short?.length > 0 && renderGroup(
+                (exam?.sqRequiredQuestions && exam?.sqRequiredQuestions > 0)
+                  ? `Short (SQ) • যেকোনো ${toBengaliNumerals(exam.sqRequiredQuestions)}টি`
+                  : "Short (SQ)",
+                groupedQuestions.short,
+                0
+              )}
 
               {/* Render Objective Group */}
               {groupedQuestions?.objective?.length > 0 && renderGroup("Objective (MCQ)", groupedQuestions.objective, 0)}

@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { generateStudentScriptPDF } from "@/lib/script-pdf-generator";
+import { calculateGrade, calculatePercentage } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -87,7 +88,9 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Calculate ranks with proper tie handling
+    const passMark = Number(exam.passMarks) || 33;
+
+    // Calculate ranks with proper tie handling and ensure percentage and grade are dynamically updated
     const resultsWithRanks = allResults.map((result, index) => {
       const sameCount = allResults.filter(r => r.total === result.total).length;
       let rank = index + 1;
@@ -96,19 +99,30 @@ export async function POST(req: NextRequest) {
         rank = firstIndex + 1;
       }
 
+      const computedPercentage = exam.totalMarks > 0
+        ? calculatePercentage(result.total, exam.totalMarks)
+        : (result.percentage || 0);
+      const computedGrade = result.grade === 'F (Disqualified)'
+        ? 'F (Disqualified)'
+        : calculateGrade(computedPercentage, passMark);
+
       return {
         ...result,
-        rank
+        rank,
+        percentage: computedPercentage,
+        grade: computedGrade
       };
     });
 
-    // Update all results with ranks and publish them immediately
+    // Update all results with ranks, corrected percentage, corrected grade, and publish them immediately
     await Promise.all(
       resultsWithRanks.map(result =>
         prisma.result.update({
           where: { id: result.id },
           data: {
             rank: result.rank,
+            percentage: result.percentage,
+            grade: result.grade,
             isPublished: true,
             publishedAt: new Date()
           }

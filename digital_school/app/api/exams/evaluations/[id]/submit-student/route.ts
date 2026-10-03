@@ -17,9 +17,10 @@ export async function POST(
 
     // Check if user has access to this exam
     let exam;
-    if (tokenData.user.role === "SUPER_USER") {
+    if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
       exam = await prisma.exam.findUnique({
-        where: { id: examId }
+        where: { id: examId },
+        include: { examSets: true }
       });
     } else {
       exam = await prisma.exam.findFirst({
@@ -30,12 +31,27 @@ export async function POST(
               evaluatorId: tokenData.user.id
             }
           }
-        }
+        },
+        include: { examSets: true }
       });
     }
 
     if (!exam) {
       return NextResponse.json({ error: "Exam not found or access denied" }, { status: 404 });
+    }
+
+    const submission = await prisma.examSubmission.findUnique({
+      where: {
+        studentId_examId: {
+          studentId,
+          examId
+        }
+      }
+    });
+
+    if (submission) {
+      const { evaluateSubmission } = await import("@/lib/exam-logic");
+      await evaluateSubmission(submission, exam as any, exam.examSets, true, true);
     }
 
     // Mark the submission as evaluated

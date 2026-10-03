@@ -5,6 +5,7 @@ import { evaluateMCQuestion } from "@/lib/evaluation/mcEvaluation";
 import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
 import { evaluateARQuestion } from "@/lib/evaluation/arEvaluation";
 import { evaluateINTQuestion } from "@/lib/evaluation/intEvaluation";
+import { calculateGrade, calculatePercentage } from "@/lib/utils";
 
 export async function GET(
   req: NextRequest,
@@ -43,6 +44,8 @@ export async function GET(
         cqMarks: true,
         sqMarks: true,
         total: true,
+        percentage: true,
+        grade: true,
         isPublished: true
       }
     });
@@ -310,6 +313,16 @@ export async function GET(
           studentTotalMarks = Math.min(studentTotalMarks, exam.totalMarks);
         }
 
+        const dbResult = studentResultMap.get(submission.studentId);
+        const earnedTotal = dbResult?.total ?? evaluation.totalScore;
+        const passMark = Number(exam.passMarks) || 33;
+        const pct = exam.totalMarks > 0 
+          ? calculatePercentage(earnedTotal, exam.totalMarks)
+          : (dbResult?.percentage ?? evaluation.percentage ?? 0);
+        const resolvedGrade = (dbResult?.grade === 'F (Disqualified)' || evaluation.grade === 'F (Disqualified)')
+          ? 'F (Disqualified)'
+          : calculateGrade(pct, passMark);
+
         processedSubmissions.push({
           id: submission.id,
           student: {
@@ -321,15 +334,17 @@ export async function GET(
           answers: { ...submission.answers },
           submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
           totalMarks: studentTotalMarks,
-          earnedMarks: evaluation.totalScore,
+          earnedMarks: earnedTotal,
           status: evaluationStatus,
           evaluatorNotes: submission.evaluatorNotes || null,
           result: {
-            mcqMarks: evaluation.mcqMarks,
-            cqMarks: evaluation.cqMarks,
-            sqMarks: evaluation.sqMarks,
-            total: evaluation.totalScore,
-            isPublished: studentResultMap.get(submission.studentId)?.isPublished || false
+            mcqMarks: dbResult?.mcqMarks ?? evaluation.mcqMarks,
+            cqMarks: dbResult?.cqMarks ?? evaluation.cqMarks,
+            sqMarks: dbResult?.sqMarks ?? evaluation.sqMarks,
+            total: earnedTotal,
+            percentage: pct,
+            grade: resolvedGrade,
+            isPublished: dbResult?.isPublished || false
           },
           submissionStatus: submission.status,
           examSetId: examSetId

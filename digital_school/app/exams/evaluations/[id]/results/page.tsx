@@ -95,7 +95,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
 
                     const totalObtained = result.total !== undefined ? result.total : (mcq + cq + sq);
                     const percentage = data.totalMarks > 0 ? calculatePercentage(totalObtained, data.totalMarks) : 0;
-                    const grade = calculateGrade(percentage);
+                    const passMark = Number(data.passMarks) || 33;
+                    const grade = result.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark);
 
                     return {
                         submissionId: sub.id,

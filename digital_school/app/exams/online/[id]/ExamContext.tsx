@@ -147,10 +147,47 @@ export function ExamContextProvider({
     let preparedQuestions: any[];
 
     if (!isPropMS) {
-      // 100% UNTOUCHED FOR SS EXAMS AND OTHERS
-      preparedQuestions = examProp.shuffleQuestions !== false 
-        ? shuffleArrayWithSeed(origQuestions, seed) 
-        : origQuestions;
+      const rawSubsections = examProp.cqSubsections;
+      const parsedSubs: any[] = Array.isArray(rawSubsections)
+        ? rawSubsections
+        : typeof rawSubsections === 'string'
+          ? (() => { try { return JSON.parse(rawSubsections); } catch { return []; } })()
+          : [];
+      const hasCqPartitions = parsedSubs.length > 1;
+
+      if (hasCqPartitions) {
+        // Multiple subsections: maintain subsection order, but optionally shuffle within each subsection
+        const nonCq = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
+        const cqs = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+
+        const shuffledNonCq = examProp.shuffleQuestions !== false
+          ? shuffleArrayWithSeed(nonCq, `${seed}_noncq`)
+          : nonCq;
+
+        const partitionedCqs: any[] = [];
+        parsedSubs.forEach((sub: any, sIdx: number) => {
+          const subSlice = cqs.slice(sub.startIndex - 1, sub.endIndex);
+          if (subSlice.length > 0) {
+            const shuffledSub = examProp.shuffleQuestions !== false
+              ? shuffleArrayWithSeed(subSlice, `${seed}_cqsub_${sIdx}`)
+              : subSlice;
+            partitionedCqs.push(...shuffledSub);
+          }
+        });
+
+        // Any trailing CQs not covered by subsections
+        const maxCovered = parsedSubs.reduce((max: number, s: any) => Math.max(max, s.endIndex || 0), 0);
+        if (maxCovered < cqs.length) {
+          partitionedCqs.push(...cqs.slice(maxCovered));
+        }
+
+        preparedQuestions = [...shuffledNonCq, ...partitionedCqs];
+      } else {
+        // 100% UNTOUCHED FOR SS EXAMS AND OTHERS WITHOUT SUBSECTIONS
+        preparedQuestions = examProp.shuffleQuestions !== false 
+          ? shuffleArrayWithSeed(origQuestions, seed) 
+          : origQuestions;
+      }
     } else {
       // FOR MS EXAMS:
       // Keep questions strictly grouped by subject. If shuffling is enabled, shuffle WITHIN each subject.
@@ -627,6 +664,32 @@ export function ExamContextProvider({
     };
   }, [exam.questions]);
 
+  // CQ Subsections (Partitions) for Single-Subject Exams
+  const cqSubsections = useMemo(() => {
+    const raw = exam?.cqSubsections;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return [];
+  }, [exam?.cqSubsections]);
+
+  const hasCqSubsections = useMemo(() => {
+    return !isMS && Array.isArray(cqSubsections) && cqSubsections.length > 1;
+  }, [isMS, cqSubsections]);
+
+  const getCqSubsectionForQuestion = useCallback((q: any) => {
+    if (!hasCqSubsections || !q) return null;
+    const type = (q.type || q.questionType || '').toLowerCase();
+    if (type !== 'cq') return null;
+    const cqs = groupedQuestions?.creative || [];
+    const idx = cqs.findIndex((item: any) => item.id === q.id);
+    if (idx === -1) return null;
+    const qNum = idx + 1; // 1-based index among CQ questions
+    return cqSubsections.find((s: any) => qNum >= s.startIndex && qNum <= s.endIndex) || null;
+  }, [hasCqSubsections, groupedQuestions?.creative, cqSubsections]);
+
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
 
   // Track attempted optional subjects
@@ -782,7 +845,10 @@ export function ExamContextProvider({
     isExceedingOptional,
     optionalNotice,
     setOptionalNotice,
-    triggerOptionalNotice
+    triggerOptionalNotice,
+    cqSubsections,
+    hasCqSubsections,
+    getCqSubsectionForQuestion
   }), [
     exam,
     patchExam,
@@ -824,7 +890,10 @@ export function ExamContextProvider({
     attemptedSubjects,
     isExceedingOptional,
     optionalNotice,
-    triggerOptionalNotice
+    triggerOptionalNotice,
+    cqSubsections,
+    hasCqSubsections,
+    getCqSubsectionForQuestion
   ]);
 
   return (

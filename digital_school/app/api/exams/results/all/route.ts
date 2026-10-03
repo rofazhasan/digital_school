@@ -152,11 +152,11 @@ export async function GET(request: NextRequest) {
 
     // Recalculate Grade & GPA dynamically for "Insaaf"
     results = results.map((r: any) => {
-      const percentage = r.percentage || (r.exam.totalMarks > 0 ? (r.total / r.exam.totalMarks) * 100 : 0);
-      const passMark = Number(r.exam.passMarks) || 33;
+      const percentage = r.exam?.totalMarks > 0 ? (r.total / r.exam.totalMarks) * 100 : (r.percentage || 0);
+      const passMark = Number(r.exam?.passMarks) || 33;
       return {
         ...r,
-        grade: calculateGrade(percentage, passMark),
+        grade: r.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark),
         gpa: calculateGPA(percentage, passMark)
       };
     });

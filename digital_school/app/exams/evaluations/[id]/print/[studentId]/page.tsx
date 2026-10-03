@@ -7,6 +7,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { Loader2, Printer, ArrowLeft, Download } from 'lucide-react';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { Button } from '@/components/ui/button';
+import { calculateGrade } from '@/lib/utils';
 
 export default function StudentScriptPrintPage({ params }: { params: Promise<{ id: string; studentId: string }> }) {
     const { id: examId, studentId } = use(params);
@@ -298,12 +299,22 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
                 <main className="max-w-6xl mx-auto p-4 md:p-8 lg:p-12">
                     {/* Brief Performance Summary for Web View */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:hidden">
-                        {[
-                            { label: 'Total Mark', value: submission?.result?.total, sub: `/ ${examData?.totalMarks}`, color: 'text-slate-900 dark:text-white' },
-                            { label: 'Rank', value: rank ? `#${rank}` : 'N/A', sub: `of ${examData?.submissions?.length}`, color: 'text-amber-600' },
-                            { label: 'Grade', value: submission?.result?.grade || 'N/A', sub: 'Performance', color: 'text-emerald-600' },
-                            { label: 'Highest', value: highestMark, sub: 'In Class', color: 'text-blue-600' }
-                        ].map((stat, i) => (
+                        {(() => {
+                            const earnedTotal = submission?.result?.total ?? submission?.score ?? 0;
+                            const examTotal = examData?.totalMarks || 100;
+                            const pct = examTotal > 0 ? (earnedTotal / examTotal) * 100 : 0;
+                            const passMark = Number(examData?.passMarks) || 33;
+                            const displayGrade = submission?.result?.grade && submission.result.grade !== 'F'
+                                ? submission.result.grade
+                                : (pct >= passMark ? calculateGrade(pct, passMark) : (submission?.result?.grade || 'F'));
+
+                            return [
+                                { label: 'Total Mark', value: submission?.result?.total, sub: `/ ${examData?.totalMarks}`, color: 'text-slate-900 dark:text-white' },
+                                { label: 'Rank', value: rank ? `#${rank}` : 'N/A', sub: `of ${examData?.submissions?.length}`, color: 'text-amber-600' },
+                                { label: 'Grade', value: displayGrade, sub: 'Performance', color: 'text-emerald-600' },
+                                { label: 'Highest', value: highestMark, sub: 'In Class', color: 'text-blue-600' }
+                            ];
+                        })().map((stat, i) => (
                             <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{stat.label}</p>
                                 <div className="flex items-baseline gap-1">

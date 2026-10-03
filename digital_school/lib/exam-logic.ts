@@ -774,12 +774,19 @@ export async function releaseExamResults(examId: string) {
         data: { status: 'COMPLETED', reviewedAt: new Date() }
     });
 
+    const exam = await prisma.exam.findUnique({
+        where: { id: examId },
+        include: { class: true, examSets: true }
+    });
+
+    const passMark = Number(exam?.passMarks) || 33;
+
     const allResults = await prisma.result.findMany({
         where: { examId },
         orderBy: { total: 'desc' },
     });
 
-    // Calculate ranks
+    // Calculate ranks and dynamic percentage & grade
     const resultsWithRanks = allResults.map((result, index: number) => {
         const sameCount = allResults.filter(r => r.total === result.total).length;
         let rank = index + 1;
@@ -787,7 +794,20 @@ export async function releaseExamResults(examId: string) {
             const firstIndex = allResults.findIndex(r => r.total === result.total);
             rank = firstIndex + 1;
         }
-        return { id: result.id, rank };
+
+        const computedPercentage = exam?.totalMarks && exam.totalMarks > 0
+            ? calculatePercentage(result.total, exam.totalMarks)
+            : (result.percentage || 0);
+        const computedGrade = result.grade === 'F (Disqualified)'
+            ? 'F (Disqualified)'
+            : calculateGrade(computedPercentage, passMark);
+
+        return {
+            id: result.id,
+            rank,
+            percentage: computedPercentage,
+            grade: computedGrade
+        };
     });
 
     // 4. IDENTIFY RESULTS TO NOTIFY (Before update to detect changes)
@@ -821,6 +841,8 @@ export async function releaseExamResults(examId: string) {
             where: { id: item.id },
             data: {
                 rank: item.rank,
+                percentage: item.percentage,
+                grade: item.grade,
                 isPublished: true,
                 ...(needsPublishing && { publishedAt: now })
             }
@@ -831,11 +853,6 @@ export async function releaseExamResults(examId: string) {
 
     // --- EMAIL NOTIFICATION LOGIC ---
     try {
-        const exam = await prisma.exam.findUnique({
-            where: { id: examId },
-            include: { class: true, examSets: true }
-        });
-
         const institute = await prisma.institute.findFirst({
             select: { name: true, address: true, phone: true, logoUrl: true }
         });
