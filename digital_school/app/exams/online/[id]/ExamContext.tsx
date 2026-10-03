@@ -147,47 +147,17 @@ export function ExamContextProvider({
     let preparedQuestions: any[];
 
     if (!isPropMS) {
-      const rawSubsections = examProp.cqSubsections;
-      const parsedSubs: any[] = Array.isArray(rawSubsections)
-        ? rawSubsections
-        : typeof rawSubsections === 'string'
-          ? (() => { try { return JSON.parse(rawSubsections); } catch { return []; } })()
-          : [];
-      const hasCqPartitions = parsedSubs.length > 1;
+      // CQ questions MUST NEVER be shuffled because subsections define question ranges (e.g. 1 to 3, 4 to 6).
+      // Shuffling changes the section order and breaks which question number goes to which section.
+      const nonCq = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
+      const cqs = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
 
-      if (hasCqPartitions) {
-        // Multiple subsections: maintain subsection order, but optionally shuffle within each subsection
-        const nonCq = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
-        const cqs = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+      const shuffledNonCq = examProp.shuffleQuestions !== false
+        ? shuffleArrayWithSeed(nonCq, `${seed}_noncq`)
+        : nonCq;
 
-        const shuffledNonCq = examProp.shuffleQuestions !== false
-          ? shuffleArrayWithSeed(nonCq, `${seed}_noncq`)
-          : nonCq;
-
-        const partitionedCqs: any[] = [];
-        parsedSubs.forEach((sub: any, sIdx: number) => {
-          const subSlice = cqs.slice(sub.startIndex - 1, sub.endIndex);
-          if (subSlice.length > 0) {
-            const shuffledSub = examProp.shuffleQuestions !== false
-              ? shuffleArrayWithSeed(subSlice, `${seed}_cqsub_${sIdx}`)
-              : subSlice;
-            partitionedCqs.push(...shuffledSub);
-          }
-        });
-
-        // Any trailing CQs not covered by subsections
-        const maxCovered = parsedSubs.reduce((max: number, s: any) => Math.max(max, s.endIndex || 0), 0);
-        if (maxCovered < cqs.length) {
-          partitionedCqs.push(...cqs.slice(maxCovered));
-        }
-
-        preparedQuestions = [...shuffledNonCq, ...partitionedCqs];
-      } else {
-        // 100% UNTOUCHED FOR SS EXAMS AND OTHERS WITHOUT SUBSECTIONS
-        preparedQuestions = examProp.shuffleQuestions !== false 
-          ? shuffleArrayWithSeed(origQuestions, seed) 
-          : origQuestions;
-      }
+      // Keep CQs strictly in their authored order without any shuffling
+      preparedQuestions = [...shuffledNonCq, ...cqs];
     } else {
       // FOR MS EXAMS:
       // Keep questions strictly grouped by subject. If shuffling is enabled, shuffle WITHIN each subject.
@@ -224,19 +194,23 @@ export function ExamContextProvider({
         });
 
         if (subQuestions.length > 0) {
+          const subCqs = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+          const subNonCq = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
           const subShuffled = examProp.shuffleQuestions !== false
-            ? shuffleArrayWithSeed(subQuestions, `${seed}_sub_${subIdx}_${subName}`)
-            : subQuestions;
-          groupedResult.push(...subShuffled);
+            ? shuffleArrayWithSeed(subNonCq, `${seed}_sub_${subIdx}_${subName}`)
+            : subNonCq;
+          groupedResult.push(...subShuffled, ...subCqs);
         }
       });
 
       const remainingQuestions = origQuestions.filter((q: any) => q.id && !matchedIds.has(q.id));
       if (remainingQuestions.length > 0) {
+        const remCqs = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+        const remNonCq = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
         const remShuffled = examProp.shuffleQuestions !== false
-          ? shuffleArrayWithSeed(remainingQuestions, `${seed}_sub_rem`)
-          : remainingQuestions;
-        groupedResult.push(...remShuffled);
+          ? shuffleArrayWithSeed(remNonCq, `${seed}_sub_rem`)
+          : remNonCq;
+        groupedResult.push(...remShuffled, ...remCqs);
       }
 
       preparedQuestions = groupedResult;
@@ -683,11 +657,16 @@ export function ExamContextProvider({
     if (!hasCqSubsections || !q) return null;
     const type = (q.type || q.questionType || '').toLowerCase();
     if (type !== 'cq') return null;
-    const cqs = groupedQuestions?.creative || [];
+    const cqs = (groupedQuestions?.creative || []).filter((item: any) => (item.type || item.questionType || '').toLowerCase() === 'cq');
     const idx = cqs.findIndex((item: any) => item.id === q.id);
     if (idx === -1) return null;
     const qNum = idx + 1; // 1-based index among CQ questions
-    return cqSubsections.find((s: any) => qNum >= s.startIndex && qNum <= s.endIndex) || null;
+    const matched = cqSubsections.find((s: any) => qNum >= s.startIndex && qNum <= s.endIndex);
+    if (!matched) return null;
+    return {
+      ...matched,
+      cqNumber: qNum
+    };
   }, [hasCqSubsections, groupedQuestions?.creative, cqSubsections]);
 
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');

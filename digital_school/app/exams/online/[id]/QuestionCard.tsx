@@ -224,12 +224,17 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
               {cqSub && (
                 <Badge className="font-bold text-xs shadow-xs px-2.5 py-1 flex items-center gap-1.5 text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 border border-blue-400/30">
                   <Layers className="w-3 h-3" />
-                  <span>{cqSub.name}</span>
+                  <span>{cqSub.name} (প্রশ্ন {toBengaliNumerals(cqSub.startIndex)}-{toBengaliNumerals(cqSub.endIndex)})</span>
                   {cqSub.requiredQuestions > 0 && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-200">
                       কমপক্ষে {toBengaliNumerals(cqSub.requiredQuestions)}টি আবশ্যক
                     </span>
                   )}
+                </Badge>
+              )}
+              {cqSub?.cqNumber && (
+                <Badge variant="outline" className="text-xs font-bold text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30">
+                  প্রশ্ন নং {toBengaliNumerals(cqSub.cqNumber)}
                 </Badge>
               )}
               {!cqSub && !isMS && (exam?.cqRequiredQuestions || 0) > 0 && type === 'cq' && (

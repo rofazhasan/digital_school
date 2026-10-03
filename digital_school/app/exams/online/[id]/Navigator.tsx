@@ -5,6 +5,7 @@ import { useExamContext } from "./ExamContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { toBengaliNumerals } from "@/utils/numeralConverter";
 
 interface NavigatorProps {
   questions?: any[];
@@ -20,6 +21,7 @@ interface NavButtonProps {
   marked: boolean;
   onNavigate: (index: number) => void;
   isAnswered: boolean;
+  displayNumber?: number | string;
 }
 
 const NavButton = memo(({
@@ -28,7 +30,8 @@ const NavButton = memo(({
   currentIdx,
   marked,
   onNavigate,
-  isAnswered
+  isAnswered,
+  displayNumber
 }: NavButtonProps) => {
   const isCurrent = currentIdx === globalIdx;
 
@@ -48,7 +51,7 @@ const NavButton = memo(({
         }
       `}
     >
-      {localIdx + 1}
+      {displayNumber !== undefined ? displayNumber : localIdx + 1}
       {marked && (
         <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-background" />
       )}
@@ -98,7 +101,7 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
   }, [isMS, questionList, msSubjects, matchSubject]);
 
   // Helper to render a group of questions
-  const renderGroup = (title: string, groupQuestions: any[], startIndex: number) => {
+  const renderGroup = (title: string, groupQuestions: any[], startIndex: number = 0) => {
     if (!groupQuestions || groupQuestions.length === 0) return null;
 
     return (
@@ -118,10 +121,13 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
             const t = (q.type || "").toLowerCase();
             const hasSub = !hasDirect && ['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc'].includes(t) && Object.keys(answers).some(key => key.startsWith(`${q.id}_`) && answers[key] !== undefined && answers[key] !== null && String(answers[key]).trim() !== '');
 
+            const displayNumber = (startIndex !== undefined && startIndex >= 0) ? (startIndex + localIdx + 1) : (localIdx + 1);
+
             return (
               <NavButton
                 key={q.id}
                 localIdx={localIdx}
+                displayNumber={displayNumber}
                 globalIdx={globalIdx}
                 currentIdx={navigation.current || 0}
                 marked={!!navigation.marked[q.id]}
@@ -163,7 +169,8 @@ const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
                   const subCqs = (groupedQuestions?.creative || []).slice(sub.startIndex - 1, sub.endIndex);
                   if (subCqs.length === 0) return null;
                   const reqText = sub.requiredQuestions > 0 ? ` • কমপক্ষে ${toBengaliNumerals(sub.requiredQuestions)}টি` : '';
-                  const title = `${sub.name || `বিভাগ ${toBengaliNumerals(subIdx + 1)}`}${reqText}`;
+                  const rangeText = `প্রশ্ন ${toBengaliNumerals(sub.startIndex)}-${toBengaliNumerals(sub.endIndex)}`;
+                  const title = `${sub.name || `বিভাগ ${toBengaliNumerals(subIdx + 1)}`} (${rangeText})${reqText}`;
                   return (
                     <React.Fragment key={subIdx}>
                       {renderGroup(title, subCqs, sub.startIndex - 1)}

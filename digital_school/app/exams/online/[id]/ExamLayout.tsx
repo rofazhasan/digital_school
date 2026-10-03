@@ -1314,7 +1314,9 @@ export default function ExamLayout() {
                               <Layers className="w-4 h-4" />
                             </div>
                             <span className="font-semibold text-blue-950 dark:text-blue-200 text-sm">
-                              {hasCqSubsections && currentCqSub ? currentCqSub.name : 'সৃজনশীল প্রশ্ন (CQ)'}
+                              {hasCqSubsections && currentCqSub 
+                                ? `${currentCqSub.name} (প্রশ্ন ${toBengaliNumerals(currentCqSub.startIndex)}-${toBengaliNumerals(currentCqSub.endIndex)})` 
+                                : 'সৃজনশীল প্রশ্ন (CQ)'}
                             </span>
                             {hasCqSubsections && currentCqSub && (
                               <Badge variant="outline" className="bg-blue-100/70 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300 dark:border-blue-700 text-xs font-semibold px-2 py-0.5">
@@ -1349,8 +1351,8 @@ export default function ExamLayout() {
                                       : "bg-blue-100/60 text-blue-900 dark:bg-blue-900/30 dark:text-blue-300"
                                   )}
                                 >
-                                  {sub.name}
-                                  {sub.requiredQuestions > 0 && ` (কমপক্ষে ${toBengaliNumerals(sub.requiredQuestions)}টি)`}
+                                  {sub.name} (প্রশ্ন {toBengaliNumerals(sub.startIndex)}-${toBengaliNumerals(sub.endIndex)})
+                                  {sub.requiredQuestions > 0 && ` • কমপক্ষে ${toBengaliNumerals(sub.requiredQuestions)}টি`}
                                 </span>
                               );
                             })}
