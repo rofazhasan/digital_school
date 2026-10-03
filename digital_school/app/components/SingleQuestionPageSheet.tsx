@@ -51,9 +51,10 @@ const MathText = ({ children }: { children: any }) => {
   } else if (children && typeof children === 'object') {
     content = children.text || children.prompt || children.question || children.questionText || children.title || '';
   }
+  const hasTable = typeof content === 'string' && content.includes('<table');
   return (
-    <span className="whitespace-pre-wrap inline-block max-w-full">
-      <UniversalMathJax inline dynamic>
+    <span className={hasTable ? "block max-w-full whitespace-normal my-0.5" : "whitespace-pre-wrap inline-block max-w-full"}>
+      <UniversalMathJax inline={!hasTable} dynamic>
         {cleanupMath(content)}
       </UniversalMathJax>
     </span>

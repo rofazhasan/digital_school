@@ -128,6 +128,53 @@
     font-size: 1em !important;
   }
 
+  /* Compact & Minimal HTML Table Styles for Print & Booklets */
+  .table-responsive-wrapper {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 2px 0 3px 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    page-break-inside: avoid;
+  }
+
+  .table-responsive-wrapper > br,
+  .table-responsive-wrapper + br,
+  br + .table-responsive-wrapper {
+    display: none !important;
+  }
+
+  .table-responsive-wrapper table,
+  .question-paper-container table,
+  .answer-paper-container table {
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 2px auto !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000 !important;
+    font-size: 8.5pt !important;
+    line-height: 1.25 !important;
+    page-break-inside: avoid;
+  }
+
+  .table-responsive-wrapper th,
+  .table-responsive-wrapper td,
+  .question-paper-container table th,
+  .question-paper-container table td,
+  .answer-paper-container table th,
+  .answer-paper-container table td {
+    border: 1px solid #000 !important;
+    padding: 2px 5px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: normal !important;
+  }
+
   /* MCQ Two-Column Layout using CSS Columns */
   /* RESTORED: This is what the user asked for */
   .mcq-container {
@@ -693,5 +740,46 @@
   .booklet-sheet.letter-paper {
     max-width: 1050px !important;
     min-height: 680px;
+  }
+
+  .booklet-sheet .table-responsive-wrapper,
+  .print-page-container .table-responsive-wrapper {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 2px 0 3px 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .booklet-sheet .table-responsive-wrapper > br,
+  .print-page-container .table-responsive-wrapper > br {
+    display: none !important;
+  }
+
+  .booklet-sheet table,
+  .print-page-container table {
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 2px auto !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000 !important;
+    font-size: 8.5pt !important;
+    line-height: 1.25 !important;
+  }
+
+  .booklet-sheet th,
+  .booklet-sheet td,
+  .print-page-container th,
+  .print-page-container td {
+    border: 1px solid #000 !important;
+    padding: 2px 5px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: normal !important;
   }
 }

@@ -190,11 +190,14 @@ const normalizeAnswer = (ans: string | undefined | number) => {
 };
 
 // Helper to render text with MathJax
-const Text = ({ children }: { children: string }) => (
-  <span className="whitespace-pre-wrap">
-    <UniversalMathJax dynamic inline>{cleanupMath((children || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-  </span>
-);
+const Text = ({ children }: { children: string }) => {
+  const hasTable = typeof children === 'string' && children.includes('<table');
+  return (
+    <span className={hasTable ? "block max-w-full whitespace-normal my-0.5" : "whitespace-pre-wrap"}>
+      <UniversalMathJax dynamic inline={!hasTable}>{cleanupMath((children || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+    </span>
+  );
+};
 
 // Helper to detect specific variant or compound subject configurations (e.g., "Only Biology", "Bio + Math", "(25 Qs)")
 const isSpecificVariantSubject = (name: string): boolean => {

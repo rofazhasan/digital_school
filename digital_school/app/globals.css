@@ -518,15 +518,39 @@ mjx-container svg text {
 /*                 Responsive Online & Print Exam Tables                      */
 /* -------------------------------------------------------------------------- */
 
+/* Responsive table wrapper: minimal, zero extra margins, no border card */
+.table-responsive-wrapper {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.25rem 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  white-space: normal !important;
+}
+
+/* Hide any stray foster-parented br tags inside or adjacent to table wrappers */
+.table-responsive-wrapper > br,
+.table-responsive-wrapper + br,
+br + .table-responsive-wrapper {
+  display: none !important;
+}
+
 /* Consistent Bangla typography inside all tables */
 table,
-.table-responsive-wrapper,
 .table-responsive-wrapper table,
 .prose table {
-  width: 100% !important;
-  max-width: 100%;
   border-collapse: collapse;
   font-family: inherit !important;
+}
+
+.table-responsive-wrapper table {
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0.2rem auto !important;
 }
 
 table th,
@@ -535,7 +559,7 @@ table td,
 .table-responsive-wrapper td,
 .prose table th,
 .prose table td {
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   min-width: fit-content;
   font-family: inherit !important;
   font-feature-settings: "liga" 1, "clig" 1 !important;
@@ -551,6 +575,18 @@ table td,
   font-family: 'ExamFont', 'Noto Serif Bengali', 'Bookman Old Style', 'Book Antiqua', 'Georgia', serif !important;
 }
 
+.font-exam-paper .table-responsive-wrapper table {
+  margin: 0.15rem auto !important;
+  border: 1px solid #334155;
+}
+
+.font-exam-paper .table-responsive-wrapper th,
+.font-exam-paper .table-responsive-wrapper td {
+  padding: 2.5px 6px !important;
+  border: 1px solid #334155;
+  text-align: center;
+}
+
 .font-exam-online table,
 .font-exam-online table th,
 .font-exam-online table td,
@@ -560,11 +596,15 @@ table td,
   font-family: var(--font-inter), var(--font-tiro-bangla), var(--font-hind-siliguri), sans-serif !important;
 }
 
-.table-responsive-wrapper {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch;
+.font-exam-online .table-responsive-wrapper table {
+  border: 1px solid #cbd5e1;
+}
+
+.font-exam-online .table-responsive-wrapper th,
+.font-exam-online .table-responsive-wrapper td {
+  padding: 4px 8px !important;
+  border: 1px solid #e2e8f0;
+  text-align: center;
 }
 
 /* Fallback: any direct table inside prose or font-exam-online scrolls horizontally */

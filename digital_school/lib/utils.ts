@@ -197,6 +197,43 @@ const LATEX_N_COMMANDS = '(?:abla|atural|earrow|eq(?![a-zA-Z])|e(?![a-zA-Z])|eg(
 const LITERAL_N_REGEX = new RegExp(`\\\\+n(?!${LATEX_N_COMMANDS})`, 'g');
 
 /**
+ * Sanitizes an HTML table string by stripping foster-parentable line breaks
+ * and whitespace between structural table tags, ensuring compact rendering.
+ */
+export function sanitizeHtmlTable(tableHtml: string): string {
+  if (!tableHtml || !tableHtml.includes('<table')) return tableHtml;
+
+  return tableHtml
+    // Remove all <br> tags placed inside structural table tags
+    .replace(/(<\/?(?:table|thead|tbody|tfoot|tr|colgroup|col)[^>]*>)\s*(?:<br\s*\/?>|\r?\n|\r)+\s*/gi, '$1')
+    .replace(/\s*(?:<br\s*\/?>|\r?\n|\r)+\s*(<\/?(?:table|thead|tbody|tfoot|tr|colgroup|col|th|td)[^>]*>)/gi, '$1')
+    // Remove newlines and whitespace between structural tags
+    .replace(/(>)\s*[\r\n]+\s*(<)/g, '$1$2')
+    // Strip leading/trailing <br> inside cells
+    .replace(/(<(?:th|td)[^>]*>)\s*(?:<br\s*\/?>|\r?\n|\r)+/gi, '$1')
+    .replace(/(?:<br\s*\/?>|\r?\n|\r)+\s*(<\/(?:th|td)>)/gi, '$1');
+}
+
+function cleanupTableContent(tableStr: string): string {
+  // Clean math inside table cells while keeping structural tags intact
+  return tableStr.replace(/(<t[dh][^>]*>)([\s\S]*?)(<\/t[dh]>)/gi, (_, openTag, innerContent, closeTag) => {
+    // Process math within this cell
+    const cellCleaned = innerContent
+      .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$')
+      .replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+      .replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g, (mathMatch: string) => {
+        // Wrap Bangla in \text{}
+        return mathMatch.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (m: string, banglaText: string, offset: number, fullString: string) => {
+          const before = fullString.slice(0, offset);
+          if (/\\text\s*\{$/.test(before)) return m;
+          return `\\text{${m}}`;
+        });
+      });
+    return `${openTag}${cellCleaned}${closeTag}`;
+  });
+}
+
+/**
  * Processes custom formatting markers from the Excel template
  * Handles:
  * - || -> <br /> (Line break / Poetry)
@@ -208,6 +245,16 @@ export function applyFormatting(text: string | null | undefined): string {
   if (!text) return "";
 
   let processed = text;
+
+  // Protect complete HTML tables during formatting
+  const tablePlaceholders: string[] = [];
+  if (processed.includes('<table')) {
+    processed = processed.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+      const idx = tablePlaceholders.length;
+      tablePlaceholders.push(sanitizeHtmlTable(match));
+      return `@@@HTML_TABLE_PLACEHOLDER_${idx}@@@`;
+    });
+  }
 
   // 1. Line Breaks (||)
   processed = processed.replace(/\|\|/g, '<br />');
@@ -226,6 +273,19 @@ export function applyFormatting(text: string | null | undefined): string {
   // 5. Fill in the blanks (___)
   processed = processed.replace(/___/g, '<span class="inline-block border-b-2 border-current min-w-[60px] mx-1" style="vertical-align: baseline;">&nbsp;</span>');
 
+  // Restore protected tables and collapse redundant <br /> tags directly adjacent to them
+  if (tablePlaceholders.length > 0) {
+    for (let i = 0; i < tablePlaceholders.length; i++) {
+      const placeholder = `@@@HTML_TABLE_PLACEHOLDER_${i}@@@`;
+      // Collapse multiple <br /> before/after placeholder
+      const regexBefore = new RegExp(`(?:<br\\s*\\/?>\\s*)+${placeholder}`, 'g');
+      processed = processed.replace(regexBefore, placeholder);
+      const regexAfter = new RegExp(`${placeholder}(?:\\s*<br\\s*\\/?>)+`, 'g');
+      processed = processed.replace(regexAfter, placeholder);
+      processed = processed.replace(placeholder, tablePlaceholders[i]);
+    }
+  }
+
   return processed;
 }
 
@@ -242,8 +302,8 @@ export function cleanupMath(text: string | null | undefined): string {
   let raw = text.trim();
 
   // Auto-delimit raw math/chemical expressions missing $...$
-  // BUT only if it is a single-line expression without newlines or pipes
-  if (!raw.includes('$') && !/[\r\n]|\\n|\|\|/.test(raw)) {
+  // BUT only if it is a single-line expression without newlines, pipes, or HTML tables
+  if (!raw.includes('$') && !/[\r\n]|\\n|\|\||<table/i.test(raw)) {
     const hasMathTokens = /\\(frac|sqrt|cdot|times|pm|pi|alpha|beta|theta|gamma|Delta|omega|sigma|partial|int|sum|infty|text|mathrm|mathbf)|(\^[0-9a-zA-Z+-]+)|(\^\{[^{}]+\})|(_[0-9a-zA-Z+-]+)|(_{0,1}\{[^{}]+\})/i.test(raw);
     if (hasMathTokens) {
       // Format ion charges & simple powers before wrapping: e.g. D^2+ -> D^{2+}
@@ -259,7 +319,17 @@ export function cleanupMath(text: string | null | undefined): string {
     .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$')
     .replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 
-  // 2. Process display math ($$...$$) first, then inline math ($...$)
+  // 2. Protect complete HTML tables so split on math delimiters ($...$) does not fragment table tags into applyFormatting
+  const tables: string[] = [];
+  if (normalized.includes('<table')) {
+    normalized = normalized.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+      const idx = tables.length;
+      tables.push(sanitizeHtmlTable(cleanupTableContent(match)));
+      return `@@@CLEANUP_MATH_TABLE_${idx}@@@`;
+    });
+  }
+
+  // 3. Process display math ($$...$$) first, then inline math ($...$)
   // We use regex split to separate math blocks from plain text
   const parts = normalized.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
 
@@ -293,6 +363,26 @@ export function cleanupMath(text: string | null | undefined): string {
   });
 
   let processed = processedParts.join('');
+
+  // 4. Restore protected HTML tables and collapse any redundant adjacent <br /> tags
+  if (tables.length > 0) {
+    for (let i = 0; i < tables.length; i++) {
+      const placeholder = `@@@CLEANUP_MATH_TABLE_${i}@@@`;
+      // Collapse multiple <br /> before/after placeholder
+      const regexBefore = new RegExp(`(?:<br\\s*\\/?>\\s*)+${placeholder}`, 'g');
+      processed = processed.replace(regexBefore, placeholder);
+      const regexAfter = new RegExp(`${placeholder}(?:\\s*<br\\s*\\/?>)+`, 'g');
+      processed = processed.replace(regexAfter, placeholder);
+      processed = processed.replace(placeholder, tables[i]);
+    }
+  }
+
+  // 5. Final safety check on any tables (including partial or nested)
+  if (processed.includes('<table')) {
+    processed = processed.replace(/<table[\s\S]*?<\/table>/gi, (match) => sanitizeHtmlTable(match));
+    processed = processed.replace(/(?:<br\s*\/?>\s*)+(<table[^>]*>)/gi, '$1');
+    processed = processed.replace(/(<\/table>)\s*(?:<br\s*\/?>\s*)+/gi, '$1');
+  }
 
   // Fallback for Bangla text in explicit LaTeX tables
   const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;

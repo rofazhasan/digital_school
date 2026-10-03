@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, sanitizeHtmlTable } from "@/lib/utils";
 
 declare global {
     interface Window {
@@ -270,13 +270,21 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         return text;
     }, [processedText]);
 
-    // Ensure HTML tables are responsive and wrapped in a scrollable container for small screens
+    // Ensure HTML tables are responsive, compact, and wrapped in a clean minimal container
     const finalHtml = useMemo(() => {
         let html = renderedText;
-        if (html && html.includes('<table') && !html.includes('table-responsive-wrapper')) {
-            html = html.replace(/<table([\s\S]*?)<\/table>/gi, (match) => {
-                return `<div class="table-responsive-wrapper w-full max-w-full overflow-x-auto my-3 -mx-0.5 px-0.5 touch-pan-x rounded-xl border border-border/60 shadow-xs">${match}</div>`;
-            });
+        if (html && html.includes('<table')) {
+            if (!html.includes('table-responsive-wrapper')) {
+                html = html.replace(/<table([\s\S]*?)<\/table>/gi, (match) => {
+                    const cleaned = sanitizeHtmlTable(match);
+                    return `<div class="table-responsive-wrapper w-full max-w-full overflow-x-auto my-1 touch-pan-x">${cleaned}</div>`;
+                });
+            } else {
+                html = html.replace(/<table([\s\S]*?)<\/table>/gi, (match) => sanitizeHtmlTable(match));
+            }
+            // Strip any rogue br tags that could have leaked right next to table containers
+            html = html.replace(/(?:<br\s*\/?>\s*)+(<div class="table-responsive-wrapper[^>]*>)/gi, '$1');
+            html = html.replace(/(<\/div>)\s*(?:<br\s*\/?>\s*)+/gi, '$1');
         }
         return html;
     }, [renderedText]);
@@ -317,7 +325,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     return (
         <div 
             ref={containerRef}
-            className={`block max-w-full ${hasTable ? '' : 'whitespace-pre-line'}`} 
+            className={`block max-w-full ${hasTable ? 'whitespace-normal' : 'whitespace-pre-line'}`} 
             dangerouslySetInnerHTML={{ __html: finalHtml }} 
         />
     );

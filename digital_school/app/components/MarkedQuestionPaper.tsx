@@ -193,9 +193,10 @@ const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', '�
 
 const Text = ({ children }: { children: React.ReactNode }) => {
     const content = typeof children === 'string' ? children.replace(/\|\|/g, '\n') : children;
+    const hasTable = typeof content === 'string' && content.includes('<table');
     return (
-        <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper whitespace-pre-wrap break-words">
-            <UniversalMathJax inline dynamic>{typeof content === 'string' ? cleanupMath(content) : content}</UniversalMathJax>
+        <div className={`align-middle max-w-full overflow-x-auto custom-mathjax-wrapper ${hasTable ? 'block whitespace-normal my-0.5' : 'inline-block whitespace-pre-wrap break-words'}`}>
+            <UniversalMathJax inline={!hasTable} dynamic>{typeof content === 'string' ? cleanupMath(content) : content}</UniversalMathJax>
         </div>
     );
 };

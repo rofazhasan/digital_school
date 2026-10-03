@@ -143,13 +143,16 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 // Helper to render text with diagrams support
-const Text = ({ children }: { children: string }) => (
-  <span className="whitespace-pre-wrap">
-    <UniversalMathJax inline dynamic>
-      {cleanupMath((children || "").replace(/\|\|/g, '\n'))}
-    </UniversalMathJax>
-  </span>
-);
+const Text = ({ children }: { children: string }) => {
+  const hasTable = typeof children === 'string' && children.includes('<table');
+  return (
+    <span className={hasTable ? "block max-w-full whitespace-normal my-0.5" : "whitespace-pre-wrap"}>
+      <UniversalMathJax inline={!hasTable} dynamic>
+        {cleanupMath((children || "").replace(/\|\|/g, '\n'))}
+      </UniversalMathJax>
+    </span>
+  );
+};
 
 
 // 100+ beautiful Bangla words for set label decoration
