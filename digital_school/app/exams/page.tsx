@@ -822,6 +822,15 @@ export default function ExamsPage() {
                   <Printer className="h-4 w-4 mr-1.5 text-blue-600 dark:text-blue-400" />
                   Bulk Print
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/bulk-result')}
+                  className="rounded-xl border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/30 font-semibold text-emerald-700 dark:text-emerald-300 shadow-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all"
+                >
+                  <BarChart3 className="h-4 w-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+                  Bulk Result
+                </Button>
                 {userRole !== 'TEACHER' && (
                   <Button
                     onClick={handleCreate}
@@ -1254,6 +1263,14 @@ export default function ExamsPage() {
                     Bulk Print ({selectedExams.length})
                   </Button>
                   <Button
+                    size="sm"
+                    onClick={() => router.push(`/exams/bulk-result?ids=${selectedExams.join(',')}`)}
+                    className="h-8 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 mr-1" />
+                    Bulk Result ({selectedExams.length})
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedExams([])}
@@ -1438,9 +1455,9 @@ export default function ExamsPage() {
                                       </>
                                     )}
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/bulk-result?ids=${exam.id}`)}>
                                     <BarChart3 className="w-4 h-4 text-emerald-500" />
-                                    <span>View Results</span>
+                                    <span>Open in Bulk Result Hub</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => window.open(`/exams/${exam.id}/print`, '_blank')}>
                                     <Printer className="w-4 h-4 text-violet-500" />
