@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
-import { calculateGrade, calculateGPA } from '@/lib/utils';
+import { calculateGrade, calculateGPA, getPassPercentage } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 
@@ -227,9 +227,9 @@ async function generateResultsPDF(data: PDFData): Promise<Buffer> {
     const rowHeight = 8;
 
     const percentage = result.percentage || (exam.totalMarks > 0 ? (result.total / exam.totalMarks) * 100 : 0);
-    const passMark = Number(exam.passMarks) || 33;
-    const grade = calculateGrade(percentage, passMark);
-    const gpa = calculateGPA(percentage, passMark);
+    const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
+    const grade = calculateGrade(percentage, passMark, exam.totalMarks);
+    const gpa = calculateGPA(percentage, passMark, exam.totalMarks);
 
     // Data preparation
     const rowData = [

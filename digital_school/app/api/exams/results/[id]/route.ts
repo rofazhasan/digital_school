@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
-import { calculateGrade, calculateGPA, calculatePercentage } from '@/lib/utils';
+import { calculateGrade, calculateGPA, calculatePercentage, getPassPercentage } from '@/lib/utils';
 import { evaluateMCQuestion } from '@/lib/evaluation/mcEvaluation';
 import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
 import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
@@ -531,14 +531,14 @@ export async function GET(
         status: isSuspended ? 'SUSPENDED' : submission.status
       },
       result: (result && (result.isPublished || isTeacher)) ? (() => {
-        const passMark = Number(exam.passMarks) || 33;
+        const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
         const computedPercentage = exam.totalMarks > 0
           ? calculatePercentage(result.total, exam.totalMarks)
           : (result.percentage || 0);
         const computedGrade = result.grade === 'F (Disqualified)'
           ? 'F (Disqualified)'
-          : calculateGrade(computedPercentage, passMark);
-        const computedGpa = calculateGPA(computedPercentage, passMark);
+          : calculateGrade(computedPercentage, passMark, exam.totalMarks);
+        const computedGpa = calculateGPA(computedPercentage, passMark, exam.totalMarks);
 
         // Self-heal stale result records in database asynchronously
         if (result.percentage !== computedPercentage || result.grade !== computedGrade) {

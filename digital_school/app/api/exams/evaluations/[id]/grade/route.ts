@@ -196,7 +196,7 @@ export async function POST(
 
     // Use centralized evaluation logic to recalculate total score and marks by type
     const { evaluateSubmission } = await import("@/lib/exam-logic");
-    const { calculateGrade, calculatePercentage } = await import("@/lib/utils");
+    const { calculateGrade, calculatePercentage, getPassPercentage } = await import("@/lib/utils");
     const evaluation = await evaluateSubmission(
       { ...submission, answers: updatedAnswers as any },
       exam,
@@ -209,13 +209,13 @@ export async function POST(
     const cqMarks = evaluation.cqMarks ?? 0;
     const sqMarks = evaluation.sqMarks ?? 0;
 
-    const passMark = Number(exam.passMarks) || 33;
+    const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
     const computedPercentage = exam.totalMarks > 0
       ? calculatePercentage(totalScore, exam.totalMarks)
       : (evaluation.percentage || 0);
     const computedGrade = evaluation.grade === 'F (Disqualified)'
       ? 'F (Disqualified)'
-      : calculateGrade(computedPercentage, passMark);
+      : calculateGrade(computedPercentage, passMark, exam.totalMarks);
 
     await prisma.examSubmission.update({
       where: {

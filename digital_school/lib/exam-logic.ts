@@ -1,5 +1,5 @@
 import prisma from "@/lib/db";
-import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
 import { evaluateMCQuestion, MCQuestion, MCAnswer } from "./evaluation/mcEvaluation";
 import { evaluateINTQuestion, INTQuestion, INTAnswer } from "./evaluation/intEvaluation";
 import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluation";
@@ -744,15 +744,24 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     // 4. Update Submission
     const percentage = isDisqualified ? 0 : calculatePercentage(totalScore, exam.totalMarks);
-    const passMark = Number(exam.passMarks) || 33;
-    const grade = isDisqualified ? "F (Disqualified)" : calculateGrade(percentage, passMark);
+    const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
+    const containsCqSq = hasCqSqQuestions(exam, examSets);
+    const isSubjectivePending = containsCqSq && !submission.evaluatedAt;
+    const grade = isDisqualified 
+        ? "F (Disqualified)" 
+        : (isSubjectivePending && percentage < passMark 
+            ? "Pending Evaluation" 
+            : calculateGrade(percentage, passMark, exam.totalMarks));
 
     if (saveToDb) {
         const updateData: any = {
             answers: answers as any, // Include populated _marks
             score: totalScore, // Keep score for backward compatibility
-            evaluatedAt: new Date()
         };
+
+        if (!containsCqSq || submission.evaluatedAt) {
+            updateData.evaluatedAt = submission.evaluatedAt || new Date();
+        }
 
         if (isDisqualified) {
             updateData.exceededQuestionLimit = true;
@@ -823,7 +832,7 @@ export async function releaseExamResults(examId: string) {
         include: { class: true, examSets: true }
     });
 
-    const passMark = Number(exam?.passMarks) || 33;
+    const passMark = getPassPercentage(exam?.passMarks, exam?.totalMarks);
 
     const allResults = await prisma.result.findMany({
         where: { examId },
@@ -844,7 +853,7 @@ export async function releaseExamResults(examId: string) {
             : (result.percentage || 0);
         const computedGrade = result.grade === 'F (Disqualified)'
             ? 'F (Disqualified)'
-            : calculateGrade(computedPercentage, passMark);
+            : calculateGrade(computedPercentage, passMark, exam?.totalMarks);
 
         return {
             id: result.id,

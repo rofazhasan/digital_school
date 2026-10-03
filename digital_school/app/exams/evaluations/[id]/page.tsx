@@ -4017,14 +4017,20 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               </Badge>
                             )}
                             {currentStudent?.result?.grade && !currentStudent?.result?.grade?.includes('Disqualified') && (
-                              <Badge variant="outline" className={cn(
-                                "font-bold text-xs px-2.5 py-0.5",
-                                currentStudent.result.grade === 'F'
-                                  ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
-                                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
-                              )}>
-                                Grade: {currentStudent.result.grade}
-                              </Badge>
+                              currentStudent.result.grade === 'Pending Evaluation' ? (
+                                <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-bold text-xs px-2.5 py-0.5">
+                                  মূল্যায়ন অপেক্ষমান
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className={cn(
+                                  "font-bold text-xs px-2.5 py-0.5",
+                                  currentStudent.result.grade === 'F'
+                                    ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
+                                    : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                                )}>
+                                  Grade: {currentStudent.result.grade}
+                                </Badge>
+                              )
                             )}
                           </div>
                           <div className="text-sm font-medium text-blue-700 bg-blue-100/50 px-2 py-1 rounded">

@@ -47,14 +47,65 @@ export function normalizePhone(phone: string): string {
 }
 
 /**
+ * Resolves the effective passing percentage threshold (0-100).
+ * Handles raw pass marks (e.g. 92 out of 230 total marks => 40%) 
+ * as well as direct percentage pass marks (e.g. 33 or 40).
+ */
+export function getPassPercentage(passMarks?: number | null, totalMarks?: number | null): number {
+  const rawPass = Number(passMarks);
+  const total = Number(totalMarks);
+
+  if (isNaN(rawPass) || rawPass <= 0) {
+    return 33;
+  }
+
+  // If totalMarks is specified and > 0:
+  if (!isNaN(total) && total > 0) {
+    // If rawPass is <= total, it represents points out of totalMarks
+    // e.g. 92 out of 230 => (92 / 230) * 100 = 40%
+    // e.g. 33 out of 100 => 33%
+    // e.g. 17 out of 50 => 34%
+    if (rawPass <= total) {
+      return Math.round((rawPass / total) * 10000) / 100;
+    }
+  }
+
+  // If rawPass is already a percentage <= 100
+  if (rawPass <= 100) {
+    // Standard passing thresholds in Bangladesh are at most 60%.
+    // If rawPass > 60 without totalMarks, it is almost certainly raw points,
+    // so return standard 33% fallback to prevent false fail.
+    if (rawPass > 60) {
+      return 33;
+    }
+    return rawPass;
+  }
+
+  return 33;
+}
+
+/**
  * Calculate grade based on percentage and pass mark.
  * Standard scale: 80+=A+, 70+=A, 60+=A-, 50+=B, 40+=C, Pass+=D, <Pass=F.
  * @param percentage - The percentage score (0-100)
- * @param passMark - The passing threshold (default: 33)
+ * @param passMark - The passing threshold (default: 33). Can be a percentage or raw marks if totalMarks is provided.
+ * @param totalMarks - Optional total marks of the exam to normalize raw pass marks.
  * @returns The grade (A+, A, A-, B, C, D, F)
  */
-export function calculateGrade(percentage: number, passMark: number = 33): string {
-  if (percentage < passMark) {
+export function calculateGrade(percentage: number, passMark: number = 33, totalMarks?: number): string {
+  let effectivePassMark = Number(passMark);
+  if (isNaN(effectivePassMark) || effectivePassMark <= 0) {
+    effectivePassMark = 33;
+  }
+
+  if (totalMarks && totalMarks > 0 && effectivePassMark <= totalMarks) {
+    effectivePassMark = (effectivePassMark / totalMarks) * 100;
+  } else if (effectivePassMark > 60) {
+    // Pass mark > 60% without totalMarks is almost certainly raw marks
+    effectivePassMark = 33;
+  }
+
+  if (percentage < effectivePassMark) {
     return 'F';
   }
   if (percentage >= 80) {
@@ -86,8 +137,19 @@ export function calculateGrade(percentage: number, passMark: number = 33): strin
  * D : 1.00 (Pass-39)
  * F : 0.00 (<Pass)
  */
-export function calculateGPA(percentage: number, passMark: number = 33): number {
-  if (percentage < passMark) return 0.00;
+export function calculateGPA(percentage: number, passMark: number = 33, totalMarks?: number): number {
+  let effectivePassMark = Number(passMark);
+  if (isNaN(effectivePassMark) || effectivePassMark <= 0) {
+    effectivePassMark = 33;
+  }
+
+  if (totalMarks && totalMarks > 0 && effectivePassMark <= totalMarks) {
+    effectivePassMark = (effectivePassMark / totalMarks) * 100;
+  } else if (effectivePassMark > 60) {
+    effectivePassMark = 33;
+  }
+
+  if (percentage < effectivePassMark) return 0.00;
   if (percentage >= 80) return 5.00;
 
   // Segment definitions for linear mapping
@@ -96,7 +158,7 @@ export function calculateGPA(percentage: number, passMark: number = 33): number 
     { start: 60, end: 70, minGPA: 3.50, maxGPA: 4.00 },
     { start: 50, end: 60, minGPA: 3.00, maxGPA: 3.50 },
     { start: 40, end: 50, minGPA: 2.00, maxGPA: 3.00 },
-    { start: passMark, end: 40, minGPA: 1.00, maxGPA: 2.00 },
+    { start: effectivePassMark, end: 40, minGPA: 1.00, maxGPA: 2.00 },
   ];
 
   // Find the appropriate segment

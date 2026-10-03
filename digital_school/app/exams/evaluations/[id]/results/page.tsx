@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Download, Trophy, Medal, Award } from "lucide-react";
 import { toast } from "sonner";
-import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
 
 interface ExamResult {
     rank: number;
@@ -95,8 +95,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
 
                     const totalObtained = result.total !== undefined ? result.total : (mcq + cq + sq);
                     const percentage = data.totalMarks > 0 ? calculatePercentage(totalObtained, data.totalMarks) : 0;
-                    const passMark = Number(data.passMarks) || 33;
-                    const grade = result.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark);
+                    const passMark = getPassPercentage(data.passMarks, data.totalMarks);
+                    const grade = result.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark, data.totalMarks);
 
                     return {
                         submissionId: sub.id,

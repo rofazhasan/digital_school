@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { generateStudentScriptPDF } from "@/lib/script-pdf-generator";
-import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    const passMark = Number(exam.passMarks) || 33;
+    const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
 
     // Calculate ranks with proper tie handling and ensure percentage and grade are dynamically updated
     const resultsWithRanks = allResults.map((result, index) => {
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         : (result.percentage || 0);
       const computedGrade = result.grade === 'F (Disqualified)'
         ? 'F (Disqualified)'
-        : calculateGrade(computedPercentage, passMark);
+        : calculateGrade(computedPercentage, passMark, exam.totalMarks);
 
       return {
         ...result,

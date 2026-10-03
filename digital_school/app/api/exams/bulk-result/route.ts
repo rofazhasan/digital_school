@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   try {
@@ -296,11 +296,11 @@ export async function GET(req: NextRequest) {
       } else {
         // Fallback if no result record was generated
         const exam = processedExams.find(e => e.id === sub.examId);
-        const passMark = exam?.passMarks || 33;
+        const passMark = getPassPercentage(exam?.passMarks, exam?.totalMarks);
         const totalMarks = exam?.totalMarks || 100;
         const earned = sub.score ?? 0;
         const pct = totalMarks > 0 ? calculatePercentage(earned, totalMarks) : 0;
-        const grade = calculateGrade(pct, passMark);
+        const grade = calculateGrade(pct, passMark, totalMarks);
 
         studentResultsMap[sub.studentId][sub.examId] = {
           mcqMarks: 0,

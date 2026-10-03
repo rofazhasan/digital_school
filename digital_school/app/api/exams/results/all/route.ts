@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
-import { calculateGrade, calculateGPA } from '@/lib/utils';
+import { calculateGrade, calculateGPA, getPassPercentage } from '@/lib/utils';
 import { Prisma } from '@prisma/client';
 
 interface ExamResultsGroup {
@@ -153,11 +153,11 @@ export async function GET(request: NextRequest) {
     // Recalculate Grade & GPA dynamically for "Insaaf"
     results = results.map((r: any) => {
       const percentage = r.exam?.totalMarks > 0 ? (r.total / r.exam.totalMarks) * 100 : (r.percentage || 0);
-      const passMark = Number(r.exam?.passMarks) || 33;
+      const passMark = getPassPercentage(r.exam?.passMarks, r.exam?.totalMarks);
       return {
         ...r,
-        grade: r.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark),
-        gpa: calculateGPA(percentage, passMark)
+        grade: r.grade === 'F (Disqualified)' ? 'F (Disqualified)' : calculateGrade(percentage, passMark, r.exam?.totalMarks),
+        gpa: calculateGPA(percentage, passMark, r.exam?.totalMarks)
       };
     });
 

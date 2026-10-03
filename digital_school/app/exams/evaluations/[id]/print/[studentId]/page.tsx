@@ -7,7 +7,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { Loader2, Printer, ArrowLeft, Download } from 'lucide-react';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { Button } from '@/components/ui/button';
-import { calculateGrade } from '@/lib/utils';
+import { calculateGrade, getPassPercentage } from '@/lib/utils';
 
 export default function StudentScriptPrintPage({ params }: { params: Promise<{ id: string; studentId: string }> }) {
     const { id: examId, studentId } = use(params);
@@ -303,10 +303,10 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
                             const earnedTotal = submission?.result?.total ?? submission?.score ?? 0;
                             const examTotal = examData?.totalMarks || 100;
                             const pct = examTotal > 0 ? (earnedTotal / examTotal) * 100 : 0;
-                            const passMark = Number(examData?.passMarks) || 33;
+                            const passMark = getPassPercentage(examData?.passMarks, examData?.totalMarks);
                             const displayGrade = submission?.result?.grade && submission.result.grade !== 'F'
                                 ? submission.result.grade
-                                : (pct >= passMark ? calculateGrade(pct, passMark) : (submission?.result?.grade || 'F'));
+                                : (pct >= passMark ? calculateGrade(pct, passMark, examData?.totalMarks) : (submission?.result?.grade || 'F'));
 
                             return [
                                 { label: 'Total Mark', value: submission?.result?.total, sub: `/ ${examData?.totalMarks}`, color: 'text-slate-900 dark:text-white' },

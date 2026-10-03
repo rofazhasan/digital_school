@@ -5,7 +5,7 @@ import { evaluateMCQuestion } from "@/lib/evaluation/mcEvaluation";
 import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
 import { evaluateARQuestion } from "@/lib/evaluation/arEvaluation";
 import { evaluateINTQuestion } from "@/lib/evaluation/intEvaluation";
-import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
 
 export async function GET(
   req: NextRequest,
@@ -315,13 +315,16 @@ export async function GET(
 
         const dbResult = studentResultMap.get(submission.studentId);
         const earnedTotal = dbResult?.total ?? evaluation.totalScore;
-        const passMark = Number(exam.passMarks) || 33;
+        const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
         const pct = exam.totalMarks > 0 
           ? calculatePercentage(earnedTotal, exam.totalMarks)
           : (dbResult?.percentage ?? evaluation.percentage ?? 0);
+        const isSubjectivePending = containsCqSq && evaluationStatus !== 'COMPLETED';
         const resolvedGrade = (dbResult?.grade === 'F (Disqualified)' || evaluation.grade === 'F (Disqualified)')
           ? 'F (Disqualified)'
-          : calculateGrade(pct, passMark);
+          : (isSubjectivePending && pct < passMark
+              ? 'Pending Evaluation'
+              : calculateGrade(pct, passMark, exam.totalMarks));
 
         processedSubmissions.push({
           id: submission.id,
