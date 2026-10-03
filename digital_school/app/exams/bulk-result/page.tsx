@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Printer, ArrowLeft, Download, Plus, Trash2, Edit2, Layers,
+  Printer, ArrowLeft, Download, Plus, Trash2, Edit2, Edit3, Layers,
   CheckCircle2, XCircle, Award, BarChart3, Settings2, Sliders,
   Users, Check, Building2, BookOpen, GraduationCap, ChevronRight,
   Search, Eye, EyeOff, FileSpreadsheet, RefreshCw, Star, Info,
@@ -120,12 +120,14 @@ function BulkResultContent() {
   const [resultsData, setResultsData] = useState<Record<string, Record<string, any>>>({});
   const [instituteData, setInstituteData] = useState<any>(null);
 
-  // Marksheet Customization State
+  // Marksheet Customization State (All Fully Editable)
   const [marksheetTitle, setMarksheetTitle] = useState("বার্ষিক পরীক্ষা ২০২৬ / Annual Examination 2026");
-  const [institutionName, setInstitutionName] = useState("");
-  const [institutionAddress, setInstitutionAddress] = useState("");
+  const [institutionName, setInstitutionName] = useState("DIGITAL SCHOOL ACADEMY");
+  const [institutionSubtitle, setInstitutionSubtitle] = useState("Approved by Ministry of Education & Secondary Education Board");
+  const [customClassName, setCustomClassName] = useState("All");
   const [academicYear, setAcademicYear] = useState("2026");
   const [publicationDate, setPublicationDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [candidateCountOverride, setCandidateCountOverride] = useState<string>("");
 
   // Selected students filter ('ALL' or array of studentIds)
   const [selectedStudentFilter, setSelectedStudentFilter] = useState<"ALL" | string[]>("ALL");
@@ -180,8 +182,12 @@ function BulkResultContent() {
 
       if (data.institute) {
         setInstituteData(data.institute);
-        if (!institutionName) setInstitutionName(data.institute.name || "Digital School Academy");
-        if (!institutionAddress) setInstitutionAddress(data.institute.address || "Dhaka, Bangladesh");
+        if (!institutionName || institutionName === "DIGITAL SCHOOL ACADEMY") {
+          if (data.institute.name) setInstitutionName(data.institute.name);
+        }
+        if (!institutionSubtitle || institutionSubtitle === "Approved by Ministry of Education & Secondary Education Board") {
+          if (data.institute.address) setInstitutionSubtitle(data.institute.address);
+        }
       }
 
       // Default select all exams if no specific examIds passed
@@ -210,6 +216,12 @@ function BulkResultContent() {
     setSubjectGroups([]);
     setOptionalSubjectIds([]);
     setManualSubjects([]);
+    const cls = classes.find(c => c.id === newClassId);
+    if (cls) {
+      setCustomClassName(`${cls.name}${cls.section ? ` (${cls.section})` : ""}`);
+    } else {
+      setCustomClassName("All");
+    }
     fetchData(newClassId, undefined);
   };
 
@@ -923,24 +935,108 @@ function BulkResultContent() {
         {activeTab === "tabulation" && (
           <div className="tabulation-sheet-wrapper print:block">
             
-            {/* Formal Institutional Print Header */}
-            <div className="text-center space-y-1 mb-6 border-b-2 border-slate-900 dark:border-white pb-4">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-                {institutionName || "DIGITAL SCHOOL ACADEMY"}
-              </h1>
-              <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {institutionAddress || "Approved by Ministry of Education & Secondary Education Board"}
-              </p>
-              <div className="pt-2">
-                <span className="inline-block px-4 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs sm:text-sm font-black uppercase tracking-wider">
-                  {marksheetTitle}
-                </span>
+            {/* Direct Edit Guidance Banner (Hidden in Print) */}
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5 mb-3 rounded-lg bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 text-[11px] text-blue-700 dark:text-blue-300 print:hidden">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span><strong>Directly Editable Header:</strong> Click on any field below (Institution Name, Subtitle, Exam Title, Class, Year, Date, Total Candidates) to edit directly on the sheet.</span>
+              </span>
+              <span className="text-[10px] text-blue-500 font-semibold uppercase tracking-wider hidden sm:inline">Live Preview & Print</span>
+            </div>
+
+            {/* Formal Institutional Print Header - Directly Editable In-Place */}
+            <div className="text-center space-y-1.5 mb-6 border-b-2 border-slate-900 dark:border-white pb-4">
+              {/* Institution Name */}
+              <div className="relative inline-block w-full max-w-3xl mx-auto">
+                <input
+                  type="text"
+                  value={institutionName}
+                  onChange={(e) => setInstitutionName(e.target.value)}
+                  placeholder="DIGITAL SCHOOL ACADEMY"
+                  title="Click to edit Institution Name"
+                  className="header-editable-input w-full text-center text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all duration-150 print:border-none print:p-0 print:m-0 print:text-black"
+                />
               </div>
-              <div className="flex items-center justify-between text-xs font-bold pt-2 px-2 text-slate-700 dark:text-slate-300">
-                <span>Class: {classes.find(c => c.id === selectedClassId)?.name || "All"} {classes.find(c => c.id === selectedClassId)?.section ? `(${classes.find(c => c.id === selectedClassId)?.section})` : ""}</span>
-                <span>Session / Year: {academicYear}</span>
-                <span>Date: {publicationDate}</span>
-                <span>Total Candidates: {rankedStudentRows.length}</span>
+
+              {/* Subtitle / Approval */}
+              <div className="relative inline-block w-full max-w-2xl mx-auto">
+                <input
+                  type="text"
+                  value={institutionSubtitle}
+                  onChange={(e) => setInstitutionSubtitle(e.target.value)}
+                  placeholder="Approved by Ministry of Education & Secondary Education Board"
+                  title="Click to edit Subtitle / Approval"
+                  className="header-editable-input w-full text-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded-lg px-2 py-0.5 outline-none transition-all duration-150 print:border-none print:p-0 print:m-0 print:text-slate-700"
+                />
+              </div>
+
+              {/* Exam Title Pill */}
+              <div className="pt-1.5 flex justify-center">
+                <div className="inline-flex items-center px-4 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm print:bg-slate-900 print:text-white">
+                  <input
+                    type="text"
+                    value={marksheetTitle}
+                    onChange={(e) => setMarksheetTitle(e.target.value)}
+                    placeholder="বার্ষিক পরীক্ষা ২০২৬ / Annual Examination 2026"
+                    title="Click to edit Examination Title"
+                    className="header-editable-input text-center text-xs sm:text-sm font-black uppercase tracking-wider bg-transparent border-none outline-none text-white dark:text-slate-900 print:text-white min-w-[280px] sm:min-w-[420px]"
+                  />
+                </div>
+              </div>
+
+              {/* Meta Info Bar: Class, Session/Year, Date, Total Candidates */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold pt-3 px-2 text-slate-700 dark:text-slate-300 print:text-black">
+                {/* 1. Class */}
+                <div className="flex items-center gap-1">
+                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Class:</span>
+                  <input
+                    type="text"
+                    value={customClassName}
+                    onChange={(e) => setCustomClassName(e.target.value)}
+                    placeholder={classes.find(c => c.id === selectedClassId)?.name || "All"}
+                    title="Click to edit Class name"
+                    className="header-editable-input w-full font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 print:border-none print:p-0 print:text-black"
+                  />
+                </div>
+
+                {/* 2. Session / Year */}
+                <div className="flex items-center justify-start sm:justify-center gap-1">
+                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Session / Year:</span>
+                  <input
+                    type="text"
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    placeholder="2026"
+                    title="Click to edit Session / Year"
+                    className="header-editable-input w-24 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center print:border-none print:p-0 print:text-black"
+                  />
+                </div>
+
+                {/* 3. Date */}
+                <div className="flex items-center justify-start sm:justify-center gap-1">
+                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Date:</span>
+                  <input
+                    type="text"
+                    value={publicationDate}
+                    onChange={(e) => setPublicationDate(e.target.value)}
+                    placeholder="2026-10-03"
+                    title="Click to edit Date"
+                    className="header-editable-input w-28 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-center print:border-none print:p-0 print:text-black"
+                  />
+                </div>
+
+                {/* 4. Total Candidates */}
+                <div className="flex items-center justify-start sm:justify-end gap-1">
+                  <span className="shrink-0 text-slate-500 dark:text-slate-400 font-semibold print:text-black">Total Candidates:</span>
+                  <input
+                    type="text"
+                    value={candidateCountOverride !== "" ? candidateCountOverride : String(rankedStudentRows.length)}
+                    onChange={(e) => setCandidateCountOverride(e.target.value)}
+                    placeholder={String(rankedStudentRows.length)}
+                    title="Click to edit Total Candidates count"
+                    className="header-editable-input w-16 font-bold bg-transparent border border-dashed border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-primary focus:bg-white dark:focus:bg-slate-800 rounded px-1.5 py-0.5 outline-none text-slate-800 dark:text-slate-200 text-left sm:text-right print:border-none print:p-0 print:text-black"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1250,7 +1346,7 @@ function BulkResultContent() {
                       {institutionName || "DIGITAL SCHOOL ACADEMY"}
                     </h2>
                     <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {institutionAddress || "Approved by Ministry of Education, Bangladesh"}
+                      {institutionSubtitle || "Approved by Ministry of Education & Secondary Education Board"}
                     </p>
                     <div className="py-2">
                       <span className="inline-block px-5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs sm:text-sm font-black uppercase tracking-wider">
@@ -1271,7 +1367,7 @@ function BulkResultContent() {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div><span className="text-muted-foreground">Registration No:</span> <strong>{row.student.registrationNo || "N/A"}</strong></div>
-                        <div><span className="text-muted-foreground">Class & Section:</span> <strong>Class {classes.find(c => c.id === selectedClassId)?.name || "All"} {classes.find(c => c.id === selectedClassId)?.section ? `(${classes.find(c => c.id === selectedClassId)?.section})` : ""}</strong></div>
+                        <div><span className="text-muted-foreground">Class & Section:</span> <strong>{customClassName || (classes.find(c => c.id === selectedClassId)?.name ? `Class ${classes.find(c => c.id === selectedClassId)?.name}${classes.find(c => c.id === selectedClassId)?.section ? ` (${classes.find(c => c.id === selectedClassId)?.section})` : ""}` : "Class: All")}</strong></div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div><span className="text-muted-foreground">Academic Year:</span> <strong>{academicYear}</strong></div>
@@ -1401,6 +1497,84 @@ function BulkResultContent() {
         {/* ========================================================================= */}
         {activeTab === "config" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:hidden">
+            {/* Sheet Header Information Card */}
+            <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800 md:col-span-2">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-indigo-600" />
+                  <CardTitle className="text-base font-bold">Marksheet Header & Institutional Information</CardTitle>
+                </div>
+                <CardDescription className="text-xs">
+                  ট্যাবুলেশন শিট এবং মার্কশিটের প্রাতিষ্ঠানিক তথ্য ও শিরোনাম কাস্টমাইজ করুন।
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Institution Name</label>
+                  <Input
+                    value={institutionName}
+                    onChange={(e) => setInstitutionName(e.target.value)}
+                    placeholder="DIGITAL SCHOOL ACADEMY"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Approval / Subtitle</label>
+                  <Input
+                    value={institutionSubtitle}
+                    onChange={(e) => setInstitutionSubtitle(e.target.value)}
+                    placeholder="Approved by Ministry of Education & Secondary Education Board"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Examination Title</label>
+                  <Input
+                    value={marksheetTitle}
+                    onChange={(e) => setMarksheetTitle(e.target.value)}
+                    placeholder="বার্ষিক পরীক্ষা ২০২৬ / Annual Examination 2026"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Class Label</label>
+                  <Input
+                    value={customClassName}
+                    onChange={(e) => setCustomClassName(e.target.value)}
+                    placeholder="All"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Session / Year</label>
+                  <Input
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    placeholder="2026"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Date of Issue</label>
+                  <Input
+                    value={publicationDate}
+                    onChange={(e) => setPublicationDate(e.target.value)}
+                    placeholder="2026-10-03"
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Total Candidates (Override)</label>
+                  <Input
+                    value={candidateCountOverride}
+                    onChange={(e) => setCandidateCountOverride(e.target.value)}
+                    placeholder={String(rankedStudentRows.length)}
+                    className="h-9 rounded-xl font-medium"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Subject Grouping Card */}
             <Card className="rounded-2xl border-slate-200/80 dark:border-slate-800">
               <CardHeader className="pb-3">
@@ -1718,6 +1892,15 @@ function BulkResultContent() {
           }
           .tabulation-sheet-wrapper {
             width: 100% !important;
+          }
+          .header-editable-input {
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            color: inherit !important;
           }
         }
       `}</style>

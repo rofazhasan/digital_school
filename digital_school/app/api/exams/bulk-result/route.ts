@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
               id: true,
               name: true,
               email: true,
-              image: true
+              avatar: true
             }
           }
         },
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
         roll: sp.roll || "",
         registrationNo: sp.registrationNo || "",
         email: sp.user.email || "",
-        image: sp.user.image || null
+        avatar: sp.user.avatar || null
       }));
     }
 
