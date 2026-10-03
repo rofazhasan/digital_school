@@ -112,6 +112,84 @@ export function computeBookletSheets(totalLogicalPages: number): { sheets: Bookl
   return { sheets, N };
 }
 
+/**
+ * Calculates optimal page count dynamically based on question volume, layout mode,
+ * font scaling, paper size (A3, A4, Legal), and optional user target choice.
+ * For booklet mode, guarantees a multiple of 4 pages (4, 8, 12, 16...).
+ */
+export function getOptimalPageCount(
+  set: any,
+  examInfo: any,
+  layoutMode: string,
+  fontSize: number = 100,
+  cqSqFontSize: number = 100,
+  engineeringExamBoxes: boolean = false,
+  engineeringBoxScale: number = 1.0,
+  paperSize: string = 'a4',
+  bookletPagesChoice?: 'auto' | number
+): number {
+  if (bookletPagesChoice && bookletPagesChoice !== 'auto') {
+    return Math.max(4, Math.ceil(Number(bookletPagesChoice) / 4) * 4);
+  }
+
+  const objCount = (set.mcq?.length || 0) + (set.orderedObjective?.length || 0) + (set.mc?.length || 0) + (set.int?.length || 0) + (set.ar?.length || 0);
+  const cqCount = set.cq?.length || 0;
+  const sqCount = set.sq?.length || 0;
+  const descCount = (set.descriptive?.length || 0) + (set.mtf?.length || 0);
+
+  const fontScale = Math.max(0.5, (fontSize || 100) / 100);
+  const cqScale = Math.max(0.5, (cqSqFontSize || 100) / 100);
+
+  const sqUnits = (engineeringExamBoxes && Array.isArray(set.sq) && set.sq.length > 0)
+    ? set.sq.reduce((sum: number, q: any) => sum + estimateSqVisualUnits(q, engineeringBoxScale, paperSize as any), 0)
+    : (sqCount * 3.5);
+
+  // 1 CQ is roughly ~8-9 MCQs in visual height; 1 SQ is ~3.5 MCQs; 1 Desc is ~8 MCQs
+  const estimatedUnits = (objCount * fontScale) + ((cqCount * 8.5 + sqUnits + descCount * 8) * cqScale);
+
+  // STRICT RULE FOR ENGINEERING EXAM BOXES: At least 2, at most 3 questions per page
+  const totalWritten = sqCount + cqCount + descCount;
+  if (engineeringExamBoxes && totalWritten > 0 && objCount === 0) {
+    const requiredPages = Math.max(1, Math.ceil(totalWritten / 3));
+    if (layoutMode === 'booklet_4page' || layoutMode === 'booklet') {
+      return Math.max(4, Math.ceil(requiredPages / 4) * 4);
+    }
+    if (layoutMode === 'booklet_2up') {
+      return Math.max(2, Math.ceil(requiredPages / 2) * 2);
+    }
+    return requiredPages;
+  }
+
+  if (layoutMode === 'booklet_4page' || layoutMode === 'booklet') {
+    // Capacity per half-page: A3 ~48 units, Legal ~38 units, A4 ~30 units
+    const perPageCap = paperSize === 'a3' ? 48 : paperSize === 'legal' ? 38 : 30;
+    const rawPages = Math.ceil(estimatedUnits / perPageCap);
+    // Must be a multiple of 4 (4, 8, 12, 16...)
+    return Math.max(4, Math.ceil(rawPages / 4) * 4);
+  }
+
+  if (layoutMode === 'booklet_2up') {
+    const perPageCap = paperSize === 'legal' ? 32 : 26;
+    const rawPages = Math.ceil(estimatedUnits / perPageCap);
+    return Math.max(2, Math.ceil(rawPages / 2) * 2);
+  }
+
+  // Standard portrait mode (A4, Legal, Letter)
+  if (paperSize === 'legal') {
+    if (estimatedUnits <= 26) return 1;
+    if (estimatedUnits <= 64) return 2;
+    if (estimatedUnits <= 102) return 3;
+    if (estimatedUnits <= 140) return 4;
+    return Math.max(1, Math.ceil((estimatedUnits - 26) / 38) + 1);
+  }
+
+  if (estimatedUnits <= 18) return 1;
+  if (estimatedUnits <= 46) return 2;
+  if (estimatedUnits <= 74) return 3;
+  if (estimatedUnits <= 102) return 4;
+  return Math.max(1, Math.ceil((estimatedUnits - 18) / 28) + 1);
+}
+
 // --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page, 8-page, N-page) ---
 export function splitExamSetForBooklet(
   set: any,
@@ -476,8 +554,8 @@ export function splitExamSetForBooklet(
     // STRICT RULE: At least 2 questions, at most 3 questions per page
     // Total pages required so every page has 2 or 3 questions:
     let P = Math.max(1, Math.ceil(wTotal / 3));
-    if (options?.layoutMode === 'booklet_4page') {
-      P = Math.max(4, Math.ceil(P / 4) * 4);
+    if (options?.layoutMode === 'booklet_4page' || options?.layoutMode === 'booklet') {
+      P = Math.max(targetPages || 4, Math.ceil(P / 4) * 4);
     } else if (targetPages && targetPages > P) {
       P = Math.min(targetPages, Math.max(P, Math.ceil(wTotal / 2)));
     }
@@ -535,7 +613,10 @@ export function splitExamSetForBooklet(
   }
 
   const estimatedPages = totalWrittenUnits <= p1Cap ? 1 : Math.max(2, Math.ceil((totalWrittenUnits - p1Cap) / otherCap) + 1);
-  const effectivePages = Math.max(1, Math.min(targetPages, estimatedPages));
+  const isBookletMode = options?.layoutMode === 'booklet_4page' || options?.layoutMode === 'booklet';
+  const effectivePages = isBookletMode
+    ? Math.max(targetPages || 4, Math.max(4, Math.ceil(estimatedPages / 4) * 4))
+    : Math.max(1, Math.min(targetPages || estimatedPages, estimatedPages));
 
   const p1Ratio = effectivePages === 1 ? 1.0 : (options?.hideInstitute ? 0.35 : 0.28);
   const p1WCount = Math.max(1, Math.round(wTotal * p1Ratio));
@@ -601,6 +682,7 @@ export default function PrintExamPage() {
   // Paper Size & Booklet Options State
   const [paperSize, setPaperSize] = useState<'legal' | 'a4' | 'a3' | 'letter'>('a4');
   const [layoutMode, setLayoutMode] = useState<'standard' | 'booklet_4page' | 'booklet_6page' | 'booklet_2up'>('standard');
+  const [bookletPagesChoice, setBookletPagesChoice] = useState<'auto' | 4 | 8 | 12 | 16>('auto');
   const [showFoldGuide, setShowFoldGuide] = useState(true);
   const [showBookletGuideModal, setShowBookletGuideModal] = useState(false);
   const [activeGuideTab, setActiveGuideTab] = useState<'paper_comparison' | 'print_steps'>('paper_comparison');
@@ -621,6 +703,8 @@ export default function PrintExamPage() {
       if (savedPaper) setPaperSize(savedPaper as any);
       const savedLayout = localStorage.getItem('print_layout_mode');
       if (savedLayout) setLayoutMode(savedLayout as any);
+      const savedBookletPages = localStorage.getItem('print_booklet_pages_choice');
+      if (savedBookletPages) setBookletPagesChoice(savedBookletPages === 'auto' ? 'auto' : Number(savedBookletPages) as any);
       const savedFold = localStorage.getItem('print_show_fold_guide');
       if (savedFold !== null) setShowFoldGuide(savedFold === 'true');
 
@@ -903,6 +987,11 @@ export default function PrintExamPage() {
           setPaperSize={handlePaperSizeChange}
           layoutMode={layoutMode}
           setLayoutMode={handleLayoutModeChange}
+          bookletPagesChoice={bookletPagesChoice}
+          setBookletPagesChoice={(val: any) => {
+            setBookletPagesChoice(val);
+            try { localStorage.setItem('print_booklet_pages_choice', String(val)); } catch (e) {}
+          }}
           showFoldGuide={showFoldGuide}
           toggleFoldGuide={toggleFoldGuide}
           openBookletGuide={() => setShowBookletGuideModal(true)}
@@ -1122,7 +1211,17 @@ export default function PrintExamPage() {
           {(layoutMode === 'booklet' || layoutMode === 'booklet_4page' || layoutMode === 'booklet_6page') && (
             <>
               {nonEmptySets.map((set: any) => {
-                const targetPages = 4;
+                const targetPages = getOptimalPageCount(
+                  set,
+                  examInfo,
+                  layoutMode,
+                  objectiveFontSize,
+                  cqSqFontSize,
+                  engineeringExamBoxes,
+                  engineeringBoxScale,
+                  paperSize,
+                  bookletPagesChoice
+                );
                 const logicalPages = splitExamSetForBooklet(set, examInfo, targetPages, {
                   fontSize: objectiveFontSize,
                   cqSqFontSize,
@@ -1145,7 +1244,7 @@ export default function PrintExamPage() {
                         <div className="booklet-page-header-tag">
                           <span>{examInfo.title}</span>
                           <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">
-                            {language === 'en' ? `Page ${pageNum} (Blank)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} (খসড়া)`}
+                            {language === 'en' ? `Page ${pageNum} of ${N} (Blank)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} / ${toBengaliNumerals(N)} (খসড়া)`}
                           </span>
                         </div>
                         <div className="flex-1 flex items-center justify-center text-gray-400 text-xs italic">
@@ -1167,10 +1266,10 @@ export default function PrintExamPage() {
                         </span>
                         <span className="border border-black px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-gray-50">
                           {isCover
-                            ? (language === 'en' ? 'Page 1 (Front Cover)' : 'পৃষ্ঠা ১ (কভার)')
+                            ? (language === 'en' ? `Page 1 of ${N} (Front Cover)` : `পৃষ্ঠা ১ / ${toBengaliNumerals(N)} (কভার)`)
                             : isBackCover
-                              ? (language === 'en' ? `Page ${pageNum} (Back Cover)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} (শেষ পাতা)`)
-                              : (language === 'en' ? `Page ${pageNum}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)}`)}
+                              ? (language === 'en' ? `Page ${pageNum} of ${N} (Back Cover)` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} / ${toBengaliNumerals(N)} (শেষ পাতা)`)
+                              : (language === 'en' ? `Page ${pageNum} of ${N}` : `পৃষ্ঠা ${toBengaliNumerals(pageNum)} / ${toBengaliNumerals(N)}`)}
                         </span>
                       </div>
 
@@ -1244,8 +1343,8 @@ export default function PrintExamPage() {
                             <div className="booklet-center-crease">
                               <span className="booklet-fold-badge">
                                 ✂ {language === 'en'
-                                  ? `SHEET ${sheet.sheetNumber} (FRONT: ${sheet.front.leftPageNum} | ${sheet.front.rightPageNum})`
-                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} (পৃষ্ঠা ${toBengaliNumerals(sheet.front.leftPageNum)} ও ${toBengaliNumerals(sheet.front.rightPageNum)})`}
+                                  ? `SHEET ${sheet.sheetNumber} of ${sheets.length} (FRONT: ${sheet.front.leftPageNum} | ${sheet.front.rightPageNum})`
+                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} / ${toBengaliNumerals(sheets.length)} (পৃষ্ঠা ${toBengaliNumerals(sheet.front.leftPageNum)} ও ${toBengaliNumerals(sheet.front.rightPageNum)})`}
                               </span>
                             </div>
                           )}
@@ -1264,8 +1363,8 @@ export default function PrintExamPage() {
                             <div className="booklet-center-crease">
                               <span className="booklet-fold-badge">
                                 ✂ {language === 'en'
-                                  ? `SHEET ${sheet.sheetNumber} (BACK: ${sheet.back.leftPageNum} | ${sheet.back.rightPageNum})`
-                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} (পৃষ্ঠা ${toBengaliNumerals(sheet.back.leftPageNum)} ও ${toBengaliNumerals(sheet.back.rightPageNum)})`}
+                                  ? `SHEET ${sheet.sheetNumber} of ${sheets.length} (BACK: ${sheet.back.leftPageNum} | ${sheet.back.rightPageNum})`
+                                  : `শিট ${toBengaliNumerals(sheet.sheetNumber)} / ${toBengaliNumerals(sheets.length)} (পৃষ্ঠা ${toBengaliNumerals(sheet.back.leftPageNum)} ও ${toBengaliNumerals(sheet.back.rightPageNum)})`}
                               </span>
                             </div>
                           )}
@@ -1607,6 +1706,7 @@ const PrintControls = ({
   tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
   handleSaveInstitute, handleResetInstitute,
   paperSize, setPaperSize, layoutMode, setLayoutMode,
+  bookletPagesChoice, setBookletPagesChoice,
   showFoldGuide, toggleFoldGuide, openBookletGuide,
   engineeringExamBoxes, setEngineeringExamBoxes,
   engineeringBoxScale, setEngineeringBoxScale,
@@ -1665,8 +1765,8 @@ const PrintControls = ({
               onChange={(e) => setPaperSize(e.target.value as any)}
               className="w-full py-1.5 px-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-black"
             >
-              <option value="a4">A4 Paper (Standard 210×297mm)</option>
-              <option value="a3">A3 Paper (🌟 Admission Booklet / ভর্তি সেরা)</option>
+              <option value="a4">{language === 'en' ? 'A4 Paper (Booklet: 2× A5 per side)' : 'A4 Paper (বুকলেট: প্রতি সাইডে ২টি A5)'}</option>
+              <option value="a3">{language === 'en' ? 'A3 Paper (Booklet: 2× A4 per side 🌟)' : 'A3 Paper (🌟 বুকলেট: প্রতি সাইডে ২টি A4)'}</option>
               <option value="legal">Legal Paper (Long 8.5×14")</option>
               <option value="letter">Letter Paper (8.5×11")</option>
             </select>
@@ -1707,6 +1807,27 @@ const PrintControls = ({
           {/* Booklet Sub-Controls & Advice Card */}
           {isBooklet && (
             <div className="bg-indigo-50/80 border border-indigo-200 p-2 rounded-lg space-y-1.5">
+              {/* Booklet Page Count Selector */}
+              <div>
+                <label className="block text-[10px] font-bold text-indigo-900 mb-1">
+                  {language === 'en' ? 'Booklet Page Count:' : 'বুকলেট পৃষ্ঠা সংখ্যা:'}
+                </label>
+                <select
+                  value={bookletPagesChoice || 'auto'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setBookletPagesChoice(v === 'auto' ? 'auto' : parseInt(v, 10));
+                  }}
+                  className="w-full py-1 px-1.5 bg-white border border-indigo-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 text-indigo-950"
+                >
+                  <option value="auto">{language === 'en' ? 'Auto (Smart Calculation)' : 'Auto (প্রশ্ন অনুযায়ী অটো)'}</option>
+                  <option value="4">{language === 'en' ? '4 Pages (1 Sheet: 4 pages)' : '৪ পৃষ্ঠা (১ শিট: ৪ পৃষ্ঠা)'}</option>
+                  <option value="8">{language === 'en' ? '8 Pages (2 Sheets: 8 pages)' : '৮ পৃষ্ঠা (২ শিট: ৮ পৃষ্ঠা)'}</option>
+                  <option value="12">{language === 'en' ? '12 Pages (3 Sheets: 12 pages)' : '১২ পৃষ্ঠা (৩ শিট: ১২ পৃষ্ঠা)'}</option>
+                  <option value="16">{language === 'en' ? '16 Pages (4 Sheets: 16 pages)' : '১৬ পৃষ্ঠা (৪ শিট: ১৬ পৃষ্ঠা)'}</option>
+                </select>
+              </div>
+
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-indigo-900">
                   {language === 'en' ? 'Center Fold Crease Line:' : 'মাঝে ভাঁজ রেখা (Fold Line):'}
@@ -2135,10 +2256,11 @@ export const BookletGuideModal = ({
             <div className="space-y-3.5">
               
               <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-xl text-blue-900 space-y-1">
-                <span className="font-extrabold text-xs">🖨️ বুকলেট কীভাবে কাজ করে?</span>
+                <span className="font-extrabold text-xs">🖨️ বুকলেট ইম্পোজিশন কীভাবে কাজ করে?</span>
                 <p className="text-[11px] leading-relaxed">
-                  • <strong>৪-পৃষ্ঠা বুকলেট (১ শিট ডুপ্লেক্স):</strong> শিট ১ (পৃষ্ঠা ৪ ও ১) এবং শিট ২ (পৃষ্ঠা ২ ও ৩)। মাঝে ভাঁজ করলেই ৪ পৃষ্ঠার আসল ভর্তি বুকলেট!
-                  <br />• <strong>৬-পৃষ্ঠা বুকলেট (৩ শিট নেস্টেড):</strong> শিট ১ (পৃষ্ঠা ৬ ও ১), শিট ২ (পৃষ্ঠা ২ ও ৫), এবং শিট ৩ (পৃষ্ঠা ৩ ও ৪)। ৩টি শিট ক্রমানুসারে নেস্টেড ভাঁজ করলেই চমৎকার ৬ পৃষ্ঠার অ্যাডমিশন বুকলেট!
+                  • <strong>৪-পৃষ্ঠা বুকলেট (১ শিট ডুপ্লেক্স):</strong> সামনের পিঠে পৃষ্ঠা ৪ ও ১, পেছনের পিঠে পৃষ্ঠা ২ ও ৩। মাঝে ভাঁজ করলেই ১, ২, ৩, ৪ ক্রমানুসারে আসল ভর্তি বুকলেট!
+                  <br />• <strong>৮-পৃষ্ঠা বুকলেট (২ শিট নেস্টেড):</strong> শিট ১ (সামনে ৮|১, পেছনে ২|৭) এবং শিট ২ (সামনে ৬|৩, পেছনে ৪|৫)। শিট ১ এর ভেতর শিট ২ রেখে মাঝে ভাঁজ করলেই ১ থেকে ৮ পৃষ্ঠার পারফেক্ট বুকলেট!
+                  <br />• <strong>১২ ও ১৬ পৃষ্ঠা বুকলেট:</strong> একই নিয়মে প্রতিটি শিট ক্রমানুসারে নেস্ট হয়ে ১২ বা ১৬ পৃষ্ঠার পূর্ণাঙ্গ বুকলেট তৈরি করে।
                 </p>
               </div>
 
@@ -2147,8 +2269,8 @@ export const BookletGuideModal = ({
                 <div className="flex gap-2.5 items-start p-2.5 rounded-lg bg-gray-50 border border-gray-200">
                   <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">১</span>
                   <div>
-                    <strong className="text-gray-900">লেআউট নির্বাচন:</strong>
-                    <p className="text-gray-600 text-[11px]">প্রিন্ট কন্ট্রোলস থেকে <strong>'৪-পৃষ্ঠা'</strong> বা <strong>'৬-পৃষ্ঠা'</strong> বুকলেট মোড নির্বাচন করুন।</p>
+                    <strong className="text-gray-900">লেআউট ও পৃষ্ঠা সংখ্যা নির্বাচন:</strong>
+                    <p className="text-gray-600 text-[11px]">প্রিন্ট কন্ট্রোলস থেকে <strong>'বুকলেট (ইম্পোজড)'</strong> মোড এবং প্রয়োজন অনুযায়ী অটো, ৪, ৮, ১২ বা ১৬ পৃষ্ঠা নির্বাচন করুন।</p>
                   </div>
                 </div>
 
