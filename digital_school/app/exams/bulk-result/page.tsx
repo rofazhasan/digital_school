@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
 import { toast } from "sonner";
 
@@ -1710,6 +1710,9 @@ function BulkResultContent() {
               <Layers className="w-5 h-5 text-purple-600" />
               যৌথ বিষয় গ্রুপ তৈরি করুন (Subject Group)
             </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              একাধিক পত্র বা বিষয় একত্রিত করে একক বিষয় হিসেবে মার্কশিটে প্রদর্শনের জন্য গ্রুপ তৈরি করুন।
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -1770,6 +1773,9 @@ function BulkResultContent() {
               <Plus className="w-5 h-5 text-amber-600" />
               ম্যানুয়াল / অফলাইন বিষয় যুক্ত করুন
             </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              অনলাইন সিস্টেমের বাইরের কোনো পরীক্ষার নম্বর ম্যানুয়ালি যুক্ত করতে তথ্য পূরণ করুন।
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
@@ -1840,6 +1846,9 @@ function BulkResultContent() {
                   (পূর্ণমান: {manualSubjects.find(m => m.id === marksEntrySubjectId)?.totalMarks})
                 </span>
               </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                শিক্ষার্থীদের রোল অনুযায়ী প্রাপ্ত নম্বর ইনপুট দিন।
+              </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
               {allStudents.map(s => {

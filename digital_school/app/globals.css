@@ -424,25 +424,89 @@
   color: var(--foreground);
 }
 
-/* Ensure math symbols match font weight */
+/* Ensure math symbols match font weight and fall back to proper Bengali fonts */
 mjx-container {
   outline: none;
+  font-family: MathJax_Main, var(--font-tiro-bangla), var(--font-hind-siliguri), 'Noto Serif Bengali', sans-serif, serif;
+}
+.font-exam-paper mjx-container {
+  font-family: MathJax_Main, 'ExamFont', 'Noto Serif Bengali', var(--font-tiro-bangla), serif;
+}
+.font-exam-online mjx-container {
+  font-family: MathJax_Main, var(--font-tiro-bangla), var(--font-hind-siliguri), sans-serif;
 }
 
-/* Fix Bangla font breaking in MathJax & KaTeX content */
+.katex {
+  font-family: KaTeX_Main, var(--font-tiro-bangla), var(--font-hind-siliguri), 'Noto Serif Bengali', sans-serif, serif;
+}
+.font-exam-paper .katex {
+  font-family: KaTeX_Main, 'ExamFont', 'Noto Serif Bengali', var(--font-tiro-bangla), serif;
+}
+.font-exam-online .katex {
+  font-family: KaTeX_Main, var(--font-tiro-bangla), var(--font-hind-siliguri), sans-serif;
+}
+
+/* Fix Bangla font consistency in MathJax, KaTeX & LaTeX text / tables */
+.font-exam-paper .katex .mtext,
+.font-exam-paper .katex .text,
+.font-exam-paper .katex .mathrm,
+.font-exam-paper .katex .textrm,
+.font-exam-paper .katex .textnormal,
+.font-exam-paper .katex table,
+.font-exam-paper .katex td,
+.font-exam-paper .katex th,
+.font-exam-paper mjx-utext,
+.font-exam-paper mjx-utext *,
+.font-exam-paper .mjx-utext,
+.font-exam-paper .MathJax .mtext,
+.font-exam-paper [id^="MathJax-Element"] .mtext {
+  font-family: 'ExamFont', 'Noto Serif Bengali', var(--font-tiro-bangla), serif !important;
+  font-variant-ligatures: common-ligatures contextual !important;
+  font-feature-settings: "liga" 1, "clig" 1 !important;
+}
+
+.font-exam-online .katex .mtext,
+.font-exam-online .katex .text,
+.font-exam-online .katex .mathrm,
+.font-exam-online .katex .textrm,
+.font-exam-online .katex .textnormal,
+.font-exam-online .katex table,
+.font-exam-online .katex td,
+.font-exam-online .katex th,
+.font-exam-online mjx-utext,
+.font-exam-online mjx-utext *,
+.font-exam-online .mjx-utext,
+.font-exam-online .MathJax .mtext,
+.font-exam-online [id^="MathJax-Element"] .mtext {
+  font-family: var(--font-inter), var(--font-tiro-bangla), var(--font-hind-siliguri), sans-serif !important;
+  font-variant-ligatures: common-ligatures contextual !important;
+  font-feature-settings: "liga" 1, "clig" 1 !important;
+}
+
+.katex .mtext,
+.katex .text,
+.katex .mathrm,
+.katex .textrm,
+.katex .textnormal,
+.katex table,
+.katex tr,
+.katex td,
+.katex th,
+.katex .matrix,
+.katex .arraycolsep,
 mjx-utext,
 mjx-utext *,
 .mjx-utext,
-.katex .mtext,
-.katex .text,
-[id^="MathJax-Element"] .mtext,
+mjx-mtable,
+mjx-mtr,
+mjx-mtd,
 .MathJax .mtext,
+[id^="MathJax-Element"] .mtext,
 mjx-container svg text {
-  font-family: var(--font-hind-siliguri), var(--font-tiro-bangla), sans-serif !important;
-  font-variant-ligatures: common-ligatures discretionary-ligatures !important;
+  font-family: inherit !important;
+  font-variant-ligatures: common-ligatures contextual !important;
   font-feature-settings: "liga" 1, "clig" 1 !important;
-  /* Prevent MathJax from trying to layout Bangla characters individually */
-  white-space: nowrap !important;
+  white-space: nowrap;
 }
 
 .font-exam-online mjx-container,
@@ -451,15 +515,49 @@ mjx-container svg text {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                 Responsive Online Exam Tables (Small Screens)              */
+/*                 Responsive Online & Print Exam Tables                      */
 /* -------------------------------------------------------------------------- */
 
-.font-exam-online table,
-.prose table,
-.table-responsive-wrapper table {
+/* Consistent Bangla typography inside all tables */
+table,
+.table-responsive-wrapper,
+.table-responsive-wrapper table,
+.prose table {
   width: 100% !important;
   max-width: 100%;
   border-collapse: collapse;
+  font-family: inherit !important;
+}
+
+table th,
+table td,
+.table-responsive-wrapper th,
+.table-responsive-wrapper td,
+.prose table th,
+.prose table td {
+  padding: 0.5rem 0.75rem;
+  min-width: fit-content;
+  font-family: inherit !important;
+  font-feature-settings: "liga" 1, "clig" 1 !important;
+  font-variant-ligatures: common-ligatures contextual !important;
+}
+
+.font-exam-paper table,
+.font-exam-paper table th,
+.font-exam-paper table td,
+.font-exam-paper .table-responsive-wrapper table,
+.font-exam-paper .table-responsive-wrapper th,
+.font-exam-paper .table-responsive-wrapper td {
+  font-family: 'ExamFont', 'Noto Serif Bengali', 'Bookman Old Style', 'Book Antiqua', 'Georgia', serif !important;
+}
+
+.font-exam-online table,
+.font-exam-online table th,
+.font-exam-online table td,
+.font-exam-online .table-responsive-wrapper table,
+.font-exam-online .table-responsive-wrapper th,
+.font-exam-online .table-responsive-wrapper td {
+  font-family: var(--font-inter), var(--font-tiro-bangla), var(--font-hind-siliguri), sans-serif !important;
 }
 
 .table-responsive-wrapper {
@@ -477,14 +575,6 @@ mjx-container svg text {
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-}
-
-.font-exam-online table th,
-.font-exam-online table td,
-.prose table th,
-.prose table td {
-  padding: 0.5rem 0.75rem;
-  min-width: fit-content;
 }
 
 /* Line Clamp */

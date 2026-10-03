@@ -109,7 +109,6 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         name: true,
-        subject: true,
         date: true,
         totalMarks: true,
         passMarks: true,
@@ -139,7 +138,6 @@ export async function GET(req: NextRequest) {
         select: {
           id: true,
           name: true,
-          subject: true,
           date: true,
           totalMarks: true,
           passMarks: true
@@ -202,7 +200,7 @@ export async function GET(req: NextRequest) {
       return {
         id: exam.id,
         name: exam.name,
-        subject: exam.subject || 'General',
+        subject: (exam as any).subject || exam.name || 'General',
         date: exam.date,
         totalMarks: exam.totalMarks,
         passMarks: exam.passMarks || 33,
