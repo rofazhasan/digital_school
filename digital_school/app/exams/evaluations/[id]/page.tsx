@@ -2647,6 +2647,92 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return exam?.questions || [];
   }, [currentStudent, exam]);
 
+  // CQ Subsections (Partitions) for Single-Subject Exams
+  const cqSubsections = useMemo(() => {
+    const raw = (exam as any)?.cqSubsections;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return [];
+  }, [(exam as any)?.cqSubsections]);
+
+  const hasCqSubsections = useMemo(() => {
+    return !isMS && Array.isArray(cqSubsections) && cqSubsections.length > 1;
+  }, [isMS, cqSubsections]);
+
+  const getQuestionMarkScore = useCallback((question: any, answers: any): number => {
+    if (!answers || !question) return 0;
+    const qId = question.id;
+    const subQs = question.subQuestions || question.sub_questions || question.parts || [];
+    if (subQs.length > 0) {
+      let sum = 0;
+      let hasAny = false;
+      subQs.forEach((_: any, i: number) => {
+        const m = answers[`${qId}_sub_${i}_marks`] ?? answers[`${qId}_desc_${i}_marks`];
+        if (typeof m === 'number') {
+          sum += m;
+          hasAny = true;
+        }
+      });
+      if (hasAny) return sum;
+    }
+    const top = answers[`${qId}_marks`];
+    return typeof top === 'number' ? top : 0;
+  }, []);
+
+  const isQuestionMarked = useCallback((question: any, answers: any): boolean => {
+    return getQuestionMarkScore(question, answers) > 0;
+  }, [getQuestionMarkScore]);
+
+  const hasStudentAttempted = useCallback((q: any, answers: any): boolean => {
+    if (!answers || !q) return false;
+    if (isQuestionMarked(q, answers)) return true;
+    if (answers[q.id] || answers[`${q.id}_image`] || answers[`${q.id}_images`]) return true;
+    const subQs = q.subQuestions || q.sub_questions || q.parts || [];
+    if (subQs.length > 0) {
+      return subQs.some((_: any, i: number) => {
+        const subAns = answers[`${q.id}_sub_${i}`] || answers[`${q.id}_desc_${i}`] || answers[`${q.id}_sub_${i}_image`];
+        return subAns !== undefined && subAns !== null && subAns !== '';
+      });
+    }
+    return false;
+  }, [isQuestionMarked]);
+
+  const cqQuestions = useMemo(() => {
+    return (activeQuestions || []).filter((q: any) => (q.type || '').toLowerCase() === 'cq');
+  }, [activeQuestions]);
+
+  const sqQuestions = useMemo(() => {
+    return (activeQuestions || []).filter((q: any) => (q.type || '').toLowerCase() === 'sq');
+  }, [activeQuestions]);
+
+  const getCqQuestionSubsection = useCallback((q: any) => {
+    if (!hasCqSubsections || !q) return null;
+    const type = (q.type || '').toLowerCase();
+    if (type !== 'cq') return null;
+    const idx = cqQuestions.findIndex((item: any) => item.id === q.id);
+    if (idx === -1) return null;
+    const qNum = idx + 1; // 1-based index among CQ questions
+    const matched = cqSubsections.find((s: any) => qNum >= s.startIndex && qNum <= s.endIndex);
+    if (!matched) return null;
+    return {
+      ...matched,
+      cqNumber: qNum
+    };
+  }, [hasCqSubsections, cqQuestions, cqSubsections]);
+
+  const markedCqCount = useMemo(() => {
+    if (!currentStudent?.answers) return 0;
+    return cqQuestions.filter(q => isQuestionMarked(q, currentStudent.answers)).length;
+  }, [cqQuestions, currentStudent?.answers, isQuestionMarked]);
+
+  const markedSqCount = useMemo(() => {
+    if (!currentStudent?.answers) return 0;
+    return sqQuestions.filter(q => isQuestionMarked(q, currentStudent.answers)).length;
+  }, [sqQuestions, currentStudent?.answers, isQuestionMarked]);
+
   // Counts of each result status for current student
   const statusCounts = useMemo(() => {
     const counts = { ALL: 0, CORRECT: 0, PARTIAL: 0, WRONG: 0, UNANSWERED: 0 };
@@ -2858,7 +2944,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    const targetQuestion = (exam?.questions || []).find(q => q.id === questionId);
+    const targetQuestion = activeQuestions.find(q => q.id === questionId) || (exam?.questions || []).find(q => q.id === questionId);
+    if (!targetQuestion) return;
+
     let maxMarks = 0;
 
     if (subIndex !== undefined) {
@@ -2873,6 +2961,76 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     if (marks > maxMarks) {
       toast.error(`Cannot give more than ${maxMarks} marks`);
       return;
+    }
+
+    // Quota and Section Dependency validations
+    const currentScore = getQuestionMarkScore(targetQuestion, currentStudent?.answers);
+    let projectedScore = marks;
+    if (subIndex !== undefined) {
+      const subQs = targetQuestion?.subQuestions || (targetQuestion as any)?.sub_questions || (targetQuestion as any)?.parts || [];
+      let totalSub = 0;
+      subQs.forEach((_: any, idx: number) => {
+        if (idx === subIndex) {
+          totalSub += marks;
+        } else {
+          const m = currentStudent?.answers?.[`${questionId}_sub_${idx}_marks`] ?? currentStudent?.answers?.[`${questionId}_desc_${idx}_marks`];
+          if (typeof m === 'number') totalSub += m;
+        }
+      });
+      projectedScore = totalSub;
+    }
+
+    if (currentScore === 0 && projectedScore > 0) {
+      const qType = (targetQuestion?.type || '').toLowerCase();
+      const cqReq = (exam as any)?.cqRequiredQuestions;
+      if (qType === 'cq' && typeof cqReq === 'number' && cqReq > 0) {
+        if (markedCqCount >= cqReq) {
+          toast.error(`ইতিমধ্যে ${cqReq}টি CQ প্রশ্ন মূল্যায়ন করা হয়েছে। সর্বোচ্চ ${cqReq}টি CQ-তে নম্বর দেওয়া যাবে।`);
+          return;
+        }
+
+        // Section dependency check
+        if (hasCqSubsections) {
+          const targetSub = getCqQuestionSubsection(targetQuestion);
+          if (targetSub) {
+            const remSlots = cqReq - markedCqCount;
+            let slotsNeededByOthers = 0;
+            let blockingSubName = '';
+
+            cqSubsections.forEach((sub: any) => {
+              if (sub.startIndex !== targetSub.startIndex || sub.endIndex !== targetSub.endIndex) {
+                const minReq = Number(sub.requiredQuestions) || 0;
+                if (minReq > 0) {
+                  const markedInOtherSub = cqQuestions.filter(q => {
+                    if (q.id === questionId) return false;
+                    if (!isQuestionMarked(q, currentStudent?.answers)) return false;
+                    const sqSub = getCqQuestionSubsection(q);
+                    return sqSub && sqSub.startIndex === sub.startIndex && sqSub.endIndex === sub.endIndex;
+                  }).length;
+                  const needed = Math.max(0, minReq - markedInOtherSub);
+                  slotsNeededByOthers += needed;
+                  if (needed > 0 && !blockingSubName) {
+                    blockingSubName = sub.name;
+                  }
+                }
+              }
+            });
+
+            if (remSlots - 1 < slotsNeededByOthers) {
+              toast.error(`বিভাগীয় শর্ত পূরণের জন্য ${blockingSubName || 'অন্য বিভাগ'}-এ অবশিষ্ট প্রশ্ন মূল্যায়ন করতে হবে।`);
+              return;
+            }
+          }
+        }
+      }
+
+      const sqReq = (exam as any)?.sqRequiredQuestions;
+      if (qType === 'sq' && typeof sqReq === 'number' && sqReq > 0) {
+        if (markedSqCount >= sqReq) {
+          toast.error(`ইতিমধ্যে ${sqReq}টি SQ প্রশ্ন মূল্যায়ন করা হয়েছে। সর্বোচ্চ ${sqReq}টি SQ-তে নম্বর দেওয়া যাবে।`);
+          return;
+        }
+      }
     }
 
     const marksKey = (subIndex !== undefined) 
@@ -2916,6 +3074,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       });
 
       if (!response.ok) {
+        const errJson = await response.json().catch(() => null);
         // Revert optimistic update on error
         if (exam && currentStudent) {
           const studentIndex = (exam?.submissions?.findIndex(s => s?.student?.id === currentStudent?.student?.id) ?? -1);
@@ -2933,7 +3092,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             }
           }
         }
-        toast.error("Failed to update marks. Please try again.");
+        toast.error(errJson?.error || "Failed to update marks. Please try again.");
         return;
       }
 
@@ -3044,6 +3203,50 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
+    // Validate CQ requirements and section dependency
+    const cqReq = (exam as any)?.cqRequiredQuestions;
+    if (typeof cqReq === 'number' && cqReq > 0 && cqQuestions.length > 0) {
+      // 1. Check subsection requirements first
+      if (hasCqSubsections) {
+        for (const sub of cqSubsections) {
+          const minReq = Number(sub.requiredQuestions) || 0;
+          if (minReq > 0) {
+            const subCqs = cqQuestions.filter(q => {
+              const s = getCqQuestionSubsection(q);
+              return s && s.startIndex === sub.startIndex && s.endIndex === sub.endIndex;
+            });
+            const attemptedInSub = subCqs.filter(q => hasStudentAttempted(q, currentStudent?.answers)).length;
+            const markedInSub = subCqs.filter(q => isQuestionMarked(q, currentStudent?.answers)).length;
+            const targetMin = Math.min(minReq, attemptedInSub);
+
+            if (markedInSub < targetMin) {
+              toast.error(`"${sub.name}" বিভাগ থেকে কমপক্ষে ${targetMin}টি প্রশ্নের মূল্যায়ন করা আবশ্যক (বর্তমানে ${markedInSub}টি মূল্যায়ন করা হয়েছে)।`);
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Check total whole required CQ questions
+      const attemptedCqs = cqQuestions.filter(q => hasStudentAttempted(q, currentStudent?.answers)).length;
+      const targetCq = Math.min(cqReq, attemptedCqs);
+      if (markedCqCount < targetCq) {
+        toast.error(`CQ-তে মোট ${targetCq}টি প্রশ্ন মূল্যায়ন করা আবশ্যক (বর্তমানে ${markedCqCount}টি মূল্যায়ন করা হয়েছে)।`);
+        return;
+      }
+    }
+
+    // Validate SQ requirements
+    const sqReq = (exam as any)?.sqRequiredQuestions;
+    if (typeof sqReq === 'number' && sqReq > 0 && sqQuestions.length > 0) {
+      const attemptedSqs = sqQuestions.filter(q => hasStudentAttempted(q, currentStudent?.answers)).length;
+      const targetSq = Math.min(sqReq, attemptedSqs);
+      if (markedSqCount < targetSq) {
+        toast.error(`SQ-তে মোট ${targetSq}টি প্রশ্ন মূল্যায়ন করা আবশ্যক (বর্তমানে ${markedSqCount}টি মূল্যায়ন করা হয়েছে)।`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const response = await fetch(`/api/exams/evaluations/${id}/submit-student`, {
@@ -3055,14 +3258,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         })
       });
 
-
       if (response.ok) {
         toast.success("Student evaluation submitted successfully");
         fetchExamData(currentStudent?.student?.id); // Refresh data with current student
       } else {
-        const errorText = await response.text();
-        console.error('Submit error:', errorText);
-        toast.error("Failed to submit student evaluation");
+        const errJson = await response.json().catch(() => null);
+        toast.error(errJson?.error || "Failed to submit student evaluation");
       }
     } catch (error) {
       console.error("Error submitting student evaluation:", error);
@@ -3876,7 +4077,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           <div className="flex items-center justify-between p-3 bg-green-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-green-600" />
-                              <span className="font-medium text-green-800">CQ</span>
+                              <div>
+                                <span className="font-medium text-green-800">CQ</span>
+                                {typeof (exam as any)?.cqRequiredQuestions === 'number' && (exam as any)?.cqRequiredQuestions > 0 && (
+                                  <div className="text-[10px] text-green-700 font-semibold flex items-center gap-1">
+                                    <span>মূল্যায়িত: {markedCqCount}/{(exam as any).cqRequiredQuestions}</span>
+                                    {markedCqCount >= (exam as any).cqRequiredQuestions && (
+                                      <span className="text-emerald-800 bg-emerald-200/80 px-1 py-0.2 rounded text-[9px] font-bold">✓ পূর্ণ</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-lg font-bold text-green-600">
@@ -3906,7 +4117,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           <div className="flex items-center justify-between p-3 bg-yellow-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <MessageSquare className="h-4 w-4 text-yellow-600" />
-                              <span className="font-medium text-yellow-800">SQ</span>
+                              <div>
+                                <span className="font-medium text-yellow-800">SQ</span>
+                                {typeof (exam as any)?.sqRequiredQuestions === 'number' && (exam as any)?.sqRequiredQuestions > 0 && (
+                                  <div className="text-[10px] text-yellow-700 font-semibold flex items-center gap-1">
+                                    <span>মূল্যায়িত: {markedSqCount}/{(exam as any).sqRequiredQuestions}</span>
+                                    {markedSqCount >= (exam as any).sqRequiredQuestions && (
+                                      <span className="text-amber-800 bg-amber-200/80 px-1 py-0.2 rounded text-[9px] font-bold">✓ পূর্ণ</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-lg font-bold text-yellow-600">
@@ -4264,28 +4485,55 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       }>
                                         {(currentQuestion?.type || "unknown").toUpperCase()}
                                       </Badge>
+                                      {(() => {
+                                        const subInfo = getCqQuestionSubsection(currentQuestion);
+                                        if (!subInfo) return null;
+                                        return (
+                                          <Badge className="bg-emerald-700 text-white font-bold text-xs shadow-xs px-2.5 py-0.5">
+                                            {subInfo.name} (প্রশ্ন {subInfo.startIndex}-{subInfo.endIndex} • কমপক্ষে {subInfo.requiredQuestions || 1}টি)
+                                          </Badge>
+                                        );
+                                      })()}
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
                                       <div className="text-sm text-muted-foreground">
                                         {currentQuestion?.marks} mark{currentQuestion?.marks > 1 ? 's' : ''}
                                       </div>
-                                      {['cq', 'sq', 'descriptive'].includes(currentQuestion?.type?.toLowerCase() || '') && (
-                                        <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">
-                                          Awarded: {(() => {
-                                            const qId = currentQuestion?.id;
-                                            let total = 0;
-                                            const subQs = currentQuestion?.subQuestions || currentQuestion?.sub_questions || currentQuestion?.parts || [];
-                                            subQs.forEach((_: any, i: number) => {
-                                              total += Number(
-                                                currentStudent?.answers?.[`${qId}_sub_${i}_marks`] || 
-                                                currentStudent?.answers?.[`${qId}_desc_${i}_marks`] || 
-                                                0
-                                              );
-                                            });
-                                            return total;
-                                          })()} / {currentQuestion?.marks}
-                                        </Badge>
-                                      )}
+                                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                        {currentQuestion?.type?.toLowerCase() === 'cq' && typeof (exam as any)?.cqRequiredQuestions === 'number' && (exam as any)?.cqRequiredQuestions > 0 && (
+                                          <Badge variant="outline" className={cn(
+                                            "text-[10px] font-black",
+                                            markedCqCount >= (exam as any).cqRequiredQuestions ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-blue-50 text-blue-700 border-blue-200"
+                                          )}>
+                                            CQ Evaluated: {markedCqCount}/{(exam as any).cqRequiredQuestions}
+                                          </Badge>
+                                        )}
+                                        {currentQuestion?.type?.toLowerCase() === 'sq' && typeof (exam as any)?.sqRequiredQuestions === 'number' && (exam as any)?.sqRequiredQuestions > 0 && (
+                                          <Badge variant="outline" className={cn(
+                                            "text-[10px] font-black",
+                                            markedSqCount >= (exam as any).sqRequiredQuestions ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                          )}>
+                                            SQ Evaluated: {markedSqCount}/{(exam as any).sqRequiredQuestions}
+                                          </Badge>
+                                        )}
+                                        {['cq', 'sq', 'descriptive'].includes(currentQuestion?.type?.toLowerCase() || '') && (
+                                          <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">
+                                            Awarded: {(() => {
+                                              const qId = currentQuestion?.id;
+                                              let total = 0;
+                                              const subQs = currentQuestion?.subQuestions || currentQuestion?.sub_questions || currentQuestion?.parts || [];
+                                              subQs.forEach((_: any, i: number) => {
+                                                total += Number(
+                                                  currentStudent?.answers?.[`${qId}_sub_${i}_marks`] || 
+                                                  currentStudent?.answers?.[`${qId}_desc_${i}_marks`] || 
+                                                  0
+                                                );
+                                              });
+                                              return total;
+                                            })()} / {currentQuestion?.marks}
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                   <div className="text-base md:text-lg mb-4 whitespace-pre-wrap">

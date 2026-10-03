@@ -501,6 +501,7 @@ export async function GET(
       mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
       cqRequiredQuestions: (exam as any).cqRequiredQuestions,
       sqRequiredQuestions: (exam as any).sqRequiredQuestions,
+      cqSubsections: (exam as any).cqSubsections || null,
       questions: baseQuestions.map((q: any) => formatQuestion(q)),
       submissions: processedSubmissions,
       questionsBySet: formattedQuestionsBySet

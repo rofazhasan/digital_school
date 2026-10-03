@@ -13,7 +13,7 @@ export async function POST(
     }
 
     const { id: examId } = await params;
-    const { studentId, questionId, marks, notes } = await req.json();
+    const { studentId, questionId, marks, notes, subIndex } = await req.json();
 
     // Check if user has access to this exam
     let exam;
@@ -70,8 +70,108 @@ export async function POST(
     const targetQuestion = (questions || []).find((q: any) => q.id === questionId);
     const isManualType = ['CQ', 'SQ', 'DESCRIPTIVE'].includes(targetQuestion?.type?.toUpperCase());
 
+    const currentAnswers = (submission.answers as Record<string, any>) || {};
+
+    const getQScore = (q: any, answers: Record<string, any>): number => {
+      if (!answers || !q) return 0;
+      const subQs = q.subQuestions || q.sub_questions || q.parts || [];
+      if (subQs.length > 0) {
+        let sum = 0;
+        let hasAny = false;
+        subQs.forEach((_: any, i: number) => {
+          const m = answers[`${q.id}_sub_${i}_marks`] ?? answers[`${q.id}_desc_${i}_marks`];
+          if (typeof m === 'number') {
+            sum += m;
+            hasAny = true;
+          }
+        });
+        if (hasAny) return sum;
+      }
+      const top = answers[`${q.id}_marks`];
+      return typeof top === 'number' ? top : 0;
+    };
+
+    const prevScore = getQScore(targetQuestion, currentAnswers);
+    let projectedScore = marks;
+    if (subIndex !== undefined) {
+      const subQs = targetQuestion?.subQuestions || targetQuestion?.sub_questions || targetQuestion?.parts || [];
+      let totalSub = 0;
+      subQs.forEach((_: any, idx: number) => {
+        if (idx === subIndex) {
+          totalSub += marks;
+        } else {
+          const m = currentAnswers[`${questionId}_sub_${idx}_marks`] ?? currentAnswers[`${questionId}_desc_${idx}_marks`];
+          if (typeof m === 'number') totalSub += m;
+        }
+      });
+      projectedScore = totalSub;
+    }
+
+    if (prevScore === 0 && projectedScore > 0) {
+      const allQuestionsList: any[] = questions || [];
+      const cqQuestions = allQuestionsList.filter((q: any) => (q.type || '').toUpperCase() === 'CQ');
+      const sqQuestions = allQuestionsList.filter((q: any) => (q.type || '').toUpperCase() === 'SQ');
+      const qType = (targetQuestion?.type || '').toUpperCase();
+
+      if (qType === 'CQ' && exam.cqRequiredQuestions && exam.cqRequiredQuestions > 0) {
+        const markedCqs = cqQuestions.filter((q: any) => q.id !== questionId && getQScore(q, currentAnswers) > 0);
+        if (markedCqs.length >= exam.cqRequiredQuestions) {
+          return NextResponse.json({
+            error: `ইতিমধ্যে ${exam.cqRequiredQuestions}টি CQ প্রশ্ন মূল্যায়ন করা হয়েছে। সর্বোচ্চ ${exam.cqRequiredQuestions}টি CQ-তে নম্বর দেওয়া যাবে।`
+          }, { status: 400 });
+        }
+
+        // Section dependency validation
+        const rawSubs = (exam as any).cqSubsections;
+        const subsections = Array.isArray(rawSubs) ? rawSubs : (typeof rawSubs === 'string' ? JSON.parse(rawSubs || '[]') : []);
+        if (Array.isArray(subsections) && subsections.length > 1) {
+          const cqIndex = cqQuestions.findIndex((q: any) => q.id === questionId);
+          const cqNumber = cqIndex + 1;
+          const targetSub = subsections.find((s: any) => cqNumber >= s.startIndex && cqNumber <= s.endIndex);
+
+          if (targetSub) {
+            const remSlots = exam.cqRequiredQuestions - markedCqs.length;
+            let slotsNeededByOthers = 0;
+            let blockingSubName = '';
+
+            subsections.forEach((sub: any) => {
+              if (sub.startIndex !== targetSub.startIndex || sub.endIndex !== targetSub.endIndex) {
+                const minReq = Number(sub.requiredQuestions) || 0;
+                if (minReq > 0) {
+                  const markedInOtherSub = markedCqs.filter((q: any) => {
+                    const idx = cqQuestions.findIndex((x: any) => x.id === q.id);
+                    const num = idx + 1;
+                    return num >= sub.startIndex && num <= sub.endIndex;
+                  }).length;
+                  const needed = Math.max(0, minReq - markedInOtherSub);
+                  slotsNeededByOthers += needed;
+                  if (needed > 0 && !blockingSubName) {
+                    blockingSubName = sub.name;
+                  }
+                }
+              }
+            });
+
+            if (remSlots - 1 < slotsNeededByOthers) {
+              return NextResponse.json({
+                error: `বিভাগীয় শর্ত পূরণের জন্য ${blockingSubName || 'অন্য বিভাগ'}-এ অবশিষ্ট প্রশ্ন মূল্যায়ন করতে হবে।`
+              }, { status: 400 });
+            }
+          }
+        }
+      }
+
+      if (qType === 'SQ' && exam.sqRequiredQuestions && exam.sqRequiredQuestions > 0) {
+        const markedSqs = sqQuestions.filter((q: any) => q.id !== questionId && getQScore(q, currentAnswers) > 0);
+        if (markedSqs.length >= exam.sqRequiredQuestions) {
+          return NextResponse.json({
+            error: `ইতিমধ্যে ${exam.sqRequiredQuestions}টি SQ প্রশ্ন মূল্যায়ন করা হয়েছে। সর্বোচ্চ ${exam.sqRequiredQuestions}টি SQ-তে নম্বর দেওয়া যাবে।`
+          }, { status: 400 });
+        }
+      }
+    }
+
     // Update the submission with new marks and notes
-    const { subIndex } = await req.json().catch(() => ({ subIndex: undefined }));
     const updatedAnswers = {
       ...(submission.answers as Record<string, unknown>),
     };

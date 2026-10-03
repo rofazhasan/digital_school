@@ -188,6 +188,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     // Initialize section-wise scores
     const allCqScores: number[] = [];
+    const allCqItems: { id: string; score: number; cqNumber: number }[] = [];
     const allSqScores: number[] = [];
     const evaluationResult: Record<string, any> = {};
     // 1. Determine Exam Set
@@ -364,8 +365,12 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     score = typeof manualMark === 'number' ? manualMark : 0;
                 }
 
-                if (type === 'CQ') allCqScores.push(score);
-                else allSqScores.push(score); // DESCRIPTIVE grouped with SQ marks
+                if (type === 'CQ') {
+                    allCqScores.push(score);
+                    allCqItems.push({ id: question.id, score, cqNumber: allCqItems.length + 1 });
+                } else {
+                    allSqScores.push(score); // DESCRIPTIVE grouped with SQ marks
+                }
                 continue;
             }
 
@@ -494,12 +499,51 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         }
     }
 
-    // 3. Select Best N for CQ and SQ
+    // 3. Select Best N for CQ and SQ with Section Dependency support
     const cqRequired = exam.cqRequiredQuestions || allCqScores.length;
     const sqRequired = exam.sqRequiredQuestions || allSqScores.length;
 
-    // Sort descending to pick highest marks
-    cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqRequired).reduce((sum, s) => sum + s, 0);
+    const rawCqSubsections = (exam as any).cqSubsections;
+    const cqSubsectionsList = Array.isArray(rawCqSubsections)
+      ? rawCqSubsections
+      : (typeof rawCqSubsections === 'string' ? JSON.parse(rawCqSubsections || '[]') : []);
+
+    if (cqSubsectionsList && cqSubsectionsList.length > 1 && allCqItems.length > 0) {
+      const chosenIds = new Set<string>();
+      let selectedCqMarks = 0;
+
+      // 1. First pass: for each subsection, pick top requiredQuestions
+      cqSubsectionsList.forEach((sub: any) => {
+        const minReq = Number(sub.requiredQuestions) || 0;
+        if (minReq > 0) {
+          const subQs = allCqItems
+            .filter(item => item.cqNumber >= sub.startIndex && item.cqNumber <= sub.endIndex)
+            .sort((a, b) => b.score - a.score);
+          const topSub = subQs.slice(0, minReq);
+          topSub.forEach(item => {
+            if (!chosenIds.has(item.id)) {
+              chosenIds.add(item.id);
+              selectedCqMarks += item.score;
+            }
+          });
+        }
+      });
+
+      // 2. Second pass: fill remaining slots up to cqRequired from remaining questions with highest scores
+      const remainingQs = allCqItems
+        .filter(item => !chosenIds.has(item.id))
+        .sort((a, b) => b.score - a.score);
+      const slotsLeft = Math.max(0, cqRequired - chosenIds.size);
+      remainingQs.slice(0, slotsLeft).forEach(item => {
+        chosenIds.add(item.id);
+        selectedCqMarks += item.score;
+      });
+
+      cqMarks = selectedCqMarks;
+    } else {
+      // Sort descending to pick highest marks
+      cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqRequired).reduce((sum, s) => sum + s, 0);
+    }
     sqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqRequired).reduce((sum, s) => sum + s, 0);
 
     mcqMarks = Math.round(mcqMarks * 100) / 100;
