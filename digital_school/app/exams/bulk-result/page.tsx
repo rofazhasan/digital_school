@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
+import { getPassPercentage } from "@/lib/utils";
 import { toast } from "sonner";
 
 // --- Types ---
@@ -91,7 +92,7 @@ interface SubjectGroup {
 export function getSubjectGradePoint(marks: number, totalMarks: number, passMarks: number = 33): { gp: number; grade: string } {
   if (totalMarks <= 0) return { gp: 0.0, grade: "F" };
   const percentage = (marks / totalMarks) * 100;
-  const passThresholdPct = (passMarks / totalMarks) * 100;
+  const passThresholdPct = getPassPercentage(passMarks, totalMarks);
 
   if (percentage < passThresholdPct) {
     return { gp: 0.0, grade: "F" };

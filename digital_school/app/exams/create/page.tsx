@@ -926,7 +926,14 @@ export default function CreateExamPage() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="passMarks" control={form.control} render={({ field }) => (
-                            <FormItem><FormLabel>Pass Marks</FormLabel><FormControl><Input type="number" step="any" min="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                              <div className="flex items-center justify-between">
+                                <FormLabel>Pass Marks / পাস মার্ক</FormLabel>
+                                <span className="text-[11px] text-muted-foreground font-normal">নম্বর বা শতকরা (যেমন: 40% বা ২০)</span>
+                              </div>
+                              <FormControl><Input type="number" step="any" min="0.01" placeholder="e.g. 40 or 33" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )} />
                           <FormField name="allowRetake" control={form.control} render={({ field }) => (
                             <FormItem className="flex flex-row items-center space-x-3 mt-6"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="mb-0">Allow Retake</FormLabel></FormItem>

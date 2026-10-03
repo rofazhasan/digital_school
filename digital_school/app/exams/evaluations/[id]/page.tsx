@@ -70,7 +70,7 @@ import {
 import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
-import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation, cn, calculateGrade, getPassPercentage } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
@@ -4034,22 +4034,39 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 পরীক্ষা বাতিল (Disqualified)
                               </Badge>
                             )}
-                            {currentStudent?.result?.grade && !currentStudent?.result?.grade?.includes('Disqualified') && (
-                              currentStudent.result.grade === 'Pending Evaluation' ? (
-                                <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-bold text-xs px-2.5 py-0.5">
-                                  মূল্যায়ন অপেক্ষমান
-                                </Badge>
-                              ) : (
+                            {(() => {
+                              const rawGrade = currentStudent?.result?.grade;
+                              if (!rawGrade || rawGrade.includes('Disqualified') || (currentStudent?.answers as any)?._isDisqualified) return null;
+                              if (rawGrade === 'Pending Evaluation') {
+                                return (
+                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-bold text-xs px-2.5 py-0.5">
+                                    মূল্যায়ন অপেক্ষমান
+                                  </Badge>
+                                );
+                              }
+
+                              const studentEarned = currentStudent?.earnedMarks ?? currentStudent?.result?.total ?? 0;
+                              const effectiveTotal = exam?.totalMarks && exam.totalMarks > 0 ? exam.totalMarks : (totalMarks || 100);
+                              const studentPct = effectiveTotal > 0 ? (studentEarned / effectiveTotal) * 100 : (currentStudent?.result?.percentage ?? 0);
+                              const effectivePassMark = getPassPercentage(exam?.passMarks, effectiveTotal);
+
+                              const displayGrade = (rawGrade === 'F' && studentPct >= effectivePassMark)
+                                ? calculateGrade(studentPct, effectivePassMark, effectiveTotal)
+                                : rawGrade;
+
+                              const isFail = displayGrade === 'F';
+
+                              return (
                                 <Badge variant="outline" className={cn(
                                   "font-bold text-xs px-2.5 py-0.5",
-                                  currentStudent.result.grade === 'F'
+                                  isFail
                                     ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
                                     : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
                                 )}>
-                                  Grade: {currentStudent.result.grade}
+                                  Grade: {displayGrade}
                                 </Badge>
-                              )
-                            )}
+                              );
+                            })()}
                           </div>
                           <div className="text-sm font-medium text-blue-700 bg-blue-100/50 px-2 py-1 rounded">
                             Total: {totalMarks} marks

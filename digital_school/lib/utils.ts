@@ -59,25 +59,44 @@ export function getPassPercentage(passMarks?: number | null, totalMarks?: number
     return 33;
   }
 
-  // If totalMarks is specified and > 0:
-  if (!isNaN(total) && total > 0) {
-    // If rawPass is <= total, it represents points out of totalMarks
-    // e.g. 92 out of 230 => (92 / 230) * 100 = 40%
-    // e.g. 33 out of 100 => 33%
-    // e.g. 17 out of 50 => 34%
-    if (rawPass <= total) {
-      return Math.round((rawPass / total) * 10000) / 100;
-    }
+  // If no valid totalMarks provided or totalMarks <= 0
+  if (isNaN(total) || total <= 0) {
+    return rawPass <= 60 ? rawPass : 33;
   }
 
-  // If rawPass is already a percentage <= 100
-  if (rawPass <= 100) {
-    // Standard passing thresholds in Bangladesh are at most 60%.
-    // If rawPass > 60 without totalMarks, it is almost certainly raw points,
-    // so return standard 33% fallback to prevent false fail.
-    if (rawPass > 60) {
-      return 33;
-    }
+  if (total === 100) {
+    return rawPass <= 60 ? rawPass : 33;
+  }
+
+  const asRawMarksPct = (rawPass / total) * 100;
+
+  // In educational grading systems (e.g. Bangladesh NCTB / SSC / HSC / University),
+  // a pass mark percentage is NEVER higher than 60% (60% is A-, 80% is A+).
+  // If treating rawPass as raw marks produces a pass threshold > 60% (e.g. 40 out of 50 = 80%),
+  // but rawPass itself is <= 60 (e.g. 40 or 33 or 50):
+  // The user/teacher entered a direct percentage (e.g. 40% pass mark)!
+  if (asRawMarksPct > 60 && rawPass <= 60) {
+    return rawPass;
+  }
+
+  // Conversely, if treating rawPass as raw marks produces an unrealistically low threshold (< 25%, e.g. 40 out of 200 = 20%),
+  // but rawPass is between 30 and 60 (e.g. 40 or 33):
+  // The user also entered a direct percentage!
+  if (asRawMarksPct < 25 && rawPass >= 30 && rawPass <= 60) {
+    return rawPass;
+  }
+
+  // If rawPass is within total and represents a realistic pass percentage (25% to 60%):
+  // e.g. 20 out of 50 => 40%
+  // e.g. 16.5 out of 50 => 33%
+  // e.g. 33 out of 100 => 33%
+  // e.g. 80 out of 200 => 40%
+  if (rawPass <= total) {
+    return Math.round(asRawMarksPct * 100) / 100;
+  }
+
+  // If rawPass > total, but rawPass is a valid percentage (<= 60, e.g. 33% on 25 marks):
+  if (rawPass <= 60) {
     return rawPass;
   }
 
@@ -93,17 +112,7 @@ export function getPassPercentage(passMarks?: number | null, totalMarks?: number
  * @returns The grade (A+, A, A-, B, C, D, F)
  */
 export function calculateGrade(percentage: number, passMark: number = 33, totalMarks?: number): string {
-  let effectivePassMark = Number(passMark);
-  if (isNaN(effectivePassMark) || effectivePassMark <= 0) {
-    effectivePassMark = 33;
-  }
-
-  if (totalMarks && totalMarks > 0 && effectivePassMark <= totalMarks) {
-    effectivePassMark = (effectivePassMark / totalMarks) * 100;
-  } else if (effectivePassMark > 60) {
-    // Pass mark > 60% without totalMarks is almost certainly raw marks
-    effectivePassMark = 33;
-  }
+  const effectivePassMark = getPassPercentage(passMark, totalMarks);
 
   if (percentage < effectivePassMark) {
     return 'F';
@@ -138,16 +147,7 @@ export function calculateGrade(percentage: number, passMark: number = 33, totalM
  * F : 0.00 (<Pass)
  */
 export function calculateGPA(percentage: number, passMark: number = 33, totalMarks?: number): number {
-  let effectivePassMark = Number(passMark);
-  if (isNaN(effectivePassMark) || effectivePassMark <= 0) {
-    effectivePassMark = 33;
-  }
-
-  if (totalMarks && totalMarks > 0 && effectivePassMark <= totalMarks) {
-    effectivePassMark = (effectivePassMark / totalMarks) * 100;
-  } else if (effectivePassMark > 60) {
-    effectivePassMark = 33;
-  }
+  const effectivePassMark = getPassPercentage(passMark, totalMarks);
 
   if (percentage < effectivePassMark) return 0.00;
   if (percentage >= 80) return 5.00;

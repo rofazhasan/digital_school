@@ -335,6 +335,14 @@ export async function GET(
               ? 'Pending Evaluation'
               : calculateGrade(pct, passMark, exam.totalMarks));
 
+        // Self-heal stale result records in database if grade changed
+        if (dbResult && dbResult.grade !== resolvedGrade && resolvedGrade !== 'Pending Evaluation' && !dbResult.grade?.includes('Disqualified')) {
+          prisma.result.update({
+            where: { id: dbResult.id },
+            data: { grade: resolvedGrade, percentage: pct }
+          }).catch(err => console.error('Self-healing result grade in evaluation route error:', err));
+        }
+
         processedSubmissions.push({
           id: submission.id,
           student: {
