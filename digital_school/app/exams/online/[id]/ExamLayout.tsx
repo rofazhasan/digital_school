@@ -1298,68 +1298,9 @@ export default function ExamLayout() {
               {(() => {
                 const qType = (currentQuestion?.type || currentQuestion?.questionType || "").toLowerCase();
                 const isSubjective = ['cq', 'sq', 'descriptive'].includes(qType);
-                const isCq = qType === 'cq';
-                const currentCqSub = isCq && getCqSubsectionForQuestion ? getCqSubsectionForQuestion(currentQuestion) : null;
-                const totalCqQuestions = (fullSortedQuestions || []).filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq').length || exam?.cqTotalQuestions || 0;
-                const requiredCqQuestions = exam?.cqRequiredQuestions || 0;
 
                 return (
                   <div className="space-y-4">
-                    {/* CQ Section & Subsection Partition Guidance Banner (SS Exams) */}
-                    {!isMS && isCq && (hasCqSubsections || requiredCqQuestions > 0) && (
-                      <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-purple-50/40 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-purple-950/10 border border-blue-200/80 dark:border-blue-900/40 p-3.5 sm:p-4 rounded-2xl shadow-sm space-y-2.5 animate-in fade-in duration-300">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-blue-500/10 dark:bg-blue-400/10 text-blue-600 dark:text-blue-400 rounded-lg">
-                              <Layers className="w-4 h-4" />
-                            </div>
-                            <span className="font-semibold text-blue-950 dark:text-blue-200 text-sm">
-                              {hasCqSubsections && currentCqSub 
-                                ? `${currentCqSub.name} (প্রশ্ন ${toBengaliNumerals(currentCqSub.startIndex)}-${toBengaliNumerals(currentCqSub.endIndex)})` 
-                                : 'সৃজনশীল প্রশ্ন (CQ)'}
-                            </span>
-                            {hasCqSubsections && currentCqSub && (
-                              <Badge variant="outline" className="bg-blue-100/70 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300 dark:border-blue-700 text-xs font-semibold px-2 py-0.5">
-                                {currentCqSub.requiredQuestions > 0 
-                                  ? `কমপক্ষে ${toBengaliNumerals(currentCqSub.requiredQuestions)}টি উত্তর করতে হবে`
-                                  : 'যেকোনো প্রশ্ন'}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Overall CQ Rule */}
-                          {requiredCqQuestions > 0 && (
-                            <div className="text-xs font-medium text-blue-800/90 dark:text-blue-300 bg-white/80 dark:bg-blue-950/60 px-2.5 py-1 rounded-full border border-blue-200/60 dark:border-blue-800/40">
-                              মোট {toBengaliNumerals(totalCqQuestions)}টির মধ্যে যেকোনো {toBengaliNumerals(requiredCqQuestions)}টি উত্তর দিতে হবে
-                            </div>
-                          )}
-                        </div>
-
-                        {/* All Partitions Summary (only if multiple subsections exist) */}
-                        {hasCqSubsections && cqSubsections && cqSubsections.length > 1 && (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-blue-200/50 dark:border-blue-900/30 text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground/80">বিভাগসমূহ:</span>
-                            {cqSubsections.map((sub: any, idx: number) => {
-                              const isCurrentSub = currentCqSub?.name === sub.name;
-                              return (
-                                <span
-                                  key={idx}
-                                  className={cn(
-                                    "px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors",
-                                    isCurrentSub
-                                      ? "bg-blue-600 text-white shadow-xs"
-                                      : "bg-blue-100/60 text-blue-900 dark:bg-blue-900/30 dark:text-blue-300"
-                                  )}
-                                >
-                                  {sub.name} (প্রশ্ন {toBengaliNumerals(sub.startIndex)}-${toBengaliNumerals(sub.endIndex)})
-                                  {sub.requiredQuestions > 0 && ` • কমপক্ষে ${toBengaliNumerals(sub.requiredQuestions)}টি`}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {isPractice && isSubjective && (
                       <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 p-4 rounded-2xl flex gap-3 items-start animate-in slide-in-from-top-2 duration-300">
