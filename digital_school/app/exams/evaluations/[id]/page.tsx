@@ -2274,9 +2274,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 (newSubmission?.result?.total === 0 || newSubmission?.result?.total == null) &&
                 (existingSubmission?.result?.total ?? 0) > 0;
 
-              updatedSubmissions[studentIndex] = shouldPreserveOldResult
-                ? { ...newSubmission, result: existingSubmission?.result }
-                : newSubmission;
+              const mergedStudent = {
+                ...existingSubmission?.student,
+                ...newSubmission?.student,
+                roll: newSubmission?.student?.roll || existingSubmission?.student?.roll,
+                registrationNo: newSubmission?.student?.registrationNo || existingSubmission?.student?.registrationNo,
+              };
+
+              const mergedEarnedMarks = (newSubmission?.earnedMarks != null && newSubmission.status !== 'ERROR')
+                ? newSubmission.earnedMarks
+                : (shouldPreserveOldResult ? (existingSubmission?.earnedMarks ?? existingSubmission?.result?.total ?? 0) : (newSubmission?.earnedMarks ?? 0));
+
+              updatedSubmissions[studentIndex] = {
+                ...existingSubmission,
+                ...newSubmission,
+                student: mergedStudent,
+                earnedMarks: mergedEarnedMarks,
+                result: shouldPreserveOldResult ? existingSubmission?.result : (newSubmission?.result || existingSubmission?.result),
+                status: (newSubmission?.status === 'ERROR' && existingSubmission?.status) 
+                  ? existingSubmission.status 
+                  : (newSubmission?.status || existingSubmission?.status)
+              };
 
               return {
                 ...prevExam,
@@ -4331,11 +4349,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               </div>
                               <div>
                                 <label className="text-xs font-medium text-muted-foreground">Roll</label>
-                                <div className="font-semibold">{currentStudent?.student?.roll}</div>
+                                <div className="font-semibold">{currentStudent?.student?.roll || '—'}</div>
                               </div>
                               <div className="col-span-2">
                                 <label className="text-xs font-medium text-muted-foreground">Registration</label>
-                                <div className="font-semibold text-xs">{currentStudent?.student?.registrationNo}</div>
+                                <div className="font-semibold text-xs">{currentStudent?.student?.registrationNo || '—'}</div>
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -4343,7 +4361,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <Badge className={
                                   currentStudent?.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                                     currentStudent?.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-gray-100 text-gray-800'
+                                      currentStudent?.status === 'ERROR' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
                                 }>
                                   {currentStudent?.status}
                                 </Badge>
@@ -4379,7 +4398,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               <div className="text-right">
                                 <div className="text-xs text-gray-500">Marks</div>
                                 <div className="font-bold text-lg">
-                                  {currentStudent?.earnedMarks} / {totalMarks}
+                                  {currentStudent?.earnedMarks ?? currentStudent?.result?.total ?? 0} / {totalMarks}
                                   {(() => {
                                     // Local calculation for deducted marks
                                     const deducted = 0;

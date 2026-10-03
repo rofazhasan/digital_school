@@ -6,6 +6,7 @@ import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
 import { evaluateARQuestion } from "@/lib/evaluation/arEvaluation";
 import { evaluateINTQuestion } from "@/lib/evaluation/intEvaluation";
 import { calculateGrade, calculatePercentage, getPassPercentage } from "@/lib/utils";
+import { hasCqSqQuestions } from "@/lib/exam-logic";
 
 export async function GET(
   req: NextRequest,
@@ -169,16 +170,16 @@ export async function GET(
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
+    const containsCqSq = hasCqSqQuestions(exam, (exam as any).examSets || []);
+
     // -------------------------------------------------------------------------
     // AUTO-RELEASE TRIGGER (Teacher View & Evaluation Load Fallback)
     // -------------------------------------------------------------------------
     try {
-      const { finalizeAndReleaseExam, hasCqSqQuestions } = await import("@/lib/exam-logic");
-      const containsCqSq = hasCqSqQuestions(exam, (exam as any).examSets || []);
-
       // Never auto-release results on evaluation load for exams with CQ/SQ!
       // Teachers must manually review and click 'Release Results'.
       if (!containsCqSq) {
+        const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
         const isTimeOver = (new Date() > new Date(exam.endTime));
 
         const totalClassStudents = await prisma.studentProfile.count({
@@ -206,9 +207,17 @@ export async function GET(
 
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
-      const generatedSet = exam.generatedSet as any;
-      if (generatedSet.questions && Array.isArray(generatedSet.questions)) {
-        allQuestions.push(...generatedSet.questions);
+      const genSet = exam.generatedSet as any;
+      if (Array.isArray(genSet)) {
+        if (genSet.length > 0 && Array.isArray(genSet[0]?.questions)) {
+          genSet.forEach((s: any) => {
+            if (Array.isArray(s.questions)) allQuestions.push(...s.questions);
+          });
+        } else if (genSet.length > 0 && (genSet[0]?.id || genSet[0]?.questionText)) {
+          allQuestions.push(...genSet);
+        }
+      } else if (genSet.questions && Array.isArray(genSet.questions)) {
+        allQuestions.push(...genSet.questions);
       }
     }
 
@@ -354,13 +363,55 @@ export async function GET(
         });
       } catch (error) {
         console.error(`Error processing submission for ${submission.studentId}:`, error);
+        const dbResult = studentResultMap.get(submission.studentId);
+        const fallbackMarks = dbResult?.total ?? submission.score ?? 0;
+        const examSetId = studentExamSetMap.get(submission.studentId);
+
+        let evaluationStatus = 'PENDING';
+        if (submission.evaluatedAt) {
+          evaluationStatus = 'COMPLETED';
+        } else if (submission.evaluatorNotes || fallbackMarks > 0) {
+          evaluationStatus = 'IN_PROGRESS';
+        }
+
+        const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
+        const pct = exam.totalMarks > 0 
+          ? calculatePercentage(fallbackMarks, exam.totalMarks)
+          : (dbResult?.percentage ?? 0);
+
         processedSubmissions.push({
           id: submission.id,
-          student: { id: submission.student.id, name: submission.student.user.name },
-          answers: submission.answers,
+          student: {
+            id: submission.student.id,
+            name: submission.student.user?.name || (submission.student as any)?.name || 'Student',
+            roll: submission.student.roll || null,
+            registrationNo: submission.student.registrationNo || null
+          },
+          answers: { ...(submission.answers || {}) },
           submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
-          earnedMarks: 0,
-          status: 'ERROR'
+          totalMarks: exam.totalMarks || 100,
+          earnedMarks: fallbackMarks,
+          status: evaluationStatus,
+          evaluatorNotes: submission.evaluatorNotes || null,
+          result: dbResult ? {
+            mcqMarks: dbResult.mcqMarks,
+            cqMarks: dbResult.cqMarks,
+            sqMarks: dbResult.sqMarks,
+            total: dbResult.total,
+            percentage: dbResult.percentage,
+            grade: dbResult.grade,
+            isPublished: dbResult.isPublished || false
+          } : {
+            mcqMarks: 0,
+            cqMarks: fallbackMarks,
+            sqMarks: 0,
+            total: fallbackMarks,
+            percentage: pct,
+            grade: calculateGrade(pct, passMark, exam.totalMarks),
+            isPublished: false
+          },
+          submissionStatus: submission.status,
+          examSetId: examSetId
         });
       }
     }
@@ -376,9 +427,15 @@ export async function GET(
 
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
-      const generatedSet = exam.generatedSet as any;
-      if (generatedSet.questions && Array.isArray(generatedSet.questions)) {
-        baseQuestions = generatedSet.questions;
+      const genSet = exam.generatedSet as any;
+      if (Array.isArray(genSet)) {
+        if (genSet.length > 0 && Array.isArray(genSet[0]?.questions)) {
+          baseQuestions = genSet[0].questions;
+        } else if (genSet.length > 0 && (genSet[0]?.id || genSet[0]?.questionText)) {
+          baseQuestions = genSet;
+        }
+      } else if (genSet.questions && Array.isArray(genSet.questions)) {
+        baseQuestions = genSet.questions;
       }
     }
 

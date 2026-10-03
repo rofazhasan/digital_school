@@ -136,9 +136,18 @@ export function hasCqSqQuestions(exam: Partial<Exam>, examSets: Partial<ExamSet>
 
     // 2. Check generatedSet if present
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
-        const questions = Array.isArray((exam.generatedSet as any).questions)
-            ? (exam.generatedSet as any).questions
-            : [];
+        const genSet: any = exam.generatedSet;
+        let questions: any[] = [];
+        if (Array.isArray(genSet)) {
+            if (genSet.length > 0 && Array.isArray(genSet[0]?.questions)) {
+                genSet.forEach((s: any) => { if (Array.isArray(s.questions)) questions.push(...s.questions); });
+            } else if (genSet.length > 0 && (genSet[0]?.type || genSet[0]?.questionType)) {
+                questions = genSet;
+            }
+        } else if (Array.isArray(genSet.questions)) {
+            questions = genSet.questions;
+        }
+
         const hasCqSq = questions.some((q: QuestionData) => {
             const type = (q.type || q.questionType || '').toUpperCase();
             return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
@@ -216,11 +225,27 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     const targetSet = assignedExamSet || (examSets && examSets.length > 0 ? examSets[0] : null);
 
-    // 2. Main Evaluation Loop
+    let questionsList: any[] = [];
     if (targetSet?.questionsJson) {
-        const questions = typeof targetSet.questionsJson === 'string'
+        questionsList = typeof targetSet.questionsJson === 'string'
             ? JSON.parse(targetSet.questionsJson)
             : targetSet.questionsJson;
+    } else if (exam.generatedSet) {
+        const genSet: any = exam.generatedSet;
+        if (Array.isArray(genSet)) {
+            if (genSet.length > 0 && Array.isArray(genSet[0]?.questions)) {
+                questionsList = genSet[0].questions;
+            } else if (genSet.length > 0 && (genSet[0]?.id || genSet[0]?.questionText)) {
+                questionsList = genSet;
+            }
+        } else if (Array.isArray(genSet.questions)) {
+            questionsList = genSet.questions;
+        }
+    }
+
+    // 2. Main Evaluation Loop
+    if (Array.isArray(questionsList) && questionsList.length > 0) {
+        const questions = questionsList;
 
         const seenQuestionIds = new Set<string>();
 
@@ -599,7 +624,9 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         const optionalSubjectsAttempted = new Set<string>();
 
         // Build question subject map
-        const qList = (typeof targetSet?.questionsJson === 'string' ? JSON.parse(targetSet.questionsJson) : targetSet?.questionsJson) || [];
+        const qList = (Array.isArray(questionsList) && questionsList.length > 0)
+            ? questionsList
+            : ((typeof targetSet?.questionsJson === 'string' ? JSON.parse(targetSet.questionsJson) : targetSet?.questionsJson) || []);
         
         let msSubjectsList: any[] = Array.isArray(msConfig?.subjects) && msConfig.subjects.length > 0 ? msConfig.subjects : [];
         if (msSubjectsList.length === 0) {
