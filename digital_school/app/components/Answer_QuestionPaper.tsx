@@ -248,7 +248,10 @@ const getOptionsGridClass = (options: any[], fontSize?: number): string => {
   const numFontSize = Number(fontSize) || 100;
   const fontFactor = 100 / Math.max(65, numFontSize);
 
-  const lengths = options.map((opt: any) => (typeof opt === 'string' ? opt : opt.text || opt || '').length);
+  const lengths = options.map((opt: any) => {
+    const str = typeof opt === 'string' ? opt : (typeof opt?.text === 'string' ? opt.text : '');
+    return str.length;
+  });
   const maxOptLen = Math.max(...lengths, 0);
   const totalOptLen = lengths.reduce((sum: number, len: number) => sum + len, 0);
   const count = options.length;

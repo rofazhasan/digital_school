@@ -243,8 +243,8 @@ const matchSubject = (questionSubject: string | undefined | null, targetSubjectN
 };
 
 // Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
-export const getCleanVisualLength = (text: string): number => {
-  if (!text) return 0;
+export const getCleanVisualLength = (text: any): number => {
+  if (!text || typeof text !== 'string') return 0;
   let clean = text
     .replace(/\$\$[\s\S]*?\$\$/g, (m) => m.slice(2, -2).replace(/\\[a-zA-Z]+/g, 'X').slice(0, 15))
     .replace(/\$([^\$]+)\$/g, (_, inner) => {
@@ -288,7 +288,10 @@ export const getOptionsGridClass = (options: any[], fontSize?: number): string =
   const numFontSize = Number(fontSize) || 100;
   const fontFactor = 100 / Math.max(60, numFontSize);
 
-  const lengths = options.map((opt: any) => getCleanVisualLength(typeof opt === 'string' ? opt : opt.text || opt || ''));
+  const lengths = options.map((opt: any) => {
+    const str = typeof opt === 'string' ? opt : (typeof opt?.text === 'string' ? opt.text : '');
+    return getCleanVisualLength(str);
+  });
   const maxOptLen = Math.max(...lengths, 0);
   const totalOptLen = lengths.reduce((sum: number, len: number) => sum + len, 0);
   const count = options.length;

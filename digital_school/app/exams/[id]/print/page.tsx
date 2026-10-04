@@ -30,8 +30,8 @@ export const toBengaliNumerals = (input: string | number | undefined | null): st
 };
 
 // Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
-export const getCleanVisualLength = (text: string): number => {
-  if (!text) return 0;
+export const getCleanVisualLength = (text: any): number => {
+  if (!text || typeof text !== 'string') return 0;
   let clean = text
     .replace(/\$\$[\s\S]*?\$\$/g, (m) => m.slice(2, -2).replace(/\\[a-zA-Z]+/g, 'X').slice(0, 15))
     .replace(/\$([^\$]+)\$/g, (_, inner) => {
@@ -315,7 +315,10 @@ export function splitExamSetForBooklet(
       else if (textLen > 50) w += 0.1;
 
       const opts = q.options || [];
-      const lengths = opts.map((o: any) => getCleanVisualLength(typeof o === 'string' ? o : o.text || o || ''));
+      const lengths = opts.map((o: any) => {
+        const str = typeof o === 'string' ? o : (typeof o?.text === 'string' ? o.text : '');
+        return getCleanVisualLength(str);
+      });
       const maxOpt = Math.max(...lengths, 0);
       const totOpt = lengths.reduce((sum: number, l: number) => sum + l, 0);
 
