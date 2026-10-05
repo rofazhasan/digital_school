@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -516,8 +516,9 @@ export default function ExamBuilderPage() {
     topic: '',
   });
 
-  // Add state for number of sets
+  // Add state for number of sets and option shuffle
   const [numSets, setNumSets] = useState(1);
+  const [shuffleOptions, setShuffleOptions] = useState<boolean>(true);
   const [sets, setSets] = useState<any[]>([]); // Add this state if not present
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -1278,37 +1279,56 @@ export default function ExamBuilderPage() {
         const orderedQuestions = orderedQuestionsRaw.map(q => {
           let processedQuestion = { ...q };
 
-          // Shuffle MCQ/MC options while preserving originalIndex and updating correctAnswer
+          // Shuffle MCQ/MC options while preserving originalIndex and updating correctAnswer (when shuffleOptions is ON)
           if ((q.type === 'MCQ' || q.type === 'MC') && Array.isArray(q.options)) {
             const optionsWithOriginal = q.options.map((opt: any, idx: number) => {
               if (typeof opt === 'string') return { text: opt, originalIndex: idx };
               return { ...opt, originalIndex: opt.originalIndex !== undefined ? opt.originalIndex : idx };
             });
-            const shuffledOptions = shuffleArray(optionsWithOriginal);
-            processedQuestion = { ...processedQuestion, options: shuffledOptions };
 
-            // Recalculate correctAnswer based on the new position of correct options
-            const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
-              if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
-                acc.push(idx);
+            if (shuffleOptions) {
+              const shuffledOptions = shuffleArray(optionsWithOriginal);
+              processedQuestion = { ...processedQuestion, options: shuffledOptions };
+
+              // Recalculate correctAnswer based on the new position of correct options
+              const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                  acc.push(idx);
+                }
+                return acc;
+              }, []);
+
+              if (correctIndices.length > 0) {
+                // Convert index 0->A, 1->B, 2->C...
+                const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                processedQuestion = {
+                  ...processedQuestion,
+                  correctAnswer: answerString
+                };
               }
-              return acc;
-            }, []);
-
-            if (correctIndices.length > 0) {
-              // Convert index 0->A, 1->B, 2->C...
-              const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
-              processedQuestion = {
-                ...processedQuestion,
-                correctAnswer: answerString
-              };
+            } else {
+              // Option shuffle OFF: preserve original option sequence
+              processedQuestion = { ...processedQuestion, options: optionsWithOriginal };
+              if (!processedQuestion.correctAnswer) {
+                const correctIndices = optionsWithOriginal.reduce((acc: number[], opt: any, idx: number) => {
+                  if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                    acc.push(idx);
+                  }
+                  return acc;
+                }, []);
+                if (correctIndices.length > 0) {
+                  processedQuestion.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                }
+              }
             }
           }
 
           // Shuffle MTF Right Column
           if (q.type === 'MTF' && Array.isArray(q.rightColumn)) {
-            const shuffledRightColumn = shuffleArray(q.rightColumn);
-            processedQuestion = { ...processedQuestion, rightColumn: shuffledRightColumn };
+            if (shuffleOptions) {
+              const shuffledRightColumn = shuffleArray(q.rightColumn);
+              processedQuestion = { ...processedQuestion, rightColumn: shuffledRightColumn };
+            }
           }
 
           // Shuffle AR Options (Generate default if missing)
@@ -1357,26 +1377,29 @@ export default function ExamBuilderPage() {
           if (q.type === 'SMCQ') {
             const subQs = q.subQuestions || q.sub_questions || [];
             if (Array.isArray(subQs) && subQs.length > 0) {
-              const shuffledSubQs = shuffleArray(subQs).map((sq: any) => {
+              const subQsList = shuffleOptions ? shuffleArray(subQs) : [...subQs];
+              const processedSubQs = subQsList.map((sq: any) => {
                 let processedSq = { ...sq };
                 if (Array.isArray(sq.options)) {
-                  const shuffledOptions = shuffleArray(sq.options);
-                  processedSq = { ...processedSq, options: shuffledOptions };
+                  if (shuffleOptions) {
+                    const shuffledOptions = shuffleArray(sq.options);
+                    processedSq = { ...processedSq, options: shuffledOptions };
 
-                  // Recalculate correctAnswer for the sub-question
-                  const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
-                    if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
-                      acc.push(idx);
+                    // Recalculate correctAnswer for the sub-question
+                    const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                      if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                        acc.push(idx);
+                      }
+                      return acc;
+                    }, []);
+
+                    if (correctIndices.length > 0) {
+                      const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                      processedSq = {
+                        ...processedSq,
+                        correctAnswer: answerString
+                      };
                     }
-                    return acc;
-                  }, []);
-
-                  if (correctIndices.length > 0) {
-                    const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
-                    processedSq = {
-                      ...processedSq,
-                      correctAnswer: answerString
-                    };
                   }
                 }
 
@@ -1393,8 +1416,8 @@ export default function ExamBuilderPage() {
               });
               processedQuestion = {
                 ...processedQuestion,
-                subQuestions: shuffledSubQs,
-                sub_questions: shuffledSubQs // Keep both for safety
+                subQuestions: processedSubQs,
+                sub_questions: processedSubQs // Keep both for safety
               };
             }
           }
@@ -1406,62 +1429,64 @@ export default function ExamBuilderPage() {
               const processedParts = parts.map((part: any) => {
                 let processedPart = { ...part };
 
-                // 1. Shuffling for Rearranging
-                if (part.subType === 'rearranging' && Array.isArray(part.items)) {
-                  // Keep track of original item content to label mapping
-                  const originalItemsWithLabels = part.items.map((item: string, idx: number) => ({
-                    content: item,
-                    originalLabel: String.fromCharCode(97 + idx)
-                  }));
+                if (shuffleOptions) {
+                  // 1. Shuffling for Rearranging
+                  if (part.subType === 'rearranging' && Array.isArray(part.items)) {
+                    // Keep track of original item content to label mapping
+                    const originalItemsWithLabels = part.items.map((item: string, idx: number) => ({
+                      content: item,
+                      originalLabel: String.fromCharCode(97 + idx)
+                    }));
 
-                  const shuffledItems = shuffleArray(part.items);
-                  processedPart = { ...processedPart, items: shuffledItems };
+                    const shuffledItems = shuffleArray(part.items);
+                    processedPart = { ...processedPart, items: shuffledItems };
 
-                  // Map original modelAnswer labels to new shuffled labels
-                  if (part.modelAnswer) {
-                    const originalAnsLabels = part.modelAnswer.split(',').map((s: string) => s.trim().toLowerCase());
-                    const newAnsLabels = originalAnsLabels.map((origLabel: string) => {
-                      // Find which content had this label
-                      const item = originalItemsWithLabels.find((it: any) => it.originalLabel === origLabel);
-                      if (!item) return origLabel;
-                      // Find new index of this content
-                      const newIdx = shuffledItems.indexOf(item.content);
-                      return String.fromCharCode(97 + newIdx);
-                    });
-                    processedPart.modelAnswer = newAnsLabels.join(', ');
+                    // Map original modelAnswer labels to new shuffled labels
+                    if (part.modelAnswer) {
+                      const originalAnsLabels = part.modelAnswer.split(',').map((s: string) => s.trim().toLowerCase());
+                      const newAnsLabels = originalAnsLabels.map((origLabel: string) => {
+                        // Find which content had this label
+                        const item = originalItemsWithLabels.find((it: any) => it.originalLabel === origLabel);
+                        if (!item) return origLabel;
+                        // Find new index of this content
+                        const newIdx = shuffledItems.indexOf(item.content);
+                        return String.fromCharCode(97 + newIdx);
+                      });
+                      processedPart.modelAnswer = newAnsLabels.join(', ');
+                    }
                   }
-                }
 
-                // 2. Shuffling for Fill-in Word Box
-                if (part.subType === 'fill_in' && Array.isArray(part.wordBox)) {
-                  processedPart.wordBox = shuffleArray(part.wordBox);
-                }
+                  // 2. Shuffling for Fill-in Word Box
+                  if (part.subType === 'fill_in' && Array.isArray(part.wordBox)) {
+                    processedPart.wordBox = shuffleArray(part.wordBox);
+                  }
 
-                // 3. Shuffling for Comprehension MCQ
-                if (part.subType === 'comprehension_mcq') {
-                  const subQs = part.subQuestions || part.questions || [];
-                  if (Array.isArray(subQs) && subQs.length > 0) {
-                    const shuffledSubQs = shuffleArray(subQs).map((sq: any) => {
-                      let processedSq = { ...sq };
-                      if (Array.isArray(sq.options)) {
-                        const shuffledOptions = shuffleArray(sq.options);
-                        processedSq = { ...processedSq, options: shuffledOptions };
+                  // 3. Shuffling for Comprehension MCQ
+                  if (part.subType === 'comprehension_mcq') {
+                    const subQs = part.subQuestions || part.questions || [];
+                    if (Array.isArray(subQs) && subQs.length > 0) {
+                      const shuffledSubQs = shuffleArray(subQs).map((sq: any) => {
+                        let processedSq = { ...sq };
+                        if (Array.isArray(sq.options)) {
+                          const shuffledOptions = shuffleArray(sq.options);
+                          processedSq = { ...processedSq, options: shuffledOptions };
 
-                        // Recalculate correctAnswer for the sub-question
-                        const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
-                          const isCorrect = typeof opt === 'object' ? (opt.isCorrect === true || String(opt.isCorrect) === 'true') : false;
-                          if (isCorrect) acc.push(idx);
-                          return acc;
-                        }, []);
+                          // Recalculate correctAnswer for the sub-question
+                          const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                            const isCorrect = typeof opt === 'object' ? (opt.isCorrect === true || String(opt.isCorrect) === 'true') : false;
+                            if (isCorrect) acc.push(idx);
+                            return acc;
+                          }, []);
 
-                        if (correctIndices.length > 0) {
-                          const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
-                          processedSq = { ...processedSq, correctAnswer: answerString };
+                          if (correctIndices.length > 0) {
+                            const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                            processedSq = { ...processedSq, correctAnswer: answerString };
+                          }
                         }
-                      }
-                      return processedSq;
-                    });
-                    processedPart.subQuestions = shuffledSubQs;
+                        return processedSq;
+                      });
+                      processedPart.subQuestions = shuffledSubQs;
+                    }
                   }
                 }
 
@@ -1931,17 +1956,48 @@ export default function ExamBuilderPage() {
                     <label htmlFor="setName" className="block text-sm font-medium mb-1">Set Name</label>
                     <Input id="setName" placeholder="e.g., Set A, Morning Shift" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
                   </div>
-                  <div className="mb-4 flex items-center gap-2">
-                    <label htmlFor="numSets" className="text-sm font-medium">Number of Sets:</label>
-                    <Input
-                      id="numSets"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={numSets}
-                      onChange={e => setNumSets(Math.max(1, Math.min(10, Number(e.target.value))))}
-                      className="w-20 text-center"
-                    />
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="numSets" className="text-sm font-medium whitespace-nowrap">Number of Sets:</label>
+                      <Input
+                        id="numSets"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={numSets}
+                        onChange={e => setNumSets(Math.max(1, Math.min(10, Number(e.target.value))))}
+                        className="w-16 text-center"
+                      />
+                    </div>
+                  </div>
+                  {/* Option Shuffle ON / OFF Toggle Button */}
+                  <div className="mb-4 flex items-center justify-between p-3 rounded-lg border bg-muted/40 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-md ${shuffleOptions ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                        <Shuffle className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium leading-none">Option Shuffle</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {shuffleOptions ? 'Options (A, B, C, D) shuffled per set' : 'Options preserved in original order'}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={shuffleOptions ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShuffleOptions(prev => !prev)}
+                      className={`h-7 px-3 text-xs font-semibold gap-1.5 transition-all ${
+                        shuffleOptions
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                          : 'border-muted-foreground/30 text-muted-foreground hover:text-foreground'
+                      }`}
+                      title={shuffleOptions ? "Click to turn OFF option shuffling" : "Click to turn ON option shuffling"}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${shuffleOptions ? 'bg-emerald-300 animate-pulse' : 'bg-gray-400'}`} />
+                      {shuffleOptions ? 'ON' : 'OFF'}
+                    </Button>
                   </div>
                   <h3 className="text-md font-semibold mb-2">Selected Questions ({selectedQuestions.length})</h3>
                   <ScrollArea className="h-[45vh] pr-4">
