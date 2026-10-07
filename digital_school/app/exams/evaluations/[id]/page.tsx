@@ -2549,7 +2549,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
 
       if (type === 'mc') {
-        return evaluateMCDetails(question, answer, exam?.mcqNegativeMarking || 0).score;
+        const mcNeg = (exam as any)?.mcNegativeMarking || exam?.mcqNegativeMarking || 0;
+        return evaluateMCDetails(question, answer, mcNeg).score;
       }
 
       if (type === 'ar') {
@@ -2616,7 +2617,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       if (score >= maxMarks && maxMarks > 0) return 'CORRECT';
 
       if (type === 'mc') {
-        const mcDetails = evaluateMCDetails(question, answer, exam?.mcqNegativeMarking || 0);
+        const mcNeg = (exam as any)?.mcNegativeMarking || exam?.mcqNegativeMarking || 0;
+        const mcDetails = evaluateMCDetails(question, answer, mcNeg);
         if (mcDetails.isPartial || score > 0) return 'PARTIAL';
       } else if (type === 'mtf') {
         const mtfDetails = evaluateMTFDetails(question, answer);
@@ -2818,7 +2820,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     for (const q of objectiveQuestions) {
       const score = getAutoScore(q, currentStudent?.answers);
       const qMarks = Number(q.marks || q.mark || 0);
-      const safeScore = Math.max(0, Math.min(qMarks, score));
+      const safeScore = Math.min(qMarks, score);
       
       await updateMarks(q.id, safeScore);
       gradedCount++;
@@ -4665,7 +4667,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           const autoScore = getAutoScore(currentQuestion, currentStudent?.answers);
                                           const qMarks = Number(currentQuestion?.marks) || 1;
                                           const isFull = autoScore >= qMarks && qMarks > 0;
-                                          const isPart = !isFull && (autoScore > 0 || (currentQuestion?.type?.toLowerCase() === 'mc' && evaluateMCDetails(currentQuestion, currentAnswer).isPartial) || (currentQuestion?.type?.toLowerCase() === 'mtf' && evaluateMTFDetails(currentQuestion, currentAnswer).correctCount > 0));
+                                          const mcNeg = (exam as any)?.mcNegativeMarking || exam?.mcqNegativeMarking || 0;
+                                          const isPart = !isFull && (autoScore > 0 || (currentQuestion?.type?.toLowerCase() === 'mc' && evaluateMCDetails(currentQuestion, currentAnswer, mcNeg).isPartial) || (currentQuestion?.type?.toLowerCase() === 'mtf' && evaluateMTFDetails(currentQuestion, currentAnswer).correctCount > 0));
                                           const isNeg = autoScore < 0;
 
                                           return (
@@ -4872,7 +4875,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         {currentQuestion?.type?.toLowerCase() === 'mc' && (
                                           <div className="space-y-3">
                                             {(() => {
-                                              const mc = evaluateMCDetails(currentQuestion, currentAnswer, exam?.mcqNegativeMarking || 0);
+                                              const mcNeg = (exam as any)?.mcNegativeMarking || exam?.mcqNegativeMarking || 0;
+                                              const mc = evaluateMCDetails(currentQuestion, currentAnswer, mcNeg);
                                               return (
                                                 <div className="space-y-2">
                                                   <div className="text-xs font-bold text-muted-foreground flex items-center justify-between">

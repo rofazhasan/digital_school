@@ -96,12 +96,12 @@ export function evaluateMCQuestion(
     // Round to 2 decimal places
     finalScore = Math.round(finalScore * 100) / 100;
 
-    // If score is at least 99% of total marks or within tolerance, award full marks
-    if (question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= Math.min(0.02, question.marks * 0.05))) {
+    // If score is at least 99% of total marks or within tolerance, award full marks ONLY if no wrong options were selected
+    if (wrongSelected === 0 && question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= Math.min(0.02, question.marks * 0.05))) {
         finalScore = question.marks;
     }
 
-    return finalScore;
+    return Math.max(0, finalScore);
 }
 
 /**

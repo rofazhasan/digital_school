@@ -323,7 +323,20 @@ export async function GET(
         }
 
         const dbResult = studentResultMap.get(submission.studentId);
-        const earnedTotal = dbResult?.total ?? evaluation.totalScore;
+        const isPureObjective = !containsCqSq;
+        // In pure objective exams, evaluation.totalScore is authoritative and self-heals stale DB results
+        const shouldSyncPureObjective = isPureObjective && dbResult && (
+          Math.abs((dbResult.total ?? 0) - evaluation.totalScore) > 0.001 ||
+          Math.abs((dbResult.mcqMarks ?? 0) - evaluation.mcqMarks) > 0.001
+        );
+
+        const earnedTotal = (isPureObjective && shouldSyncPureObjective)
+          ? evaluation.totalScore
+          : (dbResult?.total ?? evaluation.totalScore);
+        const earnedMcqMarks = (isPureObjective && shouldSyncPureObjective)
+          ? evaluation.mcqMarks
+          : (dbResult?.mcqMarks ?? evaluation.mcqMarks);
+
         const passMark = getPassPercentage(exam.passMarks, exam.totalMarks);
         const pct = exam.totalMarks > 0 
           ? calculatePercentage(earnedTotal, exam.totalMarks)
@@ -335,12 +348,23 @@ export async function GET(
               ? 'Pending Evaluation'
               : calculateGrade(pct, passMark, exam.totalMarks));
 
-        // Self-heal stale result records in database if grade changed
-        if (dbResult && dbResult.grade !== resolvedGrade && resolvedGrade !== 'Pending Evaluation' && !dbResult.grade?.includes('Disqualified')) {
+        // Self-heal stale result records in database if score, mcqMarks, or grade changed
+        if (dbResult && (shouldSyncPureObjective || (dbResult.grade !== resolvedGrade && resolvedGrade !== 'Pending Evaluation' && !dbResult.grade?.includes('Disqualified')))) {
           prisma.result.update({
             where: { id: dbResult.id },
-            data: { grade: resolvedGrade, percentage: pct }
+            data: {
+              ...(shouldSyncPureObjective ? { total: earnedTotal, mcqMarks: earnedMcqMarks } : {}),
+              grade: resolvedGrade,
+              percentage: pct
+            }
           }).catch(err => console.error('Self-healing result grade in evaluation route error:', err));
+
+          if (shouldSyncPureObjective && submission.id) {
+            prisma.examSubmission.update({
+              where: { id: submission.id },
+              data: { score: earnedTotal }
+            }).catch(err => console.error('Self-healing submission score in evaluation route error:', err));
+          }
         }
 
         processedSubmissions.push({
@@ -358,7 +382,7 @@ export async function GET(
           status: evaluationStatus,
           evaluatorNotes: submission.evaluatorNotes || null,
           result: {
-            mcqMarks: dbResult?.mcqMarks ?? evaluation.mcqMarks,
+            mcqMarks: earnedMcqMarks,
             cqMarks: dbResult?.cqMarks ?? evaluation.cqMarks,
             sqMarks: dbResult?.sqMarks ?? evaluation.sqMarks,
             total: earnedTotal,

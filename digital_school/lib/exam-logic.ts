@@ -421,12 +421,18 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             } else if (type === 'MC') {
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
+                const mcNeg = (exam as any).mcNegativeMarking || exam.mcqNegativeMarking || 0;
                 questionScore = evaluateMCQuestion(question as unknown as MCQuestion, studentAnswer as MCAnswer, {
-                    negativeMarking: (exam as any).mcNegativeMarking ?? exam.mcqNegativeMarking ?? 0,
+                    negativeMarking: mcNeg,
                     partialMarking: true,
                     hasAttempted: true
                 });
-                res = { score: questionScore, type };
+                const correctIndices = ((question.options || []) as any[])
+                    .map((o: any, idx: number) => ((typeof o === 'object' ? o?.isCorrect : false) ? idx : -1))
+                    .filter((idx: number) => idx !== -1);
+                const hasWrong = (studentAnswer.selectedOptions || []).some((idx: number) => !correctIndices.includes(idx));
+                const isAllCorrect = !hasWrong && (studentAnswer.selectedOptions || []).length >= correctIndices.length;
+                res = { score: questionScore, type, isCorrect: isAllCorrect };
             } else if (type === 'INT' || type === 'NUMERIC') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '' || studentAnswer === 'No answer provided') continue;
                 const evaluationRes = evaluateINTQuestion(question, studentAnswer);
@@ -507,7 +513,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
             if (res) {
                 const qMax = Number(question.marks) || 0;
-                if (qMax > 0 && (questionScore >= qMax * 0.99 || Math.abs(questionScore - qMax) <= 0.02)) {
+                if (type !== 'MC' && res.isCorrect !== false && qMax > 0 && (questionScore >= qMax * 0.99 || Math.abs(questionScore - qMax) <= 0.02)) {
                     questionScore = qMax;
                     res.score = qMax;
                     res.isCorrect = true;

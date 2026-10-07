@@ -47,11 +47,18 @@ export function evaluateINTQuestion(
     // Check if answer is correct (exact numeric integer match or close float rounding or algebraic expression equivalence)
     const studentFloat = parseFloat(cleanStudent);
     const correctFloat = parseFloat(cleanCorrect);
-    const isCloseFloat = !isNaN(studentFloat) && !isNaN(correctFloat) && (
+    const isPureStudentNum = !isNaN(studentFloat) && cleanStudent !== '';
+    const isPureCorrectNum = !isNaN(correctFloat) && cleanCorrect !== '';
+    const isCloseFloat = isPureStudentNum && isPureCorrectNum && (
         Math.abs(studentFloat - correctFloat) <= 0.02 + 1e-6 ||
         (Math.round(studentFloat) === Math.round(correctFloat) && Math.abs(studentFloat - correctFloat) <= 0.05)
     );
-    const isCorrect = studentAns === correctAnswer || isCloseFloat || areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.02);
+    let isCorrect = false;
+    if (studentAns === correctAnswer || isCloseFloat) {
+        isCorrect = true;
+    } else if (!isPureStudentNum || !isPureCorrectNum) {
+        isCorrect = areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.02);
+    }
     const score = isCorrect ? marks : 0;
 
     const feedback = isCorrect
