@@ -44,20 +44,28 @@ export function evaluateINTQuestion(
 
     const marks = Number(question.marks) || 0;
 
-    // Check if answer is correct (exact numeric integer match or close float rounding or algebraic expression equivalence)
+    // Check if answer is correct (exact match, variation of digits like 78/80 for 79, or algebraic expression equivalence)
     const studentFloat = parseFloat(cleanStudent);
     const correctFloat = parseFloat(cleanCorrect);
     const isPureStudentNum = !isNaN(studentFloat) && cleanStudent !== '';
     const isPureCorrectNum = !isNaN(correctFloat) && cleanCorrect !== '';
-    const isCloseFloat = isPureStudentNum && isPureCorrectNum && (
-        Math.abs(studentFloat - correctFloat) <= 0.02 + 1e-6 ||
-        (Math.round(studentFloat) === Math.round(correctFloat) && Math.abs(studentFloat - correctFloat) <= 0.05)
-    );
+
     let isCorrect = false;
-    if (studentAns === correctAnswer || isCloseFloat) {
+    if (studentAns === correctAnswer) {
         isCorrect = true;
-    } else if (!isPureStudentNum || !isPureCorrectNum) {
-        isCorrect = areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.02);
+    } else if (isPureStudentNum && isPureCorrectNum) {
+        const diff = Math.abs(studentFloat - correctFloat);
+        const maxVal = Math.max(Math.abs(studentFloat), Math.abs(correctFloat));
+        const relDiff = maxVal > 1e-9 ? (diff / maxVal) : diff;
+
+        // Allow calculation variations of some digits (e.g. 78 or 80 for 79) and relative calculation tolerance (e.g. 7482.74 for 7479)
+        if (diff <= 1.5 || relDiff <= 0.025) {
+            isCorrect = true;
+        } else {
+            isCorrect = areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.025);
+        }
+    } else {
+        isCorrect = areExpressionsEquivalent(String(studentAnsRaw), String(rawCorrect), 0.025);
     }
     const score = isCorrect ? marks : 0;
 

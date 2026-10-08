@@ -84,11 +84,10 @@ export function evaluateMCQuestion(
         return 0;
     }
 
-    // Partial marking calculation
-    const correctRatio = correctSelected / totalCorrect;
-    const partialMarks = correctRatio * question.marks;
+    // Partial marking calculation: (correct ans * full marks / all correct answers)
+    const partialMarks = (correctSelected * question.marks) / totalCorrect;
 
-    // Apply negative marking for wrong selections
+    // Apply negative marking for wrong selections: minus marking in percent * num of incorrect
     const wrongPenalty = wrongSelected * (settings.negativeMarking / 100) * question.marks;
 
     let finalScore = partialMarks - wrongPenalty;
@@ -96,8 +95,8 @@ export function evaluateMCQuestion(
     // Round to 2 decimal places
     finalScore = Math.round(finalScore * 100) / 100;
 
-    // If score is at least 99% of total marks or within tolerance, award full marks ONLY if no wrong options were selected
-    if (wrongSelected === 0 && question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= Math.min(0.02, question.marks * 0.05))) {
+    // also if .99 round it to 1
+    if (question.marks > 0 && (finalScore >= question.marks * 0.99 || Math.abs(finalScore - question.marks) <= 0.015)) {
         finalScore = question.marks;
     }
 

@@ -332,9 +332,13 @@ export function evaluateMCDetails(question: any, studentAnswer: any, negPct = 0)
     score = totalMarks;
   } else if (selectedIndices.length > 0) {
     const marksPerCorrect = totalMarks / totalCorrect;
-    const partialEarned = correctSelected * marksPerCorrect;
+    const partialEarned = (correctSelected * totalMarks) / totalCorrect;
     const wrongPenalty = negPct > 0 ? (wrongSelected * (negPct / 100) * totalMarks) : 0;
     score = Math.max(0, Math.round((partialEarned - wrongPenalty) * 100) / 100);
+    // also if .99 round it to 1
+    if (totalMarks > 0 && (score >= totalMarks * 0.99 || Math.abs(score - totalMarks) <= 0.015)) {
+      score = totalMarks;
+    }
   }
 
   const isPartial = !isFullCorrect && (score > 0 || correctSelected > 0);
@@ -371,8 +375,13 @@ export function evaluateINTDetails(question: any, studentAnswer: any, negPct = 0
     } else {
       const numStudent = parseFloat(strStudent);
       const numCorrect = parseFloat(strCorrect);
-      if (!isNaN(numStudent) && !isNaN(numCorrect) && Math.abs(numStudent - numCorrect) < 0.0001) {
-        isCorrect = true;
+      if (!isNaN(numStudent) && !isNaN(numCorrect)) {
+        const diff = Math.abs(numStudent - numCorrect);
+        const maxVal = Math.max(Math.abs(numStudent), Math.abs(numCorrect));
+        const relDiff = maxVal > 1e-9 ? (diff / maxVal) : diff;
+        if (diff <= 1.5 || relDiff <= 0.025) {
+          isCorrect = true;
+        }
       }
     }
   }

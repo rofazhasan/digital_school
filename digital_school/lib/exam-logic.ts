@@ -513,7 +513,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
             if (res) {
                 const qMax = Number(question.marks) || 0;
-                if (type !== 'MC' && res.isCorrect !== false && qMax > 0 && (questionScore >= qMax * 0.99 || Math.abs(questionScore - qMax) <= 0.02)) {
+                if (qMax > 0 && (questionScore >= qMax * 0.99 || Math.abs(questionScore - qMax) <= 0.015)) {
                     questionScore = qMax;
                     res.score = qMax;
                     res.isCorrect = true;
