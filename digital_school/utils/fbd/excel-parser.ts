@@ -310,11 +310,11 @@ export function validateExcelFBD(text: string): { valid: boolean; error?: string
  * Convert FBD diagram back to Excel format (for export)
  */
 export function fbdToExcelFormat(diagram: FBDDiagram): string {
-    const points = diagram.points
+    const points = (diagram.points || [])
         .map(p => `${p.id}(${p.x},${p.y}${p.label ? ',' + p.label : ''})`)
         .join(' ');
 
-    const forces = diagram.forces
+    const forces = (diagram.forces || [])
         .map(f => `${f.id}@${f.pointId}(${f.magnitude},${f.angle},${f.label}${f.type ? ',' + f.type : ''})`)
         .join(' ');
 

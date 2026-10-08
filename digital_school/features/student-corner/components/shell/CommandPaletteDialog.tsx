@@ -22,6 +22,9 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { crossFeatureSearchAction } from '../../actions/cross-feature-actions';
 import { CrossFeatureSearchResult } from '../../services/cross-feature-service';
@@ -314,6 +317,10 @@ export function CommandPaletteDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-3xl border-slate-200 dark:border-slate-800 shadow-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Command Palette</DialogTitle>
+          <DialogDescription>Search topics, mistakes, revisions, exams, goals, or commands</DialogDescription>
+        </DialogHeader>
         {/* Search Input Bar */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <Search className="w-5 h-5 text-indigo-500 shrink-0" />

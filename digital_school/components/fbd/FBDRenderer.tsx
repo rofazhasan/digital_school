@@ -25,12 +25,10 @@ export function FBDRenderer({
     className = '',
     showMagnitudes = false,
 }: FBDRendererProps) {
+    if (!diagram) return null;
     const {
-        width,
-        height,
-        points,
-        forces,
-        moments = [],
+        width = 600,
+        height = 400,
         body,
         showAxes = true,
         showGrid = false,
@@ -38,8 +36,12 @@ export function FBDRenderer({
         customSVG,
     } = diagram;
 
+    const safePoints = Array.isArray(diagram.points) ? diagram.points : [];
+    const safeForces = Array.isArray(diagram.forces) ? diagram.forces : [];
+    const safeMoments = Array.isArray(diagram.moments) ? diagram.moments : [];
+
     // Create a map of point IDs to coordinates for quick lookup
-    const pointMap = new Map(points.map(p => [p.id, p]));
+    const pointMap = new Map(safePoints.map(p => [p.id, p]));
 
     return (
         <svg
@@ -78,7 +80,7 @@ export function FBDRenderer({
                     {body && <RigidBody body={body} />}
 
                     {/* Points */}
-                    {points.map(point => (
+                    {safePoints.map(point => (
                         <g key={point.id}>
                             <circle
                                 cx={point.x}
@@ -103,7 +105,7 @@ export function FBDRenderer({
                     ))}
 
                     {/* Forces */}
-                    {forces.map(force => {
+                    {safeForces.map(force => {
                         const point = pointMap.get(force.pointId);
                         if (!point) return null;
 
@@ -120,7 +122,7 @@ export function FBDRenderer({
                     })}
 
                     {/* Moments */}
-                    {moments.map(moment => {
+                    {safeMoments.map(moment => {
                         const point = pointMap.get(moment.pointId);
                         if (!point) return null;
 

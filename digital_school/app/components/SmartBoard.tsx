@@ -110,7 +110,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         // Reverse iterate to find top-most
         for (let i = strokes.length - 1; i >= 0; i--) {
             const stroke = strokes[i];
-            if (stroke.tool === 'laser' || stroke.tool === 'eraser') continue;
+            if (!stroke || !Array.isArray(stroke.points) || stroke.tool === 'laser' || stroke.tool === 'eraser') continue;
 
             // Simple bounding box check first could optimize, but for now traverse points
             // Check distance to any point in the stroke
@@ -119,6 +119,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
             for (let j = 0; j < stroke.points.length; j += 2) { // Skip every other point for perf
                 const sp = stroke.points[j];
+                if (!sp) continue;
                 const dx = sp.x - point.x;
                 const dy = sp.y - point.y;
                 if (dx * dx + dy * dy < threshold * threshold) {
@@ -153,14 +154,16 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
     // --- Rendering ---
     const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke, offsetPos: Point = { x: 0, y: 0 }) => {
-        if (stroke.points.length < 1) return;
+        if (!stroke || !Array.isArray(stroke.points) || stroke.points.length < 1) return;
 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.lineWidth = stroke.width;
 
+        if (!stroke.points[0]) return;
         const p1 = { x: stroke.points[0].x + offsetPos.x, y: stroke.points[0].y + offsetPos.y };
         const rawLast = stroke.points[stroke.points.length - 1];
+        if (!rawLast) return;
         const p2 = { x: rawLast.x + offsetPos.x, y: rawLast.y + offsetPos.y };
 
         // Highlighter Logic
@@ -260,20 +263,23 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
         } else if (stroke.tool === 'pen' || stroke.tool === 'semigloss' || stroke.tool === 'eraser') {
             // Standard Pen & Eraser
-            if (stroke.points.length < 2) return;
+            if (!Array.isArray(stroke.points) || stroke.points.length < 2) return;
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
 
             for (let i = 1; i < stroke.points.length - 1; i++) {
                 const rawPt1 = stroke.points[i];
                 const rawPt2 = stroke.points[i + 1];
+                if (!rawPt1 || !rawPt2) continue;
                 const pt1 = { x: rawPt1.x + offsetPos.x, y: rawPt1.y + offsetPos.y };
                 const pt2 = { x: rawPt2.x + offsetPos.x, y: rawPt2.y + offsetPos.y };
                 const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
                 ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
             }
             const last = stroke.points[stroke.points.length - 1];
-            ctx.lineTo(last.x + offsetPos.x, last.y + offsetPos.y);
+            if (last) {
+                ctx.lineTo(last.x + offsetPos.x, last.y + offsetPos.y);
+            }
             ctx.stroke();
         }
 
@@ -526,16 +532,16 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             return;
         }
 
-        if (isDrawing && currentStroke) {
+        if (isDrawing && currentStroke && Array.isArray(currentStroke.points)) {
             if (isShapeTool(currentStroke.tool)) {
                 // For shapes, we just update the End Point (2nd point)
                 setCurrentStroke({
                     ...currentStroke,
-                    points: [currentStroke.points[0], worldPoint]
+                    points: [currentStroke.points[0] || worldPoint, worldPoint]
                 });
             } else {
                 // For freehand, we append
-                setCurrentStroke(prev => prev ? {
+                setCurrentStroke(prev => (prev && Array.isArray(prev.points)) ? {
                     ...prev,
                     points: [...prev.points, worldPoint]
                 } : null);
@@ -548,10 +554,10 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         if (isDraggingStroke && selectedStrokeId && dragOffset.x !== 0) {
             // Commit Transform
             const newPaths = paths.map(p => {
-                if (p.id === selectedStrokeId) {
+                if (p && p.id === selectedStrokeId && Array.isArray(p.points)) {
                     return {
                         ...p,
-                        points: p.points.map(pt => ({ x: pt.x + dragOffset.x, y: pt.y + dragOffset.y }))
+                        points: p.points.map(pt => pt ? ({ x: pt.x + dragOffset.x, y: pt.y + dragOffset.y }) : pt)
                     };
                 }
                 return p;
@@ -665,8 +671,9 @@ export function getPathBoundingBox(paths: Stroke[]) {
     let hasPoints = false;
 
     paths.forEach(p => {
-        if (p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
+        if (!p || !Array.isArray(p.points) || p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
         p.points.forEach(pt => {
+            if (!pt) return;
             if (pt.x < minX) minX = pt.x;
             if (pt.y < minY) minY = pt.y;
             if (pt.x > maxX) maxX = pt.x;
@@ -683,6 +690,7 @@ export function getPathBoundingBox(paths: Stroke[]) {
  * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
  */
 export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors = false): string | null {
+    if (!Array.isArray(paths) || paths.length === 0) return null;
     const bbox = getPathBoundingBox(paths);
     if (!bbox) return null;
 
@@ -712,7 +720,7 @@ export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors =
     ctx.lineJoin = 'round';
 
     paths.forEach(stroke => {
-        if (stroke.tool === 'eraser' || stroke.tool === 'laser') return;
+        if (!stroke || !Array.isArray(stroke.points) || stroke.tool === 'eraser' || stroke.tool === 'laser') return;
 
         ctx.beginPath();
         let strokeColor = stroke.color;
@@ -742,12 +750,13 @@ export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors =
             ctx.lineWidth = stroke.width;
         }
 
-        if (stroke.points.length > 0) {
+        if (stroke.points.length > 0 && stroke.points[0]) {
             ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
             for (let i = 1; i < stroke.points.length; i++) {
                 // Use quadratic curves for smoothness (matching SmartBoard rendering)
                 const p1 = stroke.points[i - 1];
                 const p2 = stroke.points[i];
+                if (!p1 || !p2) continue;
                 const midX = (p1.x + p2.x) / 2;
                 const midY = (p1.y + p2.y) / 2;
                 if (i === 1) { ctx.lineTo(p1.x, p1.y); }
@@ -755,7 +764,9 @@ export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors =
             }
             if (stroke.points.length > 1) {
                 const last = stroke.points[stroke.points.length - 1];
-                ctx.lineTo(last.x, last.y);
+                if (last) {
+                    ctx.lineTo(last.x, last.y);
+                }
             }
         }
         ctx.stroke();

@@ -33,29 +33,34 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
     if (diagram.body) {
         svgContent += renderBody(diagram.body);
     }
-    if (diagram.bodies) {
+    if (Array.isArray(diagram.bodies)) {
         diagram.bodies.forEach(body => {
-            svgContent += renderBody(body);
+            if (body) svgContent += renderBody(body);
         });
     }
 
+    const safePoints = Array.isArray(diagram.points) ? diagram.points : [];
+    const safeForces = Array.isArray(diagram.forces) ? diagram.forces : [];
+
     // 4. Points (Fixed supports, etc.)
-    diagram.points.forEach(point => {
-        svgContent += renderPoint(point);
+    safePoints.forEach(point => {
+        if (point) svgContent += renderPoint(point);
     });
 
     // 5. Forces
-    diagram.forces.forEach(force => {
-        const point = diagram.points.find(p => p.id === force.pointId);
+    safeForces.forEach(force => {
+        if (!force) return;
+        const point = safePoints.find(p => p.id === force.pointId);
         if (point) {
             svgContent += renderForce(force, point, config);
         }
     });
 
     // 6. Moments
-    if (diagram.moments) {
+    if (Array.isArray(diagram.moments)) {
         diagram.moments.forEach(moment => {
-            const point = diagram.points.find(p => p.id === moment.pointId);
+            if (!moment) return;
+            const point = safePoints.find(p => p.id === moment.pointId);
             if (point) {
                 svgContent += renderMoment(moment, point);
             }

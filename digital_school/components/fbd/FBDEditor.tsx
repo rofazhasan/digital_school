@@ -29,8 +29,8 @@ export function FBDEditor({
     width = 600,
     height = 400,
 }: FBDEditorProps) {
-    const [diagram, setDiagram] = useState<FBDDiagram>(
-        initialDiagram || {
+    const [diagram, setDiagram] = useState<FBDDiagram>(() => {
+        const base = initialDiagram || {
             id: `fbd-${Date.now()}`,
             width,
             height,
@@ -39,8 +39,14 @@ export function FBDEditor({
             moments: [],
             showAxes: true,
             showGrid: true,
-        }
-    );
+        };
+        return {
+            ...base,
+            points: Array.isArray(base.points) ? base.points : [],
+            forces: Array.isArray(base.forces) ? base.forces : [],
+            moments: Array.isArray(base.moments) ? base.moments : [],
+        };
+    });
 
     const [mode, setMode] = useState<EditorMode>('select');
     const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -101,19 +107,22 @@ export function FBDEditor({
         }
 
         if (mode === 'add-point') {
+            const currentPoints = diagram.points || [];
             const newPoint: FBDPoint = {
-                id: `p${diagram.points.length + 1}`,
+                id: `p${currentPoints.length + 1}`,
                 x,
                 y,
-                label: `P${diagram.points.length + 1}`,
+                label: `P${currentPoints.length + 1}`,
             };
 
             addToHistory({
                 ...diagram,
-                points: [...diagram.points, newPoint],
+                points: [...currentPoints, newPoint],
             });
         } else if (mode === 'add-force' && selectedPointId) {
-            const point = diagram.points.find(p => p.id === selectedPointId);
+            const currentPoints = diagram.points || [];
+            const currentForces = diagram.forces || [];
+            const point = currentPoints.find(p => p.id === selectedPointId);
             if (!point) return;
 
             let angle = calculateAngle(point.x, point.y, x, y);
@@ -124,7 +133,7 @@ export function FBDEditor({
             const magnitude = calculateDistance(point.x, point.y, x, y);
 
             const newForce: FBDForce = {
-                id: `f${diagram.forces.length + 1}`,
+                id: `f${currentForces.length + 1}`,
                 pointId: selectedPointId,
                 magnitude: forceConfig.magnitude,
                 angle,
@@ -134,7 +143,7 @@ export function FBDEditor({
 
             addToHistory({
                 ...diagram,
-                forces: [...diagram.forces, newForce],
+                forces: [...currentForces, newForce],
             });
 
             setMode('select');
@@ -147,14 +156,14 @@ export function FBDEditor({
         if (selectedForceId) {
             addToHistory({
                 ...diagram,
-                forces: diagram.forces.filter(f => f.id !== selectedForceId),
+                forces: (diagram.forces || []).filter(f => f.id !== selectedForceId),
             });
             setSelectedForceId(null);
         } else if (selectedPointId) {
             addToHistory({
                 ...diagram,
-                points: diagram.points.filter(p => p.id !== selectedPointId),
-                forces: diagram.forces.filter(f => f.pointId !== selectedPointId),
+                points: (diagram.points || []).filter(p => p.id !== selectedPointId),
+                forces: (diagram.forces || []).filter(f => f.pointId !== selectedPointId),
             });
             setSelectedPointId(null);
         }
@@ -232,11 +241,12 @@ export function FBDEditor({
                                 size="sm"
                                 onClick={() => {
                                     setMode('add-force');
-                                    if (diagram.points.length > 0) {
-                                        setSelectedPointId(diagram.points[0].id);
+                                    const pts = diagram.points || [];
+                                    if (pts.length > 0) {
+                                        setSelectedPointId(pts[0].id);
                                     }
                                 }}
-                                disabled={diagram.points.length === 0}
+                                disabled={(diagram.points || []).length === 0}
                             >
                                 <Plus className="h-4 w-4 mr-1" />
                                 Force
@@ -256,7 +266,7 @@ export function FBDEditor({
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {diagram.points.map(p => (
+                                        {(diagram.points || []).map(p => (
                                             <SelectItem key={p.id} value={p.id}>
                                                 {p.label || p.id}
                                             </SelectItem>
@@ -375,11 +385,11 @@ export function FBDEditor({
                     <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
                         <div>
                             <Label className="text-xs text-muted-foreground">Points</Label>
-                            <p className="font-semibold">{diagram.points.length}</p>
+                            <p className="font-semibold">{diagram.points?.length || 0}</p>
                         </div>
                         <div>
                             <Label className="text-xs text-muted-foreground">Forces</Label>
-                            <p className="font-semibold">{diagram.forces.length}</p>
+                            <p className="font-semibold">{diagram.forces?.length || 0}</p>
                         </div>
                         <div>
                             <Label className="text-xs text-muted-foreground">Moments</Label>

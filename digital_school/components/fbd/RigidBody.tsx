@@ -8,7 +8,8 @@ interface RigidBodyProps {
 }
 
 export function RigidBody({ body }: RigidBodyProps) {
-    const { type, centerX, centerY, width, height, radius, points, fill = '#E5E7EB', stroke = '#374151' } = body;
+    if (!body) return null;
+    const { type, centerX = 0, centerY = 0, width, height, radius, points, fill = '#E5E7EB', stroke = '#374151' } = body;
 
     switch (type) {
         case 'point':

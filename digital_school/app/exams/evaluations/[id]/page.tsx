@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -1417,7 +1417,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           data.drawings.forEach((drawing: any) => {
             const key = `${drawing.questionId}_${drawing.imageIndex}`;
             annotationMap[key] = drawing.imageData;
-            dataStore[key] = drawing.drawingData;
+            let dData = drawing.drawingData;
+            if (typeof dData === 'string') {
+              try { dData = JSON.parse(dData); } catch {}
+            }
+            dataStore[key] = dData;
           });
           
           setAnnotations(annotationMap);
@@ -7037,6 +7041,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           {/* Drawing Canvas Annotation Modal */}
           <Dialog open={isAnnotationOpen} onOpenChange={setIsAnnotationOpen}>
             <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 border-none bg-transparent shadow-none">
+              <DialogHeader className="sr-only">
+                <DialogTitle>Annotation Canvas</DialogTitle>
+                <DialogDescription>Annotate and draw on exam submission image</DialogDescription>
+              </DialogHeader>
               {activeAnnotationOriginal && (
                 <DrawingCanvas
                   backgroundImage={activeAnnotationOriginal || ''}
@@ -7046,8 +7054,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   onPrev={handlePrevAnnotationImage}
                   currentIndex={activeAnnotationMeta?.index}
                   totalImages={activeAnnotationImages.length}
-                  initialStrokes={drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.strokes || []}
-                  initialTexts={drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.texts || []}
+                  initialStrokes={Array.isArray(drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.strokes) ? drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`].strokes : []}
+                  initialTexts={Array.isArray(drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.texts) ? drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`].texts : []}
                 />
               )}
             </DialogContent>

@@ -340,15 +340,15 @@ export function validateFBD(diagram: FBDDiagram): { valid: boolean; errors: stri
     if (!diagram.points || diagram.points.length === 0) errors.push('Diagram must have at least one point');
 
     // Validate forces reference existing points
-    const pointIds = new Set(diagram.points.map(p => p.id));
-    diagram.forces.forEach((force, index) => {
+    const pointIds = new Set((diagram.points || []).map(p => p.id));
+    (diagram.forces || []).forEach((force, index) => {
         if (!pointIds.has(force.pointId)) {
             errors.push(`Force ${index} references non-existent point: ${force.pointId}`);
         }
     });
 
     // Validate moments reference existing points
-    diagram.moments?.forEach((moment, index) => {
+    (diagram.moments || []).forEach((moment, index) => {
         if (!pointIds.has(moment.pointId)) {
             errors.push(`Moment ${index} references non-existent point: ${moment.pointId}`);
         }

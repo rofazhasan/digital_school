@@ -979,9 +979,12 @@ export default function AdminUsersPage() {
             {importSummary && (
                 <Dialog open={!!importSummary} onOpenChange={() => setImportSummary(null)}>
                     <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle className="text-center">Import Complete</DialogTitle>
+                            <DialogDescription className="text-center">Summary of user bulk import results</DialogDescription>
+                        </DialogHeader>
                         <div className="flex flex-col items-center justify-center p-4">
                             <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                            <h2 className="text-lg font-semibold text-center">Import Complete</h2>
                             <p className="text-center text-gray-500">
                                 {importSummary.success} users added successfully.
                                 {importSummary.fail > 0 && <span className="block text-red-500">{importSummary.fail} failed.</span>}

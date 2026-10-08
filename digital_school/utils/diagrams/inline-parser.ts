@@ -48,8 +48,8 @@ export function parseDiagramsInText(text: string): string {
                     if (diagram && fbdParts) {
                         const extraFBD = parseExcelFBD(fbdParts, `hybrid-combine-${Math.random().toString(36).substr(2, 5)}`);
                         if (extraFBD) {
-                            diagram.points = [...diagram.points, ...extraFBD.points];
-                            diagram.forces = [...diagram.forces, ...extraFBD.forces];
+                            diagram.points = [...(diagram.points || []), ...(extraFBD.points || [])];
+                            diagram.forces = [...(diagram.forces || []), ...(extraFBD.forces || [])];
                             diagram.moments = [...(diagram.moments || []), ...(extraFBD.moments || [])];
                         }
                     }
@@ -141,8 +141,8 @@ export function parseDiagramsInText(text: string): string {
                         if (fbdParts) {
                             const extraFBD = parseExcelFBD(fbdParts, `hybrid-${id}`);
                             if (extraFBD) {
-                                diagram.points = [...diagram.points, ...extraFBD.points];
-                                diagram.forces = [...diagram.forces, ...extraFBD.forces];
+                                diagram.points = [...(diagram.points || []), ...(extraFBD.points || [])];
+                                diagram.forces = [...(diagram.forces || []), ...(extraFBD.forces || [])];
                                 diagram.moments = [...(diagram.moments || []), ...(extraFBD.moments || [])];
                             }
                         }

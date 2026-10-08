@@ -91,8 +91,26 @@ export default function DrawingCanvas({
   const [color, setColor] = useState('#EF4444');
   const [lineWidth, setLineWidth] = useState(3);
 
-  const [strokes, setStrokes] = useState<Stroke[]>(initialStrokes);
-  const [texts, setTexts] = useState<TextAnnotation[]>(initialTexts);
+  const sanitizeStrokes = (st: any): Stroke[] => {
+    if (!st) return [];
+    if (typeof st === 'string') {
+      try { st = JSON.parse(st); } catch { return []; }
+    }
+    if (!Array.isArray(st)) return [];
+    return st.filter((s: any) => s && Array.isArray(s.points));
+  };
+
+  const sanitizeTexts = (tx: any): TextAnnotation[] => {
+    if (!tx) return [];
+    if (typeof tx === 'string') {
+      try { tx = JSON.parse(tx); } catch { return []; }
+    }
+    if (!Array.isArray(tx)) return [];
+    return tx.filter(Boolean);
+  };
+
+  const [strokes, setStrokes] = useState<Stroke[]>(() => sanitizeStrokes(initialStrokes));
+  const [texts, setTexts] = useState<TextAnnotation[]>(() => sanitizeTexts(initialTexts));
   const [history, setHistory] = useState<{ strokes: Stroke[]; texts: TextAnnotation[] }[]>([]);
   const [historyStep, setHistoryStep] = useState(-1);
 
@@ -145,8 +163,8 @@ export default function DrawingCanvas({
   }, [backgroundImage]);
 
   // sync initialStrokes/texts if they change (e.g. opening different question)
-  useEffect(() => { setStrokes(initialStrokes); }, [initialStrokes]);
-  useEffect(() => { setTexts(initialTexts); }, [initialTexts]);
+  useEffect(() => { setStrokes(sanitizeStrokes(initialStrokes)); }, [initialStrokes]);
+  useEffect(() => { setTexts(sanitizeTexts(initialTexts)); }, [initialTexts]);
 
   // ─── Draw Annotations ────────────────────────────────────────────────────────
   const drawAnnotations = useCallback(() => {
@@ -160,7 +178,7 @@ export default function DrawingCanvas({
 
     // Draw strokes
     strokes.forEach(stroke => {
-      if (!stroke.points.length) return;
+      if (!stroke || !Array.isArray(stroke.points) || !stroke.points.length) return;
       ctx.beginPath();
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.width;
@@ -168,17 +186,21 @@ export default function DrawingCanvas({
       ctx.lineJoin = 'round';
       ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
 
+      if (!stroke.points[0]) return;
       ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
       if (stroke.points.length < 3) {
-        stroke.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        stroke.points.slice(1).forEach(p => { if (p) ctx.lineTo(p.x, p.y); });
       } else {
         for (let i = 1; i < stroke.points.length - 2; i++) {
+          if (!stroke.points[i] || !stroke.points[i + 1]) continue;
           const mx = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
           const my = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
           ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, mx, my);
         }
         const n = stroke.points.length;
-        ctx.quadraticCurveTo(stroke.points[n-2].x, stroke.points[n-2].y, stroke.points[n-1].x, stroke.points[n-1].y);
+        if (stroke.points[n - 2] && stroke.points[n - 1]) {
+          ctx.quadraticCurveTo(stroke.points[n-2].x, stroke.points[n-2].y, stroke.points[n-1].x, stroke.points[n-1].y);
+        }
       }
       ctx.stroke();
     });
@@ -262,9 +284,15 @@ export default function DrawingCanvas({
     const { clientX, clientY } = getEventCoords(e);
     const pos = toImageCoords(clientX, clientY);
     setStrokes(prev => {
+      if (!prev || prev.length === 0) return prev;
       const copy = [...prev];
-      const last = { ...copy[copy.length - 1], points: [...copy[copy.length - 1].points, pos] };
-      copy[copy.length - 1] = last;
+      const lastIndex = copy.length - 1;
+      const lastStroke = copy[lastIndex];
+      if (!lastStroke || !Array.isArray(lastStroke.points)) return prev;
+      copy[lastIndex] = {
+        ...lastStroke,
+        points: [...lastStroke.points, pos]
+      };
       return copy;
     });
   };

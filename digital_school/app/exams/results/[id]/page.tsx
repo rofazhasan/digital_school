@@ -1841,8 +1841,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null);
 
     // PRE-CALCULATE ANNOTATIONS FOR OPTIMIZED RENDERING
-    setActiveZoomStrokes(annotation?.drawingData?.strokes || []);
-    setActiveZoomTexts(annotation?.drawingData?.texts || []);
+    let rawDrawingData = annotation?.drawingData;
+    if (typeof rawDrawingData === 'string') {
+      try { rawDrawingData = JSON.parse(rawDrawingData); } catch {}
+    }
+    setActiveZoomStrokes(Array.isArray(rawDrawingData?.strokes) ? rawDrawingData.strokes : []);
+    setActiveZoomTexts(Array.isArray(rawDrawingData?.texts) ? rawDrawingData.texts : []);
 
     setShowZoomModal(true);
   };
