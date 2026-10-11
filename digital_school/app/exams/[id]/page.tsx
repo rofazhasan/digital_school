@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers, Shuffle } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers, Shuffle, Lock, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,13 +25,14 @@ import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { CheckSquare } from "lucide-react";
 import { cleanupMath, shuffleArray } from "@/lib/utils";
+import { encryptQuestion, maskEncryptedQuestion } from "@/lib/encryption";
 
 import { CMARenderer, MPCRenderer } from '@/components/ui/QuestionRenderers';
 import { BulkAddExamQuestionsDialog } from './BulkAddExamQuestionsDialog';
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'CODING';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -519,6 +520,7 @@ export default function ExamBuilderPage() {
   // Add state for number of sets and option shuffle
   const [numSets, setNumSets] = useState(1);
   const [shuffleOptions, setShuffleOptions] = useState<boolean>(true);
+  const [encryptSets, setEncryptSets] = useState<boolean>(false);
   const [sets, setSets] = useState<any[]>([]); // Add this state if not present
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -1516,9 +1518,16 @@ export default function ExamBuilderPage() {
 
           return processedQuestion;
         });
+
+        const finalQuestions = encryptSets
+          ? orderedQuestions.map(q => encryptQuestion(q))
+          : orderedQuestions;
+
         return {
           name: `${newSetName.trim()} ${String.fromCharCode(65 + i)}`,
-          questions: orderedQuestions,
+          description: encryptSets ? 'Encrypted Confidential Set' : '',
+          isEncrypted: encryptSets,
+          questions: finalQuestions,
         };
       });
       const response = await fetch(`/api/exams/${examId}/set`, {
@@ -1999,6 +2008,42 @@ export default function ExamBuilderPage() {
                       {shuffleOptions ? 'ON' : 'OFF'}
                     </Button>
                   </div>
+                  {/* Question Encryption ON / OFF Toggle Button */}
+                  <div className="mb-4 flex items-center justify-between p-3 rounded-lg border bg-muted/40 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-md ${encryptSets ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'bg-muted text-muted-foreground'}`}>
+                        <Lock className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium leading-none flex items-center gap-1.5">
+                          Question Encryption
+                          <Badge variant="outline" className="text-[10px] py-0 px-1 font-mono text-purple-600 border-purple-300 dark:border-purple-800">
+                            AES-256-GCM
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {encryptSets
+                            ? 'Questions encrypted & hidden in preview until exam'
+                            : 'Standard unencrypted set preview (Default)'}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={encryptSets ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEncryptSets(prev => !prev)}
+                      className={`h-7 px-3 text-xs font-semibold gap-1.5 transition-all ${
+                        encryptSets
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-xs'
+                          : 'border-muted-foreground/30 text-muted-foreground hover:text-foreground'
+                      }`}
+                      title={encryptSets ? "Click to turn OFF question encryption" : "Click to turn ON question encryption"}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${encryptSets ? 'bg-purple-300 animate-pulse' : 'bg-gray-400'}`} />
+                      {encryptSets ? 'ENCRYPTED' : 'PLAIN'}
+                    </Button>
+                  </div>
                   <h3 className="text-md font-semibold mb-2">Selected Questions ({selectedQuestions.length})</h3>
                   <ScrollArea className="h-[45vh] pr-4">
                     {selectedQuestions.length > 0 ? (
@@ -2151,6 +2196,16 @@ export default function ExamBuilderPage() {
                           return (
                             <td key={set.name} className="border px-2 py-1">
                               {setQ ? (
+                                (set.description?.includes('Encrypted') || setQ.isEncrypted || (typeof setQ.questionText === 'string' && setQ.questionText.startsWith('ENC:'))) ? (
+                                  <div className="p-2 rounded-lg border border-purple-200 dark:border-purple-900 bg-purple-50/60 dark:bg-purple-950/20 text-xs">
+                                    <div className="flex items-center gap-1 font-semibold text-purple-700 dark:text-purple-300">
+                                      <Lock className="h-3.5 w-3.5 text-purple-600 inline shrink-0" /> [🔒 Confidential Question]
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                                      Encrypted with AES-256-GCM. Hidden until live exam.
+                                    </div>
+                                  </div>
+                                ) : (
                                 <div>
                                   <UniversalMathJax inline dynamic>{cleanupMath(setQ.questionText)}</UniversalMathJax>
                                   {((setQ.type === 'MCQ' || setQ.type === 'AR') && Array.isArray(setQ.options)) && (
@@ -2222,7 +2277,24 @@ export default function ExamBuilderPage() {
                   </DialogHeader>
                   <div className="max-h-[70vh] overflow-y-auto">
                     {Array.isArray(previewSet?.questionsJson) && previewSet.questionsJson.length > 0 ? (
-                      previewSet.questionsJson.map((q: any, idx: number) => (
+                      previewSet.questionsJson.map((q: any, idx: number) => {
+                        const isQuestionEncrypted = previewSet?.description?.includes('Encrypted') || q.isEncrypted || (typeof q.questionText === 'string' && q.questionText.startsWith('ENC:'));
+                        if (isQuestionEncrypted) {
+                          return (
+                            <div key={q.id || idx} className="mb-4 p-4 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-sm text-foreground">Question {idx + 1} ({q.type || 'Question'})</span>
+                                <Badge className="bg-purple-600 text-white text-[10px] py-0 px-2 flex items-center gap-1 font-mono">
+                                  <Lock className="h-3 w-3" /> Encrypted & Confidential
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground italic">
+                                Question content, options, and model answers are encrypted with AES-256-GCM. Protected until live student exam execution.
+                              </p>
+                            </div>
+                          );
+                        }
+                        return (
                         <div key={q.id || idx} className="mb-6">
                           <div className="font-bold mb-1">Q{idx + 1}.</div>
                           <div className="mb-2">
@@ -2326,9 +2398,24 @@ export default function ExamBuilderPage() {
                                 ))}
                               </div>
                             </div>
+                          {q.type === 'CODING' && (
+                            <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
+                              <div className="font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                                <span>CSE Coding Problem [{q.marks} Marks]</span>
+                                <span className="font-mono text-[10px] bg-purple-100 dark:bg-purple-900/60 px-2 py-0.5 rounded">
+                                  {((q.options?.allowedLanguages || ['python', 'c', 'cpp']) as string[]).join(', ')}
+                                </span>
+                              </div>
+                              {Array.isArray(q.options?.testCases) && (
+                                <div className="text-[11px] text-muted-foreground">
+                                  {q.options.testCases.length} Test Cases configured ({q.options.testCases.filter((t: any) => !t.isHidden).length} Sample / {q.options.testCases.filter((t: any) => t.isHidden).length} Hidden)
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
-                      ))
+                      );
+                    })
                     ) : <div className="text-muted-foreground text-center">No questions in this set.</div>}
                   </div>
                 </DialogContent>

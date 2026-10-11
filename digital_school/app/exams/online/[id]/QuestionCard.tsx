@@ -25,6 +25,7 @@ import { MTFGrid } from "./question-types/MTFSection";
 import { IntNumericSection } from "./question-types/IntNumericSection";
 import { DebouncedTextarea, DebouncedInput } from "./question-types/SubjectiveSection";
 import { DescriptiveSection } from "./question-types/DescriptiveSection";
+import { CodingSection } from "./question-types/CodingSection";
 import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 
 // Lazy components
@@ -563,6 +564,18 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                 disabled={!!disabled || !!submitted}
                 showFeedback={showResult}
                 evalResult={result}
+              />
+            )}
+
+            {type === "coding" && (
+              <CodingSection
+                question={question}
+                userAnswer={userAnswer}
+                disabled={!!disabled || !!submitted}
+                submitted={!!submitted}
+                onAnswerChange={onAnswerChange}
+                showResult={showResult}
+                result={result}
               />
             )}
 

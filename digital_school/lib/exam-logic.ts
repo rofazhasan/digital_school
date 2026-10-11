@@ -6,6 +6,7 @@ import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluat
 import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
 import { evaluateCMAQuestion } from "./evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "./evaluation/mpcEvaluation";
+import { evaluateCodingQuestion } from "./evaluation/codingEvaluation";
 import { isMCQAnswerCorrect } from "./evaluation/mcqEvaluation";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
@@ -509,6 +510,20 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
                 questionScore = mpcRes.score;
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
+            } else if (type === 'CODING') {
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '' || studentAnswer === 'No answer provided') continue;
+                const codingRes = evaluateCodingQuestion(question as any, studentAnswer as any);
+                questionScore = codingRes.score;
+                res = {
+                    score: questionScore,
+                    type,
+                    isCorrect: codingRes.isCorrect,
+                    passedCount: codingRes.passedCount,
+                    totalTests: codingRes.totalTests,
+                    testCaseResults: codingRes.testCaseResults,
+                    code: codingRes.code,
+                    language: codingRes.language
+                };
             }
 
             if (res) {
@@ -526,6 +541,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 answers[`${question.id}_marks`] = questionScore;
                 if (type === 'CMA' && res.partResults) answers[`${question.id}_partResults`] = res.partResults;
                 if (type === 'MPC' && res.stageResults) answers[`${question.id}_stageResults`] = res.stageResults;
+                if (type === 'CODING' && res.testCaseResults) answers[`${question.id}_testCaseResults`] = res.testCaseResults;
             }
         }
     }

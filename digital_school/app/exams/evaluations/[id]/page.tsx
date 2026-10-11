@@ -82,6 +82,7 @@ import { scanDocument } from "@/lib/native/scanner";
 import { CMARenderer, MPCRenderer } from "@/components/ui/QuestionRenderers";
 import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
 import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { evaluateCodingQuestion } from "@/lib/evaluation/codingEvaluation";
 import { findSelectedOptionIndex, getMCQCorrectIndices, isMCQAnswerCorrect } from "@/lib/evaluation/mcqEvaluation";
 
 // --- Constants & Utilities ---
@@ -5197,6 +5198,94 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             )}
 
 
+
+                                            {/* CODING Specific Rendering (Auto-evaluated Test Cases & Code) */}
+                                            {(currentQuestion?.type || "").toLowerCase() === 'coding' && (
+                                              <div className="space-y-4 text-left not-prose">
+                                                {(() => {
+                                                  const codingEval = evaluateCodingQuestion(currentQuestion as any, currentAnswer);
+                                                  const codeToDisplay = codingEval.code || (typeof currentAnswer === 'string' ? currentAnswer : '') || '// No code submitted';
+                                                  const lang = codingEval.language || 'python';
+                                                  const testResults = codingEval.testCaseResults || [];
+                                                  const maxMarks = Number(currentQuestion?.marks) || 10;
+                                                  const earnedMarks = codingEval.score;
+
+                                                  return (
+                                                    <div className="space-y-4">
+                                                      {/* Score Banner */}
+                                                      <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${
+                                                        codingEval.isCorrect
+                                                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                                                          : codingEval.passedCount > 0
+                                                          ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                                                          : 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+                                                      }`}>
+                                                        <div className="flex items-center gap-3">
+                                                          <div className="p-2 rounded-lg bg-card/80 border border-border">
+                                                            <Terminal className="w-5 h-5 text-primary" />
+                                                          </div>
+                                                          <div>
+                                                            <h4 className="font-bold text-sm">
+                                                              Automated Test Case Evaluation ({codingEval.passedCount}/{codingEval.totalTests || (currentQuestion?.testCases?.length || 0)} Passed)
+                                                            </h4>
+                                                            <p className="text-xs opacity-80">
+                                                              Language: <span className="font-mono font-bold uppercase">{lang}</span> | Evaluated automatically against test suites
+                                                            </p>
+                                                          </div>
+                                                        </div>
+                                                        <Badge className="text-sm font-black px-3 py-1 bg-primary text-primary-foreground">
+                                                          {earnedMarks} / {maxMarks} Marks
+                                                        </Badge>
+                                                      </div>
+
+                                                      {/* Student Code Box */}
+                                                      <div className="rounded-xl bg-slate-950 border border-slate-800 overflow-hidden text-xs font-mono shadow-sm">
+                                                        <div className="flex items-center justify-between px-3.5 py-2 bg-slate-900 border-b border-slate-800 text-slate-300 font-sans text-xs">
+                                                          <span className="font-bold flex items-center gap-2">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                                            SUBMITTED {lang.toUpperCase()} SOLUTION
+                                                          </span>
+                                                          <span className="text-slate-500 font-mono text-[11px]">{codeToDisplay.split('\n').length} lines</span>
+                                                        </div>
+                                                        <pre className="p-4 overflow-x-auto text-slate-200 leading-relaxed custom-scrollbar whitespace-pre-wrap">
+                                                          <code>{codeToDisplay}</code>
+                                                        </pre>
+                                                      </div>
+
+                                                      {/* Test Cases Table */}
+                                                      {testResults.length > 0 && (
+                                                        <div className="p-3.5 bg-card rounded-xl border border-border space-y-2">
+                                                          <h5 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                                                            <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                                            Test Cases Execution Breakdown
+                                                          </h5>
+                                                          <div className="space-y-1.5">
+                                                            {testResults.map((tr: any, idx: number) => (
+                                                              <div key={idx} className="p-2.5 bg-muted/40 rounded-lg border border-border/80 flex items-center justify-between text-xs font-mono">
+                                                                <div className="flex items-center gap-2">
+                                                                  {tr.passed ? (
+                                                                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                                  ) : (
+                                                                    <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                                                                  )}
+                                                                  <span className="font-bold">Case {idx + 1} {tr.isHidden ? '(Hidden)' : ''}:</span>
+                                                                  <span className={tr.passed ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-rose-600 dark:text-rose-400 font-semibold"}>
+                                                                    {tr.status || (tr.passed ? 'Passed' : 'Failed')}
+                                                                  </span>
+                                                                </div>
+                                                                <div className="text-[11px] text-muted-foreground">
+                                                                  {tr.executionTimeMs !== undefined ? `${tr.executionTimeMs}ms` : ''}
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </div>
+                                            )}
 
                                             {/* MTF Specific Rendering (Clean Match Analysis Table) */}
                                             {currentQuestion?.type?.toLowerCase() === 'mtf' && (

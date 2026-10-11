@@ -35,7 +35,8 @@ import {
   Info,
   Edit,
   Eye,
-  EyeOff
+  EyeOff,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { n } from "@/utils/parser-utils";
@@ -43,7 +44,7 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 
-export type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC';
+export type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'CODING';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 export interface StagedQuestion {
@@ -99,10 +100,13 @@ export function BulkAddExamQuestionsDialog({
   onAddQuestionsToSet,
   onQuestionsPermanentlySaved
 }: BulkAddExamQuestionsDialogProps) {
-  const [inputType, setInputType] = useState<'file' | 'json' | 'text'>('file');
+  const [inputType, setInputType] = useState<'file' | 'json' | 'text' | 'encrypt'>('file');
   const [file, setFile] = useState<File | null>(null);
   const [jsonInput, setJsonInput] = useState('');
   const [textInput, setTextInput] = useState('');
+  const [encryptRawInput, setEncryptRawInput] = useState('');
+  const [encryptedOutput, setEncryptedOutput] = useState('');
+  const [isEncrypting, setIsEncrypting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previewQuestions, setPreviewQuestions] = useState<StagedQuestion[]>([]);
@@ -110,6 +114,35 @@ export function BulkAddExamQuestionsDialog({
   const [showMathPreview, setShowMathPreview] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEncryptPayload = async () => {
+    if (!encryptRawInput.trim()) {
+      toast.error("Please enter questions or payload to encrypt.");
+      return;
+    }
+    setIsEncrypting(true);
+    try {
+      let dataToEncrypt: any = encryptRawInput;
+      try {
+        dataToEncrypt = JSON.parse(encryptRawInput);
+      } catch {
+        // Plain string
+      }
+      const res = await fetch('/api/questions/encrypt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: dataToEncrypt })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Encryption failed');
+      setEncryptedOutput(data.encrypted);
+      toast.success("Payload successfully encrypted with AES-256-GCM!");
+    } catch (err: any) {
+      toast.error(err.message || 'Encryption failed');
+    } finally {
+      setIsEncrypting(false);
+    }
+  };
 
   // Fetch classes on mount
   useEffect(() => {
@@ -201,6 +234,25 @@ export function BulkAddExamQuestionsDialog({
       "subject": defaultSubject,
       "className": defaultClassName,
       "modelAnswer": "Energy cannot be created or destroyed, only transformed from one form to another."
+    },
+    {
+      "type": "CODING",
+      "questionText": "Write a program that takes two space-separated integers $a$ and $b$ from stdin and prints their sum.",
+      "marks": 10,
+      "difficulty": "EASY",
+      "subject": "Computer Science",
+      "className": defaultClassName,
+      "options": {
+        "allowedLanguages": ["python", "c", "cpp"],
+        "starterCode": {
+          "python": "import sys\n\ndef main():\n    line = sys.stdin.read().strip()\n    if not line: return\n    a, b = map(int, line.split())\n    print(a + b)\n\nif __name__ == '__main__':\n    main()",
+          "cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    long long a, b;\n    if (cin >> a >> b) cout << a + b << endl;\n    return 0;\n}"
+        },
+        "testCases": [
+          { "id": "tc1", "input": "3 5", "expectedOutput": "8", "weight": 5, "isHidden": false, "explanation": "Sample test: 3 + 5 = 8" },
+          { "id": "tc2", "input": "-10 25", "expectedOutput": "15", "weight": 5, "isHidden": true, "explanation": "Negative integers test" }
+        ]
+      }
     }
   ];
 
@@ -227,7 +279,10 @@ D) Yellow
 Answer: 400
 
 4. State Archimedes' principle. [2M] [SQ]
-Answer: Any body completely or partially submerged in a fluid at rest is acted upon by an upward force equal to the weight of fluid displaced.`;
+Answer: Any body completely or partially submerged in a fluid at rest is acted upon by an upward force equal to the weight of fluid displaced.
+
+5. Write a program to sum two numbers from stdin. [10M] [CODING]
+Answer: Read a and b, output a+b`;
     setTextInput(sampleText);
     toast.success("Sample plain text questions loaded.");
   };
@@ -255,6 +310,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
       else if (/\[AR\]/i.test(firstLine)) type = 'AR';
       else if (/\[MTF\]/i.test(firstLine)) type = 'MTF';
       else if (/\[MC\]/i.test(firstLine)) type = 'MC';
+      else if (/\[CODING\]/i.test(firstLine)) type = 'CODING';
 
       const questionText = firstLine.replace(/\[.*?\]/g, '').trim();
       const options: Array<{ text: string; isCorrect: boolean; explanation?: string }> = [];
@@ -330,7 +386,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
           subject: item.subject || defaultSubject,
           className: item.className || defaultClassName,
           classId: item.classId || null,
-          options: Array.isArray(item.options) ? item.options : undefined,
+          options: Array.isArray(item.options) ? item.options : (item.options && typeof item.options === 'object' ? item.options : undefined),
           modelAnswer: item.modelAnswer || item.correctAnswer || undefined,
           explanation: item.explanation || undefined,
           assertion: item.assertion || undefined,
@@ -648,7 +704,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
             /* Input Mode */
             <div className="space-y-6">
               {/* Mode Selectors */}
-              <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setInputType('file')}
@@ -685,6 +741,18 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                   <FileText className="h-4 w-4 text-blue-500" />
                   Quick Plain Text
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setInputType('encrypt')}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    inputType === 'encrypt'
+                      ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Lock className="h-4 w-4 text-purple-500" />
+                  🔒 Encrypt Tool
+                </button>
               </div>
 
               {/* Mode 1: Excel File */}
@@ -713,7 +781,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                         {file ? file.name : "Click or drag & drop Excel spreadsheet (.xlsx)"}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Supports MCQ, MC, AR, INT, MTF, CQ, SQ, SMCQ, CMA, MPC & Descriptive rows.
+                        Supports MCQ, MC, AR, INT, MTF, CQ, SQ, SMCQ, CMA, MPC, CODING & Descriptive rows.
                       </p>
                     </div>
                     {file && (
@@ -724,7 +792,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -732,7 +800,7 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                         className="rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800"
                       >
                         <Download className="h-3.5 w-3.5 mr-1 text-indigo-500" />
-                        Objective Template
+                        Objective
                       </Button>
                       <Button
                         variant="outline"
@@ -741,7 +809,25 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                         className="rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800"
                       >
                         <Download className="h-3.5 w-3.5 mr-1 text-emerald-500" />
-                        Descriptive Template
+                        Descriptive
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/api/question-bank/sample-template?type=coding', '_blank')}
+                        className="rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1 text-purple-500" />
+                        Coding Sheet
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/api/question-bank/sample-template?type=all', '_blank')}
+                        className="rounded-xl text-xs font-bold border-slate-200 dark:border-slate-800"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                        All-in-One
                       </Button>
                     </div>
 
@@ -828,6 +914,73 @@ Answer: Any body completely or partially submerged in a fluid at rest is acted u
                       <Eye className="h-4 w-4 mr-1.5" /> Parse & Preview Text
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {/* Mode 4: Encrypt Tool for AI & Authors */}
+              {inputType === 'encrypt' && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-200 dark:border-purple-800/60 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <h4 className="text-sm font-bold text-foreground">AI & Superadmin Question Encryption Vault</h4>
+                      <Badge className="bg-purple-600 text-white text-[10px] py-0 px-2">AES-256-GCM</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Paste questions generated by AI or human authors below. Click <strong>Encrypt Payload</strong> to generate an encrypted token (<code className="text-purple-600 font-mono">ENC:ey...</code>) that only this application can decrypt. You can paste this payload directly into your Excel template or JSON array!
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Plain Questions (JSON Array or Text)
+                    </label>
+                    <Textarea
+                      value={encryptRawInput}
+                      onChange={(e) => setEncryptRawInput(e.target.value)}
+                      placeholder='Paste question JSON (e.g. [{"questionText": "...", "type": "MCQ", ...}]) or secret questions text here...'
+                      rows={7}
+                      className="font-mono text-xs rounded-2xl bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleEncryptPayload}
+                      disabled={!encryptRawInput.trim() || isEncrypting}
+                      className="rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md h-9 px-5 gap-2"
+                    >
+                      {isEncrypting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                      Encrypt Payload
+                    </Button>
+                  </div>
+
+                  {encryptedOutput && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Encrypted Payload Output
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(encryptedOutput);
+                            toast.success("Encrypted payload copied to clipboard!");
+                          }}
+                          className="h-7 text-xs rounded-xl font-bold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
+                        >
+                          Copy Payload
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={encryptedOutput}
+                        readOnly
+                        rows={5}
+                        className="font-mono text-[11px] rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900 text-purple-900 dark:text-purple-200 select-all"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

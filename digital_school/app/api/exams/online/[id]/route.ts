@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
+import { decryptQuestion } from "@/lib/encryption";
 
 // @ts-ignore - Prisma Client types might be stale in dev
 const IN_PROGRESS = 'IN_PROGRESS';
@@ -252,6 +253,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             : typeof assignedExamSet.questionsJson === "string"
               ? JSON.parse(assignedExamSet.questionsJson)
               : [];
+          questions = questions.map((q: any) => decryptQuestion(q));
         } catch {
           questions = [];
         }
@@ -323,6 +325,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           : typeof s.questionsJson === "string"
             ? JSON.parse(s.questionsJson)
             : [];
+        setQuestions = setQuestions.map((q: any) => decryptQuestion(q));
       } catch {
         setQuestions = [];
       }

@@ -1096,6 +1096,7 @@ enum QuestionType {
   SMCQ
   CMA
   MPC
+  CODING
 }
 
 enum Difficulty {

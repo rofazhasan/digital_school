@@ -6654,24 +6654,33 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
 
               {inputType === 'file' ? (
                 <>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-3">
                     <Button 
                       variant="outline" 
                       onClick={() => window.open('/api/question-bank/sample-template?type=objective', '_blank')}
-                      className="h-auto py-4 flex flex-col gap-2 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50"
+                      className="h-auto py-3 flex flex-col gap-1.5 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50"
                     >
-                      <Download className="h-5 w-5 text-indigo-600" />
+                      <Download className="h-4 w-4 text-indigo-600" />
                       <div className="text-xs font-bold">Objective Template</div>
                       <div className="text-[10px] text-gray-400 font-normal">MCQ, INT, SQ, CQ, MTF</div>
                     </Button>
                     <Button 
                       variant="outline" 
                       onClick={() => window.open('/api/question-bank/sample-template?type=descriptive', '_blank')}
-                      className="h-auto py-4 flex flex-col gap-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50/50"
+                      className="h-auto py-3 flex flex-col gap-1.5 border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50/50"
                     >
-                      <Download className="h-5 w-5 text-purple-600" />
+                      <Download className="h-4 w-4 text-emerald-600" />
                       <div className="text-xs font-bold">Descriptive Template</div>
                       <div className="text-[10px] text-gray-400 font-normal">Fill-in, Rearrange, Graphs</div>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.open('/api/question-bank/sample-template?type=coding', '_blank')}
+                      className="h-auto py-3 flex flex-col gap-1.5 border-purple-200 hover:border-purple-400 hover:bg-purple-50/50"
+                    >
+                      <Download className="h-4 w-4 text-purple-600" />
+                      <div className="text-xs font-bold">Coding Template</div>
+                      <div className="text-[10px] text-purple-600/70 font-normal">Python, C, C++, Tests</div>
                     </Button>
                   </div>
 

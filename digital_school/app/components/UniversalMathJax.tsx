@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { cleanupMath, sanitizeHtmlTable } from "@/lib/utils";
+import { extractCodeBlocks } from "@/lib/code-formatter";
 
 declare global {
     interface Window {
@@ -243,31 +244,35 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         });
     }, [hasChemfig, formulaMap, cacheVersion]);
 
-    // Pre-render standard math with KaTeX for Instant performance on mobile/low-ram
+    // Pre-render standard math with KaTeX for Instant performance on mobile/low-ram,
+    // and format code blocks / inline code for CSE questions seamlessly
     const renderedText = useMemo(() => {
-        let text = processedText;
-        if (!text || (!text.includes('$') && !text.includes('\\') && !text.includes('{'))) {
-            return text;
+        if (!processedText) return "";
+
+        // 1. Isolate code blocks & inline code so math symbols like $ / \ / { don't get eaten
+        const { cleanText: textWithoutCode, restore: restoreCode } = extractCodeBlocks(processedText);
+        let text = textWithoutCode;
+
+        if (text && (text.includes('$') || text.includes('\\') || text.includes('{'))) {
+            // Render Display Math $$...$$ or \[...\]
+            text = text.replace(/(\$\$|\\\[)([\s\S]*?)(?:\$\$|\\\])/g, (_, __, math) => {
+                try {
+                    return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false, trust: true });
+                } catch (e) { return `$$${math}$$`; }
+            });
+
+            // Render Inline Math $...$ or \(...\)
+            text = text.replace(new RegExp('(?:(?<![="])\\$(.*?)\\$|\\\\\\(([\\s\\S]*?)\\\\\\))', 'gs'), (_, math1, math2) => {
+                const math = math1 ?? math2;
+                if (!math) return '';
+                try {
+                    return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false, trust: true });
+                } catch (e) { return `$${math}$`; }
+            });
         }
-        
-        // 1. Render Display Math $$...$$ or \[...\]
-        text = text.replace(/(\$\$|\\\[)([\s\S]*?)(?:\$\$|\\\])/g, (_, __, math) => {
-            try {
-                return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false, trust: true });
-            } catch (e) { return `$$${math}$$`; }
-        });
 
-        // 2. Render Inline Math $...$ or \(...\)
-        // Avoid matching $ inside attributes (e.g. data-hash="...")
-        text = text.replace(new RegExp('(?:(?<![="])\\$(.*?)\\$|\\\\\\(([\\s\\S]*?)\\\\\\))', 'gs'), (_, math1, math2) => {
-            const math = math1 ?? math2;
-            if (!math) return '';
-            try {
-                return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false, trust: true });
-            } catch (e) { return `$${math}$`; }
-        });
-
-        return text;
+        // 2. Restore beautiful syntax-styled code containers
+        return restoreCode(text);
     }, [processedText]);
 
     // Ensure HTML tables are responsive, compact, and wrapped in a clean minimal container

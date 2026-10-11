@@ -271,13 +271,12 @@ export function ExamContextProvider({
 
     const obj = questions.some((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
-      // DESCRIPTIVE is now part of CQ/SQ section
-      return objectiveTypes.includes(type) || !['cq', 'sq', 'descriptive'].includes(type);
+      return objectiveTypes.includes(type) && !['cq', 'sq', 'descriptive', 'coding'].includes(type);
     });
 
     const sub = questions.some((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
-      return ['cq', 'sq', 'descriptive'].includes(type);
+      return ['cq', 'sq', 'descriptive', 'coding'].includes(type);
     });
 
     return { hasObjective: obj, hasCqSq: sub };
@@ -419,8 +418,8 @@ export function ExamContextProvider({
 
     if (!isMS) {
       // 100% UNTOUCHED ORIGINAL LOGIC FOR SS EXAMS AND OTHERS
-      const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc'];
-      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], other: [] };
+      const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq', 'cma', 'mpc', 'coding'];
+      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], cma: [], mpc: [], coding: [], other: [] };
 
       exam.questions.forEach((q: any) => {
         let type = (q.type || q.questionType || '').toLowerCase();
@@ -443,6 +442,7 @@ export function ExamContextProvider({
         ...grouped.int,
         ...grouped.numeric,
         ...grouped.descriptive,
+        ...grouped.coding,
         ...grouped.other
       ];
     }
@@ -460,7 +460,7 @@ export function ExamContextProvider({
         return matches;
       });
 
-      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], smcq: [], cma: [], mpc: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], other: [] };
+      const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], smcq: [], cma: [], mpc: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], coding: [], other: [] };
       subQuestions.forEach((q: any) => {
         let type = (q.type || q.questionType || '').toLowerCase();
         if (type === 'constructed_multi_answer' || type === 'constructed-multi-answer') type = 'cma';
@@ -482,6 +482,7 @@ export function ExamContextProvider({
         ...grouped.int,
         ...grouped.numeric,
         ...grouped.descriptive,
+        ...grouped.coding,
         ...grouped.other
       );
     });
@@ -498,12 +499,12 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'other'].includes(type) && !['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
     } else {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['cq', 'sq', 'descriptive'].includes(type);
+        return ['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
     }
   }, [fullSortedQuestions, activeSection]);
@@ -514,12 +515,12 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return raw.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return !['cq', 'sq', 'descriptive'].includes(type);
+        return !['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
     } else {
       return raw.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['cq', 'sq', 'descriptive'].includes(type);
+        return ['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
     }
   }, [exam.questions, activeSection]);
@@ -625,15 +626,16 @@ export function ExamContextProvider({
 
   const groupedQuestions = useMemo(() => {
     if (!exam.questions) return {};
-    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cma: [], mpc: [], dr: [], cq: [], sq: [], descriptive: [], other: [] };
+    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cma: [], mpc: [], dr: [], cq: [], sq: [], descriptive: [], coding: [], other: [] };
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
       if (g[type]) g[type].push(q);
       else g.other.push(q);
     });
     return {
-      creative: [...g.cq, ...g.descriptive],
+      creative: [...g.cq, ...g.descriptive, ...g.coding],
       short: [...g.sq],
+      coding: [...g.coding],
       objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.cma, ...g.mpc, ...g.dr, ...g.other]
     };
   }, [exam.questions]);

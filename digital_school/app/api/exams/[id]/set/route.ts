@@ -19,7 +19,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
     // Add new sets (do not delete previous)
     const createdSets = await Promise.all(
-      sets.map(async (set: { name: string; questions: Record<string, unknown>; description?: string }) => {
+      sets.map(async (set: { name: string; questions: Record<string, unknown>; description?: string; isEncrypted?: boolean }) => {
+        const desc = set.description || (set.isEncrypted ? 'Encrypted Confidential Set' : '');
         // Optionally, skip or update if a set with the same name exists
         const existing = await prismadb.examSet.findFirst({ where: { examId, name: set.name } });
         if (existing) {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
             where: { id: existing.id },
             data: {
               questionsJson: set.questions as any,
-              description: set.description || '',
+              description: desc,
               updatedAt: new Date(),
             },
           });
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           return await prismadb.examSet.create({
             data: {
               name: set.name,
-              description: set.description || '',
+              description: desc,
               examId,
               createdById: auth.user.id,
               questionsJson: set.questions as any,

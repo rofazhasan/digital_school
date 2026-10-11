@@ -1294,7 +1294,7 @@ export default function ExamLayout() {
             )}
 
             {/* Question Card Container */}
-            <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "")}>
+            <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "", (currentQuestion?.type || currentQuestion?.questionType || "").toLowerCase() === "coding" ? "max-w-none w-full" : "")}>
               {(() => {
                 const qType = (currentQuestion?.type || currentQuestion?.questionType || "").toLowerCase();
                 const isSubjective = ['cq', 'sq', 'descriptive'].includes(qType);

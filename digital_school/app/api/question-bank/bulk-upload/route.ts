@@ -4,16 +4,27 @@ import prisma from "@/lib/db";
 import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 import { parseDescriptiveSubQuestion } from '@/utils/descriptive-parser';
 import { s, n, getValue } from '@/utils/parser-utils';
+import { decryptData, isEncrypted } from '@/lib/encryption';
 
-// Define locally to avoid import issues with agent's linter
-// Define locally to avoid import issues with agent's linter
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'CODING';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
-async function validateAndMapRow(row: any, classes: any[]) {
+async function validateAndMapRow(rawRow: any, classes: any[]) {
+    // 1. Automatic Decryption for AI/superadmin encrypted cells or rows
+    let row: any = rawRow;
+    if (typeof rawRow === 'object' && rawRow !== null) {
+        row = { ...rawRow };
+        for (const key of Object.keys(row)) {
+            const val = row[key];
+            if (typeof val === 'string' && val.startsWith('ENC:')) {
+                row[key] = decryptData(val);
+            }
+        }
+    }
+
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
-    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
+    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'CODING'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
     const diffRaw = s(getValue(row, ["Difficulty", "Level", "Diff"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';
@@ -40,7 +51,7 @@ async function validateAndMapRow(row: any, classes: any[]) {
     };
 
     try {
-        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC'].includes(typeRaw)) {
+        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'CODING'].includes(typeRaw)) {
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
@@ -280,6 +291,58 @@ async function validateAndMapRow(row: any, classes: any[]) {
                 if (subQ) data.subQuestions.push(subQ);
             }
             if (data.subQuestions.length === 0) throw new Error("DESCRIPTIVE requires at least one Sub-Question");
+        } else if (data.type === 'CODING') {
+            const testCases: any[] = [];
+            for (let i = 1; i <= 10; i++) {
+                const input = s(getValue(row, [`Test ${i} Input`, `TC${i}Input`, `Test${i}Input`, `Input ${i}`]));
+                const output = s(getValue(row, [`Test ${i} Output`, `TC${i}Output`, `Test${i}Output`, `Output ${i}`]));
+                if (!input && !output) continue;
+
+                const hiddenRaw = s(getValue(row, [`Test ${i} Hidden`, `TC${i}Hidden`, `Test${i}Hidden`]));
+                const weight = n(getValue(row, [`Test ${i} Weight`, `TC${i}Weight`])) || 1;
+                const exp = s(getValue(row, [`Test ${i} Explanation`, `TC${i}Explanation`]));
+
+                testCases.push({
+                    id: i,
+                    input,
+                    expectedOutput: output,
+                    isHidden: /true|yes|1/i.test(hiddenRaw),
+                    weight,
+                    explanation: exp
+                });
+            }
+
+            const constraints = s(getValue(row, ["Constraints", "Limits", "Specs"]));
+            const allowedLanguagesRaw = s(getValue(row, ["Allowed Languages", "Languages", "Langs"]));
+            const allowedLanguages = allowedLanguagesRaw
+                ? allowedLanguagesRaw.split(/[,|\s]+/).map(l => l.trim().toLowerCase()).filter(Boolean)
+                : ['python', 'c', 'cpp'];
+
+            const starterPython = s(getValue(row, ["Starter Code Python", "Starter Python", "Python Starter"]));
+            const starterC = s(getValue(row, ["Starter Code C", "Starter C", "C Starter"]));
+            const starterCPP = s(getValue(row, ["Starter Code CPP", "Starter Code C++", "Starter CPP", "CPP Starter"]));
+
+            const starterCode: Record<string, string> = {};
+            if (starterPython) starterCode.python = starterPython;
+            if (starterC) starterCode.c = starterC;
+            if (starterCPP) starterCode.cpp = starterCPP;
+
+            data.options = {
+                testCases,
+                constraints,
+                allowedLanguages,
+                starterCode: Object.keys(starterCode).length > 0 ? starterCode : undefined
+            };
+
+            // Also keep subQuestions format for universal compatibility
+            data.subQuestions = testCases.map(tc => ({
+                id: `tc_${tc.id}`,
+                input: tc.input,
+                expectedOutput: tc.expectedOutput,
+                marks: tc.weight,
+                isHidden: tc.isHidden,
+                explanation: tc.explanation
+            }));
         }
 
         // If parent marks not provided, calculate sum of subquestions if present
@@ -290,7 +353,7 @@ async function validateAndMapRow(row: any, classes: any[]) {
             }
         }
         if (!data.marks || data.marks <= 0) {
-            data.marks = (data.type === 'CQ' || data.type === 'DESCRIPTIVE') ? 10 : 1;
+            data.marks = (data.type === 'CQ' || data.type === 'DESCRIPTIVE' || data.type === 'CODING') ? 10 : 1;
         }
 
         const { processedData } = processQuestionWithInlineFBDs(data);
@@ -333,25 +396,35 @@ export async function POST(req: NextRequest) {
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: 'buffer' });
 
-            // Prefer "Template" sheet, fallback to first sheet
-            const sheetName: string = workbook.SheetNames.find(n => n === "Template") || workbook.SheetNames[0];
+            // Collect rows from all question sheets, ignoring documentation/instruction sheets
+            const isIgnoredSheet = (name: string) => {
+                const lower = name.toLowerCase().trim();
+                return lower.includes('instruction') || lower.includes('guide') || lower.includes('readme') || lower.includes('help');
+            };
 
-            if (!sheetName) {
-                return NextResponse.json({ error: "Excel file has no sheets" }, { status: 400 });
+            const candidateSheets = workbook.SheetNames.filter(n => !isIgnoredSheet(n));
+            const sheetsToProcess = candidateSheets.length > 0 ? candidateSheets : workbook.SheetNames;
+
+            if (sheetsToProcess.length === 0) {
+                return NextResponse.json({ error: "Excel file has no valid sheets" }, { status: 400 });
             }
-
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-            if (jsonData.length === 0) return NextResponse.json({ error: "Excel file is empty" }, { status: 400 });
 
             const previewRows = [];
-            for (let i = 0; i < jsonData.length; i++) {
-                const result = await validateAndMapRow(jsonData[i], classes);
-                if (result) {
-                    previewRows.push({ ...result, rowNum: i + 2 });
+            let rowCounter = 2;
+            for (const sName of sheetsToProcess) {
+                const worksheet = workbook.Sheets[sName];
+                if (!worksheet) continue;
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                for (let i = 0; i < jsonData.length; i++) {
+                    const result = await validateAndMapRow(jsonData[i], classes);
+                    if (result) {
+                        previewRows.push({ ...result, rowNum: rowCounter, sheet: sName });
+                        rowCounter++;
+                    }
                 }
             }
+
+            if (previewRows.length === 0) return NextResponse.json({ error: "No valid question rows found in Excel file" }, { status: 400 });
 
             return NextResponse.json({ mode: 'preview', rows: previewRows });
         }
