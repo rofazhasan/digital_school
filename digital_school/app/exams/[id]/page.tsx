@@ -2260,6 +2260,7 @@ export default function ExamBuilderPage() {
                                     </div>
                                   )}
                                 </div>
+                                )
                               ) : <span className="text-muted-foreground">-</span>}
                             </td>
                           );
@@ -2398,6 +2399,7 @@ export default function ExamBuilderPage() {
                                 ))}
                               </div>
                             </div>
+                          )}
                           {q.type === 'CODING' && (
                             <div className="mt-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-2">
                               <div className="font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
