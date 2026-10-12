@@ -89,11 +89,11 @@ function drawSmoothStroke(
         ctx.globalAlpha = 0.35;
         ctx.globalCompositeOperation = 'multiply';
         ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = stroke.width * 2.5;
+        ctx.lineWidth = stroke.width * 2.8;
 
         if (stroke.points.length === 1) {
             ctx.beginPath();
-            ctx.arc(p1.x, p1.y, (stroke.width * 2.5) / 2, 0, Math.PI * 2);
+            ctx.arc(p1.x, p1.y, (stroke.width * 2.8) / 2, 0, Math.PI * 2);
             ctx.fillStyle = stroke.color;
             ctx.fill();
             ctx.restore();
@@ -119,11 +119,11 @@ function drawSmoothStroke(
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'destination-out';
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = stroke.width;
+        ctx.lineWidth = stroke.width * 2;
 
         if (stroke.points.length === 1) {
             ctx.beginPath();
-            ctx.arc(p1.x, p1.y, stroke.width / 2, 0, Math.PI * 2);
+            ctx.arc(p1.x, p1.y, stroke.width, 0, Math.PI * 2);
             ctx.fillStyle = '#000000';
             ctx.fill();
             ctx.restore();
@@ -132,10 +132,13 @@ function drawSmoothStroke(
 
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
-        for (let i = 1; i < stroke.points.length; i++) {
-            const pt = stroke.points[i];
-            ctx.lineTo(pt.x + offsetPos.x, pt.y + offsetPos.y);
+        for (let i = 1; i < stroke.points.length - 1; i++) {
+            const pt1 = stroke.points[i];
+            const pt2 = stroke.points[i + 1];
+            const mid = { x: (pt1.x + pt2.x) / 2 + offsetPos.x, y: (pt1.y + pt2.y) / 2 + offsetPos.y };
+            ctx.quadraticCurveTo(pt1.x + offsetPos.x, pt1.y + offsetPos.y, mid.x, mid.y);
         }
+        ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
         ctx.restore();
         return;
@@ -157,12 +160,10 @@ function drawSmoothStroke(
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
         } else if (stroke.tool === 'arrow') {
-            // Draw Main Shaft
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
             ctx.stroke();
 
-            // Draw crisp Arrowhead
             const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
             const headLen = Math.max(12, stroke.width * 3.5);
             ctx.beginPath();
@@ -207,13 +208,10 @@ function drawSmoothStroke(
             ctx.moveTo(p1.x, p1.y + h); ctx.lineTo(p1.x + d, p1.y + h - d);
             ctx.rect(p1.x + d, p1.y, w - d, h - d);
         } else if (stroke.tool === 'axis') {
-            // Coordinate System with arrowheads
             ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2, p1.y + h);
             ctx.moveTo(p1.x, p1.y + h / 2); ctx.lineTo(p1.x + w, p1.y + h / 2);
-            // X-axis arrow
             ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 - 5);
             ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 + 5);
-            // Y-axis arrow
             ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 - 5, p1.y + 10);
             ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 + 5, p1.y + 10);
         }
@@ -223,7 +221,7 @@ function drawSmoothStroke(
         return;
     }
 
-    // --- 4. Smooth Freehand Pen / Gel Pen / Calligraphy ---
+    // --- 4. Smooth Freehand Pen / Gel Pen / Graphics Tablet Inking ---
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     ctx.strokeStyle = stroke.color;
@@ -233,10 +231,10 @@ function drawSmoothStroke(
     const len = pts.length;
 
     if (len === 1) {
-        // Single tap dot
         ctx.beginPath();
         const baseR = Math.max(1.5, stroke.width / 2);
-        const r = (pts[0].pressure && pts[0].pressure > 0) ? baseR * (0.5 + pts[0].pressure) : baseR;
+        const pVal = pts[0].pressure !== undefined && pts[0].pressure > 0 ? pts[0].pressure : 0.5;
+        const r = baseR * (0.6 + pVal * 0.7);
         ctx.arc(p1.x, p1.y, r, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
@@ -244,7 +242,8 @@ function drawSmoothStroke(
     }
 
     if (len === 2) {
-        ctx.lineWidth = stroke.width;
+        const pAvg = ((pts[0].pressure || 0.5) + (pts[1].pressure || 0.5)) / 2;
+        ctx.lineWidth = Math.max(1.2, stroke.width * (0.65 + pAvg * 0.7));
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(pts[1].x + offsetPos.x, pts[1].y + offsetPos.y);
@@ -253,29 +252,47 @@ function drawSmoothStroke(
         return;
     }
 
-    // High quality Bezier interpolation
-    // If pressure data exists, render with variable segment width
-    const hasPressureData = pts.some(p => p.pressure !== undefined && p.pressure > 0 && p.pressure !== 0.5);
+    // Check if stroke has variable pressure data from graphics tablet
+    const hasPressureData = pts.some(p => p.pressure !== undefined && p.pressure > 0 && Math.abs(p.pressure - 0.5) > 0.05);
 
-    if (hasPressureData && len > 2) {
-        for (let i = 0; i < len - 1; i++) {
-            const curr = pts[i];
-            const next = pts[i + 1];
-            const pX1 = curr.x + offsetPos.x;
-            const pY1 = curr.y + offsetPos.y;
-            const pX2 = next.x + offsetPos.x;
-            const pY2 = next.y + offsetPos.y;
+    if (hasPressureData) {
+        // Continuous, silky smooth quadratic curve segments with pressure dynamic width
+        let prevMidX = (pts[0].x + pts[1].x) / 2 + offsetPos.x;
+        let prevMidY = (pts[0].y + pts[1].y) / 2 + offsetPos.y;
 
-            const pFactor = Math.max(0.4, Math.min(1.8, ((curr.pressure || 0.5) + (next.pressure || 0.5))));
-            ctx.lineWidth = stroke.width * pFactor;
+        const startP = pts[0].pressure || 0.5;
+        ctx.lineWidth = Math.max(1.2, stroke.width * (0.6 + startP * 0.7));
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(prevMidX, prevMidY);
+        ctx.stroke();
+
+        for (let i = 1; i < len - 1; i++) {
+            const ptCurr = pts[i];
+            const ptNext = pts[i + 1];
+            const midX = (ptCurr.x + ptNext.x) / 2 + offsetPos.x;
+            const midY = (ptCurr.y + ptNext.y) / 2 + offsetPos.y;
+
+            const pVal = ptCurr.pressure !== undefined ? ptCurr.pressure : 0.5;
+            ctx.lineWidth = Math.max(1.2, stroke.width * (0.65 + pVal * 0.7));
 
             ctx.beginPath();
-            ctx.moveTo(pX1, pY1);
-            ctx.lineTo(pX2, pY2);
+            ctx.moveTo(prevMidX, prevMidY);
+            ctx.quadraticCurveTo(ptCurr.x + offsetPos.x, ptCurr.y + offsetPos.y, midX, midY);
             ctx.stroke();
+
+            prevMidX = midX;
+            prevMidY = midY;
         }
+
+        const endP = pts[len - 1].pressure || 0.5;
+        ctx.lineWidth = Math.max(1.2, stroke.width * (0.6 + endP * 0.7));
+        ctx.beginPath();
+        ctx.moveTo(prevMidX, prevMidY);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
     } else {
-        // Fast, butter-smooth quadratic spline through midpoints
+        // Single continuous path for maximum anti-aliasing perfection
         ctx.lineWidth = stroke.width;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
@@ -300,7 +317,11 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     onDrawEnd,
     backgroundColor = 'white'
 }, ref) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Layered Dual-Canvas Architecture:
+    // baseCanvasRef: renders committed historical strokes (static, zero per-frame cost)
+    // activeCanvasRef: renders live stroke currently being drawn at 120 FPS
+    const baseCanvasRef = useRef<HTMLCanvasElement>(null);
+    const activeCanvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // --- State ---
@@ -327,21 +348,25 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     const [dragStartPos, setDragStartPos] = useState<Point | null>(null);
     const [dragOffset, setDragOffset] = useState<Point>({ x: 0, y: 0 });
 
-    // --- Performance Optimization: Active Stroke Ref for ZERO-LAG live drawing ---
+    // Active in-memory stroke ref
     const activeStrokeRef = useRef<Stroke | null>(null);
     const rafIdRef = useRef<number | null>(null);
     const laserTrailRef = useRef<LaserPoint[]>([]);
 
     // --- Helpers ---
-    const getScreenPoint = (e: React.PointerEvent | PointerEvent): Point => {
-        const canvas = canvasRef.current;
+    const getScreenPointFromEvent = (e: React.PointerEvent | PointerEvent): Point => {
+        const canvas = activeCanvasRef.current || baseCanvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
+        let p = 0.5;
+        if (typeof e.pressure === 'number' && e.pressure > 0) {
+            p = e.pressure;
+        }
         return {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top,
-            pressure: e.pressure || 0.5,
-            time: Date.now()
+            pressure: p,
+            time: e.timeStamp || Date.now()
         };
     };
 
@@ -375,7 +400,6 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         return null;
     };
 
-    // --- Cursor Generation ---
     const getCursor = () => {
         if (tool === 'select') return isDraggingStroke ? 'grabbing' : 'default';
         if (tool === 'move') return isPanning ? 'grabbing' : 'grab';
@@ -384,16 +408,14 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         return 'crosshair';
     };
 
-    // --- Full Screen Redraw ---
-    const redraw = useCallback(() => {
-        const canvas = canvasRef.current;
+    // --- Redraw Base Canvas (Committed History Only) ---
+    const redrawBase = useCallback(() => {
+        const canvas = baseCanvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
-
-        // Reset transform to native pixels & clear
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -424,8 +446,21 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 ctx.restore();
             }
         }
+    }, [scale, offset, paths, historyStep, selectedStrokeId, dragOffset, isDraggingStroke]);
 
-        // Draw Active Live Stroke (Direct from Ref)
+    // --- Redraw Active Canvas (Live Drawing & Laser Overlay Only) ---
+    const redrawActive = useCallback(() => {
+        const canvas = activeCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offset.x * dpr, offset.y * dpr);
+
         if (activeStrokeRef.current) {
             drawSmoothStroke(ctx, activeStrokeRef.current);
         }
@@ -468,14 +503,14 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 ctx.restore();
             }
         }
-    }, [scale, offset, paths, historyStep, selectedStrokeId, dragOffset, isDraggingStroke]);
+    }, [scale, offset]);
 
     // Laser Animation Loop
     useEffect(() => {
         let animId: number;
         const checkLaser = () => {
             if (tool === 'laser' || laserTrailRef.current.length > 0) {
-                redraw();
+                redrawActive();
                 animId = requestAnimationFrame(checkLaser);
             }
         };
@@ -483,26 +518,37 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             animId = requestAnimationFrame(checkLaser);
         }
         return () => cancelAnimationFrame(animId);
-    }, [tool, redraw]);
+    }, [tool, redrawActive]);
 
     // Redraw on dependencies
     useEffect(() => {
-        redraw();
-    }, [redraw]);
+        redrawBase();
+    }, [redrawBase]);
 
-    // Resize Handler with DevicePixelRatio
+    // Resize Handler with DPR for both canvases
     useEffect(() => {
         const resize = () => {
-            const canvas = canvasRef.current;
             const parent = containerRef.current;
-            if (canvas && parent) {
+            const base = baseCanvasRef.current;
+            const active = activeCanvasRef.current;
+            if (parent && base && active) {
                 const rect = parent.getBoundingClientRect();
                 const dpr = window.devicePixelRatio || 1;
-                canvas.width = Math.round(rect.width * dpr);
-                canvas.height = Math.round(rect.height * dpr);
-                canvas.style.width = `${rect.width}px`;
-                canvas.style.height = `${rect.height}px`;
-                redraw();
+                const w = Math.round(rect.width * dpr);
+                const h = Math.round(rect.height * dpr);
+
+                base.width = w;
+                base.height = h;
+                base.style.width = `${rect.width}px`;
+                base.style.height = `${rect.height}px`;
+
+                active.width = w;
+                active.height = h;
+                active.style.width = `${rect.width}px`;
+                active.style.height = `${rect.height}px`;
+
+                redrawBase();
+                redrawActive();
             }
         };
 
@@ -515,21 +561,17 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             ro.disconnect();
             window.removeEventListener('resize', resize);
         };
-    }, [redraw]);
+    }, [redrawBase, redrawActive]);
 
-    // --- High-Performance Pointer Events ---
+    // --- High-Performance Hardware Graphics Tablet Pointer Events ---
     const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        // Prevent default touch gestures (scrolling, pinch zoom from browser)
         e.preventDefault();
 
-        // Capture pointer to guarantee no lost points even if dragging off-screen
         try {
             e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-            // Ignore if pointer capture unsupported
-        }
+        } catch {}
 
-        const screenPoint = getScreenPoint(e);
+        const screenPoint = getScreenPointFromEvent(e);
         const worldPoint = toWorldPoint(screenPoint);
 
         // Select Tool Logic
@@ -546,7 +588,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             return;
         }
 
-        // Panning Logic (Middle click or Move tool)
+        // Panning Logic (Middle click or Move tool or Alt key)
         if (tool === 'move' || e.button === 1 || e.altKey) {
             setIsPanning(true);
             setLastPanPoint(screenPoint);
@@ -557,7 +599,6 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         if (tool === 'eraser') {
             const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
             if (hitId) {
-                // Delete clicked stroke immediately
                 const updated = paths.filter(p => p.id !== hitId);
                 setPaths(updated);
                 setHistoryStep(updated.length);
@@ -570,7 +611,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         if (tool === 'laser') {
             setIsDrawing(true);
             laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
-            redraw();
+            redrawActive();
             return;
         }
 
@@ -584,15 +625,14 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             id: `str_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
         };
 
-        redraw();
+        redrawActive();
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
         e.preventDefault();
-        const screenPoint = getScreenPoint(e);
-        const worldPoint = toWorldPoint(screenPoint);
 
         if (isPanning && lastPanPoint) {
+            const screenPoint = getScreenPointFromEvent(e);
             const dx = screenPoint.x - lastPanPoint.x;
             const dy = screenPoint.y - lastPanPoint.y;
             setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
@@ -601,50 +641,71 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         }
 
         if (isDraggingStroke && dragStartPos && selectedStrokeId) {
+            const screenPoint = getScreenPointFromEvent(e);
+            const worldPoint = toWorldPoint(screenPoint);
             const dx = worldPoint.x - dragStartPos.x;
             const dy = worldPoint.y - dragStartPos.y;
             setDragOffset({ x: dx, y: dy });
-            redraw();
+            redrawBase();
             return;
         }
 
-        if (tool === 'laser' && isDrawing) {
-            laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
-            redraw();
-            return;
-        }
+        if (!isDrawing) return;
 
-        // Freehand Live Eraser (swipe-through delete)
-        if (tool === 'eraser' && isDrawing) {
-            const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
-            if (hitId) {
-                const updated = paths.filter(p => p.id !== hitId);
-                setPaths(updated);
-                setHistoryStep(updated.length);
+        // Extract hardware coalesced events from Graphics Tablets
+        const rawEvents = (e.nativeEvent && typeof (e.nativeEvent as any).getCoalescedEvents === 'function')
+            ? (e.nativeEvent as any).getCoalescedEvents()
+            : [e];
+
+        for (const ev of rawEvents) {
+            const screenPoint = getScreenPointFromEvent(ev);
+            const worldPoint = toWorldPoint(screenPoint);
+
+            if (tool === 'laser') {
+                laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
+                continue;
             }
+
+            // Freehand Live Eraser (swipe-through delete)
+            if (tool === 'eraser') {
+                const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
+                if (hitId) {
+                    const updated = paths.filter(p => p.id !== hitId);
+                    setPaths(updated);
+                    setHistoryStep(updated.length);
+                }
+                if (activeStrokeRef.current) {
+                    activeStrokeRef.current.points.push(worldPoint);
+                }
+                continue;
+            }
+
             if (activeStrokeRef.current) {
-                activeStrokeRef.current.points.push(worldPoint);
+                if (isShapeTool(activeStrokeRef.current.tool)) {
+                    activeStrokeRef.current.points = [activeStrokeRef.current.points[0], worldPoint];
+                } else {
+                    const pts = activeStrokeRef.current.points;
+                    const lastPt = pts[pts.length - 1];
+                    const dx = worldPoint.x - lastPt.x;
+                    const dy = worldPoint.y - lastPt.y;
+
+                    // Micro-distance threshold to eliminate zero-length jitter
+                    if (dx * dx + dy * dy >= 0.7) {
+                        if (worldPoint.pressure !== undefined && lastPt.pressure !== undefined) {
+                            worldPoint.pressure = lastPt.pressure * 0.6 + worldPoint.pressure * 0.4;
+                        }
+                        pts.push(worldPoint);
+                    }
+                }
             }
-            redraw();
-            return;
         }
 
-        if (isDrawing && activeStrokeRef.current) {
-            if (isShapeTool(activeStrokeRef.current.tool)) {
-                // Update shape endpoint
-                activeStrokeRef.current.points = [activeStrokeRef.current.points[0], worldPoint];
-            } else {
-                // Append point with pressure
-                activeStrokeRef.current.points.push(worldPoint);
-            }
-
-            // High efficiency RAF render
-            if (rafIdRef.current === null) {
-                rafIdRef.current = requestAnimationFrame(() => {
-                    rafIdRef.current = null;
-                    redraw();
-                });
-            }
+        // Draw ONLY on active canvas overlay with zero lag
+        if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(() => {
+                rafIdRef.current = null;
+                redrawActive();
+            });
         }
     };
 
@@ -653,9 +714,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
         try {
             e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-            // Ignore
-        }
+        } catch {}
 
         if (rafIdRef.current !== null) {
             cancelAnimationFrame(rafIdRef.current);
@@ -690,7 +749,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
         // Commit active stroke to paths state
         if (activeStrokeRef.current && activeStrokeRef.current.points.length > 0) {
-            const newStroke = activeStrokeRef.current;
+            const newStroke = { ...activeStrokeRef.current };
             activeStrokeRef.current = null;
 
             const visible = paths.slice(0, historyStep);
@@ -701,7 +760,21 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             if (onDrawEnd) onDrawEnd();
         }
 
-        redraw();
+        // Clear active overlay and draw committed stroke onto base canvas
+        const activeCanvas = activeCanvasRef.current;
+        if (activeCanvas) {
+            const ctx = activeCanvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+        }
+        redrawBase();
+    };
+
+    const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        // Prevent spurious pointercancel from dropping strokes during graphics tablet handwriting
+        if (e.buttons === 1 && isDrawing) {
+            return;
+        }
+        handlePointerUp(e);
     };
 
     const handleWheel = (e: React.WheelEvent) => {
@@ -720,7 +793,12 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             setPaths([]);
             setHistoryStep(0);
             setSelectedStrokeId(null);
-            redraw();
+            const activeCanvas = activeCanvasRef.current;
+            if (activeCanvas) {
+                const ctx = activeCanvas.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, activeCanvas.width, activeCanvas.height);
+            }
+            redrawBase();
         },
         undo: () => {
             setHistoryStep(prev => Math.max(0, prev - 1));
@@ -739,7 +817,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         },
         zoomIn: () => setScale(s => Math.min(s * 1.25, 4)),
         zoomOut: () => setScale(s => Math.max(s / 1.25, 0.2)),
-        getCanvas: () => canvasRef.current,
+        getCanvas: () => baseCanvasRef.current || activeCanvasRef.current,
         getPaths: () => paths.slice(0, historyStep),
         loadPaths: (newPaths: Stroke[]) => {
             activeStrokeRef.current = null;
@@ -769,14 +847,21 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 backgroundSize: backgroundColor === 'grid' ? '24px 24px' : undefined
             }}
         >
+            {/* Base Canvas: Committed Historical Strokes (Static, Zero Draw Cost while Writing) */}
             <canvas
-                ref={canvasRef}
+                ref={baseCanvasRef}
+                className="absolute inset-0 block w-full h-full pointer-events-none"
+            />
+
+            {/* Active Canvas: Live 120 FPS Active Stroke Layer & Hardware Digitizer Event Receiver */}
+            <canvas
+                ref={activeCanvasRef}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
                 onWheel={handleWheel}
-                className="block w-full h-full touch-none"
+                className="absolute inset-0 block w-full h-full touch-none select-none"
                 style={{
                     cursor: getCursor(),
                     touchAction: 'none'
