@@ -3,7 +3,42 @@
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback, memo } from 'react';
 
 // --- Types ---
-export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'select' | 'move' | 'line' | 'rect' | 'circle' | 'triangle' | 'right_triangle' | 'axis' | 'cube' | 'diamond';
+export type ToolType =
+    | 'pen'
+    | 'highlighter'
+    | 'eraser'
+    | 'semigloss'
+    | 'laser'
+    | 'select'
+    | 'move'
+    | 'line'
+    | 'arrow'
+    | 'rect'
+    | 'circle'
+    | 'triangle'
+    | 'right_triangle'
+    | 'axis'
+    | 'cube'
+    | 'diamond';
+
+export interface Point {
+    x: number;
+    y: number;
+    pressure?: number;
+    time?: number;
+}
+
+export interface Stroke {
+    points: Point[];
+    color: string;
+    width: number;
+    tool: ToolType;
+    id: string;
+}
+
+interface LaserPoint extends Point {
+    time: number;
+}
 
 export interface SmartBoardRef {
     clear: () => void;
@@ -18,6 +53,8 @@ export interface SmartBoardRef {
     getCanvas: () => HTMLCanvasElement | null;
     getPaths: () => Stroke[];
     loadPaths: (paths: Stroke[]) => void;
+    canUndo?: () => boolean;
+    canRedo?: () => boolean;
 }
 
 interface SmartBoardProps {
@@ -26,19 +63,236 @@ interface SmartBoardProps {
     backgroundColor?: 'white' | 'black' | 'grid' | 'transparent';
 }
 
-type Point = { x: number; y: number };
+const isShapeTool = (t: ToolType) => {
+    return ['line', 'arrow', 'rect', 'circle', 'triangle', 'right_triangle', 'axis', 'cube', 'diamond'].includes(t);
+};
 
-// A stroke is a collection of points with style
-export interface Stroke {
-    points: Point[];
-    color: string;
-    width: number;
-    tool: ToolType;
-    id: string;
-}
+// Natural stroke drawing with Bezier smoothing and velocity/pressure dynamics
+function drawSmoothStroke(
+    ctx: CanvasRenderingContext2D,
+    stroke: Stroke,
+    offsetPos: Point = { x: 0, y: 0 }
+) {
+    if (!stroke || !Array.isArray(stroke.points) || stroke.points.length === 0) return;
 
-interface LaserPoint extends Point {
-    time: number;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const p0 = stroke.points[0];
+    const p1 = { x: p0.x + offsetPos.x, y: p0.y + offsetPos.y };
+    const rawLast = stroke.points[stroke.points.length - 1];
+    const p2 = { x: rawLast.x + offsetPos.x, y: rawLast.y + offsetPos.y };
+
+    // --- 1. Highlighter Mode ---
+    if (stroke.tool === 'highlighter') {
+        ctx.globalAlpha = 0.35;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.width * 2.5;
+
+        if (stroke.points.length === 1) {
+            ctx.beginPath();
+            ctx.arc(p1.x, p1.y, (stroke.width * 2.5) / 2, 0, Math.PI * 2);
+            ctx.fillStyle = stroke.color;
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        for (let i = 1; i < stroke.points.length - 1; i++) {
+            const pt1 = stroke.points[i];
+            const pt2 = stroke.points[i + 1];
+            const mid = { x: (pt1.x + pt2.x) / 2 + offsetPos.x, y: (pt1.y + pt2.y) / 2 + offsetPos.y };
+            ctx.quadraticCurveTo(pt1.x + offsetPos.x, pt1.y + offsetPos.y, mid.x, mid.y);
+        }
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    // --- 2. Eraser Mode ---
+    if (stroke.tool === 'eraser') {
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = stroke.width;
+
+        if (stroke.points.length === 1) {
+            ctx.beginPath();
+            ctx.arc(p1.x, p1.y, stroke.width / 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        for (let i = 1; i < stroke.points.length; i++) {
+            const pt = stroke.points[i];
+            ctx.lineTo(pt.x + offsetPos.x, pt.y + offsetPos.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    // --- 3. Geometric Shapes & Stencils ---
+    if (isShapeTool(stroke.tool)) {
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.width;
+
+        const w = p2.x - p1.x;
+        const h = p2.y - p1.y;
+
+        ctx.beginPath();
+
+        if (stroke.tool === 'line') {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+        } else if (stroke.tool === 'arrow') {
+            // Draw Main Shaft
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+
+            // Draw crisp Arrowhead
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const headLen = Math.max(12, stroke.width * 3.5);
+            ctx.beginPath();
+            ctx.moveTo(p2.x, p2.y);
+            ctx.lineTo(
+                p2.x - headLen * Math.cos(angle - Math.PI / 6),
+                p2.y - headLen * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.moveTo(p2.x, p2.y);
+            ctx.lineTo(
+                p2.x - headLen * Math.cos(angle + Math.PI / 6),
+                p2.y - headLen * Math.sin(angle + Math.PI / 6)
+            );
+        } else if (stroke.tool === 'rect') {
+            ctx.rect(p1.x, p1.y, w, h);
+        } else if (stroke.tool === 'circle') {
+            const centerX = p1.x + w / 2;
+            const centerY = p1.y + h / 2;
+            ctx.ellipse(centerX, centerY, Math.abs(w / 2), Math.abs(h / 2), 0, 0, 2 * Math.PI);
+        } else if (stroke.tool === 'triangle') {
+            ctx.moveTo(p1.x + w / 2, p1.y);
+            ctx.lineTo(p1.x, p1.y + h);
+            ctx.lineTo(p1.x + w, p1.y + h);
+            ctx.closePath();
+        } else if (stroke.tool === 'right_triangle') {
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p1.x, p1.y + h);
+            ctx.lineTo(p1.x + w, p1.y + h);
+            ctx.closePath();
+        } else if (stroke.tool === 'diamond') {
+            ctx.moveTo(p1.x + w / 2, p1.y);
+            ctx.lineTo(p1.x + w, p1.y + h / 2);
+            ctx.lineTo(p1.x + w / 2, p1.y + h);
+            ctx.lineTo(p1.x, p1.y + h / 2);
+            ctx.closePath();
+        } else if (stroke.tool === 'cube') {
+            const d = w * 0.25;
+            ctx.rect(p1.x, p1.y + d, w - d, h - d);
+            ctx.moveTo(p1.x, p1.y + d); ctx.lineTo(p1.x + d, p1.y);
+            ctx.moveTo(p1.x + w - d, p1.y + d); ctx.lineTo(p1.x + w, p1.y);
+            ctx.moveTo(p1.x + w - d, p1.y + h); ctx.lineTo(p1.x + w, p1.y + h - d);
+            ctx.moveTo(p1.x, p1.y + h); ctx.lineTo(p1.x + d, p1.y + h - d);
+            ctx.rect(p1.x + d, p1.y, w - d, h - d);
+        } else if (stroke.tool === 'axis') {
+            // Coordinate System with arrowheads
+            ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2, p1.y + h);
+            ctx.moveTo(p1.x, p1.y + h / 2); ctx.lineTo(p1.x + w, p1.y + h / 2);
+            // X-axis arrow
+            ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 - 5);
+            ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 + 5);
+            // Y-axis arrow
+            ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 - 5, p1.y + 10);
+            ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 + 5, p1.y + 10);
+        }
+
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    // --- 4. Smooth Freehand Pen / Gel Pen / Calligraphy ---
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+
+    const pts = stroke.points;
+    const len = pts.length;
+
+    if (len === 1) {
+        // Single tap dot
+        ctx.beginPath();
+        const baseR = Math.max(1.5, stroke.width / 2);
+        const r = (pts[0].pressure && pts[0].pressure > 0) ? baseR * (0.5 + pts[0].pressure) : baseR;
+        ctx.arc(p1.x, p1.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+    }
+
+    if (len === 2) {
+        ctx.lineWidth = stroke.width;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(pts[1].x + offsetPos.x, pts[1].y + offsetPos.y);
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    // High quality Bezier interpolation
+    // If pressure data exists, render with variable segment width
+    const hasPressureData = pts.some(p => p.pressure !== undefined && p.pressure > 0 && p.pressure !== 0.5);
+
+    if (hasPressureData && len > 2) {
+        for (let i = 0; i < len - 1; i++) {
+            const curr = pts[i];
+            const next = pts[i + 1];
+            const pX1 = curr.x + offsetPos.x;
+            const pY1 = curr.y + offsetPos.y;
+            const pX2 = next.x + offsetPos.x;
+            const pY2 = next.y + offsetPos.y;
+
+            const pFactor = Math.max(0.4, Math.min(1.8, ((curr.pressure || 0.5) + (next.pressure || 0.5))));
+            ctx.lineWidth = stroke.width * pFactor;
+
+            ctx.beginPath();
+            ctx.moveTo(pX1, pY1);
+            ctx.lineTo(pX2, pY2);
+            ctx.stroke();
+        }
+    } else {
+        // Fast, butter-smooth quadratic spline through midpoints
+        ctx.lineWidth = stroke.width;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+
+        for (let i = 1; i < len - 1; i++) {
+            const raw1 = pts[i];
+            const raw2 = pts[i + 1];
+            const midX = (raw1.x + raw2.x) / 2 + offsetPos.x;
+            const midY = (raw1.y + raw2.y) / 2 + offsetPos.y;
+            ctx.quadraticCurveTo(raw1.x + offsetPos.x, raw1.y + offsetPos.y, midX, midY);
+        }
+
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+    }
+
+    ctx.restore();
 }
 
 const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
@@ -52,7 +306,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     // --- State ---
     const [tool, setTool] = useState<ToolType>('pen');
     const [color, setColor] = useState('#000000');
-    const [lineWidth, setLineWidth] = useState(2);
+    const [lineWidth, setLineWidth] = useState(2.5);
 
     // History (Vector Paths)
     const [paths, setPaths] = useState<Stroke[]>([]);
@@ -65,59 +319,50 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     // Interaction State
     const [isDrawing, setIsDrawing] = useState(false);
     const [isPanning, setIsPanning] = useState(false);
-    const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
     const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
-
-    // Laser State (Ref for performance)
-    const laserTrailRef = useRef<LaserPoint[]>([]);
 
     // Selection & Drag State
     const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
     const [isDraggingStroke, setIsDraggingStroke] = useState(false);
-    const [dragStartPos, setDragStartPos] = useState<Point | null>(null); // World coordinates
-    const [dragOffset, setDragOffset] = useState<Point>({ x: 0, y: 0 }); // World delta
+    const [dragStartPos, setDragStartPos] = useState<Point | null>(null);
+    const [dragOffset, setDragOffset] = useState<Point>({ x: 0, y: 0 });
+
+    // --- Performance Optimization: Active Stroke Ref for ZERO-LAG live drawing ---
+    const activeStrokeRef = useRef<Stroke | null>(null);
+    const rafIdRef = useRef<number | null>(null);
+    const laserTrailRef = useRef<LaserPoint[]>([]);
 
     // --- Helpers ---
-    const getScreenPoint = (e: React.MouseEvent | React.TouchEvent): Point => {
+    const getScreenPoint = (e: React.PointerEvent | PointerEvent): Point => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
-
-        let clientX, clientY;
-        if ('touches' in e) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = (e as React.MouseEvent).clientX;
-            clientY = (e as React.MouseEvent).clientY;
-        }
-        return { x: clientX - rect.left, y: clientY - rect.top };
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            pressure: e.pressure || 0.5,
+            time: Date.now()
+        };
     };
 
     const toWorldPoint = (screenPoint: Point): Point => {
         return {
             x: (screenPoint.x - offset.x) / scale,
-            y: (screenPoint.y - offset.y) / scale
+            y: (screenPoint.y - offset.y) / scale,
+            pressure: screenPoint.pressure,
+            time: screenPoint.time
         };
-    };
-
-    const isShapeTool = (t: ToolType) => {
-        return ['line', 'rect', 'circle', 'triangle', 'right_triangle', 'axis', 'cube', 'diamond'].includes(t);
     };
 
     // --- Hit Testing ---
     const hitTest = (point: Point, strokes: Stroke[]): string | null => {
-        // Reverse iterate to find top-most
         for (let i = strokes.length - 1; i >= 0; i--) {
             const stroke = strokes[i];
             if (!stroke || !Array.isArray(stroke.points) || stroke.tool === 'laser' || stroke.tool === 'eraser') continue;
 
-            // Simple bounding box check first could optimize, but for now traverse points
-            // Check distance to any point in the stroke
-            // Threshold varies by stroke width
-            const threshold = Math.max(10, stroke.width * 2) / scale;
+            const threshold = Math.max(14, stroke.width * 2.5) / scale;
 
-            for (let j = 0; j < stroke.points.length; j += 2) { // Skip every other point for perf
+            for (let j = 0; j < stroke.points.length; j += 2) {
                 const sp = stroke.points[j];
                 if (!sp) continue;
                 const dx = sp.x - point.x;
@@ -130,192 +375,16 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         return null;
     };
 
-    // --- Cursors ---
+    // --- Cursor Generation ---
     const getCursor = () => {
         if (tool === 'select') return isDraggingStroke ? 'grabbing' : 'default';
         if (tool === 'move') return isPanning ? 'grabbing' : 'grab';
-
-        const scaleFactor = 1; // standard
-        // SVGs for Cursors
-        const penSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
-        const eraserSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>`;
-        const highlighterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 2-7 20-5-5-5-5 5-5 22 2z"/></svg>`; // Rotate or simplify?
-        const crosshairSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-
-        const encode = (svg: string) => `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}')`;
-
-        if (tool === 'pen') return `${encode(penSvg)} 0 24, crosshair`;
-        if (tool === 'highlighter') return `${encode(penSvg)} 0 24, crosshair`; // Reuse pen for now or distinctive
-        if (tool === 'eraser') return `${encode(eraserSvg)} 12 12, crosshair`;
-        if (tool === 'laser') return `${encode(crosshairSvg)} 12 12, crosshair`;
-
+        if (tool === 'eraser') return 'crosshair';
+        if (tool === 'laser') return 'crosshair';
         return 'crosshair';
     };
 
-    // --- Rendering ---
-    const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke, offsetPos: Point = { x: 0, y: 0 }) => {
-        if (!stroke || !Array.isArray(stroke.points) || stroke.points.length < 1) return;
-
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = stroke.width;
-
-        if (!stroke.points[0]) return;
-        const p1 = { x: stroke.points[0].x + offsetPos.x, y: stroke.points[0].y + offsetPos.y };
-        const rawLast = stroke.points[stroke.points.length - 1];
-        if (!rawLast) return;
-        const p2 = { x: rawLast.x + offsetPos.x, y: rawLast.y + offsetPos.y };
-
-        // Highlighter Logic
-        if (stroke.tool === 'highlighter') {
-            ctx.globalAlpha = 0.4;
-            ctx.globalCompositeOperation = 'multiply'; // Better blending
-            ctx.strokeStyle = stroke.color;
-            // Draw regular stroke
-            if (stroke.points.length < 2) return;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            for (let i = 1; i < stroke.points.length - 1; i++) {
-                const pt1 = stroke.points[i];
-                const pt2 = stroke.points[i + 1];
-                const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
-                ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
-            }
-            ctx.lineTo(stroke.points[stroke.points.length - 1].x, stroke.points[stroke.points.length - 1].y);
-            ctx.stroke();
-
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.globalAlpha = 1;
-            return;
-        }
-
-        if (stroke.tool === 'eraser') {
-            ctx.globalAlpha = 1;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.strokeStyle = '#000000';
-        } else {
-            ctx.globalAlpha = 1;
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = stroke.color;
-        }
-
-        // Shape Logic
-        if (isShapeTool(stroke.tool)) {
-            const w = p2.x - p1.x;
-            const h = p2.y - p1.y;
-
-            ctx.beginPath();
-
-            if (stroke.tool === 'line') {
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-            } else if (stroke.tool === 'rect') {
-                ctx.rect(p1.x, p1.y, w, h);
-            } else if (stroke.tool === 'circle') {
-                // Ellipse based on bounding box
-                const centerX = p1.x + w / 2;
-                const centerY = p1.y + h / 2;
-                ctx.ellipse(centerX, centerY, Math.abs(w / 2), Math.abs(h / 2), 0, 0, 2 * Math.PI);
-            } else if (stroke.tool === 'triangle') {
-                // Isosceles
-                ctx.moveTo(p1.x + w / 2, p1.y); // Top Middle
-                ctx.lineTo(p1.x, p1.y + h);     // Bottom Left
-                ctx.lineTo(p1.x + w, p1.y + h); // Bottom Right
-                ctx.closePath();
-            } else if (stroke.tool === 'right_triangle') {
-                ctx.moveTo(p1.x, p1.y);        // Top Left
-                ctx.lineTo(p1.x, p1.y + h);    // Bottom Left
-                ctx.lineTo(p1.x + w, p1.y + h);// Bottom Right
-                ctx.closePath();
-            } else if (stroke.tool === 'diamond') {
-                ctx.moveTo(p1.x + w / 2, p1.y);
-                ctx.lineTo(p1.x + w, p1.y + h / 2);
-                ctx.lineTo(p1.x + w / 2, p1.y + h);
-                ctx.lineTo(p1.x, p1.y + h / 2);
-                ctx.closePath();
-            } else if (stroke.tool === 'cube') {
-                // Simple 3D Cube
-                const d = w * 0.25; // depth offset
-                // Front face
-                ctx.rect(p1.x, p1.y + d, w - d, h - d);
-                // Back face (lines)
-                ctx.moveTo(p1.x, p1.y + d); ctx.lineTo(p1.x + d, p1.y);
-                ctx.moveTo(p1.x + w - d, p1.y + d); ctx.lineTo(p1.x + w, p1.y);
-                ctx.moveTo(p1.x + w - d, p1.y + h); ctx.lineTo(p1.x + w, p1.y + h - d);
-                ctx.moveTo(p1.x, p1.y + h); ctx.lineTo(p1.x + d, p1.y + h - d);
-                // Back face rect part
-                ctx.rect(p1.x + d, p1.y, w - d, h - d);
-            } else if (stroke.tool === 'axis') {
-                // Cartesian Plane Stencil (Always black/grey usually but uses color)
-                // Draw Axis Lines
-                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2, p1.y + h); // Y
-                ctx.moveTo(p1.x, p1.y + h / 2); ctx.lineTo(p1.x + w, p1.y + h / 2); // X
-                // Arrows (Simple)
-                // X Arrow
-                ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 - 5);
-                ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 + 5);
-                // Y Arrow
-                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 - 5, p1.y + 10);
-                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 + 5, p1.y + 10);
-            }
-
-            ctx.stroke();
-
-        } else if (stroke.tool === 'pen' || stroke.tool === 'semigloss' || stroke.tool === 'eraser') {
-            // Standard Pen & Eraser
-            if (!Array.isArray(stroke.points) || stroke.points.length < 2) return;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-
-            for (let i = 1; i < stroke.points.length - 1; i++) {
-                const rawPt1 = stroke.points[i];
-                const rawPt2 = stroke.points[i + 1];
-                if (!rawPt1 || !rawPt2) continue;
-                const pt1 = { x: rawPt1.x + offsetPos.x, y: rawPt1.y + offsetPos.y };
-                const pt2 = { x: rawPt2.x + offsetPos.x, y: rawPt2.y + offsetPos.y };
-                const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
-                ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
-            }
-            const last = stroke.points[stroke.points.length - 1];
-            if (last) {
-                ctx.lineTo(last.x + offsetPos.x, last.y + offsetPos.y);
-            }
-            ctx.stroke();
-        }
-
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
-    };
-
-    const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number, dpr: number) => {
-        if (backgroundColor !== 'grid') return;
-
-        const startX = -offset.x / scale;
-        const startY = -offset.y / scale;
-        const endX = (width / dpr - offset.x) / scale;
-        const endY = (height / dpr - offset.y) / scale;
-
-        const gridSize = 50;
-
-        ctx.beginPath();
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1 / scale;
-
-        // Snap to grid
-        const firstLineX = Math.floor(startX / gridSize) * gridSize;
-        const firstLineY = Math.floor(startY / gridSize) * gridSize;
-
-        for (let x = firstLineX; x <= endX; x += gridSize) {
-            ctx.moveTo(x, startY);
-            ctx.lineTo(x, endY);
-        }
-        for (let y = firstLineY; y <= endY; y += gridSize) {
-            ctx.moveTo(startX, y);
-            ctx.lineTo(endX, y);
-        }
-        ctx.stroke();
-    };
-
+    // --- Full Screen Redraw ---
     const redraw = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -324,127 +393,104 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
         const dpr = window.devicePixelRatio || 1;
 
-        // 1. Clear Screen (Reset transform to identity relative to device pixels)
+        // Reset transform to native pixels & clear
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 2. Draw Background - REMOVED to allow Eraser to work (transparent strokes = show CSS background)
-        // If we draw fillRect here, destination-out cuts a hole to the browser body (white).
-        // Instead, we rely on the canvas container having the correct background-color via CSS.
-
-        // 3. Apply View Transform (Including DPR!)
+        // Apply View Transform with DPR
         ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offset.x * dpr, offset.y * dpr);
 
-        if (backgroundColor === 'grid') {
-            // drawGrid(ctx, canvas.width, canvas.height, dpr); // Using CSS background for grid now
-        }
-
-        // 4. Draw Paths
+        // Render Committed Visible Paths
         const visiblePaths = paths.slice(0, historyStep);
         visiblePaths.forEach(path => {
             if (path.id === selectedStrokeId && isDraggingStroke) {
-                // Draw with offset
-                drawStroke(ctx, path, dragOffset);
-                // Draw highlight box
-                // (Optional: Implement bounding box highlight here)
+                drawSmoothStroke(ctx, path, dragOffset);
             } else {
-                drawStroke(ctx, path);
+                drawSmoothStroke(ctx, path);
             }
         });
 
-        // 5. Highlight Selected Static
+        // Highlight Selected Stroke
         if (selectedStrokeId && !isDraggingStroke) {
             const selected = visiblePaths.find(p => p.id === selectedStrokeId);
             if (selected) {
-                // Glow effect for selection
                 ctx.save();
-                ctx.shadowColor = 'blue';
+                ctx.shadowColor = '#3b82f6';
                 ctx.shadowBlur = 10;
                 ctx.strokeStyle = '#3b82f6';
-                ctx.lineWidth = selected.width + 2;
-                ctx.globalAlpha = 0.5;
-                drawStroke(ctx, selected); // overlay highlight
+                ctx.lineWidth = selected.width + 3;
+                ctx.globalAlpha = 0.6;
+                drawSmoothStroke(ctx, selected);
                 ctx.restore();
             }
         }
 
-        // 6. Draw Current Stroke
-        if (currentStroke) {
-            drawStroke(ctx, currentStroke);
+        // Draw Active Live Stroke (Direct from Ref)
+        if (activeStrokeRef.current) {
+            drawSmoothStroke(ctx, activeStrokeRef.current);
         }
 
-        // 6. Draw Laser Trail
+        // Draw Laser Trail
         const now = Date.now();
         if (laserTrailRef.current.length > 0) {
-            // Remove points older than 2s
-            laserTrailRef.current = laserTrailRef.current.filter(p => now - p.time < 2000);
+            laserTrailRef.current = laserTrailRef.current.filter(p => now - p.time < 1800);
 
             if (laserTrailRef.current.length > 1) {
+                ctx.save();
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                // Draw trail segments with fading opacity
                 for (let i = 1; i < laserTrailRef.current.length; i++) {
-                    const p1 = laserTrailRef.current[i - 1];
-                    const p2 = laserTrailRef.current[i];
-                    const age = now - p2.time;
-                    const opacity = Math.max(0, 1 - age / 2000); // 2 seconds fade
-
+                    const pA = laserTrailRef.current[i - 1];
+                    const pB = laserTrailRef.current[i];
+                    const age = now - pB.time;
+                    const opacity = Math.max(0, 1 - age / 1800);
 
                     ctx.beginPath();
-                    ctx.moveTo(p1.x, p1.y);
-                    ctx.lineTo(p2.x, p2.y);
-                    ctx.strokeStyle = `rgba(255, 0, 0, ${opacity})`;
-                    ctx.lineWidth = (10 / scale) * opacity;
+                    ctx.moveTo(pA.x, pA.y);
+                    ctx.lineTo(pB.x, pB.y);
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${opacity})`;
+                    ctx.lineWidth = (8 / scale) * opacity;
                     ctx.stroke();
                 }
-            }
 
-            // Draw Tip
-            const last = laserTrailRef.current[laserTrailRef.current.length - 1];
-            if (last) {
-                ctx.beginPath();
-                ctx.arc(last.x, last.y, 6 / scale, 0, Math.PI * 2);
-                ctx.fillStyle = 'red';
-                ctx.fill();
-                // Glow
-                ctx.beginPath();
-                ctx.arc(last.x, last.y, 15 / scale, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-                ctx.fill();
+                const last = laserTrailRef.current[laserTrailRef.current.length - 1];
+                if (last) {
+                    ctx.beginPath();
+                    ctx.arc(last.x, last.y, 6 / scale, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.arc(last.x, last.y, 16 / scale, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+                    ctx.fill();
+                }
+                ctx.restore();
             }
         }
-    }, [scale, offset, paths, historyStep, currentStroke, backgroundColor, selectedStrokeId, dragOffset, isDraggingStroke]);
+    }, [scale, offset, paths, historyStep, selectedStrokeId, dragOffset, isDraggingStroke]);
 
     // Laser Animation Loop
     useEffect(() => {
-        let animationFrameId: number;
-
-        const animate = () => {
-            const hasLaserTrail = laserTrailRef.current.length > 0;
-            if (tool === 'laser' || hasLaserTrail) {
+        let animId: number;
+        const checkLaser = () => {
+            if (tool === 'laser' || laserTrailRef.current.length > 0) {
                 redraw();
-                animationFrameId = requestAnimationFrame(animate);
+                animId = requestAnimationFrame(checkLaser);
             }
         };
-
-        if (tool === 'laser') {
-            animationFrameId = requestAnimationFrame(animate);
-        } else if (laserTrailRef.current.length > 0) {
-            // Finish fading out existing trail
-            animationFrameId = requestAnimationFrame(animate);
+        if (tool === 'laser' || laserTrailRef.current.length > 0) {
+            animId = requestAnimationFrame(checkLaser);
         }
-
-        return () => cancelAnimationFrame(animationFrameId);
+        return () => cancelAnimationFrame(animId);
     }, [tool, redraw]);
 
-    // Draw on mount/update
+    // Redraw on dependencies
     useEffect(() => {
         redraw();
     }, [redraw]);
 
-
-
-    // Handle Resize
+    // Resize Handler with DevicePixelRatio
     useEffect(() => {
         const resize = () => {
             const canvas = canvasRef.current;
@@ -452,29 +498,43 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             if (canvas && parent) {
                 const rect = parent.getBoundingClientRect();
                 const dpr = window.devicePixelRatio || 1;
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
+                canvas.width = Math.round(rect.width * dpr);
+                canvas.height = Math.round(rect.height * dpr);
                 canvas.style.width = `${rect.width}px`;
                 canvas.style.height = `${rect.height}px`;
+                redraw();
             }
         };
+
+        const ro = new ResizeObserver(resize);
+        if (containerRef.current) ro.observe(containerRef.current);
         window.addEventListener('resize', resize);
         resize();
-        return () => window.removeEventListener('resize', resize);
-    }, []);
 
-    // --- Inputs ---
-    const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', resize);
+        };
+    }, [redraw]);
+
+    // --- High-Performance Pointer Events ---
+    const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        // Prevent default touch gestures (scrolling, pinch zoom from browser)
+        e.preventDefault();
+
+        // Capture pointer to guarantee no lost points even if dragging off-screen
+        try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+            // Ignore if pointer capture unsupported
+        }
+
         const screenPoint = getScreenPoint(e);
         const worldPoint = toWorldPoint(screenPoint);
 
         // Select Tool Logic
         if (tool === 'select') {
-            // 1. Check if we clicked on an already selected object to drag it
-            // OR 2. Try to hit test a new object
-
             const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
-
             if (hitId) {
                 setSelectedStrokeId(hitId);
                 setIsDraggingStroke(true);
@@ -486,29 +546,49 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             return;
         }
 
-        if (tool === 'move' || ('button' in e && e.button === 1)) {
+        // Panning Logic (Middle click or Move tool)
+        if (tool === 'move' || e.button === 1 || e.altKey) {
             setIsPanning(true);
             setLastPanPoint(screenPoint);
             return;
         }
 
+        // Stroke Eraser (Single Click/Tap on stroke)
+        if (tool === 'eraser') {
+            const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
+            if (hitId) {
+                // Delete clicked stroke immediately
+                const updated = paths.filter(p => p.id !== hitId);
+                setPaths(updated);
+                setHistoryStep(updated.length);
+                if (onDrawEnd) onDrawEnd();
+                return;
+            }
+        }
+
+        // Laser Tool
         if (tool === 'laser') {
             setIsDrawing(true);
             laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
+            redraw();
             return;
         }
 
+        // Freehand / Shape Drawing Start
         setIsDrawing(true);
-        setCurrentStroke({
+        activeStrokeRef.current = {
             points: [worldPoint],
             color: tool === 'eraser' ? '#000000' : color,
-            width: lineWidth * (tool === 'highlighter' ? 10 : tool === 'eraser' ? 20 : 1),
+            width: lineWidth * (tool === 'highlighter' ? 3.5 : tool === 'eraser' ? 5 : 1),
             tool: tool === 'semigloss' ? 'pen' : tool,
-            id: Date.now().toString()
-        });
+            id: `str_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+        };
+
+        redraw();
     };
 
-    const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+    const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         const screenPoint = getScreenPoint(e);
         const worldPoint = toWorldPoint(screenPoint);
 
@@ -524,40 +604,70 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             const dx = worldPoint.x - dragStartPos.x;
             const dy = worldPoint.y - dragStartPos.y;
             setDragOffset({ x: dx, y: dy });
+            redraw();
             return;
         }
 
         if (tool === 'laser' && isDrawing) {
             laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
+            redraw();
             return;
         }
 
-        if (isDrawing && currentStroke && Array.isArray(currentStroke.points)) {
-            if (isShapeTool(currentStroke.tool)) {
-                // For shapes, we just update the End Point (2nd point)
-                setCurrentStroke({
-                    ...currentStroke,
-                    points: [currentStroke.points[0] || worldPoint, worldPoint]
-                });
+        // Freehand Live Eraser (swipe-through delete)
+        if (tool === 'eraser' && isDrawing) {
+            const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
+            if (hitId) {
+                const updated = paths.filter(p => p.id !== hitId);
+                setPaths(updated);
+                setHistoryStep(updated.length);
+            }
+            if (activeStrokeRef.current) {
+                activeStrokeRef.current.points.push(worldPoint);
+            }
+            redraw();
+            return;
+        }
+
+        if (isDrawing && activeStrokeRef.current) {
+            if (isShapeTool(activeStrokeRef.current.tool)) {
+                // Update shape endpoint
+                activeStrokeRef.current.points = [activeStrokeRef.current.points[0], worldPoint];
             } else {
-                // For freehand, we append
-                setCurrentStroke(prev => (prev && Array.isArray(prev.points)) ? {
-                    ...prev,
-                    points: [...prev.points, worldPoint]
-                } : null);
+                // Append point with pressure
+                activeStrokeRef.current.points.push(worldPoint);
+            }
+
+            // High efficiency RAF render
+            if (rafIdRef.current === null) {
+                rafIdRef.current = requestAnimationFrame(() => {
+                    rafIdRef.current = null;
+                    redraw();
+                });
             }
         }
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
 
-        if (isDraggingStroke && selectedStrokeId && dragOffset.x !== 0) {
-            // Commit Transform
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+            // Ignore
+        }
+
+        if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+        }
+
+        if (isDraggingStroke && selectedStrokeId && (dragOffset.x !== 0 || dragOffset.y !== 0)) {
             const newPaths = paths.map(p => {
                 if (p && p.id === selectedStrokeId && Array.isArray(p.points)) {
                     return {
                         ...p,
-                        points: p.points.map(pt => pt ? ({ x: pt.x + dragOffset.x, y: pt.y + dragOffset.y }) : pt)
+                        points: p.points.map(pt => ({ x: pt.x + dragOffset.x, y: pt.y + dragOffset.y }))
                     };
                 }
                 return p;
@@ -578,24 +688,27 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             return;
         }
 
-        if (currentStroke) {
-            const newPaths = paths.slice(0, historyStep);
-            newPaths.push(currentStroke);
-            setPaths(newPaths);
-            setHistoryStep(newPaths.length);
-            setCurrentStroke(null);
+        // Commit active stroke to paths state
+        if (activeStrokeRef.current && activeStrokeRef.current.points.length > 0) {
+            const newStroke = activeStrokeRef.current;
+            activeStrokeRef.current = null;
+
+            const visible = paths.slice(0, historyStep);
+            visible.push(newStroke);
+            setPaths(visible);
+            setHistoryStep(visible.length);
 
             if (onDrawEnd) onDrawEnd();
         }
+
+        redraw();
     };
 
     const handleWheel = (e: React.WheelEvent) => {
         if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            const zoomSensitivity = 0.001;
-            const delta = -e.deltaY * zoomSensitivity;
-            const newScale = Math.min(Math.max(0.1, scale + delta), 5);
-            setScale(newScale);
+            const delta = -e.deltaY * 0.0015;
+            setScale(prev => Math.min(Math.max(0.2, prev + delta), 4));
         } else {
             setOffset(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
         }
@@ -603,11 +716,20 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
     useImperativeHandle(ref, () => ({
         clear: () => {
+            activeStrokeRef.current = null;
             setPaths([]);
             setHistoryStep(0);
+            setSelectedStrokeId(null);
+            redraw();
         },
-        undo: () => setHistoryStep(prev => Math.max(0, prev - 1)),
-        redo: () => setHistoryStep(prev => Math.min(paths.length, prev + 1)),
+        undo: () => {
+            setHistoryStep(prev => Math.max(0, prev - 1));
+            setSelectedStrokeId(null);
+        },
+        redo: () => {
+            setHistoryStep(prev => Math.min(paths.length, prev + 1));
+            setSelectedStrokeId(null);
+        },
         setTool,
         setColor,
         setLineWidth,
@@ -615,161 +737,75 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             setScale(1);
             setOffset({ x: 0, y: 0 });
         },
-        zoomIn: () => setScale(s => Math.min(s * 1.2, 5)),
-        zoomOut: () => setScale(s => Math.max(s / 1.2, 0.1)),
+        zoomIn: () => setScale(s => Math.min(s * 1.25, 4)),
+        zoomOut: () => setScale(s => Math.max(s / 1.25, 0.2)),
         getCanvas: () => canvasRef.current,
-        getPaths: () => paths,
+        getPaths: () => paths.slice(0, historyStep),
         loadPaths: (newPaths: Stroke[]) => {
-            setPaths(newPaths);
-            setHistoryStep(newPaths.length);
-        }
+            activeStrokeRef.current = null;
+            setPaths(newPaths || []);
+            setHistoryStep((newPaths || []).length);
+            setSelectedStrokeId(null);
+        },
+        canUndo: () => historyStep > 0,
+        canRedo: () => historyStep < paths.length
     }));
 
     return (
         <div
             ref={containerRef}
-            className={`relative w-full h-full overflow-hidden touch-none ${className}`}
+            className={`relative w-full h-full overflow-hidden touch-none select-none ${className}`}
             style={{
-                backgroundColor: backgroundColor === 'transparent' ? 'transparent' : (backgroundColor === 'black' ? '#0f172a' : '#ffffff'),
-                backgroundImage: backgroundColor === 'grid' ? 'radial-gradient(#cbd5e1 1px, transparent 1px)' : undefined,
-                backgroundSize: backgroundColor === 'grid' ? '20px 20px' : undefined
+                backgroundColor:
+                    backgroundColor === 'transparent'
+                        ? 'transparent'
+                        : backgroundColor === 'black'
+                        ? '#090d16'
+                        : '#ffffff',
+                backgroundImage:
+                    backgroundColor === 'grid'
+                        ? 'radial-gradient(#94a3b8 1.2px, transparent 1.2px)'
+                        : undefined,
+                backgroundSize: backgroundColor === 'grid' ? '24px 24px' : undefined
             }}
-
         >
             <canvas
                 ref={canvasRef}
-                onMouseDown={handlePointerDown}
-                onMouseMove={handlePointerMove}
-                onMouseUp={handlePointerUp}
-                onMouseLeave={handlePointerUp}
-                onTouchStart={handlePointerDown}
-                onTouchMove={handlePointerMove}
-                onTouchEnd={handlePointerUp}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 onWheel={handleWheel}
-                className={`block`}
-                style={{ cursor: getCursor() }}
+                className="block w-full h-full touch-none"
+                style={{
+                    cursor: getCursor(),
+                    touchAction: 'none'
+                }}
             />
-        </div >
+        </div>
     );
 });
 
 SmartBoard.displayName = "SmartBoard";
 
-// --- Helper Functions for PDF Export ---
-
-/**
- * Calculates the bounding box of a set of strokes.
- * Returns null if no paths or valid points.
- */
-export function getPathBoundingBox(paths: Stroke[]) {
-    if (!paths || paths.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let hasPoints = false;
-
-    paths.forEach(p => {
-        if (!p || !Array.isArray(p.points) || p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
-        p.points.forEach(pt => {
-            if (!pt) return;
-            if (pt.x < minX) minX = pt.x;
-            if (pt.y < minY) minY = pt.y;
-            if (pt.x > maxX) maxX = pt.x;
-            if (pt.y > maxY) maxY = pt.y;
-            hasPoints = true;
-        });
-    });
-
-    if (!hasPoints) return null;
-    return { minX, minY, maxX, maxY };
-}
-
-/**
- * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
- */
-export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors = false): string | null {
-    if (!Array.isArray(paths) || paths.length === 0) return null;
-    const bbox = getPathBoundingBox(paths);
-    if (!bbox) return null;
-
-    const width = bbox.maxX - bbox.minX + (padding * 2);
-    const height = bbox.maxY - bbox.minY + (padding * 2);
-
-    // Create off-screen canvas (not attached to DOM, purely for export)
-    if (typeof document === 'undefined') return null;
-
+export function exportPathsToImage(paths: Stroke[], width = 1920, height = 1080, invertColors = false): string {
+    if (typeof document === 'undefined') return '';
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    if (!ctx) return '';
 
-    // Fill white background if inverting colors (simulating paper)
-    if (invertColors) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
-    }
-
-    // Translate context to center the drawing in the cropped canvas
-    ctx.translate(-bbox.minX + padding, -bbox.minY + padding);
-
-    // Set consistent styling for export (e.g. rounded caps)
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.fillStyle = invertColors ? '#0f172a' : '#ffffff';
+    ctx.fillRect(0, 0, width, height);
 
     paths.forEach(stroke => {
-        if (!stroke || !Array.isArray(stroke.points) || stroke.tool === 'eraser' || stroke.tool === 'laser') return;
-
-        ctx.beginPath();
-        let strokeColor = stroke.color;
-
-        if (invertColors) {
-            // Simple color mapping for dark mode -> print mode
-            if (strokeColor.toLowerCase() === '#ffffff' || strokeColor.toLowerCase() === '#fff') {
-                strokeColor = '#000000'; // White -> Black
-            } else if (strokeColor.toLowerCase() === '#ffff00' || strokeColor.toLowerCase() === 'yellow') {
-                strokeColor = '#eab308'; // Bright Yellow -> Darker Yellow/Gold
-            } else if (strokeColor.toLowerCase() === '#00ff00' || strokeColor.toLowerCase() === 'lime') {
-                strokeColor = '#16a34a'; // Bright Green -> Darker Green
-            } else if (strokeColor.toLowerCase() === '#00ffff' || strokeColor.toLowerCase() === 'cyan') {
-                strokeColor = '#0891b2'; // Cyan -> Teal
-            }
-            // Add more mappings as needed or use a color manipulation lib if available
+        if (!stroke || !Array.isArray(stroke.points) || stroke.tool === 'laser') return;
+        let strokeCopy = { ...stroke };
+        if (invertColors && stroke.color.toLowerCase() === '#000000') {
+            strokeCopy.color = '#ffffff';
         }
-
-        ctx.strokeStyle = strokeColor;
-
-        // Handle highlighter transparency
-        if (stroke.tool === 'highlighter') {
-            ctx.globalAlpha = 0.3;
-            ctx.lineWidth = stroke.width * 2; // Highlighter is wider
-        } else {
-            ctx.globalAlpha = 1.0;
-            ctx.lineWidth = stroke.width;
-        }
-
-        if (stroke.points.length > 0 && stroke.points[0]) {
-            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-            for (let i = 1; i < stroke.points.length; i++) {
-                // Use quadratic curves for smoothness (matching SmartBoard rendering)
-                const p1 = stroke.points[i - 1];
-                const p2 = stroke.points[i];
-                if (!p1 || !p2) continue;
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
-                if (i === 1) { ctx.lineTo(p1.x, p1.y); }
-                ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
-            }
-            if (stroke.points.length > 1) {
-                const last = stroke.points[stroke.points.length - 1];
-                if (last) {
-                    ctx.lineTo(last.x, last.y);
-                }
-            }
-        }
-        ctx.stroke();
+        drawSmoothStroke(ctx, strokeCopy);
     });
 
     return canvas.toDataURL('image/png');

@@ -1,30 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed, Star, Play, Pause, RotateCcw, CheckSquare, ChevronDown
+    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2,
+    Clock, CheckCircle, XCircle, Star, Play, Pause, RotateCcw,
+    CheckSquare, Square, Eye, EyeOff, Layout, Columns2, PanelsTopLeft,
+    Sparkles, User, GraduationCap, ArrowRight, ShieldCheck, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MathJaxContext, MathJax } from "better-react-mathjax";
+import { MathJaxContext } from "better-react-mathjax";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
-
 // Dynamic Imports
-import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
+import { SmartBoardRef, exportPathsToImage, Stroke } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
-const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
+const SmartBoardToolbar = dynamic(
+    () => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar),
+    { ssr: false }
+);
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-
 
 // Types
 interface Question {
@@ -47,6 +48,7 @@ interface Question {
     matches?: Record<string, string>;
     status?: 'correct' | 'wrong' | 'unanswered';
     userAnswer?: any;
+    studentAnswer?: any;
 }
 
 const mathJaxConfig = {
@@ -61,29 +63,30 @@ const mathJaxConfig = {
 export default function ProblemSolvingSession() {
     const router = useRouter();
     const boardRef = useRef<SmartBoardRef>(null);
-    // Force Rebuild Check
-
 
     // Session State
     const [questions, setQuestions] = useState<Question[]>([]);
     const [examName, setExamName] = useState<string>("");
+    const [studentName, setStudentName] = useState<string>("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
 
+    // Studio Layout Mode:
+    // 'split' = Side-by-side (Question Panel on Left, Whiteboard on Right with 100% unobstructed pen writing)
+    // 'full' = Question hidden, 100% canvas
+    // 'annotation' = Live pen annotation directly over question overlay
+    const [layoutMode, setLayoutMode] = useState<'split' | 'full' | 'annotation'>('split');
+    const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 
+    // Board Settings
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [annotationMode, setAnnotationMode] = useState(false);
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
-    // Persistence
-    const [boardHistories, setBoardHistories] = useState<Record<string, any[]>>({});
+    // Whiteboard Persistence Per Question
+    const [boardHistories, setBoardHistories] = useState<Record<string, Stroke[]>>({});
 
-    // Interaction State
-    const [showAnswer, setShowAnswer] = useState(false);
-    const [showOverlay, setShowOverlay] = useState(true);
-
-    // Question Answer & Interaction State
+    // Question Interaction State
     const [userAnswers, setUserAnswers] = useState<Record<number, any>>({});
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
@@ -137,15 +140,95 @@ export default function ProblemSolvingSession() {
         }
     }, [currentIndex, timerSetting, timerDurationSeconds]);
 
-    // Initialize
+    // Process question formatting
+    const processQuestionItem = useCallback((q: Question, isReview = false): Question => {
+        const updatedQ: Question = { ...q };
+
+        // 1. Resolve correctness and map options for MCQ, MC, SMCQ, AR BEFORE shuffling
+        if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ' || q.type === 'AR') && Array.isArray(q.options) && q.options.length > 0) {
+            let dbCorrectIdx = -1;
+            const foundIdx = q.options.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+            if (foundIdx !== -1) {
+                dbCorrectIdx = foundIdx;
+            } else if ((q as any).correctOption !== undefined && (q as any).correctOption !== null) {
+                const num = Number((q as any).correctOption);
+                dbCorrectIdx = num > 0 && num <= q.options.length ? num - 1 : num;
+            } else if ((q as any).correctAnswer || q.modelAnswer) {
+                const str = ((q as any).correctAnswer || q.modelAnswer || "").trim().toUpperCase();
+                const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
+                if (letterMap[str] !== undefined) {
+                    dbCorrectIdx = letterMap[str];
+                } else {
+                    const num = parseInt(str);
+                    if (!isNaN(num)) dbCorrectIdx = num;
+                }
+            }
+
+            const optionsWithIndex = q.options.map((opt: any, idx: number) => {
+                const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
+                const isOptCorrect = foundIdx !== -1
+                    ? idx === foundIdx
+                    : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
+                return {
+                    ...optObj,
+                    originalIndex: idx,
+                    isCorrect: isOptCorrect
+                };
+            });
+
+            const finalOptions = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
+            updatedQ.options = finalOptions;
+
+            const correctIndices = finalOptions.reduce((acc: number[], opt: any, idx: number) => {
+                if (opt.isCorrect === true) acc.push(idx);
+                return acc;
+            }, []);
+            if (correctIndices.length > 0) {
+                (updatedQ as any).correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+            }
+        }
+
+        // 2. AR Questions: Ensure 4 options exist with correctness mapping if empty
+        if (q.type === 'AR' && (!Array.isArray(updatedQ.options) || updatedQ.options.length === 0)) {
+            const defaultAROptions = [
+                { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+                { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+                { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+                { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
+            ];
+
+            let correctIdx = -1;
+            if ((q as any).correctOption) {
+                correctIdx = Number((q as any).correctOption) - 1;
+            }
+
+            updatedQ.options = defaultAROptions.map((opt: any, idx: number) => ({
+                ...opt,
+                originalIndex: idx,
+                isCorrect: correctIdx >= 0 ? idx === correctIdx : false
+            }));
+        }
+
+        // 3. MTF Column Shuffling
+        if (q.type === 'MTF' && Array.isArray(q.rightColumn) && q.rightColumn.length > 0) {
+            const rightWithIndex = q.rightColumn.map((item, idx) => ({ ...item, originalIndex: idx }));
+            updatedQ.rightColumn = isReview ? rightWithIndex : shuffleArray(rightWithIndex);
+        }
+
+        return updatedQ;
+    }, []);
+
+    // Initialize Session (With Robust Cloud Fallback for Direct URLs)
     useEffect(() => {
         const initSession = async () => {
             try {
                 setLoading(true);
                 const params = new URLSearchParams(window.location.search);
                 const isReview = params.get('mode') === 'review';
-                const storedIds = localStorage.getItem(isReview ? "review-session-data" : "problem-solving-session");
+                const examId = params.get('id');
+                const studentId = params.get('studentId');
 
+                // Read Timer Preferences
                 const savedTimerSecsStr = localStorage.getItem("problem-solving-timer-seconds");
                 const savedTimerStr = localStorage.getItem("problem-solving-timer") || "off";
                 let customSecs = 0;
@@ -164,199 +247,180 @@ export default function ProblemSolvingSession() {
                     setTimerDurationSeconds(0);
                 }
 
-                const res = await fetch('/api/questions');
-                const data = await res.json();
-
                 let sessionQuestions: Question[] = [];
-                const storedData = storedIds ? JSON.parse(storedIds) : [];
 
-                const processQ = (q: Question) => {
-                    let updatedQ = { ...q };
-
-                    // 1. Resolve correctness and map options for MCQ, MC, SMCQ, AR BEFORE shuffling
-                    if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ' || q.type === 'AR') && Array.isArray(q.options) && q.options.length > 0) {
-                        let dbCorrectIdx = -1;
-                        const foundIdx = q.options.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
-                        if (foundIdx !== -1) {
-                            dbCorrectIdx = foundIdx;
-                        } else if ((q as any).correctOption !== undefined && (q as any).correctOption !== null) {
-                            const num = Number((q as any).correctOption);
-                            dbCorrectIdx = num > 0 && num <= q.options.length ? num - 1 : num;
-                        } else if ((q as any).correctAnswer || q.modelAnswer) {
-                            const str = ((q as any).correctAnswer || q.modelAnswer || "").trim().toUpperCase();
-                            const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
-                            if (letterMap[str] !== undefined) {
-                                dbCorrectIdx = letterMap[str];
+                // 1. Check LocalStorage Cache
+                const storedCache = localStorage.getItem(isReview ? "review-session-data" : "problem-solving-session");
+                if (storedCache) {
+                    try {
+                        const parsed = JSON.parse(storedCache);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            if (typeof parsed[0] === 'string') {
+                                // Question ID array -> Fetch question bodies
+                                const res = await fetch('/api/questions');
+                                const allQ = await res.json();
+                                sessionQuestions = (allQ.questions || []).filter((q: Question) => parsed.includes(q.id));
+                                sessionQuestions = sessionQuestions.map(q => processQuestionItem(q, isReview));
                             } else {
-                                const num = parseInt(str);
-                                if (!isNaN(num)) dbCorrectIdx = num;
+                                sessionQuestions = (parsed as Question[]).map(q => processQuestionItem(q, isReview));
+                            }
+                        } else if (parsed.questions && Array.isArray(parsed.questions)) {
+                            sessionQuestions = parsed.questions.map((q: any) => processQuestionItem(q, isReview));
+                            if (parsed.examName) setExamName(parsed.examName);
+                        }
+                    } catch {
+                        // Ignore parse error and proceed to cloud fetch
+                    }
+                }
+
+                // 2. Cloud Fetch if Cache is empty AND examId is provided (e.g. direct link)
+                if (sessionQuestions.length === 0 && examId) {
+                    try {
+                        const evalUrl = `/api/exams/evaluations/${examId}${studentId ? `?studentId=${studentId}` : ''}`;
+                        const evalRes = await fetch(evalUrl);
+
+                        if (evalRes.ok) {
+                            const evalData = await evalRes.json();
+                            const sub = studentId
+                                ? evalData.submissions?.find((s: any) => s.studentId === studentId) || evalData.submissions?.[0]
+                                : evalData.submissions?.[0];
+
+                            const answers = sub?.answers || {};
+                            if (evalData.exam?.name) setExamName(evalData.exam.name);
+                            if (sub?.student?.name) setStudentName(sub.student.name);
+
+                            if (evalData.questions && Array.isArray(evalData.questions)) {
+                                sessionQuestions = evalData.questions.map((q: any) => {
+                                    const qText = q.text || q.questionText || "Question text missing";
+                                    const userAnsText = answers[q.id];
+                                    let userAnsIndex: number | null = null;
+
+                                    if (userAnsText !== undefined && userAnsText !== null && q.options) {
+                                        const norm = (s: any) => String(s).trim().toLowerCase();
+                                        userAnsIndex = q.options.findIndex((opt: any) => norm(opt.text) === norm(userAnsText));
+                                        if (userAnsIndex === -1 && !isNaN(Number(userAnsText))) {
+                                            const n = Number(userAnsText);
+                                            if (n >= 0 && n < q.options.length) userAnsIndex = n;
+                                        }
+                                    }
+
+                                    let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                                    if (userAnsIndex !== null && userAnsIndex >= 0) {
+                                        const sel = q.options?.[userAnsIndex];
+                                        status = sel?.isCorrect ? 'correct' : 'wrong';
+                                    }
+
+                                    const mappedQ: Question = {
+                                        ...q,
+                                        questionText: qText,
+                                        userAnswer: userAnsIndex !== null ? userAnsIndex : userAnsText,
+                                        studentAnswer: userAnsText,
+                                        status
+                                    };
+                                    return processQuestionItem(mappedQ, true);
+                                });
+                            }
+                        } else {
+                            // Fallback to basic exam API
+                            const examRes = await fetch(`/api/exams/${examId}`);
+                            if (examRes.ok) {
+                                const examData = await examRes.json();
+                                if (examData.name) setExamName(examData.name);
+                                if (examData.questions) {
+                                    sessionQuestions = examData.questions.map((q: any) => processQuestionItem(q, isReview));
+                                }
                             }
                         }
-
-                        const optionsWithIndex = q.options.map((opt: any, idx: number) => {
-                            const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
-                            const isOptCorrect = foundIdx !== -1
-                                ? idx === foundIdx
-                                : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
-                            return {
-                                ...optObj,
-                                originalIndex: idx,
-                                isCorrect: isOptCorrect
-                            };
-                        });
-
-                        const shuffledOptions = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
-                        updatedQ.options = shuffledOptions;
-
-                        // Recalculate correctAnswer string (e.g. A, B, C...) based on new shuffled order
-                        const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
-                            if (opt.isCorrect === true) acc.push(idx);
-                            return acc;
-                        }, []);
-                        if (correctIndices.length > 0) {
-                            (updatedQ as any).correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
-                        }
+                    } catch (e) {
+                        console.warn("Direct cloud exam fetch warning:", e);
                     }
+                }
 
-                    // 2. AR Questions: Ensure 4 options exist with correctness mapping if empty
-                    if (q.type === 'AR' && (!Array.isArray(updatedQ.options) || updatedQ.options.length === 0)) {
-                        const defaultAROptions = [
-                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
-                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
-                            { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
-                            { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
-                        ];
-
-                        let correctIdx = -1;
-                        if ((q as any).correctOption) {
-                            correctIdx = Number((q as any).correctOption) - 1;
-                        }
-
-                        updatedQ.options = defaultAROptions.map((opt: any, idx: number) => ({
-                            ...opt,
-                            originalIndex: idx,
-                            isCorrect: correctIdx >= 0 ? idx === correctIdx : false
-                        }));
-                    }
-
-                    // 3. MTF Column Shuffling
-                    if (q.type === 'MTF' && Array.isArray(q.rightColumn) && q.rightColumn.length > 0) {
-                        const rightWithIndex = q.rightColumn.map((item, idx) => ({ ...item, originalIndex: idx }));
-                        updatedQ.rightColumn = isReview ? rightWithIndex : shuffleArray(rightWithIndex);
-                    }
-
-                    return updatedQ;
-                };
-
-                if (Array.isArray(storedData) && storedData.length > 0) {
-                    if (typeof storedData[0] === 'string') {
-                        const ids = storedData as string[];
-                        sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
-                        if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
-                        sessionQuestions = sessionQuestions.map((q: Question) => processQ(q));
-                    } else {
-                        sessionQuestions = (storedData as Question[]).map(q => processQ(q));
-
-                        // Extract Exam Name if available
-                        if ((storedData as any).examName) {
-                            setExamName((storedData as any).examName);
-                        } else if ((storedData as any).questions) {
-                            // Handle new object structure { questions: [], examName: "" }
-                            sessionQuestions = (storedData as any).questions;
-                            if ((storedData as any).examName) setExamName((storedData as any).examName);
-                        }
-
-                        // Do NOT shuffle in review mode - keep exam order
-                    }
-                } else {
-                    sessionQuestions = data.questions || [];
+                // 3. Fallback to general questions repository
+                if (sessionQuestions.length === 0) {
+                    const res = await fetch('/api/questions');
+                    const allData = await res.json();
+                    sessionQuestions = allData.questions || [];
                     if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
+                    sessionQuestions = sessionQuestions.map((q: any) => processQuestionItem(q, isReview));
                 }
 
                 if (sessionQuestions.length === 0) {
-                    toast.error("Questions not found");
+                    toast.error("No questions found for this session");
                     router.push("/problem-solving");
                     return;
                 }
 
                 setQuestions(sessionQuestions);
             } catch (err) {
-                console.error(err);
-                toast.error("Failed to load session");
+                console.error("Session initialization failed:", err);
+                toast.error("Failed to load problem-solving session");
             } finally {
                 setLoading(false);
             }
         };
-        initSession();
-    }, []);
 
-    // Board Persistence
-    const saveCurrentBoardState = () => {
+        initSession();
+    }, [processQuestionItem, router]);
+
+    // Save current question board state
+    const saveCurrentBoardState = useCallback(() => {
         if (boardRef.current && questions[currentIndex]) {
-            const paths = boardRef.current.getPaths();
+            const currentPaths = boardRef.current.getPaths();
             setBoardHistories(prev => ({
                 ...prev,
-                [questions[currentIndex].id]: paths
+                [questions[currentIndex].id]: currentPaths
             }));
         }
-    };
+    }, [currentIndex, questions]);
 
-    const restoreBoardState = (index: number) => {
-        if (boardRef.current && questions[index]) {
-            const savedPaths = boardHistories[questions[index].id];
-            boardRef.current.loadPaths(savedPaths || []);
+    // Restore board state for question
+    const restoreBoardState = useCallback((targetIndex: number) => {
+        if (boardRef.current && questions[targetIndex]) {
+            const saved = boardHistories[questions[targetIndex].id] || [];
+            boardRef.current.loadPaths(saved);
         }
-    };
+    }, [boardHistories, questions]);
 
-    const handleNext = () => {
-        saveCurrentBoardState();
-        if (currentIndex < questions.length - 1) {
-            const nextIndex = currentIndex + 1;
-            setCurrentIndex(nextIndex);
-
-            // State Sync happens in useEffect below now
-            setTimeout(() => restoreBoardState(nextIndex), 0);
-        }
-    };
-
-    // Sync State with Question (Review Mode or Fresh)
+    // Sync Question State (Answer check & Selection)
     useEffect(() => {
         const q = questions[currentIndex];
         if (!q) return;
 
         if (q.status) {
-            // Review Mode
-            // Set user's selected option if it exists
             setSelectedOption(typeof q.userAnswer === 'number' ? q.userAnswer : null);
-
-            // If they were correct, we auto-reveal (show Green).
-            // If wrong or unanswered, we keep it unchecked (hidden) until they click "Show Correct Answer"
             setIsAnswerChecked(q.status === 'correct');
         } else {
-            // Fresh Mode
-            setShowAnswer(false);
             setSelectedOption(null);
             setIsAnswerChecked(false);
         }
     }, [currentIndex, questions]);
 
+    const handleNext = () => {
+        saveCurrentBoardState();
+        if (currentIndex < questions.length - 1) {
+            const nextIdx = currentIndex + 1;
+            setCurrentIndex(nextIdx);
+            setTimeout(() => restoreBoardState(nextIdx), 20);
+        }
+    };
+
     const handlePrev = () => {
         saveCurrentBoardState();
         if (currentIndex > 0) {
-            const prevIndex = currentIndex - 1;
-            setCurrentIndex(prevIndex);
-            // State Sync happens in useEffect
-            setTimeout(() => restoreBoardState(prevIndex), 0);
+            const prevIdx = currentIndex - 1;
+            setCurrentIndex(prevIdx);
+            setTimeout(() => restoreBoardState(prevIdx), 20);
         }
     };
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
+            document.documentElement.requestFullscreen().catch(() => {});
             setIsFullscreen(true);
         } else {
             if (document.exitFullscreen) {
-                document.exitFullscreen();
+                document.exitFullscreen().catch(() => {});
                 setIsFullscreen(false);
             }
         }
@@ -365,847 +429,296 @@ export default function ProblemSolvingSession() {
     const handleToggleBackground = () => {
         const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
         setBoardBackground(next);
-        // We rely on Toolbar to react to this prop change for color contrast
     };
-
-
-    // updateSize removed - handled by Toolbar
-    // toggleBackground removed - handled by Toolbar locally or via ref
-
-
-
-    // Workaround: I will fix Toolbar in next step. For now, let's keep this file valid.
-    /*
-    const updateSize = (val: number) => {
-        setBoardSize(val);
-        boardRef.current?.setLineWidth(val);
-    };
-
-    const toggleBackground = () => {
-        const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
-        setBoardBackground(next);
-        if (next === 'black') {
-            setBoardColor('#ffffff');
-            boardRef.current?.setColor('#ffffff');
-            setBoardTool('pen');
-            boardRef.current?.setTool('pen');
-        } else {
-            setBoardColor('#000000');
-            boardRef.current?.setColor('#000000');
-            setBoardTool('pen');
-            boardRef.current?.setTool('pen');
-        }
-    };
-    */
 
     const handleExportPDF = async () => {
         const input = document.getElementById('session-workspace');
-        if (input) {
-            const toastId = toast.loading("Generating PDF...");
-            try {
-                // Dynamic import
-                const html2canvas = (await import('html2canvas')).default;
-                const { jsPDF } = await import('jspdf');
+        if (!input) return;
 
-                const canvas = await html2canvas(input, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    ignoreElements: (element) => element.classList.contains('no-print')
-                });
-
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
-                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                pdf.save(`LiveSession_${new Date().getTime()}.pdf`);
-                toast.dismiss(toastId);
-                toast.success("PDF Downloaded!");
-            } catch (e) {
-                console.error(e);
-                toast.dismiss(toastId);
-                toast.error("Failed to generate PDF");
-            }
-        }
-    };
-
-    // --- PDF Generation ---
-    const generateSessionReport = async () => {
-        if (!hiddenPDFContainerRef.current) return;
-
-        const toastId = toast.loading('Generating PDF Report... (This may take a moment)');
-
+        const toastId = toast.loading("Generating High-Resolution PDF...");
         try {
-            const { jsPDF } = await import('jspdf');
             const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
 
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            let currentY = 10; // Top margin
+            const canvas = await html2canvas(input, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                ignoreElements: (el) => el.classList.contains('no-print')
+            });
 
-            // Title Page
-            pdf.setFontSize(24);
-            pdf.text("Problem Solving Session", pageWidth / 2, 40, { align: 'center' });
-            pdf.setFontSize(14);
-            pdf.text(new Date().toLocaleDateString(), pageWidth / 2, 50, { align: 'center' });
-            pdf.text(`Total Questions: ${questions.length}`, pageWidth / 2, 60, { align: 'center' });
-
-            pdf.addPage();
-            currentY = 10;
-
-            for (let i = 0; i < questions.length; i++) {
-                const q = questions[i];
-                const paths = boardHistories[q.id] || [];
-                const isCorrectlyAnswered = q.type === 'MCQ' && selectedOption !== null && q.options?.[selectedOption]?.isCorrect; // Note: Logic might need to track per-question answer state if not persisted
-
-                // 1. Prepare DOM for Question Text & Options
-                const container = hiddenPDFContainerRef.current;
-                if (!container) continue;
-
-                container.innerHTML = '';
-                const wrapper = document.createElement('div');
-                wrapper.className = "p-8 bg-white text-black font-sans";
-                wrapper.style.width = "794px"; // A4 Pixel Width
-
-                // Using UniversalMathJax logic effectively means standard text for now,
-                // but we rely on the global MathJax/TikZ scripts to process the injected HTML.
-                // We wrap TikZ in script tags manually for the report if needed, or just let UniversalMathJax process it if we could mount it.
-                // Since we are inserting raw string HTML, we assume cleanupMath helps.
-
-                let htmlContent = `
-                    <div class="mb-6 border-b pb-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-400">Question ${i + 1}</span>
-                            <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${q.type} • ${q.marks} Marks</span>
-                        </div>
-                        <div class="text-xl font-bold text-gray-900 mb-4 leading-relaxed">${cleanupMath(q.questionText)}</div>
-                `;
-
-                // Options (if MCQ)
-                if (q.type === 'MCQ' && q.options) {
-                    htmlContent += `<div class="grid grid-cols-1 gap-2">`;
-                    q.options.forEach((opt, idx) => {
-                        const isCorrect = opt.isCorrect;
-                        // const isSelected = ... (We would need to track user selection per question to show Red marks properly in history)
-                        // For now highlighting Correct Answer only as per request "right answer clicked than only green mark"
-                        // Assuming report shows ideal state or we need "user state". user said "if right answer clicked than only green mark".
-
-                        const bgClass = isCorrect ? 'bg-green-50 border-green-500 text-green-900' : 'bg-white border-gray-200 text-gray-600';
-                        const label = String.fromCharCode(65 + idx);
-                        htmlContent += `
-                            <div class="flex items-center p-3 rounded border ${bgClass}">
-                                <span class="font-bold mr-3">${label}</span>
-                                <span>${cleanupMath(opt.text)}</span>
-                                ${isCorrect ? '<span class="ml-auto text-green-600 font-bold">✓</span>' : ''}
-                            </div>
-                        `;
-                    });
-                    htmlContent += `</div>`;
-                }
-
-                // Explanation
-                const correctOpt = q.options?.find(o => o.isCorrect);
-                if (correctOpt?.explanation) {
-                    htmlContent += `
-                        <div class="mt-4 p-4 bg-indigo-50 rounded-lg text-sm text-indigo-900">
-                            <strong>Explanation:</strong>
-                            <div class="mt-1">${cleanupMath(correctOpt.explanation)}</div>
-                        </div>
-                    `;
-                }
-
-                htmlContent += `</div>`; // Close Wrapper
-                wrapper.innerHTML = htmlContent;
-                container.appendChild(wrapper);
-
-                // 2. Render MathJax & TikZ in Hidden DOM
-                // Wait for scripts to process.
-                if (typeof (window as any).MathJax?.typesetPromise === 'function') {
-                    await (window as any).MathJax.typesetPromise([wrapper]);
-                }
-
-                // Wait for TikZJax (it observes DOM, give it a moment)
-                await new Promise(r => setTimeout(r, 1000)); // 1s buffer for TikZ/MathJax to fully paint
-
-                // 3. Capture Question Image
-                // Strategy: Clone the wrapper, append to body (visible but off-screen), capture, then remove.
-                // This circumvents issues with hidden containers.
-
-                const clone = wrapper.cloneNode(true) as HTMLElement;
-                clone.style.position = 'fixed';
-                clone.style.top = '0';
-                clone.style.left = '0';
-                clone.style.zIndex = '-100'; // Behind everything
-                clone.style.visibility = 'visible'; // Must be visible for html2canvas
-                clone.style.opacity = '1';
-                clone.style.background = 'white';
-                clone.style.pointerEvents = 'none'; // Prevent blocking clicks
-
-                document.body.appendChild(clone);
-
-                let qCanvas;
-                try {
-                    // Wait for clone to render (images/fonts)
-                    await new Promise(r => setTimeout(r, 500));
-
-                    qCanvas = await html2canvas(clone, {
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: '#ffffff',
-                        height: clone.scrollHeight,
-                        windowWidth: 1920
-                    });
-                } finally {
-                    document.body.removeChild(clone); // Ensure Cleanup happens!
-                }
-
-                container.innerHTML = ''; // Clear hidden container too
-
-                const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
-                const qImgProps = pdf.getImageProperties(qImgData);
-                const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;
-
-                // Check Page Break
-                if (currentY + qImgHeight > pageHeight - 10) {
-                    pdf.addPage();
-                    currentY = 10;
-                }
-
-                pdf.addImage(qImgData, 'JPEG', 0, currentY, pageWidth, qImgHeight);
-                currentY += qImgHeight + 5;
-
-                // 4. Capture Drawing (Space Optimized + Inverted Colors)
-                // Pass 'isDark' (derived from current board state, ideally should capture board state per question, but assuming consistent)
-                const drawingImgData = await exportPathsToImage(paths, 20, isDark); // Invert if Dark Mode
-
-                if (drawingImgData) {
-                    const dImgProps = pdf.getImageProperties(drawingImgData);
-                    let dWidth = pageWidth - 20; // 10mm margin
-                    let dHeight = (dImgProps.height * dWidth) / dImgProps.width;
-
-                    // If drawing is larger than remaining space, add page
-                    if (currentY + 50 > pageHeight) {
-                        pdf.addPage();
-                        currentY = 10;
-                    }
-
-                    if (currentY + dHeight > pageHeight - 10) {
-                        if (dHeight > pageHeight - 20) {
-                            // Too big for one page, scale to fit height
-                            const ratio = (pageHeight - 20) / dHeight;
-                            dWidth = dWidth * ratio;
-                            dHeight = pageHeight - 20;
-                            pdf.addPage();
-                            currentY = 10;
-                        } else {
-                            pdf.addPage();
-                            currentY = 10;
-                        }
-                    }
-
-                    pdf.setFontSize(10);
-                    pdf.setTextColor(150);
-                    pdf.text("Drawing / Notes:", 10, currentY);
-                    currentY += 5;
-
-                    pdf.addImage(drawingImgData, 'PNG', 10, currentY, dWidth, dHeight);
-                    currentY += dHeight + 10;
-                } else {
-                    currentY += 10;
-                }
-
-                // Separator
-                pdf.setDrawColor(200);
-                pdf.line(10, currentY, pageWidth - 10, currentY);
-                currentY += 10;
-            }
-
-            pdf.save(`Session_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`ProblemSolving_Session_${Date.now()}.pdf`);
             toast.dismiss(toastId);
-            toast.success("Report Generated Successfully!");
-
-        } catch (error) {
-            console.error(error);
+            toast.success("PDF Downloaded Successfully!");
+        } catch (e) {
+            console.error("PDF generation error:", e);
             toast.dismiss(toastId);
-            toast.error("Failed to generate report.");
+            toast.error("Failed to generate PDF");
         }
     };
 
-    const currentQ = questions[currentIndex];
     const isDark = boardBackground === 'black';
+    const currentQ = questions[currentIndex];
 
     if (loading || !currentQ) {
         return (
-            <div className="h-screen flex flex-col items-center justify-center bg-background">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                <p className="text-gray-500 font-medium">Preparing Studio...</p>
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-background text-foreground">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mb-4"></div>
+                <p className="text-gray-500 font-bold tracking-wide">Preparing World-Class Studio...</p>
             </div>
         );
     }
 
     return (
         <MathJaxContext config={mathJaxConfig} version={3}>
-            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-background'}`}>
-
-                {/* 1. TOP BAR */}
-                <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none bg-gradient-to-b from-black/10 to-transparent no-print">
-                    <div className="flex items-center gap-4 pointer-events-auto">
+            <div
+                id="session-workspace"
+                className={`h-screen w-full flex flex-col overflow-hidden relative font-sans select-none ${
+                    isDark ? 'bg-slate-950 text-slate-100' : 'bg-background text-foreground'
+                }`}
+            >
+                {/* 1. TOP HEADER STUDIO BAR */}
+                <header className="h-14 sm:h-16 px-4 sm:px-6 flex items-center justify-between z-40 border-b border-border/60 bg-card/90 backdrop-blur-xl shrink-0 no-print">
+                    {/* Left: Exit & Question Index */}
+                    <div className="flex items-center gap-3">
                         <Button
-                            variant="secondary" size="sm"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => router.push('/problem-solving')}
-                            className="bg-card/90 backdrop-blur shadow-sm hover:bg-card border border-border rounded-full pl-3 pr-4"
+                            className="rounded-full pl-3 pr-4 h-9 font-bold bg-muted hover:bg-muted/80 text-foreground border border-border shadow-sm"
                         >
                             <LogOut className="w-4 h-4 mr-2 text-muted-foreground" />
-                            <span className="text-foreground">Exit</span>
+                            <span>Exit</span>
                         </Button>
-                        <div className="bg-card/90 backdrop-blur shadow-sm border border-border px-4 py-1.5 rounded-full flex items-center gap-3">
-                            <span className="text-sm font-semibold text-foreground">Q {currentIndex + 1} / {questions.length}</span>
-                        </div>
-                    </div>
 
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-card/90 backdrop-blur px-4 py-1.5 rounded-full border border-border shadow-sm pointer-events-auto">
-                        <div className="flex items-center gap-2 border-r border-gray-200 pr-4">
-                            <User className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium text-foreground/90">Instructor</span>
+                        <div className="bg-primary/10 border border-primary/20 px-3.5 py-1 rounded-full flex items-center gap-1.5">
+                            <span className="text-xs font-black text-primary">
+                                Q {currentIndex + 1}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                                / {questions.length}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                <span className="text-sm font-bold text-green-800">{examName || "Session Mode"}</span>
-                            </div>
-                            <div className="w-px h-4 bg-gray-300"></div>
-                            {/* Clock / Timer Component */}
-                            {timerSetting !== "off" ? (
-                                <div className="flex items-center gap-2">
-                                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-sm font-bold shadow-inner ${isTimerExpired ? 'bg-red-500 text-white animate-pulse' : (isTimerRunning ? 'bg-indigo-600 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300')}`}>
-                                        <Clock className="w-4 h-4" />
-                                        <span>{isTimerExpired ? "Time's Up!" : formatTime(questionTimerSeconds)}</span>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setIsTimerRunning(!isTimerRunning)}
-                                        className="h-7 text-xs px-2.5 rounded-full border-indigo-200 hover:bg-indigo-50 font-semibold"
-                                    >
-                                        {isTimerRunning ? (
-                                            <><Pause className="w-3.5 h-3.5 mr-1 text-indigo-600" /> Pause</>
-                                        ) : (
-                                            <><Play className="w-3.5 h-3.5 mr-1 text-indigo-600 fill-indigo-600" /> Start Timer</>
-                                        )}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 text-muted-foreground font-medium font-mono text-sm bg-muted px-2 py-1 rounded">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    <LiveClock />
-                                </div>
-                            )}
-                            <div className="w-px h-4 bg-gray-300"></div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-600">
-                                    {currentIndex + 1} <span className="text-gray-400">/</span> {questions.length}
+
+                        {/* Toggle Question Panel Button (In Split Mode) */}
+                        {layoutMode === 'split' && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+                                className="h-9 px-3 rounded-full text-xs font-bold border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                                title={isPanelCollapsed ? "Show Question Panel" : "Hide Question for Fullscreen Board"}
+                            >
+                                <Columns2 className="w-4 h-4 mr-1.5 text-indigo-600" />
+                                <span className="hidden sm:inline">
+                                    {isPanelCollapsed ? "Show Question" : "Hide Question"}
                                 </span>
-                            </div>
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Center: Exam & Student Info + Live Timer */}
+                    <div className="hidden md:flex items-center gap-4 bg-muted/60 px-4 py-1.5 rounded-full border border-border shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <GraduationCap className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <span className="text-xs font-bold truncate max-w-[220px]">
+                                {examName || "Problem Solving Studio"}
+                            </span>
+                            {studentName && (
+                                <Badge variant="outline" className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-300 font-bold ml-1">
+                                    {studentName}
+                                </Badge>
+                            )}
                         </div>
+
+                        <div className="w-px h-4 bg-border"></div>
+
+                        {/* Question Timer */}
+                        {timerSetting !== "off" ? (
+                            <div className="flex items-center gap-2">
+                                <div className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full font-mono text-xs font-black ${
+                                    isTimerExpired
+                                        ? 'bg-rose-500 text-white animate-pulse'
+                                        : isTimerRunning
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                }`}>
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span>{isTimerExpired ? "Time's Up!" : formatTime(questionTimerSeconds)}</span>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setIsTimerRunning(!isTimerRunning)}
+                                    className="h-7 text-xs px-2 rounded-full font-bold hover:bg-muted"
+                                >
+                                    {isTimerRunning ? (
+                                        <Pause className="w-3.5 h-3.5 text-indigo-600" />
+                                    ) : (
+                                        <Play className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
+                                    )}
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1.5 text-muted-foreground font-mono text-xs font-semibold">
+                                <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                <LiveClock />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-2 bg-card/90 backdrop-blur px-3 py-1.5 rounded-full border border-border shadow-sm pointer-events-auto">
-                        <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-card/80 hover:bg-card rounded-full">
-                            {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
-                        </Button>
+                    {/* Right: Studio Layout Switcher & Fullscreen */}
+                    <div className="flex items-center gap-2">
+                        {/* Layout Selector */}
+                        <div className="flex items-center bg-muted/60 p-0.5 rounded-full border border-border">
+                            <Button
+                                variant={layoutMode === 'split' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => {
+                                    setLayoutMode('split');
+                                    setIsPanelCollapsed(false);
+                                }}
+                                className={`h-8 px-2.5 rounded-full text-xs font-bold transition-all ${
+                                    layoutMode === 'split'
+                                        ? 'bg-indigo-600 text-white shadow'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                                title="Studio Split Mode (Unobstructed side-by-side whiteboard)"
+                            >
+                                <Columns2 className="w-3.5 h-3.5 sm:mr-1.5" />
+                                <span className="hidden sm:inline">Split</span>
+                            </Button>
 
-                        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-card/80 hover:bg-card rounded-full">
-                            {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
-                        </Button>
-                    </div>
-                </div>
+                            <Button
+                                variant={layoutMode === 'annotation' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setLayoutMode('annotation')}
+                                className={`h-8 px-2.5 rounded-full text-xs font-bold transition-all ${
+                                    layoutMode === 'annotation'
+                                        ? 'bg-indigo-600 text-white shadow'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                                title="Annotation Mode (Direct pen drawing over the question)"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />
+                                <span className="hidden sm:inline">Annotate</span>
+                            </Button>
+                        </div>
 
-                {/* 2. MAIN CANVAS */}
-                {/* We rely on checking background via REF or just use default. 
-                    Wait, if I don't pass backgroundColor prop, it won't update.
-                    I need to Fix Toolbar to accept props for BG. 
-                    For this step, I will replace the logic to use a ref-based approach or just re-add the state line I deleted? 
-                    I deleted line 58-68. I will restore `boardBackground` next.
-                */}
-                <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
-                    <SmartBoard
-                        ref={boardRef}
-                        className=""
-                        backgroundColor={annotationMode ? 'transparent' : boardBackground}
-                    />
-                </div>
-
-                {/* 3. QUESTION OVERLAY */}
-                <AnimatePresence>
-                    {showOverlay && (
-                        <motion.div
-                            initial={{ x: -400, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -400, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`absolute top-24 left-0 sm:left-6 w-full sm:w-[500px] px-4 sm:px-0 pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleFullscreen}
+                            className="rounded-full w-9 h-9 hover:bg-muted"
+                            title="Toggle Fullscreen"
                         >
-                            <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-card/95 border-border ring-1 ring-border shadow-2xl'}`}>
-                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-muted/50 border-b border-border'}`}>
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                                            <span className="text-xs font-bold text-primary uppercase tracking-wider">{currentQ.subject}</span>
-                                        </div>
+                            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                        </Button>
+                    </div>
+                </header>
+
+                {/* 2. MAIN WORKSPACE CONTAINER */}
+                <main className="flex-1 flex overflow-hidden relative">
+
+                    {/* A. STUDIO SPLIT MODE: Dedicated Left Question Studio */}
+                    {layoutMode === 'split' && (
+                        <aside
+                            className={`border-r border-border transition-all duration-300 ease-in-out flex flex-col z-20 shrink-0 ${
+                                isDark ? 'bg-slate-900/90' : 'bg-card/95'
+                            } ${
+                                isPanelCollapsed
+                                    ? 'w-0 opacity-0 overflow-hidden pointer-events-none'
+                                    : 'w-full md:w-[440px] lg:w-[480px] xl:w-[520px]'
+                            }`}
+                        >
+                            {/* Question Panel Inner Container */}
+                            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 custom-scrollbar font-exam-paper">
+                                {/* Header Badges */}
+                                <div className="flex items-center justify-between pb-3 border-b border-border">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                                            {currentQ.subject}
+                                        </span>
                                         {currentQ.topic && (
-                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-muted-foreground'}`}>{currentQ.topic}</span>
+                                            <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                                • {currentQ.topic}
+                                            </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {currentQ.status === 'correct' && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Correct</Badge>}
-                                        {currentQ.status === 'wrong' && <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Wrong</Badge>}
-                                        {currentQ.status === 'unanswered' && <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100">Not Answered</Badge>}
-                                        <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                                            {currentQ.difficulty}
+                                    <div className="flex items-center gap-1.5">
+                                        {currentQ.status === 'correct' && (
+                                            <Badge className="bg-emerald-600 text-white font-bold text-xs shadow-sm">
+                                                Correct
+                                            </Badge>
+                                        )}
+                                        {currentQ.status === 'wrong' && (
+                                            <Badge variant="destructive" className="font-bold text-xs shadow-sm">
+                                                Wrong
+                                            </Badge>
+                                        )}
+                                        <Badge
+                                            variant="outline"
+                                            className={`text-xs font-bold ${
+                                                currentQ.difficulty === 'HARD'
+                                                    ? 'bg-rose-500/10 text-rose-500 border-rose-200'
+                                                    : 'bg-emerald-500/10 text-emerald-600 border-emerald-200'
+                                            }`}
+                                        >
+                                            {currentQ.difficulty} • {currentQ.marks}M
                                         </Badge>
                                     </div>
                                 </div>
 
-                                <div className="p-6 overflow-y-auto max-h-[calc(100vh-280px)] space-y-6 custom-scrollbar font-exam-paper">
-                                    {/* Question Text / Assertion-Reasoning Special Layout */}
-                                    {currentQ.type === 'AR' && (
-                                        <div className="p-4 mb-4 rounded-xl border-2 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/50 space-y-3">
-                                            <div>
-                                                <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Assertion (A)</div>
-                                                <div className="text-base font-medium">
-                                                    <UniversalMathJax dynamic>{currentQ.assertion || currentQ.questionText}</UniversalMathJax>
-                                                </div>
-                                            </div>
-                                            {currentQ.reason && (
-                                                <div className="pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
-                                                    <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Reason (R)</div>
-                                                    <div className="text-base font-medium">
-                                                        <UniversalMathJax dynamic>{currentQ.reason}</UniversalMathJax>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                {/* Question Content Render */}
+                                {renderQuestionContent()}
+                            </div>
+                        </aside>
+                    )}
 
-                                    {currentQ.type !== 'AR' && (
-                                        <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
-                                            <UniversalMathJax inline dynamic>
-                                                {cleanupMath(currentQ.questionText)}
-                                            </UniversalMathJax>
-                                        </h3>
-                                    )}
-
-                                    <div className="mt-6 space-y-4">
-                                        {/* Type 1: MCQ, SMCQ, AR (Single Option Choice) */}
-                                        {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (
-                                            <div className="grid gap-3">
-                                                {currentQ.options.map((opt, idx) => {
-                                                    const isSelected = selectedOption === idx;
-                                                    const isCorrect = opt.isCorrect;
-
-                                                    const reviewStatus = currentQ.status;
-                                                    const isUserSelected = currentQ.userAnswer === idx;
-
-                                                    let statusClass = isDark
-                                                        ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
-                                                        : "border-border bg-card shadow-sm hover:shadow-md hover:border-primary/20";
-
-                                                    if (isSelected) {
-                                                        statusClass = isDark
-                                                            ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
-                                                            : "bg-primary/10 border-primary/20 ring-1 ring-primary/20";
-                                                    }
-
-                                                    const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
-
-                                                    if (shouldReveal) {
-                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30 text-green-300 font-bold" : "bg-green-500/10 border-green-500/20 ring-1 ring-green-500/20 text-green-900 font-bold";
-                                                        else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-500/10 border-red-500/20 ring-1 ring-red-500/20 opacity-60";
-                                                        else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-muted/30 opacity-50";
-                                                    } else if (reviewStatus === 'wrong' && isUserSelected) {
-                                                        statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
-                                                    }
-
-                                                    return (
-                                                        <div
-                                                            key={idx}
-                                                            onClick={(e) => {
-                                                                if (annotationMode || reviewStatus) return;
-                                                                if (!shouldReveal) {
-                                                                    setSelectedOption(idx);
-                                                                    setUserAnswers({ ...userAnswers, [currentIndex]: idx });
-                                                                }
-                                                            }}
-                                                            className={`
-                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
-                                                                ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
-                                                                ${annotationMode ? 'cursor-crosshair' : ''}
-                                                                ${statusClass}
-                                                            `}
-                                                        >
-                                                            <div className={`
-                                                                shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                                ${isSelected || (reviewStatus && isUserSelected) ? 'bg-primary text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-muted text-muted-foreground')}
-                                                                ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
-                                                                ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
-                                                            `}>
-                                                                {String.fromCharCode(65 + idx)}
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <span className={`text-base w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
-                                                                    <UniversalMathJax inline dynamic>
-                                                                        {cleanupMath(opt.text)}
-                                                                    </UniversalMathJax>
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        {/* Type 2: MC (Multiple Correct Checkboxes) */}
-                                        {currentQ.type === 'MC' && currentQ.options && (
-                                            <div className="space-y-3">
-                                                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                                                    Select all correct options:
-                                                </div>
-                                                <div className="grid gap-3">
-                                                    {currentQ.options.map((opt, idx) => {
-                                                        const currentAns = userAnswers[currentIndex];
-                                                        const selectedIndices: number[] = Array.isArray(currentAns) ? currentAns : [];
-                                                        const isSelected = selectedIndices.includes(idx);
-                                                        const isCorrect = opt.isCorrect;
-
-                                                        let statusClass = isDark
-                                                            ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
-                                                            : "border-border bg-card shadow-sm hover:shadow-md";
-
-                                                        if (isAnswerChecked) {
-                                                            if (isSelected && isCorrect) statusClass = "bg-green-500/20 border-green-500 text-green-900 font-bold";
-                                                            else if (isSelected && !isCorrect) statusClass = "bg-red-500/20 border-red-500 text-red-900 opacity-60";
-                                                            else if (isCorrect) statusClass = "bg-green-500/10 border-green-500/50 text-green-700 font-semibold";
-                                                            else statusClass = "opacity-40";
-                                                        } else if (isSelected) {
-                                                            statusClass = "bg-primary/10 border-primary text-primary";
-                                                        }
-
-                                                        return (
-                                                            <div
-                                                                key={idx}
-                                                                onClick={() => {
-                                                                    if (isAnswerChecked) return;
-                                                                    const newSet = new Set(selectedIndices);
-                                                                    if (newSet.has(idx)) newSet.delete(idx);
-                                                                    else newSet.add(idx);
-                                                                    setUserAnswers({ ...userAnswers, [currentIndex]: Array.from(newSet) });
-                                                                }}
-                                                                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-4 ${statusClass}`}
-                                                            >
-                                                                <div className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-primary border-primary text-white' : 'bg-muted border-border'}`}>
-                                                                    {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
-                                                                </div>
-                                                                <div className="flex-1 text-base font-medium">
-                                                                    <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Type 3: INT (Numerical Input) */}
-                                        {currentQ.type === 'INT' && (
-                                            <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
-                                                <label className="block text-sm font-bold text-foreground">
-                                                    Numerical Answer:
-                                                </label>
-                                                <Input
-                                                    type="text"
-                                                    value={userAnswers[currentIndex] || ""}
-                                                    onChange={(e) => !isAnswerChecked && setUserAnswers({ ...userAnswers, [currentIndex]: e.target.value })}
-                                                    placeholder="Enter number (e.g. 42 or 3.14)"
-                                                    disabled={isAnswerChecked}
-                                                    className="text-lg font-bold h-12 bg-card border-border"
-                                                />
-                                                {isAnswerChecked && currentQ.modelAnswer && (
-                                                    <div className="text-sm font-bold text-emerald-600">
-                                                        Correct Answer: {currentQ.modelAnswer}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Type 4: MTF (Matching) */}
-                                        {currentQ.type === 'MTF' && Array.isArray(currentQ.leftColumn) && Array.isArray(currentQ.rightColumn) && (
-                                            <div className="space-y-6 mt-6">
-                                                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                                    Match Column A with Column B:
-                                                </div>
-
-                                                {/* Column B Reference Cards with Full LaTeX Math Support */}
-                                                <div className="p-4 rounded-xl bg-muted/30 border border-border space-y-2 font-fancy">
-                                                    <div className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Column B Options:</div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                        {currentQ.rightColumn.map((rightItem: any, rIdx: number) => (
-                                                            <div key={rightItem.id || rIdx} className="p-2.5 rounded-lg bg-card border border-border flex items-start gap-2.5 text-sm">
-                                                                <Badge variant="outline" className="bg-primary/10 text-primary font-bold shrink-0">
-                                                                    ({String.fromCharCode(65 + rIdx)})
-                                                                </Badge>
-                                                                <div className="flex-1 font-medium leading-normal">
-                                                                    <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                {/* Interactive Match Selector Rows with LaTeX Rendering */}
-                                                <div className="space-y-3 font-fancy">
-                                                    {currentQ.leftColumn.map((leftItem, idx) => {
-                                                        const matchesMap: Record<string, string> = userAnswers[currentIndex] || {};
-                                                        const selectedRightId = matchesMap[leftItem.id] || "";
-                                                        const correctRightId = currentQ.matches?.[leftItem.id];
-                                                        const isMatchCorrect = selectedRightId && correctRightId && selectedRightId === correctRightId;
-                                                        const selectedRightItem = currentQ.rightColumn?.find((r: any) => r.id === selectedRightId);
-                                                        const selectedRightIdx = currentQ.rightColumn?.findIndex((r: any) => r.id === selectedRightId) ?? -1;
-
-                                                        return (
-                                                            <div key={leftItem.id || idx} className={`p-4 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isAnswerChecked ? (isMatchCorrect ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500') : 'bg-card border-border'}`}>
-                                                                <div className="flex items-center gap-3 flex-1">
-                                                                    <span className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs shrink-0">
-                                                                        {idx + 1}
-                                                                    </span>
-                                                                    <div className="font-medium text-sm">
-                                                                        <UniversalMathJax inline dynamic>{cleanupMath(leftItem.text)}</UniversalMathJax>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="w-full md:w-72">
-                                                                    <Popover>
-                                                                        <PopoverTrigger asChild disabled={isAnswerChecked}>
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                className={`w-full justify-between h-auto py-2.5 px-3 text-left font-normal border-2 ${isAnswerChecked ? (isMatchCorrect ? 'border-green-500 bg-green-50/50 dark:bg-green-950/30' : 'border-red-500 bg-red-50/50 dark:bg-red-950/30') : 'border-border bg-card'}`}
-                                                                            >
-                                                                                {selectedRightItem ? (
-                                                                                    <span className="flex items-center gap-2 overflow-hidden">
-                                                                                        <Badge className="bg-primary text-primary-foreground font-bold shrink-0">
-                                                                                            ({selectedRightIdx !== -1 ? String.fromCharCode(65 + selectedRightIdx) : '?'})
-                                                                                        </Badge>
-                                                                                        <span className="text-sm font-semibold truncate">
-                                                                                            <UniversalMathJax inline dynamic>{cleanupMath(selectedRightItem.text)}</UniversalMathJax>
-                                                                                        </span>
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="text-muted-foreground text-xs font-semibold">Select Match for ({idx + 1})...</span>
-                                                                                )}
-                                                                                <ChevronDown className="w-4 h-4 opacity-50 shrink-0 ml-2" />
-                                                                            </Button>
-                                                                        </PopoverTrigger>
-                                                                        <PopoverContent className="w-72 p-1.5 space-y-1 z-[100] font-fancy" align="end">
-                                                                            {currentQ.rightColumn?.map((rightItem: any, rIdx: number) => {
-                                                                                const isSelected = selectedRightId === rightItem.id;
-                                                                                return (
-                                                                                    <button
-                                                                                        key={rightItem.id || rIdx}
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            if (!isAnswerChecked) {
-                                                                                                setUserAnswers({
-                                                                                                    ...userAnswers,
-                                                                                                    [currentIndex]: { ...matchesMap, [leftItem.id]: rightItem.id }
-                                                                                                });
-                                                                                            }
-                                                                                        }}
-                                                                                        className={`w-full text-left p-2.5 rounded-lg text-sm flex items-start gap-2.5 transition-all ${isSelected ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-accent text-foreground'}`}
-                                                                                    >
-                                                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold shrink-0 ${isSelected ? 'bg-primary-foreground text-primary' : 'bg-muted text-muted-foreground'}`}>
-                                                                                            ({String.fromCharCode(65 + rIdx)})
-                                                                                        </span>
-                                                                                        <div className="flex-1 font-medium leading-snug">
-                                                                                            <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax>
-                                                                                        </div>
-                                                                                    </button>
-                                                                                );
-                                                                            })}
-                                                                        </PopoverContent>
-                                                                    </Popover>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Type 5: CQ, SQ, DESCRIPTIVE Sub Questions */}
-                                        {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && Array.isArray(currentQ.subQuestions) && (
-                                            <div className="space-y-4">
-                                                {currentQ.subQuestions.map((sub: any, idx: number) => (
-                                                    <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                                                        <div className="flex gap-3 items-start">
-                                                            <span className="font-bold text-indigo-600 flex-shrink-0">({String.fromCharCode(97 + idx)})</span>
-                                                            <div className="flex-1 text-sm font-medium leading-relaxed">
-                                                                <UniversalMathJax inline dynamic>{sub.question || sub.text}</UniversalMathJax>
-                                                            </div>
-                                                        </div>
-
-                                                        {(isAnswerChecked || currentQ.status === 'correct') && (sub.answer || sub.modelAnswer) && (
-                                                            <div className="mt-3 pt-3 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-1">
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Model Answer</div>
-                                                                <div className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold italic">
-                                                                    <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                    {/* B. ANNOTATION MODE: Floating Question Backdrop Overlay */}
+                    {layoutMode === 'annotation' && (
+                        <div className="absolute top-4 left-4 z-10 w-full sm:w-[480px] max-h-[calc(100vh-140px)] pointer-events-auto flex flex-col">
+                            <Card className={`overflow-hidden flex flex-col rounded-2xl shadow-2xl backdrop-blur-xl border-2 ${
+                                isDark ? 'bg-slate-900/90 border-slate-700 text-white' : 'bg-card/95 border-indigo-200/80 shadow-indigo-950/10'
+                            }`}>
+                                <div className="p-4 overflow-y-auto max-h-[calc(100vh-160px)] space-y-4 custom-scrollbar">
+                                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                                        <Badge className="bg-indigo-600 text-white font-bold text-xs">
+                                            {currentQ.subject} {currentQ.topic ? `• ${currentQ.topic}` : ''}
+                                        </Badge>
+                                        <Badge variant="outline" className="text-xs font-bold">
+                                            {currentQ.type} • {currentQ.marks} Marks
+                                        </Badge>
                                     </div>
-
-                                    {/* Check Answer Button */}
-                                    {(!isAnswerChecked && currentQ.status !== 'correct') && (
-                                        <Button
-                                            onClick={() => setIsAnswerChecked(true)}
-                                            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 font-bold"
-                                        >
-                                            {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) ? "Reveal Model Answer & Explanation" : "Check Answer & Reveal Explanation"}
-                                        </Button>
-                                    )}
-
-                                     {/* ANSWER & EXPLANATION REVEAL BLOCK FOR ALL QUESTION TYPES */}
-                                    {(isAnswerChecked || currentQ.status === 'correct') && (
-                                        <div className={`mt-6 p-5 rounded-2xl border-2 shadow-xl animate-in fade-in slide-in-from-top-2 ${isDark ? 'bg-indigo-950/40 border-indigo-500/30 text-indigo-200' : 'bg-indigo-50/80 border-indigo-200 text-indigo-950'}`}>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                                                <span className="font-bold text-base">Answer & Explanation Details</span>
-                                            </div>
-
-                                            {/* MCQ / SMCQ / AR Correct Answer Badge */}
-                                            {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (() => {
-                                                const correctOpt = currentQ.options.find(o => o.isCorrect);
-                                                const correctIdx = currentQ.options.findIndex(o => o.isCorrect);
-                                                return (
-                                                    <div className="mb-3">
-                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                            Correct Answer: Option {correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : 'A'}
-                                                        </Badge>
-                                                        {correctOpt?.text && (
-                                                            <div className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                                                                <UniversalMathJax inline dynamic>{cleanupMath(correctOpt.text)}</UniversalMathJax>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            {/* MC (Multiple Correct Checkboxes) Badges */}
-                                            {currentQ.type === 'MC' && currentQ.options && (() => {
-                                                const correctIndices = currentQ.options
-                                                    .map((o, idx) => o.isCorrect ? String.fromCharCode(65 + idx) : null)
-                                                    .filter(Boolean);
-                                                return (
-                                                    <div className="mb-3">
-                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                            Correct Options: {correctIndices.join(', ') || 'All Selected'}
-                                                        </Badge>
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            {/* INT (Numerical Input) Answer Badge */}
-                                            {currentQ.type === 'INT' && (
-                                                <div className="mb-3">
-                                                    <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                        Correct Numerical Answer: {String((currentQ as any).integerAnswer ?? (currentQ as any).correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
-                                                    </Badge>
-                                                </div>
-                                            )}
-
-                                            {/* MTF (Matching Column) Answer Badges */}
-                                            {currentQ.type === 'MTF' && currentQ.leftColumn && (
-                                                <div className="mb-3 space-y-1">
-                                                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Correct Matches:</div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {currentQ.leftColumn.map((leftItem: any, i: number) => {
-                                                            let rightLabel = '?';
-                                                            let rightText = '';
-
-                                                            if (currentQ.matches && currentQ.matches[leftItem.id]) {
-                                                                const rId = currentQ.matches[leftItem.id];
-                                                                const rIdx = (currentQ.rightColumn || [])?.findIndex((r: any) => r.id === rId);
-                                                                if (rIdx !== undefined && rIdx !== -1) {
-                                                                    rightLabel = String.fromCharCode(65 + rIdx);
-                                                                    rightText = (currentQ.rightColumn || [])[rIdx]?.text || '';
-                                                                }
-                                                            } else if (leftItem.originalIndex !== undefined && currentQ.rightColumn) {
-                                                                const rIdx = currentQ.rightColumn.findIndex((r: any) => r.originalIndex === leftItem.originalIndex);
-                                                                if (rIdx !== -1) {
-                                                                    rightLabel = String.fromCharCode(65 + rIdx);
-                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
-                                                                }
-                                                            } else if (currentQ.rightColumn && currentQ.rightColumn[i]) {
-                                                                rightLabel = String.fromCharCode(65 + i);
-                                                                rightText = currentQ.rightColumn[i]?.text || '';
-                                                            }
-
-                                                            return (
-                                                                <Badge key={leftItem.id || i} variant="outline" className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300 font-bold text-xs">
-                                                                    ({i + 1} → {rightLabel}){rightText ? `: ${rightText}` : ''}
-                                                                </Badge>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* CQ / SQ / DESCRIPTIVE Model Answer */}
-                                            {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && currentQ.modelAnswer && (
-                                                <div className="mb-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                                                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Model Answer / Solution:</div>
-                                                    <div className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
-                                                        <UniversalMathJax dynamic>{cleanupMath(currentQ.modelAnswer)}</UniversalMathJax>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Explanation Text */}
-                                            {(() => {
-                                                const expText = currentQ.explanation
-                                                    || currentQ.options?.find(o => o.isCorrect && o.explanation)?.explanation
-                                                    || currentQ.modelAnswer;
-
-                                                if (!expText) return null;
-
-                                                return (
-                                                    <div className="pt-3 border-t border-indigo-200/50 dark:border-indigo-800/50">
-                                                        <h4 className="font-bold text-xs uppercase tracking-wider text-indigo-500 mb-1 flex items-center gap-1.5">
-                                                            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> Explanation / Notes
-                                                        </h4>
-                                                        <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
-                                                            <UniversalMathJax dynamic>
-                                                                {cleanupMath(renderDynamicExplanation(
-                                                                    expText,
-                                                                    currentQ.options,
-                                                                    currentQ.type,
-                                                                    currentQ.rightColumn
-                                                                ))}
-                                                            </UniversalMathJax>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
+                                    {renderQuestionContent()}
                                 </div>
                             </Card>
-                        </motion.div>
+                        </div>
                     )}
-                </AnimatePresence>
 
-                {/* 4. FLOATING TOOLBAR */}
+                    {/* C. THE INFINITE WHITEBOARD CANVAS */}
+                    {/* In Split mode: flex-1 ensures 100% of the canvas has ZERO overlapping elements, so pen writes in every single pixel */}
+                    {/* In Annotation mode: absolute inset-0 with z-30 transparent overlay allows drawing on top of questions */}
+                    <div
+                        className={`transition-all duration-300 ${
+                            layoutMode === 'annotation'
+                                ? 'absolute inset-0 z-30 pointer-events-auto'
+                                : 'flex-1 h-full relative z-10 overflow-hidden'
+                        }`}
+                    >
+                        <SmartBoard
+                            ref={boardRef}
+                            className="w-full h-full"
+                            backgroundColor={layoutMode === 'annotation' ? 'transparent' : boardBackground}
+                        />
+                    </div>
+                </main>
+
+                {/* 3. TEACHER SMARTBOARD TOOLBAR */}
                 <SmartBoardToolbar
                     boardRef={boardRef}
                     currentIndex={currentIndex}
@@ -1215,33 +728,313 @@ export default function ProblemSolvingSession() {
                     onExport={handleExportPDF}
                     bgMode={boardBackground}
                     onNavigateBg={handleToggleBackground}
-                    isAnnotationMode={annotationMode}
-                    onToggleAnnotation={() => setAnnotationMode(!annotationMode)}
+                    isAnnotationMode={layoutMode === 'annotation'}
+                    onToggleAnnotation={() => {
+                        setLayoutMode(prev => prev === 'annotation' ? 'split' : 'annotation');
+                    }}
                 />
 
-                {/* Hidden Container for PDF Generation */}
-                <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
+                {/* Hidden Container for PDF Reports */}
+                <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white" />
             </div>
-
         </MathJaxContext>
     );
+
+    // Render Question Body and Interaction Controls
+    function renderQuestionContent() {
+        return (
+            <div className="space-y-6">
+                {/* 1. AR (Assertion & Reason) Special Box */}
+                {currentQ.type === 'AR' && (
+                    <div className="p-4 rounded-2xl border-2 bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800 space-y-3 shadow-sm">
+                        <div>
+                            <div className="font-black text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5" /> Assertion (A)
+                            </div>
+                            <div className="text-base font-semibold leading-relaxed">
+                                <UniversalMathJax dynamic>{currentQ.assertion || currentQ.questionText}</UniversalMathJax>
+                            </div>
+                        </div>
+                        {currentQ.reason && (
+                            <div className="pt-2.5 border-t border-indigo-200/60 dark:border-indigo-800/60">
+                                <div className="font-black text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                    <ShieldCheck className="w-3.5 h-3.5" /> Reason (R)
+                                </div>
+                                <div className="text-base font-semibold leading-relaxed">
+                                    <UniversalMathJax dynamic>{currentQ.reason}</UniversalMathJax>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 2. Standard Question Text */}
+                {currentQ.type !== 'AR' && (
+                    <h3 className={`text-lg sm:text-xl font-bold leading-relaxed ${
+                        isDark ? 'text-indigo-50' : 'text-slate-900'
+                    }`}>
+                        <UniversalMathJax inline dynamic>
+                            {cleanupMath(currentQ.questionText)}
+                        </UniversalMathJax>
+                    </h3>
+                )}
+
+                {/* 3. MCQ / SMCQ / AR Options */}
+                {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (
+                    <div className="grid gap-3 pt-2">
+                        {currentQ.options.map((opt, idx) => {
+                            const isSelected = selectedOption === idx;
+                            const isCorrect = opt.isCorrect;
+                            const isUserSelected = currentQ.userAnswer === idx;
+                            const shouldReveal = isAnswerChecked || currentQ.status === 'correct';
+
+                            let optionStyle = isDark
+                                ? "border-slate-800 bg-slate-900/60 hover:bg-slate-800/80"
+                                : "border-border bg-card shadow-sm hover:shadow hover:border-primary/30";
+
+                            if (isSelected) {
+                                optionStyle = isDark
+                                    ? "bg-indigo-950/60 border-indigo-500/60 ring-2 ring-indigo-500/40"
+                                    : "bg-indigo-50 border-indigo-500/60 ring-2 ring-indigo-500/30";
+                            }
+
+                            if (shouldReveal) {
+                                if (isCorrect) {
+                                    optionStyle = "bg-emerald-500/15 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold ring-2 ring-emerald-500/30";
+                                } else if (isSelected) {
+                                    optionStyle = "bg-rose-500/15 border-rose-500 text-rose-950 dark:text-rose-100 opacity-70";
+                                } else {
+                                    optionStyle = "opacity-45 bg-muted/30 border-transparent";
+                                }
+                            } else if (currentQ.status === 'wrong' && isUserSelected) {
+                                optionStyle = "bg-rose-500/15 border-rose-400 ring-2 ring-rose-400";
+                            }
+
+                            return (
+                                <div
+                                    key={idx}
+                                    onClick={() => {
+                                        if (!shouldReveal && !currentQ.status) {
+                                            setSelectedOption(idx);
+                                            setUserAnswers({ ...userAnswers, [currentIndex]: idx });
+                                        }
+                                    }}
+                                    className={`p-3.5 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3.5 cursor-pointer ${optionStyle}`}
+                                >
+                                    <div className={`shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-black transition-all ${
+                                        shouldReveal && isCorrect
+                                            ? 'bg-emerald-600 text-white'
+                                            : shouldReveal && isSelected && !isCorrect
+                                            ? 'bg-rose-600 text-white'
+                                            : isSelected || (currentQ.status && isUserSelected)
+                                            ? 'bg-indigo-600 text-white'
+                                            : isDark ? 'bg-slate-800 text-slate-300' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                        {String.fromCharCode(65 + idx)}
+                                    </div>
+                                    <div className="flex-1 pt-0.5 text-sm sm:text-base font-medium">
+                                        <UniversalMathJax inline dynamic>
+                                            {cleanupMath(opt.text)}
+                                        </UniversalMathJax>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* 4. MC (Multiple Correct Checkboxes) */}
+                {currentQ.type === 'MC' && currentQ.options && (
+                    <div className="space-y-3 pt-2">
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Select all correct options:
+                        </div>
+                        <div className="grid gap-3">
+                            {currentQ.options.map((opt, idx) => {
+                                const currentAns = userAnswers[currentIndex];
+                                const selectedIndices: number[] = Array.isArray(currentAns) ? currentAns : [];
+                                const isSelected = selectedIndices.includes(idx);
+                                const isCorrect = opt.isCorrect;
+
+                                let optClass = isDark
+                                    ? "border-slate-800 bg-slate-900/60"
+                                    : "border-border bg-card shadow-sm";
+
+                                if (isAnswerChecked) {
+                                    if (isSelected && isCorrect) optClass = "bg-emerald-500/20 border-emerald-500 font-bold";
+                                    else if (isSelected && !isCorrect) optClass = "bg-rose-500/20 border-rose-500 opacity-60";
+                                    else if (isCorrect) optClass = "bg-emerald-500/10 border-emerald-400 font-semibold";
+                                    else optClass = "opacity-40";
+                                } else if (isSelected) {
+                                    optClass = "bg-indigo-50 border-indigo-500 text-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200";
+                                }
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        onClick={() => {
+                                            if (isAnswerChecked) return;
+                                            const newSet = new Set(selectedIndices);
+                                            if (newSet.has(idx)) newSet.delete(idx);
+                                            else newSet.add(idx);
+                                            setUserAnswers({ ...userAnswers, [currentIndex]: Array.from(newSet) });
+                                        }}
+                                        className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${optClass}`}
+                                    >
+                                        <div className={`shrink-0 w-7 h-7 rounded-lg border-2 flex items-center justify-center ${
+                                            isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-muted border-border'
+                                        }`}>
+                                            {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4 text-muted-foreground" />}
+                                        </div>
+                                        <div className="flex-1 text-sm sm:text-base font-medium pt-0.5">
+                                            <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. INT (Numerical Input) */}
+                {currentQ.type === 'INT' && (
+                    <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-3">
+                        <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground">
+                            Numerical Answer:
+                        </label>
+                        <Input
+                            type="text"
+                            value={userAnswers[currentIndex] || ""}
+                            onChange={(e) => !isAnswerChecked && setUserAnswers({ ...userAnswers, [currentIndex]: e.target.value })}
+                            placeholder="Enter numerical answer"
+                            disabled={isAnswerChecked}
+                            className="text-lg font-black h-12 bg-card border-2 border-border rounded-xl"
+                        />
+                        {isAnswerChecked && currentQ.modelAnswer && (
+                            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                ✓ Correct Value: {currentQ.modelAnswer}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 6. CQ / SQ Subquestions */}
+                {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && currentQ.subQuestions && Array.isArray(currentQ.subQuestions) && (
+                    <div className="space-y-3 pt-2">
+                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Sub-Questions:
+                        </div>
+                        {currentQ.subQuestions.map((sub: any, idx: number) => (
+                            <div key={idx} className="p-3.5 rounded-xl border border-border bg-muted/30 space-y-2">
+                                <div className="flex items-start gap-2">
+                                    <span className="font-black text-indigo-600 text-sm">({String.fromCharCode(97 + idx)})</span>
+                                    <div className="flex-1 text-sm font-medium">
+                                        <UniversalMathJax inline dynamic>{sub.question || sub.text}</UniversalMathJax>
+                                    </div>
+                                </div>
+                                {isAnswerChecked && (sub.answer || sub.modelAnswer) && (
+                                    <div className="pt-2 border-t border-border/60 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                        Solution: <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* 7. Check Answer / Reveal Solution Button */}
+                {!isAnswerChecked && currentQ.status !== 'correct' && (
+                    <Button
+                        onClick={() => setIsAnswerChecked(true)}
+                        className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-5 rounded-xl shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.01]"
+                    >
+                        {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type)
+                            ? "Reveal Model Answer & Explanation"
+                            : "Check Answer & Reveal Explanation"}
+                    </Button>
+                )}
+
+                {/* 8. Detailed Answer & Explanation Reveal Block */}
+                {(isAnswerChecked || currentQ.status === 'correct') && (
+                    <div className={`mt-5 p-5 rounded-2xl border-2 shadow-xl animate-in fade-in slide-in-from-top-2 ${
+                        isDark ? 'bg-indigo-950/30 border-indigo-500/30 text-indigo-100' : 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
+                    }`}>
+                        <div className="flex items-center gap-2 mb-3">
+                            <CheckCircle className="w-5 h-5 text-emerald-500" />
+                            <span className="font-black text-base">Answer & Explanation Details</span>
+                        </div>
+
+                        {/* MCQ / AR Correct Option */}
+                        {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (() => {
+                            const correctOpt = currentQ.options.find(o => o.isCorrect);
+                            const correctIdx = currentQ.options.findIndex(o => o.isCorrect);
+                            return (
+                                <div className="mb-3">
+                                    <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                        Correct Answer: Option {correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : 'A'}
+                                    </Badge>
+                                    {correctOpt?.text && (
+                                        <div className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                                            <UniversalMathJax inline dynamic>{cleanupMath(correctOpt.text)}</UniversalMathJax>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Model Answer (CQ/SQ/INT) */}
+                        {currentQ.modelAnswer && (
+                            <div className="mb-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Model Answer / Solution:</div>
+                                <div className="text-sm font-semibold text-emerald-950 dark:text-emerald-200">
+                                    <UniversalMathJax dynamic>{cleanupMath(currentQ.modelAnswer)}</UniversalMathJax>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Explanation Text */}
+                        {(() => {
+                            const expText = currentQ.explanation
+                                || currentQ.options?.find(o => o.isCorrect && o.explanation)?.explanation
+                                || currentQ.modelAnswer;
+
+                            if (!expText) return null;
+
+                            return (
+                                <div className="pt-3 border-t border-indigo-200/60 dark:border-indigo-800/60">
+                                    <h4 className="font-black text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1.5 flex items-center gap-1.5">
+                                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> Teacher Explanation / Notes
+                                    </h4>
+                                    <div className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                                        <UniversalMathJax dynamic>
+                                            {cleanupMath(renderDynamicExplanation(
+                                                expText,
+                                                currentQ.options,
+                                                currentQ.type,
+                                                currentQ.rightColumn
+                                            ))}
+                                        </UniversalMathJax>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+            </div>
+        );
+    }
 }
 
-
-
-// Live Clock Component (Client Only)
+// Live Clock Component
 function LiveClock() {
     const [time, setTime] = useState<Date | null>(null);
-    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        setIsMounted(true);
         setTime(new Date());
         const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
-
+    if (!time) return <span>00:00:00</span>;
     return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
 }
