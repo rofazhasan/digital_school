@@ -1206,7 +1206,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   };
 
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string, allImages: string[] = []) => {
-    setActiveAnnotationImages(allImages);
+    const images = (allImages && allImages.length > 0) ? allImages : (imageUrl ? [imageUrl] : []);
+    setActiveAnnotationImages(images);
     
     // Check if there is an existing annotation for this image
     const key = `${questionId}_${index}`;
@@ -1224,16 +1225,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const handleNextAnnotationImage = () => {
     if (!activeAnnotationMeta || activeAnnotationImages.length <= 1) return;
-    const nextIdx = (activeAnnotationMeta.index + 1) % activeAnnotationImages.length;
-    const nextUrl = activeAnnotationImages[nextIdx];
-    openAnnotation(nextUrl, activeAnnotationMeta.questionId, nextIdx, activeAnnotationMeta.studentId, activeAnnotationImages);
+    const curGalleryIdx = Math.max(0, activeAnnotationImages.indexOf(activeAnnotationOriginal || ''));
+    const nextGalleryIdx = (curGalleryIdx + 1) % activeAnnotationImages.length;
+    const nextUrl = activeAnnotationImages[nextGalleryIdx];
+    const prefix = Math.floor(activeAnnotationMeta.index / 100) * 100;
+    const nextIndex = prefix + nextGalleryIdx;
+    openAnnotation(nextUrl, activeAnnotationMeta.questionId, nextIndex, activeAnnotationMeta.studentId, activeAnnotationImages);
   };
 
   const handlePrevAnnotationImage = () => {
     if (!activeAnnotationMeta || activeAnnotationImages.length <= 1) return;
-    const prevIdx = (activeAnnotationMeta.index - 1 + activeAnnotationImages.length) % activeAnnotationImages.length;
-    const prevUrl = activeAnnotationImages[prevIdx];
-    openAnnotation(prevUrl, activeAnnotationMeta.questionId, prevIdx, activeAnnotationMeta.studentId, activeAnnotationImages);
+    const curGalleryIdx = Math.max(0, activeAnnotationImages.indexOf(activeAnnotationOriginal || ''));
+    const prevGalleryIdx = (curGalleryIdx - 1 + activeAnnotationImages.length) % activeAnnotationImages.length;
+    const prevUrl = activeAnnotationImages[prevGalleryIdx];
+    const prefix = Math.floor(activeAnnotationMeta.index / 100) * 100;
+    const prevIndex = prefix + prevGalleryIdx;
+    openAnnotation(prevUrl, activeAnnotationMeta.questionId, prevIndex, activeAnnotationMeta.studentId, activeAnnotationImages);
   };
 
   useEffect(() => {
@@ -5995,10 +6002,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
                                                               crossOrigin="anonymous"
                                                               className="h-24 w-24 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
-                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, allSubImages)}
                                                             />
                                                             <button
-                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, allSubImages)}
                                                               className="absolute top-1 right-1 bg-background/90 p-1.5 rounded-full shadow-sm hover:bg-muted text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                                             >
                                                               <PenTool className="w-3.5 h-3.5" />
@@ -7134,15 +7141,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 <DialogTitle>Annotation Canvas</DialogTitle>
                 <DialogDescription>Annotate and draw on exam submission image</DialogDescription>
               </DialogHeader>
-              {activeAnnotationOriginal && (
+              {(activeAnnotationOriginal || activeAnnotationImage) && (
                 <DrawingCanvas
-                  backgroundImage={activeAnnotationOriginal || ''}
+                  backgroundImage={(activeAnnotationOriginal || activeAnnotationImage) || ''}
                   onSave={handleSaveAnnotation}
                   onCancel={() => setIsAnnotationOpen(false)}
                   onNext={handleNextAnnotationImage}
                   onPrev={handlePrevAnnotationImage}
-                  currentIndex={activeAnnotationMeta?.index}
-                  totalImages={activeAnnotationImages.length}
+                  currentIndex={Math.max(0, activeAnnotationImages.indexOf(activeAnnotationOriginal || ''))}
+                  totalImages={Math.max(activeAnnotationImages.length, 1)}
                   initialStrokes={Array.isArray(drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.strokes) ? drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`].strokes : []}
                   initialTexts={Array.isArray(drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`]?.texts) ? drawingDataStore[`${activeAnnotationMeta?.questionId}_${activeAnnotationMeta?.index}`].texts : []}
                 />

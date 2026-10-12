@@ -1188,11 +1188,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {subQ.studentImages.map((imgUrl: string, imgIdx: number) => {
-                    // Check for annotation in allDrawings
-                    const annotation = (subQ.allDrawings || []).find((d: any) =>
-                      d.originalImagePath === imgUrl || d.imageIndex === imgIdx
+                    const availableDrawings = [
+                      ...(subQ.allDrawings || []),
+                      ...(Array.isArray((result?.submission as any)?.drawings) ? (result?.submission as any).drawings : []),
+                      ...((result?.questions || []).flatMap((q: any) => q.allDrawings || []))
+                    ];
+                    const annotation = availableDrawings.find((d: any) =>
+                      (d.originalImagePath && (d.originalImagePath === imgUrl || imgUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imgUrl))) ||
+                      (d.imageData && (d.imageData === imgUrl || imgUrl.endsWith(d.imageData) || d.imageData.endsWith(imgUrl))) ||
+                      d.imageIndex === (subIdx * 100 + imgIdx) ||
+                      d.imageIndex === imgIdx
                     );
                     const displayUrl = annotation?.imageData || imgUrl;
+                    const hasAnnotation = !!annotation?.imageData;
 
                     return (
                       <div key={imgIdx} className="relative group cursor-pointer" onClick={() => handleImageZoom(displayUrl, `Sub-question ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}>
@@ -1202,12 +1210,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-105"
                           loading="lazy"
                         />
-                        {annotation && (
-                          <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-bold shadow-sm">
-                            ✓
+                        {hasAnnotation && (
+                          <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full px-1.5 py-0.5 flex items-center justify-center text-[8px] font-black shadow-md">
+                            ✍️ Graded
                           </div>
                         )}
-                        <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] px-1 rounded">
+                        <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[8px] px-1 rounded font-bold">
                           {imgIdx + 1}
                         </div>
                       </div>
@@ -1448,18 +1456,41 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {subQ.studentImages.map((imageUrl: string, imgIdx: number) => (
-                  <div
-                    key={imgIdx}
-                    className="aspect-video relative rounded-2xl overflow-hidden border border-white/10 group/img cursor-zoom-in"
-                    onClick={() => handleImageZoom(imageUrl, `Submission Review • Part ${subIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
-                  >
-                    <img src={imageUrl} alt="Artifact" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-700" loading="lazy" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-3">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-white/80">View Interaction Fullscreen</span>
+                {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
+                  const availableDrawings = [
+                    ...(subQ.allDrawings || []),
+                    ...(Array.isArray((result?.submission as any)?.drawings) ? (result?.submission as any).drawings : []),
+                    ...((result?.questions || []).flatMap((q: any) => q.allDrawings || []))
+                  ];
+                  const annotation = availableDrawings.find((d: any) =>
+                    (d.originalImagePath && (d.originalImagePath === imageUrl || imageUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imageUrl))) ||
+                    (d.imageData && (d.imageData === imageUrl || imageUrl.endsWith(d.imageData) || d.imageData.endsWith(imageUrl))) ||
+                    d.imageIndex === (subIdx * 100 + imgIdx) ||
+                    d.imageIndex === imgIdx
+                  );
+                  const displayUrl = annotation?.imageData || imageUrl;
+                  const hasAnnotation = !!annotation?.imageData;
+
+                  return (
+                    <div
+                      key={imgIdx}
+                      className="aspect-video relative rounded-2xl overflow-hidden border border-white/10 group/img cursor-zoom-in"
+                      onClick={() => handleImageZoom(displayUrl, `Submission Review • Part ${subIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
+                    >
+                      <img src={displayUrl} alt="Artifact" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-700" loading="lazy" />
+                      {hasAnnotation && (
+                        <div className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">
+                          <span>✍️ Teacher Graded</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-3">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-white/80">
+                          {hasAnnotation ? 'View Teacher Graded Script ✍️' : 'View Interaction Fullscreen'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1827,26 +1858,45 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleImageZoom = async (imageUrl: string, title: string, index: number, allImages: string[], question: Question) => {
-    setActiveZoomImages(allImages);
+    const images = (allImages && allImages.length > 0) ? allImages : (imageUrl ? [imageUrl] : []);
+    setActiveZoomImages(images);
     setActiveZoomIndex(index);
     setActiveZoomQuestion(question);
     setZoomedImageTitle(title);
 
-    // Robust lookup: Match by index OR by path suffix
-    const annotation = question.allDrawings?.find(d =>
+    // Robust lookup across question drawings, root submission drawings, and all question drawings
+    const availableDrawings = [
+      ...(question?.allDrawings || []),
+      ...(Array.isArray((result?.submission as any)?.drawings) ? (result?.submission as any).drawings : []),
+      ...((result?.questions || []).flatMap((q: any) => q.allDrawings || []))
+    ];
+
+    const annotation = availableDrawings.find((d: any) =>
+      (imageUrl && d.imageData && (imageUrl === d.imageData || imageUrl.endsWith(d.imageData) || d.imageData.endsWith(imageUrl))) ||
+      (imageUrl && d.originalImagePath && (imageUrl === d.originalImagePath || imageUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imageUrl))) ||
       d.imageIndex === index ||
-      (imageUrl && d.originalImagePath && (imageUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imageUrl)))
+      d.imageIndex % 100 === index ||
+      d.imageIndex === (index * 100)
     );
-    setZoomedImage(annotation?.imageData || imageUrl);
-    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null);
 
     // PRE-CALCULATE ANNOTATIONS FOR OPTIMIZED RENDERING
     let rawDrawingData = annotation?.drawingData;
     if (typeof rawDrawingData === 'string') {
       try { rawDrawingData = JSON.parse(rawDrawingData); } catch {}
     }
-    setActiveZoomStrokes(Array.isArray(rawDrawingData?.strokes) ? rawDrawingData.strokes : []);
-    setActiveZoomTexts(Array.isArray(rawDrawingData?.texts) ? rawDrawingData.texts : []);
+    const strokes = Array.isArray(rawDrawingData?.strokes) ? rawDrawingData.strokes : [];
+    const texts = Array.isArray(rawDrawingData?.texts) ? rawDrawingData.texts : [];
+    setActiveZoomStrokes(strokes);
+    setActiveZoomTexts(texts);
+
+    // If strokes exist, background should be original image so strokes render cleanly on top.
+    // If only the flattened annotated image exists, use annotated image directly!
+    const effectiveImg = (strokes.length > 0 || texts.length > 0)
+      ? (annotation?.originalImagePath || imageUrl)
+      : (annotation?.imageData || imageUrl);
+
+    setZoomedImage(effectiveImg);
+    setActiveZoomOriginal(effectiveImg);
 
     setShowZoomModal(true);
   };
@@ -1907,7 +1957,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const fetchResult = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/exams/results/${id}`, {
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const studentIdParam = urlParams?.get('studentId');
+      const fetchUrl = studentIdParam ? `/api/exams/results/${id}?studentId=${encodeURIComponent(studentIdParam)}` : `/api/exams/results/${id}`;
+      const response = await fetch(fetchUrl, {
         credentials: 'include',
       });
 
@@ -4301,12 +4354,32 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         <Camera className="w-3 h-3" /> Root Artifacts ({q.studentAnswerImages.length})
                                       </div>
                                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        {q.studentAnswerImages.map((img: string, iIdx: number) => (
-                                          <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Evidence ${iIdx + 1}`, iIdx, q.studentAnswerImages || [], q as unknown as Question)}>
-                                            <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
-                                            <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
-                                          </div>
-                                        ))}
+                                        {q.studentAnswerImages.map((img: string, iIdx: number) => {
+                                          const availableDrawings = [
+                                            ...(q.allDrawings || []),
+                                            ...(Array.isArray((result?.submission as any)?.drawings) ? (result?.submission as any).drawings : []),
+                                            ...((result?.questions || []).flatMap((que: any) => que.allDrawings || []))
+                                          ];
+                                          const annotation = availableDrawings.find((d: any) =>
+                                            (d.originalImagePath && (d.originalImagePath === img || img.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(img))) ||
+                                            (d.imageData && (d.imageData === img || img.endsWith(d.imageData) || d.imageData.endsWith(img))) ||
+                                            d.imageIndex === iIdx
+                                          );
+                                          const displayUrl = annotation?.imageData || img;
+                                          const hasAnnotation = !!annotation?.imageData;
+
+                                          return (
+                                            <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer group/art" onClick={() => handleImageZoom(displayUrl, `Analysis Evidence ${iIdx + 1}`, iIdx, q.studentAnswerImages || [], q as unknown as Question)}>
+                                              <img src={displayUrl} className="w-full h-full object-cover transition-transform group-hover/art:scale-105 duration-500" loading="lazy" />
+                                              {hasAnnotation && (
+                                                <div className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">
+                                                  <span>✍️ Teacher Graded</span>
+                                                </div>
+                                              )}
+                                              <div className="absolute inset-0 bg-black/0 group-hover/art:bg-black/10 transition-colors" />
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}

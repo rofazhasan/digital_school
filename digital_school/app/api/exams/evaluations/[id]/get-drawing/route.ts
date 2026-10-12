@@ -31,11 +31,11 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check if user can evaluate this exam
-    if (user.role === 'SUPER_USER') {
-      // Super user can view any exam
-    } else if (user.role === 'TEACHER' || user.role === 'ADMIN') {
-      // Check if teacher is assigned to this exam
+    // Check if user can view this exam's drawings
+    if (user.role === 'SUPER_USER' || user.role === 'ADMIN') {
+      // Super user or admin can view any exam
+    } else if (user.role === 'TEACHER') {
+      // Check if teacher is assigned to this exam or created it
       const assignment = await prisma.examEvaluationAssignment.findFirst({
         where: {
           examId,
@@ -44,7 +44,20 @@ export async function GET(
       });
 
       if (!assignment) {
-        return NextResponse.json({ error: 'Not assigned to evaluate this exam' }, { status: 403 });
+        const exam = await prisma.exam.findFirst({
+          where: { id: examId, createdById: tokenData.user.id }
+        });
+        if (!exam) {
+          return NextResponse.json({ error: 'Not assigned to evaluate this exam' }, { status: 403 });
+        }
+      }
+    } else if (user.role === 'STUDENT') {
+      // Student can view their own drawings
+      const studentProfile = await prisma.studentProfile.findFirst({
+        where: { userId: user.id }
+      });
+      if (!studentProfile || studentProfile.id !== studentId) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
       }
     } else {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });

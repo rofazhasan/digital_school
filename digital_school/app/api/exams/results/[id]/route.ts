@@ -63,41 +63,76 @@ export async function GET(
 
     const userId = token.user.id;
     const isTeacher = token.user.role !== 'STUDENT';
+    const { searchParams } = new URL(request.url);
+    const requestedStudentId = searchParams.get('studentId');
 
     // 1. Consolidated fetching of User, StudentProfile, Submission, Result, and Map
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      include: {
-        studentProfile: {
-          include: {
-            class: true,
-            examSubmissions: {
-              where: { examId },
-              include: { drawings: true },
-              take: 1
-            },
-            results: {
-              where: { examId },
-              take: 1
-            },
-            examStudentMaps: {
-              where: { examId },
-              take: 1
-            },
-            resultReviews: {
-              where: { examId },
-              include: { reviewer: { select: { id: true, name: true } } },
-              take: 1
+    let studentProfile: any = null;
+    let userRecord: any = null;
+
+    if (isTeacher && requestedStudentId) {
+      studentProfile = await db.studentProfile.findUnique({
+        where: { id: requestedStudentId },
+        include: {
+          user: true,
+          class: true,
+          examSubmissions: {
+            where: { examId },
+            include: { drawings: true },
+            take: 1
+          },
+          results: {
+            where: { examId },
+            take: 1
+          },
+          examStudentMaps: {
+            where: { examId },
+            take: 1
+          },
+          resultReviews: {
+            where: { examId },
+            include: { reviewer: { select: { id: true, name: true } } },
+            take: 1
+          }
+        }
+      });
+      userRecord = studentProfile?.user;
+    } else {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        include: {
+          studentProfile: {
+            include: {
+              class: true,
+              examSubmissions: {
+                where: { examId },
+                include: { drawings: true },
+                take: 1
+              },
+              results: {
+                where: { examId },
+                take: 1
+              },
+              examStudentMaps: {
+                where: { examId },
+                take: 1
+              },
+              resultReviews: {
+                where: { examId },
+                include: { reviewer: { select: { id: true, name: true } } },
+                take: 1
+              }
             }
           }
         }
-      }
-    });
+      });
+      studentProfile = user?.studentProfile;
+      userRecord = user;
+    }
 
-    if (!user || !user.studentProfile) {
+    if (!studentProfile) {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
-    const studentProfile = user.studentProfile;
     let submission: any = studentProfile.examSubmissions[0];
     let result = studentProfile.results[0];
     const studentExamMap = studentProfile.examStudentMaps[0];
@@ -313,11 +348,13 @@ export async function GET(
           // Ensure unique images
           const uniqueSubImages = Array.from(new Set(subImages));
 
-          // MAP SUB-QUESTION DRAWINGS (Match by original path for accuracy)
+          // MAP SUB-QUESTION DRAWINGS (Match by path, subIdx, subIdx * 100, or index range)
           const subDrawingsForPart = allDrawings.filter((d: any) =>
-            uniqueSubImages.includes(d.originalImagePath) || d.imageIndex === subIdx
+            (d.originalImagePath && uniqueSubImages.some(img => img === d.originalImagePath || img.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(img))) ||
+            d.imageIndex === subIdx ||
+            d.imageIndex === (subIdx * 100) ||
+            (d.imageIndex >= subIdx * 100 && d.imageIndex < (subIdx + 1) * 100)
           );
-
 
           // Try pre-calculated marks
           let subAwarded = (studentAnswers as any)[`${subId}_marks`];
@@ -338,8 +375,10 @@ export async function GET(
           return {
             ...subQ,
             studentAnswer: subAns,
-            studentImages: subImages, // Properly mapped now!
-            allDrawings: subDrawingsForPart, // For annotations on sub-questions
+            studentImages: uniqueSubImages,
+            allDrawings: subDrawingsForPart,
+            drawingData: subDrawingsForPart[0]?.drawingData || null,
+            imageData: subDrawingsForPart[0]?.imageData || null,
             awardedMarks: Number(subAwarded) || 0,
             isCorrect: isSubCorrect
           };
@@ -521,13 +560,14 @@ export async function GET(
       omrScanId: (result as any)?.omrScanId || null,
       student: {
         id: studentProfile.id,
-        name: user.name,
+        name: userRecord?.name || studentProfile?.name || 'Student',
         roll: studentProfile.roll,
         registrationNo: studentProfile.registrationNo,
-        class: studentProfile.class.name
+        class: studentProfile.class?.name || studentProfile.class || ''
       },
       submission: {
         ...submission,
+        drawings: drawings || [],
         status: isSuspended ? 'SUSPENDED' : submission.status
       },
       result: (result && (result.isPublished || isTeacher)) ? (() => {
