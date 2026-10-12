@@ -525,6 +525,7 @@ export default function ExamBuilderPage() {
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkDialogTab, setBulkDialogTab] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt'>('file');
   const [questionSubjectOverrides, setQuestionSubjectOverrides] = useState<Record<string, string>>({});
   const [configureSubjectsOpen, setConfigureSubjectsOpen] = useState(false);
   const [editingSubjects, setEditingSubjects] = useState<SubjectConfigItem[]>([]);
@@ -1648,10 +1649,24 @@ export default function ExamBuilderPage() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => setBulkDialogOpen(true)}
+                    onClick={() => {
+                      setBulkDialogTab('file');
+                      setBulkDialogOpen(true);
+                    }}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
                   >
                     <FileSpreadsheet className="mr-2 h-4 w-4" /> Bulk Add Questions
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setBulkDialogTab('encrypted-file');
+                      setBulkDialogOpen(true);
+                    }}
+                    className="border-purple-300 dark:border-purple-700/80 bg-purple-50/50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 font-bold shadow-sm active:scale-95 transition-all"
+                  >
+                    <Lock className="mr-1.5 h-4 w-4 text-purple-600 dark:text-purple-400" /> Upload Encrypted Excel
                   </Button>
                   <Button
                     variant="default"
@@ -1694,10 +1709,24 @@ export default function ExamBuilderPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setBulkDialogOpen(true)}
+                        onClick={() => {
+                          setBulkDialogTab('file');
+                          setBulkDialogOpen(true);
+                        }}
                         className="text-xs font-bold text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
                       >
                         <Plus className="h-3.5 w-3.5 mr-1" /> Bulk Import
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setBulkDialogTab('encrypted-file');
+                          setBulkDialogOpen(true);
+                        }}
+                        className="text-xs font-bold text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/60 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                      >
+                        <Lock className="h-3.5 w-3.5 mr-1 text-purple-500" /> Encrypted Excel
                       </Button>
                       <Badge variant="secondary">{questionsData?.meta.total ?? 0} Questions Found</Badge>
                     </div>
@@ -2455,6 +2484,7 @@ export default function ExamBuilderPage() {
               exam={exam}
               onAddQuestionsToSet={handleBulkAddQuestions}
               onQuestionsPermanentlySaved={() => fetchExamData(filters, dateRange)}
+              initialTab={bulkDialogTab}
             />
           )}
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import prisma from '@/lib/db';
+import { encryptRowForExcel } from '@/lib/encryption';
 
 export async function GET(req: any) {
     try {
@@ -98,6 +99,8 @@ export async function GET(req: any) {
             instructions = [...commonInstructions, ...descriptiveGuide, ...encryptionGuide];
         } else if (mode === 'coding') {
             instructions = [...commonInstructions, ...codingGuide, ...encryptionGuide];
+        } else if (mode === 'encrypted') {
+            instructions = [...commonInstructions, ...encryptionGuide, ...objectiveGuide, ...codingGuide, ...descriptiveGuide];
         } else {
             instructions = [...commonInstructions, ...objectiveGuide, ...descriptiveGuide, ...codingGuide, ...encryptionGuide];
         }
@@ -129,7 +132,7 @@ export async function GET(req: any) {
         const sampleClass = classNames[0] || "Class 10 - A";
 
         // Helper to setup Coding Sheet
-        const setupCodingSheet = (sheet: ExcelJS.Worksheet) => {
+        const setupCodingSheet = (sheet: ExcelJS.Worksheet, isEncrypted = false) => {
             const codingCols = [
                 { header: "Type", key: "type", width: 12 },
                 { header: "Class Name", key: "className", width: 25 },
@@ -162,11 +165,15 @@ export async function GET(req: any) {
 
             const headerRow = sheet.getRow(1);
             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } }; // Emerald Green
+            headerRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: isEncrypted ? 'FF7C3AED' : 'FF059669' }
+            };
             headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
-            // Add sample coding questions
-            sheet.addRow({
+            // Sample coding questions
+            const c1 = {
                 type: "CODING",
                 className: sampleClass,
                 subject: "Computer Science",
@@ -196,9 +203,9 @@ export async function GET(req: any) {
                 tc4Output: "999",
                 tc4Hidden: "TRUE",
                 tc4Weight: 3
-            });
+            };
 
-            sheet.addRow({
+            const c2 = {
                 type: "CODING",
                 className: sampleClass,
                 subject: "Computer Science",
@@ -216,7 +223,10 @@ export async function GET(req: any) {
                 tc2Output: "racecar",
                 tc2Hidden: "TRUE",
                 tc2Weight: 5
-            });
+            };
+
+            sheet.addRow(isEncrypted ? encryptRowForExcel(c1) : c1);
+            sheet.addRow(isEncrypted ? encryptRowForExcel(c2) : c2);
 
             sheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
         };
@@ -226,8 +236,8 @@ export async function GET(req: any) {
             const codingSheet = workbook.addWorksheet('Coding Template');
             setupCodingSheet(codingSheet);
         } else {
-            // Objective, Descriptive, or All
-            const templateSheet = workbook.addWorksheet('Template');
+            // Objective, Descriptive, All, or Encrypted
+            const templateSheet = workbook.addWorksheet(mode === 'encrypted' ? 'Encrypted Template' : 'Template');
 
             const baseColumns = [
                 { header: "Type", key: "type", width: 10 },
@@ -332,7 +342,11 @@ export async function GET(req: any) {
 
             const headerRow = templateSheet.getRow(1);
             headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+            headerRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: mode === 'encrypted' ? 'FF7C3AED' : 'FF4F46E5' }
+            };
             headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
             // Add sample objective rows
@@ -354,6 +368,30 @@ export async function GET(req: any) {
                 });
             }
 
+            if (mode === 'encrypted') {
+                templateSheet.addRow(encryptRowForExcel({
+                    type: "MCQ", className: sampleClass, subject: "Physics", topic: "Kinematics", difficulty: "EASY", marks: 1,
+                    questionText: "What is the unit of force in SI system?", optionA: "Newton", optionB: "Joule", optionC: "Watt", optionD: "Pascal",
+                    correctOption: "A", explanation: "1 Newton = 1 kg*m/s^2"
+                }));
+                templateSheet.addRow(encryptRowForExcel({
+                    type: "MC", className: sampleClass, subject: "Physics", topic: "Forces", difficulty: "MEDIUM", marks: 2,
+                    questionText: "Which of the following are vector quantities?", optionA: "Velocity", optionB: "Speed", optionC: "Acceleration", optionD: "Mass",
+                    correctOption: "A, C", explanation: "Velocity and acceleration have both magnitude and direction."
+                }));
+                templateSheet.addRow(encryptRowForExcel({
+                    type: "INT", className: sampleClass, subject: "Mathematics", topic: "Algebra", difficulty: "EASY", marks: 2,
+                    questionText: "Find the value of x if 2x + 4 = 10.",
+                    modelAnswer: "3", explanation: "2x = 6 => x = 3."
+                }));
+                templateSheet.addRow(encryptRowForExcel({
+                    type: "DESCRIPTIVE", className: sampleClass, subject: "English", topic: "Comprehension", difficulty: "MEDIUM", marks: 10,
+                    questionText: "Read the passage and answer.", s1Text: "Passage Analysis", s1Type: "comprehension", s1Marks: 5,
+                    s1Stem: "21st February is a historical day for Bangladesh...", s1Questions: "What happened on this day?|Why is it important?",
+                    s1Answers: "Language movement|National identity"
+                }));
+            }
+
             if (mode === 'descriptive' || mode === 'all') {
                 templateSheet.addRow({
                     type: "DESCRIPTIVE", className: sampleClass, subject: "English", topic: "Comprehension", difficulty: "MEDIUM", marks: 10,
@@ -365,10 +403,10 @@ export async function GET(req: any) {
 
             templateSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
 
-            // Also add dedicated Coding Sheet to 'all' mode!
-            if (mode === 'all') {
-                const codingSheet = workbook.addWorksheet('Coding Template');
-                setupCodingSheet(codingSheet);
+            // Also add dedicated Coding Sheet to 'all' or 'encrypted' mode!
+            if (mode === 'all' || mode === 'encrypted') {
+                const codingSheet = workbook.addWorksheet(mode === 'encrypted' ? 'Encrypted Coding' : 'Coding Template');
+                setupCodingSheet(codingSheet, mode === 'encrypted');
             }
         }
 

@@ -36,13 +36,16 @@ import {
   Edit,
   Eye,
   EyeOff,
-  Lock
+  Lock,
+  Copy,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { n } from "@/utils/parser-utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+import { AI_ENCRYPTED_EXCEL_PROMPT } from "@/lib/encryption";
 
 export type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'CODING';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -70,9 +73,9 @@ export interface StagedQuestion {
   subQuestions?: any[];
   sub_questions?: any[];
   parts?: any[];
-  topic?: string;
   isValid?: boolean;
   error?: string;
+  isDecrypted?: boolean;
 }
 
 interface BulkAddExamQuestionsDialogProps {
@@ -91,6 +94,7 @@ interface BulkAddExamQuestionsDialogProps {
   };
   onAddQuestionsToSet: (questions: any[]) => void;
   onQuestionsPermanentlySaved?: () => void;
+  initialTab?: 'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt';
 }
 
 export function BulkAddExamQuestionsDialog({
@@ -98,9 +102,10 @@ export function BulkAddExamQuestionsDialog({
   onOpenChange,
   exam,
   onAddQuestionsToSet,
-  onQuestionsPermanentlySaved
+  onQuestionsPermanentlySaved,
+  initialTab = 'file'
 }: BulkAddExamQuestionsDialogProps) {
-  const [inputType, setInputType] = useState<'file' | 'json' | 'text' | 'encrypt'>('file');
+  const [inputType, setInputType] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt'>(initialTab || 'file');
   const [file, setFile] = useState<File | null>(null);
   const [jsonInput, setJsonInput] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -114,6 +119,62 @@ export function BulkAddExamQuestionsDialog({
   const [showMathPreview, setShowMathPreview] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setInputType(initialTab);
+    }
+  }, [isOpen, initialTab]);
+
+  const handleCopyAIPrompt = () => {
+    navigator.clipboard.writeText(AI_ENCRYPTED_EXCEL_PROMPT);
+    toast.success("AI System Prompt copied! Paste into ChatGPT, Claude, or Gemini.");
+  };
+
+  const handleGenerateEncryptedExcelFromInput = async () => {
+    let questionsPayload: any[] = [];
+    try {
+      if (jsonInput.trim()) {
+        const parsed = JSON.parse(jsonInput);
+        questionsPayload = Array.isArray(parsed) ? parsed : [parsed];
+      } else if (encryptRawInput.trim()) {
+        const parsed = JSON.parse(encryptRawInput);
+        questionsPayload = Array.isArray(parsed) ? parsed : [parsed];
+      } else if (previewQuestions.length > 0) {
+        questionsPayload = previewQuestions;
+      } else {
+        toast.error("Please enter questions in JSON format first.");
+        return;
+      }
+    } catch {
+      toast.error("Please provide valid JSON questions to generate an encrypted Excel file.");
+      return;
+    }
+
+    setIsGeneratingExcel(true);
+    try {
+      const res = await fetch('/api/questions/generate-encrypted-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: questionsPayload })
+      });
+      if (!res.ok) throw new Error("Failed to generate encrypted Excel file");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai_encrypted_questions_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Encrypted Excel file downloaded! All texts are encrypted with AES-256-GCM.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate Excel file.");
+    } finally {
+      setIsGeneratingExcel(false);
+    }
+  };
 
   const handleEncryptPayload = async () => {
     if (!encryptRawInput.trim()) {
@@ -464,13 +525,19 @@ Answer: Read a and b, output a+b`;
               (Array.isArray(q.options) && q.options.some((o: any) => /\\/.test(String(o.text || ''))))
             ),
             isValid: r.isValid !== false,
-            error: r.error
+            error: r.error,
+            isDecrypted: Boolean(r.isDecrypted || q.isDecrypted)
           };
         });
 
         setPreviewQuestions(mapped);
         setIsPreviewMode(true);
-        toast.success(`Loaded ${mapped.length} questions from Excel.`);
+        const decryptedCount = mapped.filter(m => m.isDecrypted).length;
+        if (decryptedCount > 0) {
+          toast.success(`Successfully auto-decrypted ${decryptedCount} encrypted questions (AES-256-GCM)!`);
+        } else {
+          toast.success(`Loaded ${mapped.length} questions from Excel.`);
+        }
       } else {
         toast.info("Excel processed successfully.");
       }
@@ -704,25 +771,37 @@ Answer: Read a and b, output a+b`;
             /* Input Mode */
             <div className="space-y-6">
               {/* Mode Selectors */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setInputType('file')}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     inputType === 'file'
-                      ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
-                  Excel File (.xlsx)
+                  Normal Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputType('encrypted-file')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    inputType === 'encrypted-file'
+                      ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Lock className="h-4 w-4 text-purple-500" />
+                  🔒 Encrypted Excel
                 </button>
                 <button
                   type="button"
                   onClick={() => setInputType('json')}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     inputType === 'json'
-                      ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                      ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -732,26 +811,26 @@ Answer: Read a and b, output a+b`;
                 <button
                   type="button"
                   onClick={() => setInputType('text')}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     inputType === 'text'
-                      ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                      ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <FileText className="h-4 w-4 text-blue-500" />
-                  Quick Plain Text
+                  Quick Text
                 </button>
                 <button
                   type="button"
                   onClick={() => setInputType('encrypt')}
-                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     inputType === 'encrypt'
-                      ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                      ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <Lock className="h-4 w-4 text-purple-500" />
-                  🔒 Encrypt Tool
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  AI Studio
                 </button>
               </div>
 
@@ -843,6 +922,85 @@ Answer: Read a and b, output a+b`;
                 </div>
               )}
 
+              {/* Mode: Encrypted Excel File */}
+              {inputType === 'encrypted-file' && (
+                <div className="space-y-4">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cursor-pointer border-2 border-dashed border-purple-300 dark:border-purple-700/80 hover:border-purple-500 dark:hover:border-purple-400 rounded-3xl p-8 text-center space-y-3 bg-purple-50/40 dark:bg-purple-950/20 transition-all group shadow-sm"
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+                      <Lock className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">
+                        {file ? file.name : "Click or drag & drop Encrypted Excel spreadsheet (.xlsx)"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-lg mx-auto">
+                        Upload Excel file generated with encrypted question texts (<code className="text-purple-600 font-mono font-bold">ENC:ey...</code>). Our system will automatically decrypt all questions with AES-256-GCM verification!
+                      </p>
+                    </div>
+                    {file && (
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200">
+                        Ready to auto-decrypt & preview ({(file.size / 1024).toFixed(1)} KB)
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/api/question-bank/sample-template?type=encrypted', '_blank')}
+                        className="rounded-xl text-xs font-bold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1 text-purple-500" />
+                        Download Encrypted Template (.xlsx)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyAIPrompt}
+                        className="rounded-xl text-xs font-bold border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1 text-indigo-500" />
+                        Copy AI System Prompt
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInputType('encrypt')}
+                        className="rounded-xl text-xs font-bold border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                        AI Generator Studio
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={handleUploadFile}
+                      disabled={!file || isProcessing}
+                      className="rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20 h-9 px-5 gap-2"
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      Auto-Decrypt & Preview Questions
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Mode 2: JSON Input */}
               {inputType === 'json' && (
                 <div className="space-y-4">
@@ -917,41 +1075,70 @@ Answer: Read a and b, output a+b`;
                 </div>
               )}
 
-              {/* Mode 4: Encrypt Tool for AI & Authors */}
+              {/* Mode 5: AI Prompt & Studio */}
               {inputType === 'encrypt' && (
                 <div className="space-y-4">
                   <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-200 dark:border-purple-800/60 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                      <h4 className="text-sm font-bold text-foreground">AI & Superadmin Question Encryption Vault</h4>
-                      <Badge className="bg-purple-600 text-white text-[10px] py-0 px-2">AES-256-GCM</Badge>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        <h4 className="text-sm font-bold text-foreground">AI System Prompt & Encrypted Generator</h4>
+                        <Badge className="bg-purple-600 text-white text-[10px] py-0 px-2">AES-256-GCM</Badge>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyAIPrompt}
+                        className="rounded-xl text-xs font-bold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 h-7"
+                      >
+                        <Copy className="h-3.5 w-3.5 mr-1 text-purple-500" /> Copy AI Prompt
+                      </Button>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Paste questions generated by AI or human authors below. Click <strong>Encrypt Payload</strong> to generate an encrypted token (<code className="text-purple-600 font-mono">ENC:ey...</code>) that only this application can decrypt. You can paste this payload directly into your Excel template or JSON array!
+                      Give this prompt to ChatGPT, Claude, or Gemini to have AI generate questions where all text fields are encrypted! Or paste plain question JSON below to convert & download an encrypted Excel (.xlsx) file in 1-click.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Plain Questions (JSON Array or Text)
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Plain Questions (JSON Array or Text)
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLoadSample}
+                        className="text-xs font-bold text-indigo-600 dark:text-indigo-400 h-6"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" /> Load Sample JSON
+                      </Button>
+                    </div>
                     <Textarea
                       value={encryptRawInput}
                       onChange={(e) => setEncryptRawInput(e.target.value)}
                       placeholder='Paste question JSON (e.g. [{"questionText": "...", "type": "MCQ", ...}]) or secret questions text here...'
-                      rows={7}
+                      rows={6}
                       className="font-mono text-xs rounded-2xl bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                     />
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      onClick={handleGenerateEncryptedExcelFromInput}
+                      disabled={(!encryptRawInput.trim() && !jsonInput.trim() && previewQuestions.length === 0) || isGeneratingExcel}
+                      variant="outline"
+                      className="rounded-xl font-bold border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30 h-9 px-4 gap-2"
+                    >
+                      {isGeneratingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-purple-500" />}
+                      Download Encrypted Excel (.xlsx)
+                    </Button>
                     <Button
                       onClick={handleEncryptPayload}
                       disabled={!encryptRawInput.trim() || isEncrypting}
                       className="rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-md h-9 px-5 gap-2"
                     >
                       {isEncrypting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                      Encrypt Payload
+                      Encrypt Token
                     </Button>
                   </div>
 
@@ -970,17 +1157,36 @@ Answer: Read a and b, output a+b`;
                           }}
                           className="h-7 text-xs rounded-xl font-bold border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
                         >
-                          Copy Payload
+                          <Copy className="h-3.5 w-3.5 mr-1" /> Copy Payload
                         </Button>
                       </div>
                       <Textarea
                         value={encryptedOutput}
                         readOnly
-                        rows={5}
+                        rows={4}
                         className="font-mono text-[11px] rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900 text-purple-900 dark:text-purple-200 select-all"
                       />
                     </div>
                   )}
+
+                  <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        🤖 AI Instructions for ChatGPT / Claude / Gemini
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCopyAIPrompt}
+                        className="h-6 text-[11px] font-bold text-indigo-600 dark:text-indigo-400"
+                      >
+                        <Copy className="h-3 w-3 mr-1" /> Copy Full Prompt
+                      </Button>
+                    </div>
+                    <pre className="text-[10px] font-mono text-muted-foreground bg-white dark:bg-slate-950 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-x-auto max-h-40 whitespace-pre-wrap leading-relaxed">
+                      {AI_ENCRYPTED_EXCEL_PROMPT}
+                    </pre>
+                  </div>
                 </div>
               )}
             </div>
@@ -1054,7 +1260,14 @@ Answer: Read a and b, output a+b`;
                       {previewQuestions.map((q, idx) => (
                         <tr key={q.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
                           <td className="p-3 text-center font-bold text-muted-foreground">
-                            {idx + 1}
+                            <div className="flex flex-col items-center justify-center gap-0.5">
+                              <span>{idx + 1}</span>
+                              {q.isDecrypted && (
+                                <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 text-[9px] px-1 py-0 border-purple-200 dark:border-purple-800">
+                                  🔒 DEC
+                                </Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3">
                             <Select
@@ -1075,6 +1288,7 @@ Answer: Read a and b, output a+b`;
                                 <SelectItem value="SMCQ">SMCQ</SelectItem>
                                 <SelectItem value="CMA">CMA</SelectItem>
                                 <SelectItem value="MPC">MPC</SelectItem>
+                                <SelectItem value="CODING">CODING</SelectItem>
                                 <SelectItem value="DESCRIPTIVE">DESCRIPTIVE</SelectItem>
                               </SelectContent>
                             </Select>

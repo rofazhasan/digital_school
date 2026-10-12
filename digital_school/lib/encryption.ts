@@ -75,9 +75,21 @@ export function decryptData(encryptedInput: any, customKey?: string): any {
         let payload: EncryptedPayload;
 
         if (typeof encryptedInput === 'string' && encryptedInput.startsWith('ENC:')) {
-            const rawBase64 = encryptedInput.slice(4);
-            const decodedJson = Buffer.from(rawBase64, 'base64').toString('utf8');
-            payload = JSON.parse(decodedJson);
+            const raw = encryptedInput.slice(4).trim();
+            if (raw.startsWith('BASE64:')) {
+                return Buffer.from(raw.slice(7), 'base64').toString('utf8');
+            }
+            try {
+                const decodedJson = Buffer.from(raw, 'base64').toString('utf8');
+                try {
+                    payload = JSON.parse(decodedJson);
+                } catch {
+                    // Direct base64 fallback
+                    return decodedJson;
+                }
+            } catch {
+                return encryptedInput;
+            }
         } else if (typeof encryptedInput === 'object' && encryptedInput.ciphertext) {
             payload = encryptedInput;
         } else {
@@ -199,3 +211,123 @@ export function maskEncryptedQuestion(q: any): any {
         isMasked: true
     };
 }
+
+/**
+ * Encrypt sensitive fields of an Excel question row for Encrypted Template generation
+ */
+export function encryptRowForExcel(row: Record<string, any>, customKey?: string): Record<string, any> {
+    const encryptedRow = { ...row };
+    // Columns that MUST be encrypted
+    const sensitiveColumns = [
+        'questionText', 'Question Text', 'Question', 'Title',
+        'optionA', 'Option A', 'optionB', 'Option B', 'optionC', 'Option C',
+        'optionD', 'Option D', 'optionE', 'Option E',
+        'modelAnswer', 'Model Answer', 'ModelAnswer', 'Correct Answer',
+        'explanation', 'Teacher Note / Explanation', 'Explanation', 'Rationale', 'Exp', 'Solution',
+        'assertion', 'Assertion', 'reason', 'Reason',
+        'constraints', 'Constraints',
+        'starterPython', 'Starter Code Python',
+        'starterC', 'Starter Code C',
+        'starterCPP', 'Starter Code CPP',
+    ];
+
+    // Add dynamic sub-question and testcase keys
+    for (let i = 1; i <= 10; i++) {
+        sensitiveColumns.push(
+            `tc${i}Input`, `Test ${i} Input`,
+            `tc${i}Output`, `Test ${i} Output`,
+            `tc${i}Explanation`, `Test ${i} Explanation`,
+            `s${i}Text`, `Sub ${i} Text`,
+            `s${i}ModelAnswer`, `Sub ${i} Model Answer`,
+            `s${i}Explanation`, `Sub ${i} Explanation`,
+            `s${i}Stem`, `Sub ${i} Stem Passage`,
+            `s${i}Questions`, `Sub ${i} Questions`,
+            `s${i}Answers`, `Sub ${i} Answers`,
+            `objSub${i}Text`, `objSub${i}ModelAnswer`, `objSub${i}Explanation`,
+            `objSub${i}A`, `objSub${i}B`, `objSub${i}C`, `objSub${i}D`
+        );
+    }
+
+    for (const key of Object.keys(encryptedRow)) {
+        const val = encryptedRow[key];
+        if (typeof val === 'string' && val.trim() !== '' && !val.startsWith('ENC:')) {
+            if (sensitiveColumns.includes(key)) {
+                encryptedRow[key] = encryptData(val, customKey);
+            }
+        }
+    }
+
+    return encryptedRow;
+}
+
+export const AI_ENCRYPTED_EXCEL_PROMPT = `You are an expert exam question author and secure data engineer for Digital School.
+Generate exam questions in standardized Excel spreadsheet (.xlsx) format where ALL sensitive question text contents are cryptographically encrypted.
+
+### ENCRYPTION PROTOCOL SPECIFICATION:
+1. Target Encryption: AES-256-GCM (Authenticated Encryption).
+2. Key Derivation: SHA-256 hash of the master secret key.
+   Default Master Key: "digital-school-secure-vault-key-2026"
+3. Ciphertext Format in Excel cell:
+   ENC:<base64-encoded-JSON-payload>
+   JSON payload schema:
+   {
+     "alg": "AES-256-GCM",
+     "iv": "<12-byte-IV-base64>",
+     "tag": "<16-byte-auth-tag-base64>",
+     "ciphertext": "<cipher-text-base64>",
+     "timestamp": 1775952000000
+   }
+   (Fallback format: If running in an LLM without crypto libraries, you may use "ENC:BASE64:<base64-encoded-string>")
+
+### COLUMNS REQUIRING ENCRYPTION:
+- "Question Text"
+- "Option A", "Option B", "Option C", "Option D", "Option E"
+- "Model Answer" / "Correct Answer"
+- "Teacher Note / Explanation"
+- "Assertion", "Reason"
+- "Constraints", "Starter Code Python", "Starter Code C", "Starter Code CPP"
+- "Test 1 Input" through "Test 10 Input"
+- "Test 1 Output" through "Test 10 Output"
+- "Test 1 Explanation" through "Test 10 Explanation"
+- "Sub 1 Text" through "Sub 10 Text"
+- "Sub 1 Model Answer" through "Sub 10 Model Answer"
+- "Sub 1 Explanation" through "Sub 10 Explanation"
+
+### UNENCRYPTED METADATA COLUMNS (Plain text):
+- "Type": (MCQ, MC, INT, AR, MTF, CQ, SQ, SMCQ, DESCRIPTIVE, CMA, MPC, CODING)
+- "Class Name": (Must match school class, e.g. "Class 10 - A")
+- "Subject": (e.g. "Physics", "Computer Science")
+- "Topic": (e.g. "Kinematics", "Algorithms")
+- "Difficulty": (EASY, MEDIUM, HARD)
+- "Marks": (integer/float e.g. 1, 2, 5, 10)
+- "Correct Option": (A, B, C, D, or comma-separated for MC)
+
+### PYTHON SCRIPT FOR AI / CODE INTERPRETER TO GENERATE .XLSX:
+\`\`\`python
+import os, json, base64, hashlib
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import pandas as pd
+
+SECRET = "digital-school-secure-vault-key-2026"
+KEY = hashlib.sha256(SECRET.encode()).digest()
+
+def encrypt_cell(text):
+    if text is None or text == "":
+        return ""
+    text_str = str(text)
+    iv = os.urandom(12)
+    aesgcm = AESGCM(KEY)
+    encrypted = aesgcm.encrypt(iv, text_str.encode('utf-8'), None)
+    ciphertext = encrypted[:-16]
+    tag = encrypted[-16:]
+    payload = {
+        "alg": "AES-256-GCM",
+        "iv": base64.b64encode(iv).decode('utf-8'),
+        "tag": base64.b64encode(tag).decode('utf-8'),
+        "ciphertext": base64.b64encode(ciphertext).decode('utf-8'),
+        "timestamp": 1775952000000
+    }
+    return "ENC:" + base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
+\`\`\`
+`;
+

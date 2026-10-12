@@ -12,12 +12,29 @@ type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 async function validateAndMapRow(rawRow: any, classes: any[]) {
     // 1. Automatic Decryption for AI/superadmin encrypted cells or rows
     let row: any = rawRow;
+    let wasEncrypted = false;
     if (typeof rawRow === 'object' && rawRow !== null) {
         row = { ...rawRow };
+        // Check if there is an encapsulated whole-row payload
+        const fullPayload = getValue(row, ["Encrypted Payload", "Encrypted Data", "Encrypted Row", "Payload", "Token", "ENC"]);
+        if (fullPayload && typeof fullPayload === 'string' && fullPayload.startsWith('ENC:')) {
+            const decryptedFull = decryptData(fullPayload);
+            if (decryptedFull && typeof decryptedFull === 'object') {
+                row = { ...row, ...decryptedFull };
+                wasEncrypted = true;
+            }
+        }
+
         for (const key of Object.keys(row)) {
             const val = row[key];
             if (typeof val === 'string' && val.startsWith('ENC:')) {
-                row[key] = decryptData(val);
+                const dec = decryptData(val);
+                if (dec && typeof dec === 'object') {
+                    row = { ...row, ...dec };
+                } else {
+                    row[key] = dec;
+                }
+                wasEncrypted = true;
             }
         }
     }
@@ -358,12 +375,14 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
 
         const { processedData } = processQuestionWithInlineFBDs(data);
         Object.assign(data, processedData);
+        data.isDecrypted = wasEncrypted;
 
-        return { isValid: true, data, _original: row };
+        return { isValid: true, data, _original: row, isDecrypted: wasEncrypted };
 
     } catch (err: any) {
         if (err.message === "Empty Row") return null;
-        return { isValid: false, error: err.message, data, _original: row };
+        data.isDecrypted = wasEncrypted;
+        return { isValid: false, error: err.message, data, _original: row, isDecrypted: wasEncrypted };
     }
 }
 
