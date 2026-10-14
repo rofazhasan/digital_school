@@ -18,18 +18,17 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         if (pathname === '/maintenance' || pathname === '/login') return;
 
         const checkStatus = async () => {
+            if (document.hidden) return;
             try {
                 setChecking(true);
-                const [maintenanceRes, userRes] = await Promise.all([
-                    fetch('/api/maintenance', { cache: 'no-store' }),
-                    fetch('/api/user', { cache: 'no-store' })
-                ]);
+                const maintenanceRes = await fetch('/api/maintenance', { next: { revalidate: 60 } });
 
                 if (maintenanceRes.ok) {
                     const maintenanceData = await maintenanceRes.json();
 
                     if (maintenanceData.maintenanceMode) {
-                        // Check if user is exempt
+                        // Only fetch user profile when maintenance mode is active to check for exemption
+                        const userRes = await fetch('/api/user', { cache: 'no-store' });
                         if (userRes.ok) {
                             const userData = await userRes.json();
                             const role = userData.user?.role;
@@ -58,11 +57,25 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             }
         };
 
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                checkStatus();
+            }
+        };
+
         // Check on mount and periodically
         checkStatus();
-        const interval = setInterval(checkStatus, 30000); // Every 30 seconds
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                checkStatus();
+            }
+        }, 180000); // Check every 3 minutes while tab is active
 
-        return () => clearInterval(interval);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearInterval(interval);
+        };
     }, [pathname, router]);
 
     return <>{children}</>;

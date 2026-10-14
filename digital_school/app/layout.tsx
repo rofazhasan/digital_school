@@ -50,31 +50,41 @@ const hindSiliguri = Hind_Siliguri({
 // });
 const balooDa2 = { variable: '' };
 
+import { unstable_cache } from "next/cache";
+
+// --- Cached metadata fetcher (revalidates every hour, eliminating thousands of DB hits) ---
+const getCachedInstituteName = unstable_cache(
+  async () => {
+    try {
+      const settings = await db.settings.findFirst({
+        select: {
+          instituteName: true,
+          institute: { select: { name: true } }
+        }
+      });
+
+      let instituteName = settings?.instituteName || settings?.institute?.name;
+      if (!instituteName) {
+        const institute = await db.institute.findFirst({
+          select: { name: true }
+        });
+        instituteName = institute?.name;
+      }
+
+      return instituteName || null;
+    } catch (error) {
+      console.warn("Failed to fetch settings for metadata:", error);
+      return null;
+    }
+  },
+  ['layout-institute-name'],
+  { revalidate: 3600 }
+);
+
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
-  let title = process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
-  try {
-    const settings = await db.settings.findFirst({
-      select: {
-        instituteName: true,
-        institute: { select: { name: true } }
-      }
-    });
-
-    // If settings doesn't have a name, try fetching directly from Institute
-    let instituteName = settings?.instituteName || settings?.institute?.name;
-
-    if (!instituteName) {
-      const institute = await db.institute.findFirst({
-        select: { name: true }
-      });
-      instituteName = institute?.name;
-    }
-
-    title = instituteName || process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
-  } catch (error) {
-    console.warn("Failed to fetch settings for metadata:", error);
-  }
+  const instituteName = await getCachedInstituteName();
+  const title = instituteName || process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
 
   return {
     title: {

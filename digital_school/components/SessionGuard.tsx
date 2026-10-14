@@ -59,16 +59,27 @@ export default function SessionGuard() {
         const activeSocket: Socket | null = null;
         let pollInterval: NodeJS.Timeout | null = null;
 
+        const handleVisibilityChange = () => {
+            if (!document.hidden && !isShowingModal.current) {
+                checkSession().catch(() => {});
+            }
+        };
+
         const initializeSession = async () => {
             try {
                 // Initial check
                 await checkSession().catch(() => {});
                 if (isShowingModal.current) return;
 
-                // Setup Polling (Fallback is now primary)
+                // Listen for tab focus/visibility to check immediately upon return
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
+                // Setup gentle polling: every 2 minutes only while tab is actively focused
                 pollInterval = setInterval(() => {
-                    checkSession().catch(() => {});
-                }, 5000);
+                    if (!document.hidden && !isShowingModal.current) {
+                        checkSession().catch(() => {});
+                    }
+                }, 120000);
 
             } catch (error) {
                 console.error('[SessionGuard] Initialization failed:', error);
@@ -78,7 +89,7 @@ export default function SessionGuard() {
         initializeSession().catch(() => {});
 
         return () => {
-            // if (activeSocket) activeSocket.disconnect();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (pollInterval) clearInterval(pollInterval);
         };
     }, [pathname, isPublicPage]);

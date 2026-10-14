@@ -36,17 +36,35 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
+// Short in-memory session cache (15 seconds) to deduplicate simultaneous requests
+interface CachedSessionItem {
+  result: any;
+  expiresAt: number;
+}
+const sessionMemoryCache = new Map<string, CachedSessionItem>();
+
+export function invalidateSessionCache(token?: string) {
+  if (token) {
+    sessionMemoryCache.delete(token);
+  } else {
+    sessionMemoryCache.clear();
+  }
+}
+
 // Validate session status
 export async function validateSession(token: string) {
   try {
-    console.log('[AUTH] Validating session token...');
-    const payload = await verifyToken(token);
-    if (!payload) {
-      console.warn('[AUTH] No payload returned from verifyToken');
-      return { status: 'invalid' };
+    const now = Date.now();
+    const cached = sessionMemoryCache.get(token);
+    if (cached && cached.expiresAt > now) {
+      return cached.result;
     }
 
-    console.log('[AUTH] Payload verified for user:', payload.userId);
+    const payload = await verifyToken(token);
+    if (!payload) {
+      sessionMemoryCache.delete(token);
+      return { status: 'invalid' };
+    }
 
     // Defensive check for database query
     let user: any;
@@ -87,29 +105,36 @@ export async function validateSession(token: string) {
       try {
         user = await (prismadb.user as any).findUnique({ where: { id: payload.userId } });
       } catch (_innerError) {
+        sessionMemoryCache.delete(token);
         return { status: 'invalid' };
       }
     }
 
     if (!user) {
+      sessionMemoryCache.delete(token);
       return { status: 'invalid' };
     }
 
     // Safely check fields that might be missing in DB
-    const isEmailVerified = (user as any).emailVerified !== false; // Default to true if missing or null, except if explicitly false
+    const isEmailVerified = (user as any).emailVerified !== false;
     const isApproved = (user as any).isApproved !== false;
-    // const isActive = (user as any).isActive !== false; // Removed unused variable
 
     const isPending = !isEmailVerified || !isApproved;
     if (isPending) {
-      return {
+      const pendingResult = {
         status: 'pending',
         user: { ...user } as any,
         reason: !user.emailVerified ? 'email' : 'approval'
       };
+      sessionMemoryCache.set(token, {
+        result: pendingResult,
+        expiresAt: now + 15000 // 15 seconds
+      });
+      return pendingResult;
     }
 
     if (!user.isActive) {
+      sessionMemoryCache.delete(token);
       return { status: 'invalid' };
     }
 
@@ -121,6 +146,7 @@ export async function validateSession(token: string) {
         tokenSid: payload.sid,
         reason: 'mismatch'
       });
+      sessionMemoryCache.delete(token);
       return {
         status: 'mismatch',
         user,
@@ -128,13 +154,21 @@ export async function validateSession(token: string) {
       };
     }
 
-    return {
+    const validResult = {
       status: 'valid',
       user: {
         ...user,
         role: user.role as JWTPayload['role'],
       } as unknown
     } as const;
+
+    // Cache valid session for 15 seconds to deduplicate bursts across simultaneous client queries
+    sessionMemoryCache.set(token, {
+      result: validResult,
+      expiresAt: now + 15000
+    });
+
+    return validResult;
   } catch (error) {
     console.error('Error validating session:', error);
     return { status: 'error' };
