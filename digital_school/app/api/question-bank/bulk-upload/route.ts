@@ -67,10 +67,16 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
         matches: {},
     };
 
+    // Skip rows that have neither question type nor question text nor subject (e.g. empty or reference rows)
+    const hasAnyCoreField = Boolean(data.questionText || data.subject || data.className || typeRaw);
+    if (!hasAnyCoreField || Object.values(row).every(v => !v)) {
+        return null;
+    }
+
     try {
         if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'CODING'].includes(typeRaw)) {
-            const isEmpty = Object.values(row).every(v => !v);
-            if (isEmpty) throw new Error("Empty Row");
+            // If the row doesn't have a valid question type and has no question text, skip it completely
+            if (!data.questionText) return null;
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
         }
 
@@ -432,17 +438,45 @@ export async function POST(req: NextRequest) {
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: 'buffer' });
 
-            // Collect rows from all question sheets, ignoring documentation/instruction sheets
+            // Collect rows from all question sheets, ignoring documentation/instruction/reference sheets
             const isIgnoredSheet = (name: string) => {
                 const lower = name.toLowerCase().trim();
-                return lower.includes('instruction') || lower.includes('guide') || lower.includes('readme') || lower.includes('help');
+                return lower.includes('instruction') || 
+                       lower.includes('guide') || 
+                       lower.includes('readme') || 
+                       lower.includes('help') || 
+                       lower.includes('reference') || 
+                       lower.includes('classes') || 
+                       lower.includes('dropdown') || 
+                       lower.includes('lookup') || 
+                       lower.includes('meta') || 
+                       lower.includes('config');
             };
 
-            const candidateSheets = workbook.SheetNames.filter(n => !isIgnoredSheet(n));
-            const sheetsToProcess = candidateSheets.length > 0 ? candidateSheets : workbook.SheetNames;
+            const isQuestionSheet = (sheet: XLSX.WorkSheet, name: string) => {
+                if (isIgnoredSheet(name)) return false;
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
+                const firstRowHeaders: string[] = [];
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+                    if (cell && cell.v) firstRowHeaders.push(String(cell.v).toLowerCase().trim());
+                }
+                return firstRowHeaders.some(h => 
+                    h.includes('question') || h === 'type' || h.includes('marks') || h.includes('subject')
+                );
+            };
+
+            const validQuestionSheets = workbook.SheetNames.filter(n => {
+                const ws = workbook.Sheets[n];
+                return ws && isQuestionSheet(ws, n);
+            });
+
+            const sheetsToProcess = validQuestionSheets.length > 0 
+                ? validQuestionSheets 
+                : workbook.SheetNames.filter(n => !isIgnoredSheet(n));
 
             if (sheetsToProcess.length === 0) {
-                return NextResponse.json({ error: "Excel file has no valid sheets" }, { status: 400 });
+                return NextResponse.json({ error: "Excel file has no valid question sheets" }, { status: 400 });
             }
 
             const previewRows = [];

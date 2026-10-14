@@ -8,6 +8,10 @@ def generate_perfect_ssc_math_paper():
     wb = openpyxl.load_workbook(template_path)
     ws = wb['Template']
 
+    # Remove reference sheets so only question template and instructions remain
+    if 'Valid Classes Reference' in wb.sheetnames:
+        del wb['Valid Classes Reference']
+
     # Clear existing rows except header
     while ws.max_row > 1:
         ws.delete_rows(2)

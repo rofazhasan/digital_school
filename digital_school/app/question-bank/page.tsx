@@ -6788,10 +6788,12 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       const data = await response.json();
 
       if (data.mode === 'preview') {
-        setPreviewData(data.rows);
-        setEditedPreviewData(JSON.parse(JSON.stringify(data.rows))); // Deep copy for editing
+        // Automatically drop completely blank dummy rows (e.g. from reference/empty rows)
+        const cleanRows = (data.rows || []).filter((r: any) => r.isValid || Boolean(r.data?.questionText?.trim()));
+        setPreviewData(cleanRows);
+        setEditedPreviewData(JSON.parse(JSON.stringify(cleanRows))); // Deep copy for editing
         setIsPreviewMode(true);
-        toast({ title: "Preview Ready", description: `Review ${data.rows.length} questions before finalizing.` });
+        toast({ title: "Preview Ready", description: `Review ${cleanRows.length} questions before finalizing.` });
       } else {
         // Fallback for direct success if backend logic changes
         setResults(data);
@@ -7040,7 +7042,23 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                 <CardTitle>Preview Data</CardTitle>
                 <CardDescription>Review and edit questions before finalizing. Rows with errors are highlighted.</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                {editedPreviewData.some(r => !r.isValid) && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/40 text-xs font-semibold"
+                    onClick={() => {
+                      const validOnly = editedPreviewData.filter(r => r.isValid);
+                      const removedCount = editedPreviewData.length - validOnly.length;
+                      setEditedPreviewData(validOnly);
+                      toast({ title: "Cleaned Up", description: `Removed ${removedCount} invalid/dummy rows.` });
+                    }}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5 text-red-500" />
+                    Delete Invalid ({editedPreviewData.filter(r => !r.isValid).length})
+                  </Button>
+                )}
                 <Button variant="outline" onClick={handleAddManualQuestion}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Question
                 </Button>
