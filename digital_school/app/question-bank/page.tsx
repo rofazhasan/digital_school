@@ -47,10 +47,11 @@ import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet"
 import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 import { n } from "@/utils/parser-utils";
 import { GeometryDiagramDialog } from "@/components/geometry/GeometryDiagramDialog";
+import { getBulkQuestionsLLMPrompt } from "@/lib/ai/geometry-prompt-guide";
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'CODING';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
@@ -118,7 +119,11 @@ type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
   id: string; type: QuestionType; subject: string; topic?: string | null; marks: number; difficulty: Difficulty;
   questionText: string; hasMath: boolean;
-  options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
+  options?: any;
+  testCases?: Array<{ id?: string | number; input: string; expectedOutput: string; isHidden?: boolean; weight?: number; explanation?: string }>;
+  starterCode?: Record<string, string>;
+  constraints?: string | null;
+  allowedLanguages?: string[];
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
   sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
   parts?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
@@ -141,7 +146,11 @@ type GeneratedQuestion = {
   id: string;
   type: QuestionType;
   questionText: string;
-  options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
+  options?: any;
+  testCases?: Array<{ id?: string | number; input: string; expectedOutput: string; isHidden?: boolean; weight?: number; explanation?: string }>;
+  starterCode?: Record<string, string>;
+  constraints?: string;
+  allowedLanguages?: string[];
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
   sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
   parts?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
@@ -1368,6 +1377,7 @@ export default function QuestionBankPage() {
                               <SelectItem value="SMCQ">SMCQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
                               <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                              <SelectItem value="CODING">CODING (Programming)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2018,6 +2028,7 @@ export default function QuestionBankPage() {
                                   <SelectItem value="AR">AR</SelectItem>
                                   <SelectItem value="MTF">MTF</SelectItem>
                                   <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                  <SelectItem value="CODING">CODING</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -3293,6 +3304,77 @@ const QuestionCard: React.FC<{
                   </div>
                 ));
               })()}
+            </div>
+          )}
+
+          {/* CODING Display */}
+          {question.type === 'CODING' && (
+            <div className="space-y-3 mt-3">
+              {/* Language badges & Constraints */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase">Languages:</span>
+                  {((question.options?.allowedLanguages || question.allowedLanguages) || ['python', 'c', 'cpp']).map((lang: string, li: number) => (
+                    <Badge key={li} variant="secondary" className="text-[9px] font-mono uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                      {lang}
+                    </Badge>
+                  ))}
+                </div>
+                {(question.options?.constraints || question.constraints) && (
+                  <Badge variant="outline" className="text-[9px] text-amber-700 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/30">
+                    Constraints: {question.options?.constraints || question.constraints}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Test Cases Count & Preview */}
+              {(() => {
+                const tcList = question.options?.testCases || question.testCases || question.subQuestions || [];
+                if (tcList.length === 0) return null;
+                const publicCount = tcList.filter((tc: any) => !tc.isHidden).length;
+                const hiddenCount = tcList.filter((tc: any) => tc.isHidden).length;
+
+                return (
+                  <div className="p-3 rounded-xl bg-slate-900 text-slate-100 text-xs font-mono space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Test Cases ({tcList.length} total • {publicCount} Sample • {hiddenCount} Hidden)
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">Auto-Scored</span>
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {tcList.slice(0, 3).map((tc: any, tci: number) => (
+                        <div key={tci} className="bg-slate-800/80 p-2 rounded text-[11px] flex items-center justify-between gap-3">
+                          <div className="truncate flex-1">
+                            <span className="text-slate-400 mr-2">#{tci + 1} {tc.isHidden ? '🔒 [Hidden]' : '👁️ [Sample]'}</span>
+                            <span className="text-slate-300">In: <code className="text-amber-300">{tc.input ? String(tc.input).replace(/\n/g, ' ') : '—'}</code></span>
+                            <span className="text-slate-400 mx-1.5">→</span>
+                            <span className="text-slate-300">Out: <code className="text-emerald-300">{tc.expectedOutput ? String(tc.expectedOutput).replace(/\n/g, ' ') : '—'}</code></span>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] text-slate-300 border-slate-700 shrink-0">
+                            {tc.weight || tc.marks || 1}M
+                          </Badge>
+                        </div>
+                      ))}
+                      {tcList.length > 3 && (
+                        <p className="text-[9px] text-slate-500 italic pl-1">+{tcList.length - 3} more test cases</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Model Answer / Solution Preview */}
+              {question.modelAnswer && (
+                <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 text-xs">
+                  <div className="font-bold text-[10px] text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                    Reference Solution:
+                  </div>
+                  <pre className="font-mono text-[11px] p-2 bg-slate-900 text-emerald-300 rounded overflow-x-auto max-h-32">
+                    {question.modelAnswer}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -5007,7 +5089,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="CODING">CODING (Programming Contest)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -6035,7 +6117,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
             <div><Label>Subject</Label><Input name="subject" required placeholder="e.g., Physics" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select name="questionType" defaultValue="MCQ"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select name="questionType" defaultValue="MCQ"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem><SelectItem value="CODING">CODING</SelectItem></SelectContent></Select></div>
             <div><Label>Difficulty</Label><Select name="difficulty" defaultValue="MEDIUM"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
           </div>
           <div><Label>Topic (Optional)</Label><Input name="topic" placeholder="e.g., Kinematics" /></div>
@@ -6521,12 +6603,76 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         { "id": "s2", "stageTitle": "Stage 2: Calculate velocity after 5 seconds", "marks": 5, "modelAnswer": "50", "dependsOnStageId": "s1", "formula": "prev * 5", "tolerance": 0.1 }
       ],
       "explanation": "Stage 1: a = F/m = 10 m/s^2; Stage 2: v = a * t = 10 * 5 = 50 m/s (includes Error Propagation Protection)"
+    },
+    {
+      "type": "MCQ",
+      "questionText": "In right-angled triangle $\\triangle ABC$, $AB = 3\\text{ cm}$ and $BC = 4\\text{ cm}$. Find the hypotenuse $c$.\n\n##GEO:right-triangle[A=A,B=B,C=C,a=3,b=4,c=?][size:small]##",
+      "marks": 1,
+      "difficulty": "EASY",
+      "subject": "Mathematics",
+      "className": "Class 10",
+      "options": [
+        { "text": "5 cm", "isCorrect": true, "explanation": "By Pythagorean theorem: $c = \\sqrt{3^2 + 4^2} = \\sqrt{25} = 5\\text{ cm}$." },
+        { "text": "6 cm", "isCorrect": false },
+        { "text": "7 cm", "isCorrect": false },
+        { "text": "8 cm", "isCorrect": false }
+      ]
+    },
+    {
+      "type": "CQ",
+      "questionText": "From external point $P$, a tangent $PT$ of length $12\\text{ cm}$ touches a circle of radius $5\\text{ cm}$ centered at $O$.\n\n##GEO:circle-tangent[O=O,P=P,T=T,r=5,t=12][size:small]##",
+      "marks": 10,
+      "difficulty": "MEDIUM",
+      "subject": "Mathematics",
+      "className": "Class 10",
+      "subQuestions": [
+        { "question": "(a) State the angle between radius $OT$ and tangent $PT$.", "marks": 2, "modelAnswer": "The angle is 90° ($OT \\perp PT$)." },
+        { "question": "(b) Find distance $OP$ from center to point $P$.", "marks": 4, "modelAnswer": "In right $\\triangle OTP$, $OP = \\sqrt{5^2 + 12^2} = 13\\text{ cm}$." },
+        { "question": "(c) If a second tangent $PT'$ is drawn, find the total perimeter of quadrilateral $OTPT'$.", "marks": 4, "modelAnswer": "Perimeter = $2 \\times (5 + 12) = 34\\text{ cm}$." }
+      ]
+    },
+    {
+      "type": "CODING",
+      "questionText": "Array Sum\n\nGiven an integer $N$ followed by $N$ integers, compute and print their sum.\n\n### Input Format\n- First line: integer $N$\n- Second line: $N$ space-separated integers\n\n### Output Format\n- Print the single sum integer.",
+      "marks": 10,
+      "difficulty": "MEDIUM",
+      "subject": "Computer Science",
+      "className": "Class 10",
+      "constraints": "1 <= N <= 10^5\n-10^9 <= A[i] <= 10^9",
+      "allowedLanguages": ["python", "c", "cpp"],
+      "starterCode": {
+        "python": "import sys\n\ndef solve():\n    lines = sys.stdin.read().split()\n    if not lines: return\n    n = int(lines[0])\n    nums = [int(x) for x in lines[1:n+1]]\n    print(sum(nums))\n\nsolve()\n"
+      },
+      "modelAnswer": "import sys\ndef solve():\n    lines = sys.stdin.read().split()\n    if not lines: return\n    print(sum(int(x) for x in lines[1:int(lines[0])+1]))\nsolve()",
+      "explanation": "O(N) time complexity, O(1) auxiliary space.",
+      "testCases": [
+        { "id": 1, "input": "5\n1 2 3 4 5", "expectedOutput": "15", "isHidden": false, "weight": 2, "explanation": "Sample test 1" },
+        { "id": 2, "input": "3\n10 20 30", "expectedOutput": "60", "isHidden": false, "weight": 2, "explanation": "Sample test 2" },
+        { "id": 3, "input": "4\n-5 5 -10 10", "expectedOutput": "0", "isHidden": true, "weight": 3, "explanation": "Hidden negative test" },
+        { "id": 4, "input": "1\n999", "expectedOutput": "999", "isHidden": true, "weight": 3, "explanation": "Hidden boundary test" }
+      ]
     }
   ];
 
   const handleLoadSample = () => {
     setJsonInput(JSON.stringify(sampleJson, null, 2));
-    toast({ title: "Sample Loaded", description: "Sample JSON format loaded." });
+    toast({ title: "Sample Loaded", description: "Sample JSON loaded including Geometry Diagrams & Coding Contest questions." });
+  };
+
+  const handleCopyLLMPrompt = () => {
+    const prompt = getBulkQuestionsLLMPrompt({
+      subject: "Mathematics & Computer Science",
+      className: availableClasses[0]?.name || "Class 10",
+      topic: "Geometry & Problem Solving",
+      count: 5,
+      includeGeometry: true,
+      includeCoding: true,
+    });
+    navigator.clipboard.writeText(prompt);
+    toast({
+      title: "🤖 AI Prompt Copied to Clipboard!",
+      description: "Paste into ChatGPT, Gemini, or Claude to easily generate bulk questions with Geometry diagrams and Coding tests.",
+    });
   };
 
   const handleParseJson = () => {
@@ -6534,12 +6680,51 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       if (!jsonInput.trim()) return;
       const parsed = JSON.parse(jsonInput);
       const dataArray = Array.isArray(parsed) ? parsed : [parsed];
-      const rows = dataArray.map((item, idx) => ({
-        rowNum: idx + 1,
-        isValid: true, // Optimistic
-        data: item,
-        errors: []
-      }));
+      const rows = dataArray.map((item, idx) => {
+        // Resolve classId if availableClasses match
+        let classId = item.classId;
+        if (!classId && item.className) {
+          const norm = String(item.className).toLowerCase().trim();
+          const matchClass = availableClasses.find(c =>
+            c.name.toLowerCase() === norm ||
+            (c.section ? `${c.name} - ${c.section}`.toLowerCase() === norm : false)
+          );
+          if (matchClass) classId = matchClass.id;
+        }
+
+        // For CODING, ensure options has testCases & subQuestions
+        if (item.type === 'CODING') {
+          const testCases = Array.isArray(item.testCases) ? item.testCases : (item.options?.testCases || []);
+          const constraints = item.constraints || item.options?.constraints || '';
+          const allowedLanguages = item.allowedLanguages || item.options?.allowedLanguages || ['python', 'c', 'cpp'];
+          const starterCode = item.starterCode || item.options?.starterCode;
+
+          item.options = {
+            testCases,
+            constraints,
+            allowedLanguages,
+            starterCode
+          };
+
+          if (!item.subQuestions && Array.isArray(testCases)) {
+            item.subQuestions = testCases.map((tc: any, tci: number) => ({
+              id: `tc_${tc.id || tci + 1}`,
+              input: tc.input,
+              expectedOutput: tc.expectedOutput ?? tc.output,
+              marks: tc.weight ?? tc.marks ?? 1,
+              isHidden: Boolean(tc.isHidden ?? tc.hidden),
+              explanation: tc.explanation
+            }));
+          }
+        }
+
+        return {
+          rowNum: idx + 1,
+          isValid: true, // Optimistic
+          data: { ...item, classId },
+          errors: []
+        };
+      });
       setPreviewData(rows);
       setEditedPreviewData(rows);
       setIsPreviewMode(true);
@@ -6804,11 +6989,35 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                 </>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <Label>Paste JSON Data</Label>
-                    <Button variant="outline" size="sm" onClick={handleLoadSample}>
-                      <BookCopy className="w-3 h-3 mr-1" /> Load Sample
-                    </Button>
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <Label className="font-semibold text-sm">Paste JSON Data</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyLLMPrompt}
+                        className="bg-indigo-50/50 hover:bg-indigo-100/70 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-medium"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-600 dark:text-indigo-400" /> Copy LLM Prompt
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleLoadSample}>
+                        <BookCopy className="w-3 h-3 mr-1" /> Load Sample
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/60 via-purple-50/40 to-blue-50/50 dark:from-indigo-950/30 dark:via-purple-950/20 dark:to-blue-950/20 p-3 text-xs">
+                    <div className="flex items-start gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="font-bold text-indigo-950 dark:text-indigo-200">
+                          Easiest Bulk Question Generation with LLMs (Gemini, ChatGPT, Claude):
+                        </span>
+                        <p className="text-[11px] leading-relaxed text-indigo-900/80 dark:text-indigo-300/80">
+                          Click <b>Copy LLM Prompt</b> to copy a ready-to-paste prompt. Any LLM will generate bulk questions formatted with hand-drawn <b>Geometry Diagrams</b> (e.g. <code className="bg-white/80 dark:bg-black/30 px-1 py-0.5 rounded font-mono">##GEO:right-triangle[a=3,b=4,hyp=c]##</code>) and <b>Coding Questions</b> with full test suites. Then paste the LLM response below!
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <Textarea
                     value={jsonInput}
@@ -6976,6 +7185,32 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                               ))}
                             </div>
                           )}
+                          {row.data.type === 'CODING' && (
+                            <div className="mt-1 border-t pt-1 space-y-1">
+                              <div className="flex flex-wrap gap-1 items-center">
+                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                  💻 CODING
+                                </span>
+                                {row.data.allowedLanguages?.map((lang: string) => (
+                                  <span key={lang} className="px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-[8px] font-mono text-slate-600 dark:text-slate-400">
+                                    {lang}
+                                  </span>
+                                ))}
+                              </div>
+                              {row.data.testCases && (
+                                <div className="text-[9px] text-gray-500 font-medium">
+                                  <span className="text-emerald-600 font-bold">{row.data.testCases.filter((t: any) => !t.isHidden).length} Sample</span>
+                                  {" • "}
+                                  <span className="text-amber-600 font-bold">{row.data.testCases.filter((t: any) => t.isHidden).length} Hidden</span> Tests
+                                </div>
+                              )}
+                              {row.data.constraints && (
+                                <div className="text-[8px] text-slate-500 truncate" title={row.data.constraints}>
+                                  Limits: {row.data.constraints}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -7043,6 +7278,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
           <TabsList className="mb-4 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-xl">
             <TabsTrigger value="standard" className="rounded-lg">Standard Types</TabsTrigger>
             <TabsTrigger value="descriptive" className="rounded-lg">Descriptive Sub-types</TabsTrigger>
+            <TabsTrigger value="geometry_coding" className="rounded-lg">Geometry & Coding (LLM)</TabsTrigger>
             <TabsTrigger value="tips" className="rounded-lg">Pro Tips</TabsTrigger>
           </TabsList>
 
@@ -7124,6 +7360,52 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                 <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800">
                   List sequence in <code>D1_Questions</code> using <code>|</code>.
                 </p>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="geometry_coding" className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-indigo-600">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-sm text-indigo-600">📐 Geometry Diagrams in Questions</h4>
+                  <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono px-2 py-0.5 rounded font-bold">##GEO:...##</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Embed beautiful hand-drawn or CAD geometry diagrams into any question stem or sub-question using a simple shortcode:
+                </p>
+                <div className="space-y-2 text-[11px] font-mono">
+                  <div className="bg-slate-50 dark:bg-slate-900/60 p-2 rounded border text-indigo-700 dark:text-indigo-300">
+                    ##GEO:right-triangle[a=3,b=4,hyp=5,unit=cm,style=handdrawn]##
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900/60 p-2 rounded border text-indigo-700 dark:text-indigo-300">
+                    ##GEO:circle-tangent[r=5,pt=T,center=O,style=handdrawn]##
+                  </div>
+                </div>
+                <ul className="text-[11px] space-y-1 list-disc pl-4 mt-3 text-gray-600 dark:text-gray-400">
+                  <li><b>Shapes:</b> <code>right-triangle</code>, <code>equilateral-triangle</code>, <code>circle</code>, <code>circle-tangent</code>, <code>parallelogram</code>, <code>trapezoid</code>, <code>cube</code>, <code>cylinder</code>, <code>cone</code>, <code>sphere</code>.</li>
+                  <li><b>Tolerant syntax:</b> Also accepts <code>[GEO:...]</code>, quotes, commas, semicolons, and snake_case (e.g. <code>right_triangle</code>).</li>
+                  <li><b>Collision avoidance:</b> Labels automatically offset so they never clip or overlap angles.</li>
+                </ul>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-purple-600">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-sm text-purple-600">💻 Coding Contest Questions</h4>
+                  <span className="text-[10px] bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-mono px-2 py-0.5 rounded font-bold">CODING</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Upload competitive programming problems with sample & hidden test cases, execution limits, and starter code:
+                </p>
+                <div className="space-y-2 text-[11px] text-gray-600 dark:text-gray-400">
+                  <div className="bg-slate-50 dark:bg-slate-900/60 p-2 rounded border font-mono text-[10px] text-purple-700 dark:text-purple-300">
+                    {`"type": "CODING",\n"allowedLanguages": ["python", "c", "cpp"],\n"constraints": "Time: 1.0s, Memory: 256MB",\n"testCases": [\n  { "input": "3\\n1 2 3", "expectedOutput": "6", "isHidden": false },\n  { "input": "4\\n5 5 5 5", "expectedOutput": "20", "isHidden": true }\n]`}
+                  </div>
+                </div>
+                <ul className="text-[11px] space-y-1 list-disc pl-4 mt-3 text-gray-600 dark:text-gray-400">
+                  <li><b>Excel format:</b> Use columns <code>Test 1 Input</code>, <code>Test 1 Output</code>, <code>Test 1 Hidden</code> (up to 10 tests).</li>
+                  <li><b>JSON format:</b> Include <code>testCases</code> array directly in the question object.</li>
+                </ul>
               </div>
             </div>
           </TabsContent>

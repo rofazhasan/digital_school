@@ -24,12 +24,10 @@ const questionSchema = z.object({
     hasMath: z.boolean().default(false),
     classId: z.string().cuid("Valid class ID is required"),
     isAiGenerated: z.boolean().default(false),
-    options: z.array(z.object({
-        text: z.string().min(1, "Option text is required"),
-        isCorrect: z.boolean(),
-        explanation: z.string().optional().nullable(),
-        image: z.string().optional().nullable()
-    })).nullable().default(null),
+    options: z.union([
+        z.array(z.any()),
+        z.record(z.any())
+    ]).nullable().default(null),
     subQuestions: z.array(z.object({
         question: z.string().optional().nullable(),
         text: z.string().optional().nullable(),
@@ -58,6 +56,10 @@ const questionSchema = z.object({
     confidenceTracking: z.boolean().optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
     images: z.array(z.string()).optional().nullable(),
+    constraints: z.string().optional().nullable(),
+    allowedLanguages: z.array(z.string()).optional().nullable(),
+    starterCode: z.record(z.any()).optional().nullable(),
+    testCases: z.array(z.any()).optional().nullable(),
 });
 
 const aiGenerationSchema = z.object({
@@ -93,6 +95,40 @@ export async function POST(request: Request) {
         }
 
         const { questionBankIds, ...questionData } = validation.data;
+
+        // For CODING type, ensure options has { testCases, constraints, allowedLanguages, starterCode }
+        if (questionData.type === 'CODING') {
+            const rawTestCases = body.testCases || (questionData as any).testCases || [];
+            const rawConstraints = body.constraints || (questionData as any).constraints || '';
+            const rawLangs = body.allowedLanguages || (questionData as any).allowedLanguages || ['python', 'c', 'cpp'];
+            const rawStarter = body.starterCode || (questionData as any).starterCode;
+
+            let existingOptions = questionData.options;
+            if (typeof existingOptions === 'object' && existingOptions !== null && !Array.isArray(existingOptions)) {
+                if (rawTestCases.length > 0 && !existingOptions.testCases) existingOptions.testCases = rawTestCases;
+                if (rawConstraints && !existingOptions.constraints) existingOptions.constraints = rawConstraints;
+                if (rawLangs && !existingOptions.allowedLanguages) existingOptions.allowedLanguages = rawLangs;
+                if (rawStarter && !existingOptions.starterCode) existingOptions.starterCode = rawStarter;
+            } else {
+                questionData.options = {
+                    testCases: rawTestCases,
+                    constraints: rawConstraints,
+                    allowedLanguages: rawLangs,
+                    starterCode: rawStarter
+                };
+            }
+
+            if (!questionData.subQuestions && Array.isArray((questionData.options as any).testCases)) {
+                questionData.subQuestions = (questionData.options as any).testCases.map((tc: any, idx: number) => ({
+                    id: `tc_${tc.id || idx + 1}`,
+                    input: tc.input,
+                    expectedOutput: tc.expectedOutput,
+                    marks: tc.weight || 1,
+                    isHidden: !!tc.isHidden,
+                    explanation: tc.explanation
+                }));
+            }
+        }
 
         const newQuestion = await prisma.question.create({
             data: {
@@ -367,6 +403,34 @@ async function handleAIGeneration(body: any) {
             itemProps.explanation = { type: "string" };
             itemRequired.push("explanation");
         }
+    } else if ((questionType as string) === 'CODING') {
+        itemProps.constraints = { type: "string" };
+        itemProps.allowedLanguages = { type: "array", items: { type: "string" } };
+        itemProps.modelAnswer = { type: "string" };
+        itemProps.starterCode = {
+            type: "object",
+            properties: {
+                python: { type: "string" },
+                c: { type: "string" },
+                cpp: { type: "string" }
+            }
+        };
+        itemProps.testCases = {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    id: { type: "number" },
+                    input: { type: "string" },
+                    expectedOutput: { type: "string" },
+                    isHidden: { type: "boolean" },
+                    weight: { type: "number" },
+                    explanation: { type: "string" }
+                },
+                required: ["input", "expectedOutput", "isHidden"]
+            }
+        };
+        itemRequired.push("testCases");
     }
 
     const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
@@ -376,7 +440,7 @@ ${topic ? `- Topic: ${topic}` : ''}
 - Difficulty: ${difficulty}
 - Question Type: ${questionType}
 - Count: ${count}
-- Language: Provide all content in Bengali, but keep IDs like '1', '2', 'A', 'B' and keys in 'matches' in English.
+- Language: Provide content in Bengali where appropriate, or English for STEM/Coding, but keep IDs like '1', '2', 'A', 'B' and keys in 'matches' in English.
 
 ${(questionType as string) === 'MCQ' || (questionType as string) === 'MC' ? `
 ${(questionType as string) === 'MCQ' ? 'MCQ (SINGLE CORRECT) RULES:' : 'MC (MULTIPLE CORRECT) RULES:'}
@@ -433,9 +497,33 @@ MTF (MATCH THE FOLLOWING) QUESTIONS:
 ${includeAnswers ? '- Provide detailed \'explanation\' summarizing the correct matches' : ''}
 - Use LaTeX for mathematical expressions and solutions` : ''}
 
+${(questionType as string) === 'CODING' ? `
+CODING (PROGRAMMING CONTEST) QUESTIONS:
+- 'questionText' should detail the problem statement, Input Format, Output Format, and Sample Cases.
+- 'constraints' specifies execution limits (e.g. 1 <= N <= 10^5).
+- 'allowedLanguages' should be ["python", "c", "cpp"].
+- 'starterCode' includes boilerplate for python.
+- 'modelAnswer' contains the complete, correct reference solution.
+- 'testCases' must provide 3-5 test cases (at least 2 public with isHidden=false and 2 hidden with isHidden=true).` : ''}
+
+GEOMETRY DIAGRAM FORMATTING (CRITICAL FOR GEOMETRY / MATH QUESTIONS):
+- If the question or topic involves geometry, ALWAYS embed compact textbook diagrams using:
+  ##GEO:shape-name[parameters][size:small]##
+- Supported standard shapes:
+  * Right Triangle: ##GEO:right-triangle[A=A,B=B,C=C,a=3,b=4,c=5,angle=30°][size:small]##
+  * Equilateral: ##GEO:equilateral[A=A,B=B,C=C,s=6,angle=60°][size:small]##
+  * Isosceles: ##GEO:isosceles[A=A,B=B,C=C,a=5,b=6][size:small]##
+  * Triangle with Altitude: ##GEO:triangle-altitude[A=A,B=B,C=C,D=D,h=4,base=6][size:small]##
+  * Circle Tangent: ##GEO:circle-tangent[O=O,P=P,T=T,r=5,t=12][size:small]##
+  * Circle Two Tangents: ##GEO:circle-two-tangents[O=O,P=P,A=A,B=B,r=5][size:small]##
+  * Circle Central & Inscribed Angles: ##GEO:circle-angles[O=O,A=A,B=B,C=C,central=80°,inscribed=40°][size:small]##
+  * Parallelogram: ##GEO:parallelogram[A=A,B=B,C=C,D=D,b=8,h=5][size:small]##
+  * Rectangle / Square: ##GEO:rectangle[A=A,B=B,C=C,D=D,l=8,w=5][size:small]##, ##GEO:square[s=6][size:small]##
+  * Shaded Sector / Segment: ##GEO:shaded-sector[r=6,theta=60°][size:small]##
+  * 3D Solids: ##GEO:cylinder[r=3,h=7]##, ##GEO:cone[r=4,h=9]##, ##GEO:sphere[r=5]##, ##GEO:cube[s=5]##
+
 MATHEMATICAL CONTENT AND FORMATTING:
-- For any mathematical content, use proper LaTeX notation
-- Common examples: $x^2 + y^2 = z^2$, $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, $\\int_{a}^{b} f(x) dx$
+- For any mathematical content, use proper LaTeX notation ($x^2 + y^2 = z^2$)
 
 Generate questions that will challenge students appropriately for ${difficulty} level while maintaining clarity and educational value.`;
     const payload = {

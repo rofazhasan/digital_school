@@ -310,34 +310,51 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
             if (data.subQuestions.length === 0) throw new Error("DESCRIPTIVE requires at least one Sub-Question");
         } else if (data.type === 'CODING') {
             const testCases: any[] = [];
-            for (let i = 1; i <= 10; i++) {
-                const input = s(getValue(row, [`Test ${i} Input`, `TC${i}Input`, `Test${i}Input`, `Input ${i}`]));
-                const output = s(getValue(row, [`Test ${i} Output`, `TC${i}Output`, `Test${i}Output`, `Output ${i}`]));
-                if (!input && !output) continue;
-
-                const hiddenRaw = s(getValue(row, [`Test ${i} Hidden`, `TC${i}Hidden`, `Test${i}Hidden`]));
-                const weight = n(getValue(row, [`Test ${i} Weight`, `TC${i}Weight`])) || 1;
-                const exp = s(getValue(row, [`Test ${i} Explanation`, `TC${i}Explanation`]));
-
-                testCases.push({
-                    id: i,
-                    input,
-                    expectedOutput: output,
-                    isHidden: /true|yes|1/i.test(hiddenRaw),
-                    weight,
-                    explanation: exp
+            // First check if already structured testCases or test_cases array was provided
+            if (Array.isArray(row.testCases) || Array.isArray(row.test_cases)) {
+                const rawCases = row.testCases || row.test_cases;
+                rawCases.forEach((tc: any, i: number) => {
+                    testCases.push({
+                        id: tc.id || i + 1,
+                        input: s(tc.input),
+                        expectedOutput: s(tc.expectedOutput ?? tc.output),
+                        isHidden: Boolean(tc.isHidden ?? tc.hidden),
+                        weight: n(tc.weight ?? tc.marks) || 1,
+                        explanation: s(tc.explanation)
+                    });
                 });
+            } else {
+                for (let i = 1; i <= 10; i++) {
+                    const input = s(getValue(row, [`Test ${i} Input`, `TC${i}Input`, `Test${i}Input`, `Input ${i}`]));
+                    const output = s(getValue(row, [`Test ${i} Output`, `TC${i}Output`, `Test${i}Output`, `Output ${i}`]));
+                    if (!input && !output) continue;
+
+                    const hiddenRaw = s(getValue(row, [`Test ${i} Hidden`, `TC${i}Hidden`, `Test${i}Hidden`]));
+                    const weight = n(getValue(row, [`Test ${i} Weight`, `TC${i}Weight`])) || 1;
+                    const exp = s(getValue(row, [`Test ${i} Explanation`, `TC${i}Explanation`]));
+
+                    testCases.push({
+                        id: i,
+                        input,
+                        expectedOutput: output,
+                        isHidden: /true|yes|1/i.test(hiddenRaw),
+                        weight,
+                        explanation: exp
+                    });
+                }
             }
 
-            const constraints = s(getValue(row, ["Constraints", "Limits", "Specs"]));
+            const constraints = s(getValue(row, ["Constraints", "Limits", "Specs"])) || (typeof row.constraints === 'string' ? row.constraints : '');
             const allowedLanguagesRaw = s(getValue(row, ["Allowed Languages", "Languages", "Langs"]));
-            const allowedLanguages = allowedLanguagesRaw
-                ? allowedLanguagesRaw.split(/[,|\s]+/).map(l => l.trim().toLowerCase()).filter(Boolean)
-                : ['python', 'c', 'cpp'];
+            const allowedLanguages = Array.isArray(row.allowedLanguages)
+                ? row.allowedLanguages.map((l: any) => s(l).toLowerCase()).filter(Boolean)
+                : (allowedLanguagesRaw
+                    ? allowedLanguagesRaw.split(/[,|\s]+/).map(l => l.trim().toLowerCase()).filter(Boolean)
+                    : ['python', 'c', 'cpp']);
 
-            const starterPython = s(getValue(row, ["Starter Code Python", "Starter Python", "Python Starter"]));
-            const starterC = s(getValue(row, ["Starter Code C", "Starter C", "C Starter"]));
-            const starterCPP = s(getValue(row, ["Starter Code CPP", "Starter Code C++", "Starter CPP", "CPP Starter"]));
+            const starterPython = s(getValue(row, ["Starter Code Python", "Starter Python", "Python Starter"])) || (row.starterCode && typeof row.starterCode === 'object' ? s(row.starterCode.python) : '');
+            const starterC = s(getValue(row, ["Starter Code C", "Starter C", "C Starter"])) || (row.starterCode && typeof row.starterCode === 'object' ? s(row.starterCode.c) : '');
+            const starterCPP = s(getValue(row, ["Starter Code CPP", "Starter Code C++", "Starter CPP", "CPP Starter"])) || (row.starterCode && typeof row.starterCode === 'object' ? s(row.starterCode.cpp || row.starterCode['c++']) : '');
 
             const starterCode: Record<string, string> = {};
             if (starterPython) starterCode.python = starterPython;
@@ -480,19 +497,50 @@ export async function POST(req: NextRequest) {
 
                     if (!classId) throw new Error(`Class not found/resolved: ${q.className || 'Unknown'}`);
 
+                    let finalOptions = q.options;
+                    let finalSubQuestions = q.subQuestions;
+
+                    if (q.type === 'CODING') {
+                        const testCases = Array.isArray(q.testCases) ? q.testCases : (q.options?.testCases || []);
+                        const constraints = q.constraints || q.options?.constraints || '';
+                        const allowedLanguages = q.allowedLanguages || q.options?.allowedLanguages || ['python', 'c', 'cpp'];
+                        const starterCode = q.starterCode || q.options?.starterCode || undefined;
+
+                        finalOptions = {
+                            testCases,
+                            constraints,
+                            allowedLanguages,
+                            starterCode
+                        };
+
+                        if (!finalSubQuestions && Array.isArray(testCases)) {
+                            finalSubQuestions = testCases.map((tc: any, tci: number) => ({
+                                id: `tc_${tc.id || tci + 1}`,
+                                input: tc.input,
+                                expectedOutput: tc.expectedOutput ?? tc.output,
+                                marks: tc.weight ?? tc.marks ?? 1,
+                                isHidden: Boolean(tc.isHidden ?? tc.hidden),
+                                explanation: tc.explanation
+                            }));
+                        }
+                    }
+
+                    const defaultMarks = (q.type === 'CQ' || q.type === 'DESCRIPTIVE' || q.type === 'CODING') ? 10 : 1;
+                    const parsedMarks = (q.marks !== undefined && q.marks !== null && !isNaN(Number(q.marks)) && Number(q.marks) > 0) ? Number(q.marks) : defaultMarks;
+
                     preparedQuestions.push({
                         type: (q.type || 'MCQ') as any,
                         classId: classId,
                         subject: q.subject,
                         topic: q.topic,
                         difficulty: (q.difficulty || 'MEDIUM') as any,
-                        marks: (q.marks !== undefined && q.marks !== null && !isNaN(Number(q.marks)) && Number(q.marks) > 0) ? Number(q.marks) : 1,
+                        marks: parsedMarks,
                         questionText: q.questionText,
-                        options: q.options || undefined,
-                        subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions.map((sq: any) => ({
+                        options: finalOptions || undefined,
+                        subQuestions: Array.isArray(finalSubQuestions) ? finalSubQuestions.map((sq: any) => ({
                             ...sq,
                             marks: (sq.marks !== undefined && sq.marks !== null && !isNaN(Number(sq.marks)) && Number(sq.marks) > 0) ? Number(sq.marks) : 1
-                        })) : (q.subQuestions || undefined),
+                        })) : (finalSubQuestions || undefined),
                         modelAnswer: q.modelAnswer,
                         explanation: q.explanation,
                         assertion: q.assertion || undefined,

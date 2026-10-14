@@ -18,12 +18,15 @@ import type { GeometryOptions, GeometryShapeType, DiagramSize, DiagramStyleMode 
 // Aliases mapping user-friendly names to canonical shape types
 const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   // Triangles
+  'triangle': 'scalene-triangle',
+  'tri': 'scalene-triangle',
   'right-triangle': 'right-triangle',
   'rtriangle': 'right-triangle',
   'right': 'right-triangle',
-  'right_triangle': 'right-triangle',
+  'right-tri': 'right-triangle',
   'equilateral': 'equilateral-triangle',
   'equilateral-triangle': 'equilateral-triangle',
+  'equi-triangle': 'equilateral-triangle',
   'isosceles': 'isosceles-triangle',
   'isosceles-triangle': 'isosceles-triangle',
   'scalene': 'scalene-triangle',
@@ -46,6 +49,8 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   'rhombus': 'rhombus',
   'trapezium': 'trapezium',
   'trapezoid': 'trapezium',
+  'quadrilateral': 'parallelogram',
+  'quad': 'parallelogram',
   'cyclic-quad': 'cyclic-quadrilateral',
   'cyclic-quadrilateral': 'cyclic-quadrilateral',
 
@@ -66,8 +71,12 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
 
   // Lines & Angles
   'parallel-transversal': 'parallel-transversal',
+  'parallel-lines': 'parallel-transversal',
   'transversal': 'parallel-transversal',
+  'lines': 'parallel-transversal',
+  'line': 'parallel-transversal',
   'intersecting-lines': 'intersecting-lines',
+  'intersecting': 'intersecting-lines',
   'angle-bisector': 'angle-bisector',
   'bisector': 'angle-bisector',
 
@@ -84,6 +93,8 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   'cone': 'cone',
   'sphere': 'sphere',
   'cube': 'cube',
+  'cuboid': 'cube',
+  'box': 'cube',
 };
 
 const SIZE_MODIFIERS: Record<string, DiagramSize> = {
@@ -98,6 +109,7 @@ const SIZE_MODIFIERS: Record<string, DiagramSize> = {
  * Parses a parameter string like:
  * "A=A, B=B, C=C, a=3, b=4, c=5, angle=30°, showAltitude=true"
  * or "type:right, A:A, b:12"
+ * Tolerant to semicolons, pipes, newlines, and quotes from LLMs.
  */
 function parseParamString(raw: string): {
   labels: Record<string, string>;
@@ -116,29 +128,32 @@ function parseParamString(raw: string): {
     return { labels, sides, angles, flags, rawMap };
   }
 
-  // Split by comma outside brackets or quotes
-  const tokens = raw.split(/,(?![^[]*\])/g).map(s => s.trim()).filter(Boolean);
+  // Clean quotes or outer parentheses if LLM passed them
+  const cleanedRaw = raw.replace(/^["'`]|["'`]$/g, '').trim();
+
+  // Split by comma, semicolon, pipe, or newline outside brackets
+  const tokens = cleanedRaw.split(/[,;\n|](?![^[]*\])/g).map(s => s.trim()).filter(Boolean);
 
   for (const token of tokens) {
     const separatorIdx = token.search(/[=:]/);
     if (separatorIdx === -1) {
       // Standalone flag like "shaded" or "altitude"
-      flags[token.toLowerCase()] = true;
+      flags[token.toLowerCase().replace(/['"`]/g, '')] = true;
       continue;
     }
 
-    const key = token.slice(0, separatorIdx).trim();
-    const val = token.slice(separatorIdx + 1).trim();
+    let key = token.slice(0, separatorIdx).trim().replace(/^['"`]+|['"`]+$/g, '');
+    let val = token.slice(separatorIdx + 1).trim().replace(/^['"`]+|['"`]+$/g, '');
 
     rawMap[key] = val;
 
     // Detect boolean flags
     if (val.toLowerCase() === 'true' || val === '1') {
-      flags[key] = true;
+      flags[key.toLowerCase()] = true;
       continue;
     }
     if (val.toLowerCase() === 'false' || val === '0') {
-      flags[key] = false;
+      flags[key.toLowerCase()] = false;
       continue;
     }
 
@@ -164,14 +179,26 @@ function parseParamString(raw: string): {
 /**
  * Parses a single GEO block string like:
  * "GEO:right-triangle[A=A,B=B,C=C,a=3,b=4,c=5][size:small]"
+ * Tolerant to backticks, spaces, brackets, and snake_case for LLMs.
  */
 export function parseSingleGeometryDiagram(geoString: string): string | null {
   try {
     let text = geoString.trim();
 
-    // Extract size modifier [size:small]
+    // Strip backticks or formatting wrapper if LLM placed them
+    text = text.replace(/^`+|`+$/g, '').trim();
+
+    // Strip leading/trailing markdown characters or brackets
+    if (text.startsWith('[') && text.endsWith(']')) {
+      text = text.slice(1, -1).trim();
+    }
+    if (text.startsWith('##') && text.endsWith('##')) {
+      text = text.slice(2, -2).trim();
+    }
+
+    // Extract size modifier [size:small] or size:small
     let size: DiagramSize = 'small';
-    const sizeMatch = text.match(/\[size:(tiny|small|compact|medium|large)\]/i);
+    const sizeMatch = text.match(/\[?size:(tiny|small|compact|medium|large)\]?/i);
     if (sizeMatch) {
       size = SIZE_MODIFIERS[sizeMatch[1].toLowerCase()] || 'small';
       text = text.replace(sizeMatch[0], '').trim();
@@ -179,23 +206,22 @@ export function parseSingleGeometryDiagram(geoString: string): string | null {
 
     // Extract style modifier [style:hand-drawn]
     let style: DiagramStyleMode = 'drafting';
-    const styleMatch = text.match(/\[style:(hand-drawn|drafting|textbook|monochrome)\]/i);
+    const styleMatch = text.match(/\[?style:(hand-drawn|drafting|textbook|monochrome)\]?/i);
     if (styleMatch) {
       style = styleMatch[1].toLowerCase() as DiagramStyleMode;
       text = text.replace(styleMatch[0], '').trim();
     }
 
-    // Strip "GEO:" prefix
-    if (text.startsWith('GEO:')) {
-      text = text.slice(4).trim();
-    }
+    // Strip "GEO:" or "geo:" prefix (allowing spaces)
+    text = text.replace(/^(?:GEO|geo)\s*[:=]?\s*/i, '').trim();
 
     // Match shape name and parameters:
-    // e.g. "right-triangle[A=A, a=3]" or "right-triangle(A=A, a=3)" or "right-triangle"
+    // e.g. "right-triangle[A=A, a=3]" or "right_triangle(A=A, a=3)" or "right-triangle"
     const match = text.match(/^([a-zA-Z0-9-_]+)(?:[\[(](.*)[\])])?$/);
     if (!match) return null;
 
-    const rawShape = match[1].toLowerCase();
+    // Normalize underscores to hyphens for shape name (e.g. right_triangle -> right-triangle)
+    const rawShape = match[1].toLowerCase().replace(/_/g, '-');
     const rawParams = match[2] || '';
 
     // Handle universal custom geometry DSL
@@ -244,18 +270,28 @@ export function parseSingleGeometryDiagram(geoString: string): string | null {
  * Checks if a string contains geometry markup
  */
 export function hasGeometryDiagrams(text: string): boolean {
-  return /##GEO:(.*?)##/i.test(text);
+  if (!text || typeof text !== 'string') return false;
+  return /##\s*GEO:(.*?)##/i.test(text) || /\[\s*GEO:(.*?)\]/i.test(text);
 }
 
 /**
- * Replaces all ##GEO:...## blocks in text with high-quality SVG strings
+ * Replaces all ##GEO:...## and [GEO:...] blocks in text with high-quality SVG strings
  */
 export function replaceGeometryDiagramsInText(text: string): string {
   if (!text || typeof text !== 'string') return text || '';
-  if (!text.includes('##GEO:')) return text;
+  if (!text.includes('GEO:') && !text.includes('geo:')) return text;
 
-  return text.replace(/##GEO:(.*?)##/gi, (fullMatch, geoBody) => {
+  // 1. Replace standard ##GEO:...## blocks
+  let result = text.replace(/##\s*GEO:(.*?)##/gi, (fullMatch, geoBody) => {
     const svg = parseSingleGeometryDiagram(`GEO:${geoBody}`);
     return svg !== null ? svg : fullMatch;
   });
+
+  // 2. Replace alternative [GEO:...] blocks (used by some LLMs)
+  result = result.replace(/\[\s*GEO:(.*?)\]/gi, (fullMatch, geoBody) => {
+    const svg = parseSingleGeometryDiagram(`GEO:${geoBody}`);
+    return svg !== null ? svg : fullMatch;
+  });
+
+  return result;
 }
