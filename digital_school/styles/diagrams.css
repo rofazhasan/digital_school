@@ -239,3 +239,70 @@
         transition: none !important;
     }
 }
+
+/* ============================================================
+   GEOMETRY DIAGRAMS: Responsive & High-DPI Exam Display
+   Takes minimal space, crisp vector lines, dark mode support
+   ============================================================ */
+.geometry-diagram-svg {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 155px;
+    height: auto;
+    margin: 3px 6px;
+    user-select: none;
+    transition: transform 0.15s ease-in-out;
+}
+
+.geometry-diagram-svg:hover {
+    transform: scale(1.02);
+}
+
+/* Dark mode support */
+.dark .geometry-diagram-svg line,
+.dark .geometry-diagram-svg path,
+.dark .geometry-diagram-svg polygon,
+.dark .geometry-diagram-svg circle,
+.dark .geometry-diagram-svg ellipse {
+    stroke: #e2e8f0;
+}
+
+.dark .geometry-diagram-svg text {
+    fill: #f8fafc;
+}
+
+.dark .geometry-diagram-svg [stroke="#2563eb"] {
+    stroke: #60a5fa !important;
+}
+
+.dark .geometry-diagram-svg [stroke="#dc2626"] {
+    stroke: #f87171 !important;
+}
+
+.dark .geometry-diagram-svg [fill="#1e293b"] {
+    fill: #f1f5f9 !important;
+}
+
+/* Print mode overrides */
+@media print {
+    .geometry-diagram-svg {
+        max-width: 140px !important;
+        max-height: 105px !important;
+        margin: 1px 3px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .geometry-diagram-svg line,
+    .geometry-diagram-svg path,
+    .geometry-diagram-svg polygon,
+    .geometry-diagram-svg circle,
+    .geometry-diagram-svg ellipse {
+        stroke: #000000 !important;
+    }
+
+    .geometry-diagram-svg text {
+        fill: #000000 !important;
+        font-weight: 600 !important;
+    }
+}

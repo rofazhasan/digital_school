@@ -46,6 +46,7 @@ import { Capacitor } from "@capacitor/core";
 import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet";
 import { validateMPCDependencies } from "@/lib/evaluation/mpcEvaluation";
 import { n } from "@/utils/parser-utils";
+import { GeometryDiagramDialog } from "@/components/geometry/GeometryDiagramDialog";
 
 
 // --- Types ---
@@ -219,6 +220,8 @@ const ThreeJSBackground: React.FC = () => {
 };
 
 const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
+  const [geoDialogOpen, setGeoDialogOpen] = useState(false);
+
   const symbols = [
     // Basic operations
     { display: '√x', latex: '$$\\sqrt{}$$' },
@@ -280,24 +283,119 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
   ];
 
   return (
-    <div className="flex flex-wrap gap-1 p-2 bg-gray-100 dark:bg-gray-800 rounded-md mb-2">
-      {symbols.map(s => (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-100 dark:bg-gray-800 rounded-md mb-2 border border-border/50">
+        {/* Prominent Geometry Diagram Builder Button */}
         <Button
-          key={s.display}
           type="button"
-          variant="ghost"
           size="sm"
-          className="h-auto px-2 py-1 text-xs"
+          className="h-7 px-2.5 py-0.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1 shadow-xs transition-all"
+          onClick={() => setGeoDialogOpen(true)}
+          title="Open Geometry Diagram Builder (জ্যামিতিক চিত্র নির্মাতা - অবজেক্টিভ, সৃজনশীল ও সংক্ষিপ্ত প্রশ্নের জন্য)"
+        >
+          <span>📐</span>
+          <span>জ্যামিতিক চিত্র (Geometry)</span>
+        </Button>
+
+        <div className="h-4 w-[1px] bg-border mx-0.5" />
+
+        {/* Quick geometry 1-click presets */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] bg-background hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-medium"
           onMouseDown={(e) => {
             e.preventDefault();
-            onInsert(s.latex);
+            onInsert('##GEO:right-triangle[A=A,B=B,C=C,a=3,b=4,c=5]##');
           }}
-          title={s.latex}
+          title="Insert Right Triangle (সমকোণী ত্রিভুজ)"
         >
-          <UniversalMathJax inline>{`$${s.display}$`}</UniversalMathJax>
+          সমকোণী △
         </Button>
-      ))}
-    </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] bg-background hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-medium"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onInsert('##GEO:equilateral[s=6,angle=60°]##');
+          }}
+          title="Insert Equilateral Triangle (সমবাহু ত্রিভুজ)"
+        >
+          সমবাহু △
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] bg-background hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 font-medium"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onInsert('##GEO:parallelogram[b=8,h=5]##');
+          }}
+          title="Insert Parallelogram (সামান্তরিক)"
+        >
+          সামান্তরিক ▱
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] bg-background hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 font-medium"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onInsert('##GEO:tangent[O=O,P=P,r=5]##');
+          }}
+          title="Insert Circle Tangent (বৃত্ত স্পর্শক)"
+        >
+          বৃত্ত স্পর্শক ⊙
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-[11px] bg-background hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-medium"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onInsert('##GEO:sector[r=6,theta=60°]##');
+          }}
+          title="Insert Shaded Sector (ছায়াবৃত বৃত্তকলা)"
+        >
+          বৃত্তকলা ⌔
+        </Button>
+
+        <div className="h-4 w-[1px] bg-border mx-0.5" />
+
+        {symbols.map(s => (
+          <Button
+            key={s.display}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 py-0 text-xs"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onInsert(s.latex);
+            }}
+            title={s.latex}
+          >
+            <UniversalMathJax inline>{`$${s.display}$`}</UniversalMathJax>
+          </Button>
+        ))}
+      </div>
+
+      <GeometryDiagramDialog
+        open={geoDialogOpen}
+        onOpenChange={setGeoDialogOpen}
+        onInsert={onInsert}
+      />
+    </>
   );
 };
 

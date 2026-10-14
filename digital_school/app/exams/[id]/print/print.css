@@ -782,4 +782,30 @@
     vertical-align: middle !important;
     white-space: normal !important;
   }
+
+  /* Compact geometry diagrams in print papers (saves space in columns, sharp ink) */
+  .geometry-diagram-svg {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    max-width: 140px !important;
+    max-height: 105px !important;
+    margin: 2px 4px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    filter: none !important;
+  }
+
+  .geometry-diagram-svg line,
+  .geometry-diagram-svg path,
+  .geometry-diagram-svg polygon,
+  .geometry-diagram-svg rect,
+  .geometry-diagram-svg circle,
+  .geometry-diagram-svg ellipse {
+    stroke: #000000 !important;
+  }
+
+  .geometry-diagram-svg text {
+    fill: #000000 !important;
+    font-weight: 600 !important;
+  }
 }

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource/noto-serif-bengali/index.css";
+@import "../styles/diagrams.css";
 
 @source "..";
 @source "../components";

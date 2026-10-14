@@ -5,6 +5,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import { cleanupMath, sanitizeHtmlTable } from "@/lib/utils";
 import { extractCodeBlocks } from "@/lib/code-formatter";
+import { parseDiagramsInText } from "@/utils/diagrams/inline-parser";
 
 declare global {
     interface Window {
@@ -249,8 +250,21 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     const renderedText = useMemo(() => {
         if (!processedText) return "";
 
-        // 1. Isolate code blocks & inline code so math symbols like $ / \ / { don't get eaten
-        const { cleanText: textWithoutCode, restore: restoreCode } = extractCodeBlocks(processedText);
+        // 0. Parse diagrams (Geometry diagrams ##GEO:...##, Physics presets ##PRESET:...##, FBD)
+        const textWithDiagrams = processedText.includes('##') 
+            ? parseDiagramsInText(processedText) 
+            : processedText;
+
+        // 1. Isolate SVGs so math symbols inside SVG attributes or labels aren't mangled by KaTeX
+        const svgPlaceholders: string[] = [];
+        const textWithoutSvg = textWithDiagrams.replace(/<svg[\s\S]*?<\/svg>/gi, (match) => {
+            const idx = svgPlaceholders.length;
+            svgPlaceholders.push(match);
+            return `__SVG_DIAGRAM_SLOT_${idx}__`;
+        });
+
+        // 2. Isolate code blocks & inline code so math symbols like $ / \ / { don't get eaten
+        const { cleanText: textWithoutCode, restore: restoreCode } = extractCodeBlocks(textWithoutSvg);
         let text = textWithoutCode;
 
         if (text && (text.includes('$') || text.includes('\\') || text.includes('{'))) {
@@ -271,8 +285,18 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
             });
         }
 
-        // 2. Restore beautiful syntax-styled code containers
-        return restoreCode(text);
+        // 3. Restore beautiful syntax-styled code containers
+        let restored = restoreCode(text);
+
+        // 4. Restore SVG diagrams
+        if (svgPlaceholders.length > 0) {
+            restored = restored.replace(/__SVG_DIAGRAM_SLOT_(\d+)__/g, (_, idxStr) => {
+                const idx = parseInt(idxStr, 10);
+                return svgPlaceholders[idx] || '';
+            });
+        }
+
+        return restored;
     }, [processedText]);
 
     // Ensure HTML tables are responsive, compact, and wrapped in a clean minimal container

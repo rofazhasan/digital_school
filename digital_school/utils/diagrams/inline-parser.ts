@@ -1,17 +1,19 @@
 import { getPreset, parseCombination } from './index';
 import { parseExcelFBD } from '../fbd/excel-parser';
 import { renderFBDToSVG } from '../fbd/svg-renderer';
+import { parseSingleGeometryDiagram } from './geometry/parser';
 
 const DIAGRAM_BLOCK_REGEX = /##(.*?)##/g;
-const SIZE_REGEX = /\[size:(small|medium|large|tiny)\]/;
+const SIZE_REGEX = /\[size:(small|medium|large|tiny|compact)\]/;
 const COMBINE_REGEX = /^COMBINE:(.*?)\[(.*?)\]$/;
 
 /**
  * Parses text and replaces diagram syntax with SVG strings.
  * Unified parser for:
- * 1. ##COMBINE:MODE[args]##
- * 2. ##PRESET:name(args)## (New System)
- * 3. ##P1...## (Legacy FBD Excel Format)
+ * 1. ##GEO:...## (Modern Compact Textbook & Hand-drawn Geometry Diagrams)
+ * 2. ##COMBINE:MODE[args]##
+ * 3. ##PRESET:name(args)## (New System)
+ * 4. ##P1...## (Legacy FBD Excel Format)
  */
 export function parseDiagramsInText(text: string): string {
     if (!text) return '';
@@ -20,19 +22,30 @@ export function parseDiagramsInText(text: string): string {
     return text.replace(DIAGRAM_BLOCK_REGEX, (match, content) => {
         let trimmedContent = content.trim();
 
-        // Check for size qualifier: [size:small], [size:medium], [size:large]
+        // Check for size qualifier: [size:small], [size:medium], [size:large], [size:compact]
         let sizeStyle = '';
         const sizeMatch = trimmedContent.match(SIZE_REGEX);
         if (sizeMatch) {
             const size = sizeMatch[1];
             trimmedContent = trimmedContent.replace(sizeMatch[0], '').trim();
-            if (size === 'tiny') sizeStyle = 'max-width: 80px;';
-            else if (size === 'small') sizeStyle = 'max-width: 150px;';
-            else if (size === 'medium') sizeStyle = 'max-width: 300px;';
-            else if (size === 'large') sizeStyle = 'max-width: 500px;';
+            if (size === 'tiny') sizeStyle = 'max-width: 95px;';
+            else if (size === 'small') sizeStyle = 'max-width: 145px;';
+            else if (size === 'compact') sizeStyle = 'max-width: 165px;';
+            else if (size === 'medium') sizeStyle = 'max-width: 220px;';
+            else if (size === 'large') sizeStyle = 'max-width: 320px;';
         }
 
         try {
+            // 0. Handle Geometry Diagrams (##GEO:...##)
+            if (trimmedContent.startsWith('GEO:')) {
+                const geoSvg = parseSingleGeometryDiagram(trimmedContent);
+                if (geoSvg) {
+                    let svg = geoSvg;
+                    if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
+                    return svg;
+                }
+            }
+
             // 1. Handle Combinations
             if (trimmedContent.startsWith('COMBINE:')) {
                 const parts = trimmedContent.split('|').map((p: string) => p.trim());
