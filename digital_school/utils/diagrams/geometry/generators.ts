@@ -786,48 +786,78 @@ export function renderCircleChord(options: GeometryOptions): RenderedGeometry {
 }
 
 export function renderCircleTangent(options: GeometryOptions): RenderedGeometry {
-  const w = 165, h = 145;
+  const w = 175, h = 125;
   const hatchId = getUniqueId('hatch');
   const labels = options.labels || {};
   const sides = options.sides || {};
 
-  const center: Point = { x: 60, y: 65 };
-  const radius = 45;
+  const center: Point = { x: 52, y: 46 };
+  const radius = 35;
 
-  const vT: Point = { x: 60 + radius * Math.cos(Math.PI / 4), y: 65 + radius * Math.sin(Math.PI / 4) }; // ~92, 97
-  const vP: Point = { x: 150, y: 135 }; // external point along tangent
-  const tangentBack: Point = { x: vT.x - (vP.x - vT.x) * 0.4, y: vT.y - (vP.y - vT.y) * 0.4 };
+  // Tangency point T at bottom of circle where tangent is perfectly horizontal
+  const vT: Point = { x: 52, y: 46 + radius }; // (52, 81)
+  const vP: Point = { x: 138, y: 81 };         // external point P
+  const tangentBack: Point = { x: 22, y: 81 }; // slight backward extension of tangent line
 
   let content = '';
 
+  // Circle
   content += `
     <circle cx="${center.x}" cy="${center.y}" r="${radius}" 
             fill="none" stroke="${GEO_THEME.ink}" stroke-width="1.8" />
   `;
 
-  // Tangent line through T to P
+  // Tangent line through T extending to P
   content += `
-    <line x1="${tangentBack.x.toFixed(1)}" y1="${tangentBack.y.toFixed(1)}" 
+    <line x1="${tangentBack.x}" y1="${tangentBack.y}" 
           x2="${vP.x}" y2="${vP.y}" 
           stroke="${GEO_THEME.ink}" stroke-width="1.8" stroke-linecap="round" />
   `;
 
-  // Radius OT
+  // Radius OT (perpendicular to tangent)
   content += `
-    <line x1="${center.x}" y1="${center.y}" x2="${vT.x.toFixed(1)}" y2="${vT.y.toFixed(1)}" 
-          stroke="${GEO_THEME.accentRed}" stroke-width="1.6" />
+    <line x1="${center.x}" y1="${center.y}" x2="${vT.x}" y2="${vT.y}" 
+          stroke="${GEO_THEME.accentBlue || '#2563eb'}" stroke-width="1.6" />
+  `;
+
+  // Hypotenuse OP (completing right-angled triangle OTP)
+  content += `
+    <line x1="${center.x}" y1="${center.y}" x2="${vP.x}" y2="${vP.y}" 
+          stroke="${GEO_THEME.ink}" stroke-width="1.3" stroke-dasharray="4,3" />
   `;
 
   // Right-angle marker at point of tangency T
   content += renderRightAngleMarker(vT, center, vP, 8, true);
 
-  // Label OT = r
-  content += renderSideLabel(center, vT, String(sides.r || 'r'), 9, false);
+  // Label OT = r (placed to the left of vertical segment OT, outside the triangle)
+  const rLabel = sides.r || sides.ot || (sides.a ? sides.a : '');
+  if (rLabel) {
+    content += renderSideLabel(center, vT, String(rLabel), 12, false);
+  }
 
-  content += `<circle cx="${center.x}" cy="${center.y}" r="2.2" fill="${GEO_THEME.ink}" />`;
-  content += renderVertex(center, labels.O || 'O', 'left');
-  content += renderVertex(vT, labels.T || 'T', 'top-right');
-  content += renderVertex(vP, labels.P || 'P', 'bottom-right');
+  // Label PT = t (placed below horizontal segment TP)
+  const tLabel = sides.t || sides.pt || (sides.b ? sides.b : '');
+  if (tLabel) {
+    content += renderSideLabel(vT, vP, String(tLabel), 11, false);
+  }
+
+  // Label OP = hyp (placed above slanted hypotenuse OP)
+  const hypLabel = sides.op || sides.hyp || (sides.c ? sides.c : '');
+  if (hypLabel) {
+    content += renderSideLabel(center, vP, String(hypLabel), 10, true);
+  }
+
+  // Center O dot and label
+  content += `<circle cx="${center.x}" cy="${center.y}" r="2.2" fill="${GEO_THEME.ink}" stroke="#ffffff" stroke-width="0.8" />`;
+  content += renderVertex(center, labels.O || 'O', 'top-left');
+
+  // Tangency point T dot and label
+  content += `<circle cx="${vT.x}" cy="${vT.y}" r="2.2" fill="${GEO_THEME.ink}" stroke="#ffffff" stroke-width="0.8" />`;
+  content += renderVertex(vT, labels.T || 'T', 'bottom-left');
+
+  // External point P dot and label
+  content += `<circle cx="${vP.x}" cy="${vP.y}" r="2.2" fill="${GEO_THEME.ink}" stroke="#ffffff" stroke-width="0.8" />`;
+  content += renderVertex(vP, labels.P || 'P', 'right');
 
   return wrapSvg(content, w, h, hatchId, options);
 }
