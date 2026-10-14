@@ -33,6 +33,12 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   'scalene-triangle': 'scalene-triangle',
   'triangle-altitude': 'triangle-altitude',
   'altitude': 'triangle-altitude',
+  'triangle-median': 'triangle-median',
+  'median': 'triangle-median',
+  'apollonius': 'triangle-median',
+  'vector-triangle': 'vector-triangle',
+  'vector': 'vector-triangle',
+  'vector-tri': 'vector-triangle',
   'triangle-incircle': 'triangle-incircle',
   'incircle': 'triangle-incircle',
   'triangle-circumcircle': 'triangle-circumcircle',
@@ -129,10 +135,61 @@ function parseParamString(raw: string): {
   }
 
   // Clean quotes or outer parentheses if LLM passed them
-  const cleanedRaw = raw.replace(/^["'`]|["'`]$/g, '').trim();
+  let text = raw.replace(/^["'`]|["'`]$/g, '').trim();
 
-  // Split by comma, semicolon, pipe, or newline outside brackets
-  const tokens = cleanedRaw.split(/[,;\n|](?![^[]*\])/g).map(s => s.trim()).filter(Boolean);
+  // Extract explicit labels group e.g. "labels:A,B,C,D" or "labels=[A,B,C,D]"
+  const labelsMatch = text.match(/(?:labels|vertices)\s*[:=]\s*\[?([A-Za-z0-9_,\s=]+)\]?/i);
+  if (labelsMatch) {
+    const defaultKeys = ['A', 'B', 'C', 'D', 'E', 'F', 'P', 'Q', 'R'];
+    const items = labelsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    items.forEach((item, idx) => {
+      if (item.includes('=')) {
+        const [k, v] = item.split('=');
+        labels[k.trim()] = v.trim();
+      } else {
+        const k = defaultKeys[idx] || item;
+        labels[k] = item;
+      }
+    });
+    text = text.replace(labelsMatch[0], '').trim();
+  }
+
+  // Extract explicit sides group e.g. "sides:c=6,b=8,m=AD" or "sides=[c=6,b=8]"
+  const sidesMatch = text.match(/sides\s*[:=]\s*\[?([A-Za-z0-9_=.,\s]+)\]?/i);
+  if (sidesMatch) {
+    const items = sidesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    items.forEach(item => {
+      if (item.includes('=')) {
+        const [k, v] = item.split('=');
+        sides[k.trim()] = v.trim();
+      } else if (item.includes(':')) {
+        const [k, v] = item.split(':');
+        sides[k.trim()] = v.trim();
+      }
+    });
+    text = text.replace(sidesMatch[0], '').trim();
+  }
+
+  // Extract explicit angles group e.g. "angles:A=60°,B=45°" or "angles=[A=60°,B=45°]"
+  const anglesMatch = text.match(/angles\s*[:=]\s*\[?([A-Za-z0-9_=.,\s°]+)\]?/i);
+  if (anglesMatch) {
+    const items = anglesMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+    items.forEach(item => {
+      if (item.includes('=')) {
+        const [k, v] = item.split('=');
+        angles[k.trim()] = v.trim();
+      } else if (item.includes(':')) {
+        const [k, v] = item.split(':');
+        angles[k.trim()] = v.trim();
+      } else {
+        angles['angle'] = item;
+      }
+    });
+    text = text.replace(anglesMatch[0], '').trim();
+  }
+
+  // Split remainder by comma, semicolon, pipe, or newline outside brackets
+  const tokens = text.split(/[,;\n|](?![^[]*\])/g).map(s => s.trim()).filter(Boolean);
 
   for (const token of tokens) {
     const separatorIdx = token.search(/[=:]/);

@@ -12,6 +12,7 @@ export type GeometryShapeType =
   | 'scalene-triangle'
   | 'triangle-altitude'
   | 'triangle-median'
+  | 'vector-triangle'
   | 'triangle-incircle'
   | 'triangle-circumcircle'
   | 'triangle-midsegment'

@@ -118,7 +118,27 @@ assert(
   'Universal Custom Geometry DSL parses arbitrary figures with all indicators & auto-fit'
 );
 
-// Summary
+// Test 6: Higher Math Diagrams (triangle-median and vector-triangle)
+console.log('\n--- Test 6: Higher Math Diagrams (Median & Vector) ---');
+
+const medianDsl = `##GEO:triangle-median[labels:A,B,C,D;sides:c=6,b=8,m=AD]##`;
+const parsedMedian = parseDiagramsInText(medianDsl);
+assert(
+  parsedMedian.includes('<svg') &&
+  parsedMedian.includes('stroke-dasharray=') &&
+  !parsedMedian.includes('Error parsing'),
+  'Triangle with median renders dashed median and tick marks without error'
+);
+
+const vectorDsl = `##GEO:vector-triangle[labels:P,Q,R;sides:u=a,v=b,w=c]##`;
+const parsedVector = parseDiagramsInText(vectorDsl);
+assert(
+  parsedVector.includes('<svg') &&
+  parsedVector.includes('polygon points=') &&
+  !parsedVector.includes('Error parsing'),
+  'Vector triangle renders directional arrowheads without error'
+);
+
 console.log(`\n================================`);
 console.log(`Total Passed: ${passed}`);
 console.log(`Total Failed: ${failed}`);
