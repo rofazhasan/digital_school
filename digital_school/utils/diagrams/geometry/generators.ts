@@ -289,6 +289,87 @@ export function renderTriangleWithAltitude(options: GeometryOptions): RenderedGe
   return wrapSvg(content, w, h, hatchId, options);
 }
 
+export function renderTriangleWithMedian(options: GeometryOptions): RenderedGeometry {
+  const w = 160, h = 125;
+  const hatchId = getUniqueId('hatch');
+  const labels = options.labels || {};
+  const sides = options.sides || {};
+
+  const vA: Point = { x: 75, y: 18 };
+  const vB: Point = { x: 18, y: 105 };
+  const vC: Point = { x: 142, y: 105 };
+  const vD: Point = midpoint(vB, vC); // midpoint of base BC (80, 105)
+
+  let content = '';
+
+  // Triangle body
+  content += `
+    <polygon points="${vA.x},${vA.y} ${vB.x},${vB.y} ${vC.x},${vC.y}" 
+             fill="${options.showShading ? `url(#${hatchId})` : 'none'}" 
+             stroke="${GEO_THEME.ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+  `;
+
+  // Median line AD
+  content += `
+    <line x1="${vA.x}" y1="${vA.y}" x2="${vD.x}" y2="${vD.y}" 
+          stroke="${GEO_THEME.ink}" stroke-width="1.6" stroke-dasharray="4 3" stroke-linecap="round" />
+  `;
+
+  // Equal tick marks on BD and DC to show D is midpoint
+  content += renderTickMarks(vB, vD, 1);
+  content += renderTickMarks(vD, vC, 1);
+
+  // Side labels
+  if (sides.c || sides.AB) content += renderSideLabel(vB, vA, String(sides.c || sides.AB), 10, false);
+  if (sides.b || sides.AC) content += renderSideLabel(vA, vC, String(sides.b || sides.AC), 10, true);
+  if (sides.m || sides.AD) content += renderSideLabel(vA, vD, String(sides.m || sides.AD), 8, false);
+
+  // Vertices
+  content += renderVertex(vA, labels.A || 'A', 'top');
+  content += renderVertex(vB, labels.B || 'B', 'bottom-left');
+  content += renderVertex(vC, labels.C || 'C', 'bottom-right');
+  content += renderVertex(vD, labels.D || 'D', 'bottom');
+
+  return wrapSvg(content, w, h, hatchId, options);
+}
+
+export function renderVectorTriangle(options: GeometryOptions): RenderedGeometry {
+  const w = 160, h = 125;
+  const hatchId = getUniqueId('hatch');
+  const labels = options.labels || {};
+  const sides = options.sides || {};
+
+  const vA: Point = { x: 75, y: 18 };
+  const vB: Point = { x: 20, y: 105 };
+  const vC: Point = { x: 140, y: 105 };
+
+  let content = '';
+
+  // Triangle lines with directional arrows
+  content += `
+    <line x1="${vB.x}" y1="${vB.y}" x2="${vA.x}" y2="${vA.y}" stroke="${GEO_THEME.ink}" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="${vA.x}" y1="${vA.y}" x2="${vC.x}" y2="${vC.y}" stroke="${GEO_THEME.ink}" stroke-width="1.8" stroke-linecap="round" />
+    <line x1="${vB.x}" y1="${vB.y}" x2="${vC.x}" y2="${vC.y}" stroke="${GEO_THEME.ink}" stroke-width="1.8" stroke-linecap="round" />
+  `;
+
+  // Arrows along vectors: B -> A, A -> C, B -> C
+  content += renderParallelArrows(vB, vA, 1, 6);
+  content += renderParallelArrows(vA, vC, 1, 6);
+  content += renderParallelArrows(vB, vC, 1, 6);
+
+  // Vector labels
+  if (sides.u || sides.BA || sides.AB) content += renderSideLabel(vB, vA, String(sides.u || sides.BA || sides.AB), 11, false);
+  if (sides.v || sides.AC) content += renderSideLabel(vA, vC, String(sides.v || sides.AC), 11, true);
+  if (sides.w || sides.BC) content += renderSideLabel(vB, vC, String(sides.w || sides.BC), 11, false);
+
+  // Vertices
+  content += renderVertex(vA, labels.A || 'A', 'top');
+  content += renderVertex(vB, labels.B || 'B', 'bottom-left');
+  content += renderVertex(vC, labels.C || 'C', 'bottom-right');
+
+  return wrapSvg(content, w, h, hatchId, options);
+}
+
 export function renderInscribedCircleTriangle(options: GeometryOptions): RenderedGeometry {
   const w = 155, h = 130;
   const hatchId = getUniqueId('hatch');
@@ -1403,6 +1484,8 @@ export const GEOMETRY_GENERATORS: Record<string, (options: GeometryOptions) => R
   'isosceles-triangle': renderIsoscelesTriangle,
   'scalene-triangle': renderScaleneTriangle,
   'triangle-altitude': renderTriangleWithAltitude,
+  'triangle-median': renderTriangleWithMedian,
+  'vector-triangle': renderVectorTriangle,
   'triangle-incircle': renderInscribedCircleTriangle,
   'triangle-circumcircle': renderCircumscribedCircleTriangle,
   'similar-triangles': renderSimilarTriangles,
