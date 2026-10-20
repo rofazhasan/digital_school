@@ -56,6 +56,8 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
         questionText: s(getValue(row, ["Question Text", "Question", "Title"])),
         modelAnswer: s(getValue(row, ["Model Answer", "ModelAnswer", "Answer", "Correct Answer"])),
         explanation: s(getValue(row, ["Teacher Note / Explanation", "Explanation", "Rationale", "Exp", "Solution", "Explaination"])),
+        images: [],
+        primaryImage: null,
         classId: null,
         options: [],
         subQuestions: [],
@@ -66,6 +68,15 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
         rightColumn: [],
         matches: {},
     };
+
+    const primaryImageRaw = s(getValue(row, ["Primary Image URL", "Primary Image", "Image URL", "Image", "Images", "Figure", "Diagram"]));
+    if (primaryImageRaw) {
+        data.images = [primaryImageRaw];
+        data.primaryImage = primaryImageRaw;
+    }
+    if (Array.isArray(row.images) && row.images.length > 0) {
+        data.images = row.images;
+    }
 
     // Skip rows that have neither question type nor question text nor subject (e.g. empty or reference rows)
     const hasAnyCoreField = Boolean(data.questionText || data.subject || data.className || typeRaw);
@@ -583,6 +594,7 @@ export async function POST(req: NextRequest) {
                         leftColumn: q.leftColumn || undefined,
                         rightColumn: q.rightColumn || undefined,
                         matches: q.matches || undefined,
+                        images: Array.isArray(q.images) && q.images.length > 0 ? q.images : (q.primaryImage ? [q.primaryImage] : []),
                         createdById: creator.id,
                         hasMath: Boolean(
                             /\\/.test(String(q.questionText || '')) ||

@@ -157,7 +157,13 @@ const QuestionCard = ({
         {question.images && question.images.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-2">
             {question.images.map((img, i) => (
-              <img key={i} src={img} alt="Question" className="max-h-32 rounded border shadow-sm" />
+              typeof img === 'string' && (img.includes('##') || img.startsWith('[GEO:')) ? (
+                <div key={i} className="my-1 p-1 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-700 max-w-full overflow-hidden [&_svg]:max-h-36 [&_svg]:w-auto [&_svg]:mx-auto">
+                  <UniversalMathJax inline={false} dynamic>{img}</UniversalMathJax>
+                </div>
+              ) : (
+                <img key={i} src={img} alt="Question" className="max-h-32 rounded border shadow-sm" />
+              )
             ))}
           </div>
         )}

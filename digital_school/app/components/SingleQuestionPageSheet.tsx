@@ -98,6 +98,51 @@ const getArOptions = (isBn: boolean) => [
 ];
 
 /**
+ * World-Class B&W Figure Component for Print & Sheet Maker
+ * Renders inline SVG delimiter diagrams (##PRESET:...## or ##GEO:...##) with high-contrast monochrome textbook styling
+ */
+const QuestionFigure: React.FC<{ content: string; isBn?: boolean; className?: string; label?: string }> = ({
+  content,
+  isBn = true,
+  className = '',
+  label
+}) => {
+  if (!content || typeof content !== 'string') return null;
+  const trimmed = content.trim();
+  const isDelimiter = trimmed.includes('##') || trimmed.startsWith('[GEO:') || trimmed.startsWith('GEO:') || trimmed.startsWith('PRESET:');
+  const figureCaption = label || (isBn ? 'চিত্র: উদ্দীপকের চিত্র' : 'Figure: Stem Diagram');
+
+  if (isDelimiter) {
+    const formatted = (trimmed.startsWith('##') || trimmed.startsWith('[GEO:')) ? trimmed : `##${trimmed}##`;
+    return (
+      <div className={`my-2.5 p-2.5 bg-white rounded-lg border-2 border-slate-700/80 print:border-black shadow-xs max-w-full overflow-hidden flex flex-col items-center justify-center print:shadow-none print:my-1.5 print:p-1.5 print-avoid-break ${className}`}>
+        <div className="flex justify-center items-center w-full [&_svg]:max-h-48 [&_svg]:max-w-full [&_svg]:w-auto [&_svg]:mx-auto [&_svg]:filter [&_svg]:grayscale [&_svg]:contrast-150 print:[&_svg]:max-h-40 print:[&_svg]:contrast-200">
+          <UniversalMathJax inline={false} dynamic>
+            {formatted}
+          </UniversalMathJax>
+        </div>
+        <div className="mt-1 text-[10px] md:text-[11px] font-bold text-slate-700 print:text-black tracking-wide border-t border-slate-300 print:border-black/50 pt-1 w-full text-center">
+          {figureCaption}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`my-2 p-1.5 bg-white rounded-lg border-2 border-slate-700/80 print:border-black shadow-xs flex flex-col items-center justify-center max-w-full print:shadow-none print:my-1 print-avoid-break ${className}`}>
+      <img
+        src={trimmed}
+        alt="Figure"
+        className="max-h-44 object-contain rounded print:filter print:grayscale print:contrast-150"
+      />
+      <div className="mt-1 text-[10px] md:text-[11px] font-bold text-slate-700 print:text-black tracking-wide border-t border-slate-300 print:border-black/50 pt-1 w-full text-center">
+        {figureCaption}
+      </div>
+    </div>
+  );
+};
+
+/**
  * BEST ALGORITHM: Universal Safe Question Normalizer with Robust Model Answer & Explanation Resolver
  * Normalizes all question types (CQ, MCQ, AR, MTF, INT, SQ) into clean structure
  */
@@ -315,7 +360,7 @@ export function normalizeQuestionData(q: any) {
     });
   }
 
-  // 7. Images
+  // 7. Images & Delimiter Diagrams
   let images: string[] = [];
   if (Array.isArray(q.images)) images = q.images;
   else if (typeof q.images === 'string') {
@@ -324,7 +369,17 @@ export function normalizeQuestionData(q: any) {
       if (Array.isArray(p)) images = p;
       else if (typeof p === 'string') images = [p];
     } catch (e) {
-      if (q.images.startsWith('http') || q.images.startsWith('data:')) images = [q.images];
+      if (q.images.startsWith('http') || q.images.startsWith('data:') || q.images.includes('##') || q.images.startsWith('[GEO:') || q.images.startsWith('GEO:') || q.images.startsWith('PRESET:') || q.images.startsWith('/')) {
+        images = [q.images];
+      }
+    }
+  }
+
+  // Fallback to primaryImage, stemImage, or diagram if images array is empty
+  if (images.length === 0) {
+    const pImg = q.primaryImage || q.primary_image || q.imageUrl || q.image_url || q.image || q.stemImage || q.diagram;
+    if (typeof pImg === 'string' && pImg.trim()) {
+      images = [pImg.trim()];
     }
   }
 
@@ -537,7 +592,7 @@ export default function SingleQuestionPageSheet({
       className="w-full text-black print:text-black"
       style={{ fontFamily: isBn ? bengaliFontFamily : englishFontFamily }}
     >
-      {/* INJECT DYNAMIC PRINT MEDIA STYLES TO AUTO-SET LANDSCAPE PAPER ORIENTATION */}
+      {/* INJECT DYNAMIC PRINT MEDIA STYLES TO AUTO-SET LANDSCAPE PAPER ORIENTATION & WORLD-CLASS B&W PRINT */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
@@ -547,6 +602,18 @@ export default function SingleQuestionPageSheet({
           body {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            color: #000 !important;
+          }
+          svg {
+            filter: grayscale(100%) contrast(135%) !important;
+          }
+          svg text {
+            fill: #000 !important;
+            font-family: inherit !important;
+          }
+          .print-avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       ` }} />
@@ -962,11 +1029,11 @@ export default function SingleQuestionPageSheet({
 
 
 
-                        {/* Question Images */}
+                        {/* Question Images & Delimiter Figures */}
                         {question.images && question.images.length > 0 && (
-                          <div className="flex flex-wrap gap-2 justify-center my-2">
+                          <div className="flex flex-wrap gap-2 justify-center my-2 w-full">
                             {question.images.map((img: string, i: number) => (
-                              <img key={i} src={img} alt="Diagram" className="max-h-40 object-contain rounded border border-gray-300" />
+                              <QuestionFigure key={i} content={img} isBn={isBn} />
                             ))}
                           </div>
                         )}
@@ -1379,11 +1446,11 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
-                      {/* Question Images */}
+                      {/* Question Images & Delimiter Figures */}
                       {question.images && question.images.length > 0 && (
-                        <div className="flex flex-wrap gap-4 justify-center my-3">
+                        <div className="flex flex-wrap gap-3 justify-center my-3 w-full">
                           {question.images.map((img: string, i: number) => (
-                            <img key={i} src={img} alt="Diagram" className="max-h-56 object-contain rounded border border-gray-300" />
+                            <QuestionFigure key={i} content={img} isBn={isBn} />
                           ))}
                         </div>
                       )}

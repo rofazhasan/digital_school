@@ -2,3 +2,5 @@
 .netlify
 *.pdf
 *.png
+.agents/
+.skills-library/

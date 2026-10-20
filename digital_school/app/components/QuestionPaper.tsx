@@ -199,6 +199,19 @@ function pickBanglaWord(seed: string, offset: number = 0, lang: 'bn' | 'en' = 'b
   return wordList[idx];
 }
 
+// Helper component to render delimiter diagrams (##PRESET:...## or [GEO:...]) or image URLs
+const FigureOrImg = ({ src, alt = "Diagram" }: { src: string; alt?: string }) => {
+  if (!src) return null;
+  if (typeof src === 'string' && (src.includes('##') || src.startsWith('[GEO:'))) {
+    return (
+      <div className="my-2 p-1.5 bg-white rounded border border-gray-400 print:border-black max-w-full overflow-hidden flex justify-center items-center [&_svg]:max-h-48 [&_svg]:max-w-full [&_svg]:w-auto [&_svg]:mx-auto [&_svg]:grayscale [&_svg]:contrast-125 print:[&_svg]:max-h-40">
+        <UniversalMathJax inline={false} dynamic>{src}</UniversalMathJax>
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />;
+};
+
 // Helper to detect specific variant or compound subject configurations (e.g., "Only Biology", "Bio + Math", "(25 Qs)")
 const isSpecificVariantSubject = (name: string): boolean => {
   return /[\+&]|(\b(and|plus|with|only)\b)|(\b\d+\s*qs\b)|\(|\)/i.test(name);
@@ -958,7 +971,13 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               <Text>{q.q || q.questionText || q.stem || ''}</Text>
                               {q.image && (
                                 <div className="mt-2 text-center">
-                                  <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />
+                                  {typeof q.image === 'string' && (q.image.includes('##') || q.image.startsWith('[GEO:')) ? (
+                                    <div className="flex justify-center items-center my-2 p-1.5 bg-white rounded border border-gray-400 print:border-black max-w-full overflow-hidden [&_svg]:max-h-44 [&_svg]:max-w-full [&_svg]:w-auto [&_svg]:mx-auto [&_svg]:grayscale [&_svg]:contrast-125 print:[&_svg]:max-h-40">
+                                      <UniversalMathJax inline={false} dynamic>{q.image}</UniversalMathJax>
+                                    </div>
+                                  ) : (
+                                    <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1508,7 +1527,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                               <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           )}
-                                          {(part.stemImage || part.imageUrl) && <img src={part.stemImage || part.imageUrl} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
+                                          {(part.stemImage || part.imageUrl) && <FigureOrImg src={part.stemImage || part.imageUrl} alt="Stem" />}
 
                                           {(!part.answerType || part.answerType === 'qa') && (
                                             <div className="grid grid-cols-1 gap-2 ml-4">
@@ -1534,7 +1553,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                                <UniversalMathJax dynamic>{(part.stemPassage || part.passage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                              </div>
                                            )}
-                                           {(part.stemImage || part.imageUrl) && <img src={part.stemImage || part.imageUrl} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
+                                           {(part.stemImage || part.imageUrl) && <FigureOrImg src={part.stemImage || part.imageUrl} alt="Stem" />}
 
                                            <div className="grid grid-cols-2 gap-x-4 gap-y-6 ml-4">
                                              {(part.subQuestions || part.questions || []).map((sq: any, sqi: number) => (
