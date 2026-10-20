@@ -4,3 +4,4 @@
 *.png
 .agents/
 .skills-library/
+*.xlsx
