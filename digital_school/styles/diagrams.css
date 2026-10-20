@@ -283,26 +283,46 @@
     fill: #f1f5f9 !important;
 }
 
-/* Print mode overrides */
+/* Print mode overrides - High contrast crisp Black & White */
 @media print {
-    .geometry-diagram-svg {
-        max-width: 140px !important;
-        max-height: 105px !important;
-        margin: 1px 3px !important;
+    .geometry-diagram-svg,
+    .physics-diagram-svg,
+    .fbd-diagram,
+    .inline-diagram-svg,
+    svg.responsive-svg {
+        max-width: 150px !important;
+        max-height: 115px !important;
+        margin: 2px 4px !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
+        filter: grayscale(100%) contrast(150%) !important;
+        background: #ffffff !important;
     }
 
     .geometry-diagram-svg line,
     .geometry-diagram-svg path,
     .geometry-diagram-svg polygon,
     .geometry-diagram-svg circle,
-    .geometry-diagram-svg ellipse {
+    .geometry-diagram-svg ellipse,
+    .physics-diagram-svg line,
+    .physics-diagram-svg path,
+    .physics-diagram-svg polygon,
+    .physics-diagram-svg circle,
+    .physics-diagram-svg ellipse,
+    .inline-diagram-svg line,
+    .inline-diagram-svg path,
+    .inline-diagram-svg polygon,
+    .inline-diagram-svg circle {
         stroke: #000000 !important;
+        stroke-opacity: 1 !important;
     }
 
-    .geometry-diagram-svg text {
+    .geometry-diagram-svg text,
+    .physics-diagram-svg text,
+    .inline-diagram-svg text,
+    .fbd-diagram text {
         fill: #000000 !important;
-        font-weight: 600 !important;
+        font-weight: 700 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
 }

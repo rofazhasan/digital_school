@@ -193,7 +193,11 @@ export function parseDiagramsInText(text: string): string {
                         if (diagram.customSVG && !fbdParts) {
                             let svg = diagram.customSVG;
                             if (!svg.trim().startsWith('<svg')) {
-                                svg = `<svg width="${diagram.width}" height="${diagram.height}" viewBox="0 0 ${diagram.width} ${diagram.height}" xmlns="http://www.w3.org/2000/svg">${diagram.customSVG}</svg>`;
+                                svg = `<svg class="physics-diagram-svg inline-diagram-svg" width="${diagram.width}" height="${diagram.height}" viewBox="0 0 ${diagram.width} ${diagram.height}" xmlns="http://www.w3.org/2000/svg">${diagram.customSVG}</svg>`;
+                            } else if (!svg.includes('class=')) {
+                                svg = svg.replace('<svg', '<svg class="physics-diagram-svg inline-diagram-svg"');
+                            } else if (!svg.includes('inline-diagram-svg')) {
+                                svg = svg.replace('class="', 'class="inline-diagram-svg physics-diagram-svg ');
                             }
                             if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
                             return svg;

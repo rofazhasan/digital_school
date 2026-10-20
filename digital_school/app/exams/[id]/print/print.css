@@ -783,16 +783,23 @@
     white-space: normal !important;
   }
 
-  /* Compact geometry diagrams in print papers (saves space in columns, sharp ink) */
-  .geometry-diagram-svg {
+  /* World-Class B&W Print & Sheet Diagrams (High-Contrast, Crisp Vector Line Art) */
+  .geometry-diagram-svg,
+  .physics-diagram-svg,
+  .fbd-diagram,
+  .inline-diagram-svg,
+  svg.responsive-svg,
+  .question-text svg,
+  .question-content svg {
     display: inline-block !important;
     vertical-align: middle !important;
-    max-width: 140px !important;
-    max-height: 105px !important;
-    margin: 2px 4px !important;
+    max-width: 155px !important;
+    max-height: 120px !important;
+    margin: 3px 6px !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    filter: none !important;
+    filter: grayscale(100%) contrast(150%) !important;
+    background: #ffffff !important;
   }
 
   .geometry-diagram-svg line,
@@ -800,12 +807,33 @@
   .geometry-diagram-svg polygon,
   .geometry-diagram-svg rect,
   .geometry-diagram-svg circle,
-  .geometry-diagram-svg ellipse {
+  .geometry-diagram-svg ellipse,
+  .physics-diagram-svg line,
+  .physics-diagram-svg path,
+  .physics-diagram-svg polygon,
+  .physics-diagram-svg rect,
+  .physics-diagram-svg circle,
+  .physics-diagram-svg ellipse,
+  .fbd-diagram line,
+  .fbd-diagram path,
+  .fbd-diagram polygon,
+  .fbd-diagram rect,
+  .fbd-diagram circle,
+  .inline-diagram-svg line,
+  .inline-diagram-svg path,
+  .inline-diagram-svg polygon,
+  .inline-diagram-svg rect,
+  .inline-diagram-svg circle {
     stroke: #000000 !important;
+    stroke-opacity: 1 !important;
   }
 
-  .geometry-diagram-svg text {
+  .geometry-diagram-svg text,
+  .physics-diagram-svg text,
+  .fbd-diagram text,
+  .inline-diagram-svg text {
     fill: #000000 !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   }
 }

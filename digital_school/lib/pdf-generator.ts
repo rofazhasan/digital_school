@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { Question } from '@prisma/client';
+import { parseDiagramsInText } from '@/utils/diagrams/inline-parser';
 
 export interface PDFOptions {
   title?: string;
@@ -60,7 +61,7 @@ class PDFGenerator {
           
           <div class="question-content" style="margin-bottom: 15px;">
             <div class="question-text" style="margin-bottom: 10px;">
-              ${question.questionText}
+              ${parseDiagramsInText(question.questionText || '')}
             </div>
       `;
 
@@ -68,7 +69,7 @@ class PDFGenerator {
       if (question.type === 'CQ' && question.stem) {
         html += `
           <div class="question-stem" style="background: #f8fafc; padding: 10px; border-left: 4px solid #2563eb; margin-bottom: 10px; font-style: italic;">
-            ${question.stem}
+            ${parseDiagramsInText(question.stem)}
           </div>
         `;
       }
@@ -221,6 +222,29 @@ class PDFGenerator {
           @media print {
             .question {
               page-break-inside: avoid;
+            }
+            .geometry-diagram-svg,
+            .physics-diagram-svg,
+            .fbd-diagram,
+            .inline-diagram-svg,
+            svg {
+              display: inline-block !important;
+              vertical-align: middle !important;
+              max-width: 160px !important;
+              max-height: 120px !important;
+              filter: grayscale(100%) contrast(150%) !important;
+              background: #ffffff !important;
+              page-break-inside: avoid !important;
+            }
+            .geometry-diagram-svg line,
+            .geometry-diagram-svg path,
+            .geometry-diagram-svg polygon,
+            .physics-diagram-svg line,
+            .physics-diagram-svg path,
+            .physics-diagram-svg polygon,
+            .inline-diagram-svg line,
+            .inline-diagram-svg path {
+              stroke: #000000 !important;
             }
           }
         </style>

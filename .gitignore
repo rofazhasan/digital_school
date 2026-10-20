@@ -4,4 +4,7 @@
 *.png
 .agents/
 .skills-library/
+.DS_Store
+**/.DS_Store
 *.xlsx
+!untitled folder/*.xlsx

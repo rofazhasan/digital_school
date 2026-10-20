@@ -821,6 +821,32 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'amine-group': createAmine,
     'amide-group': createAmide,
 
+    // ===== HSC PHYSICS STANDARD ALIASES & VARIANTS =====
+    'bjt-npn': createTransistorNPN,
+    'bohr-atom': createBohrModel,
+    'black-hole-event-horizon': createBlackHole,
+    'expanding-universe': createBigBang,
+    'decay-curve': createExponential,
+    'interference-slits': createDoubleSlit,
+    'diffraction-pattern': createDiffractionGrating,
+    'lorentz-relativity': createLorentzFactor,
+    'zener-regulator': createZenerDiode,
+    'logic-gates': (id: string) => createANDGate(id),
+    'kepler-orbit': (id: string) => ({
+        id, width: 300, height: 200, points: [], forces: [],
+        customSVG: createEllipse(4, 2.5, { width: 300, height: 200 })
+    }),
+    'diode-characteristics': createDiode,
+    'matter-waves': createTransverseWave,
+    'polarized-light': createTransverseWave,
+    'photoelectric-effect': createPhotoelectricSetup,
+    'xray-tube': createPhotoelectricSetup,
+    'nuclear-binding-curve': (id: string) => ({
+        id, width: 300, height: 200, points: [], forces: [],
+        customSVG: createParabola(-0.5, 0, 0, { width: 300, height: 200 })
+    }),
+    'stellar-parallax': (id: string) => createTriangle(id, 'right'),
+
     // ===== BULK GENERATED PRESETS (Standardized Variants) =====
     ...generateInclineVariants(),
     ...generateParabolaVariants(),

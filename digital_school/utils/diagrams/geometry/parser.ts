@@ -100,7 +100,10 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   'sphere': 'sphere',
   'cube': 'cube',
   'cuboid': 'cube',
-  'box': 'cube',
+  // Measuring Instruments & Conics
+  'ellipse': 'circle-radius',
+  'vernier': 'rectangle',
+  'screw-gauge': 'cylinder',
 };
 
 const SIZE_MODIFIERS: Record<string, DiagramSize> = {
