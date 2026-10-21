@@ -1477,6 +1477,103 @@ export function renderCube(options: GeometryOptions): RenderedGeometry {
   return wrapSvg(content, w, h, hatchId, options);
 }
 
+/**
+ * Simple Pendulum (Mechanics / Physics)
+ * Draws suspended pendulum with pivot, ceiling hatch, angle arc θ, string length L, and bob.
+ */
+export function renderPendulum(options: GeometryOptions): RenderedGeometry {
+  const hatchId = getUniqueId('hatch-pendulum');
+  const w = options.width || 180;
+  const h = options.height || 180;
+
+  const pivot: Point = { x: w / 2, y: 28 };
+
+  // Angle in degrees (default 15)
+  let angleDeg = 15;
+  const rawAngle =
+    options.angles?.angle ||
+    options.angles?.theta ||
+    options.angles?.['theta'] ||
+    options.rawMap?.angle ||
+    options.rawMap?.theta;
+
+  if (rawAngle) {
+    const parsed = parseFloat(String(rawAngle).replace(/[^0-9.-]/g, ''));
+    if (!isNaN(parsed) && parsed !== 0) angleDeg = parsed;
+  }
+
+  // Length display
+  const rawLength =
+    options.sides?.length ||
+    options.sides?.l ||
+    options.rawMap?.length ||
+    options.rawMap?.l;
+
+  const lengthDisplay = rawLength ? `${rawLength}m` : 'L';
+  const visualLength = Math.min(h - 55, 110);
+
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const bob: Point = {
+    x: pivot.x + visualLength * Math.sin(angleRad),
+    y: pivot.y + visualLength * Math.cos(angleRad),
+  };
+  const bobRadius = 9;
+
+  let content = '';
+
+  // 1. Rigid support / ceiling
+  const ceilingWidth = 70;
+  const cA: Point = { x: pivot.x - ceilingWidth / 2, y: pivot.y };
+  const cB: Point = { x: pivot.x + ceilingWidth / 2, y: pivot.y };
+  content += `<line x1="${cA.x}" y1="${cA.y}" x2="${cB.x}" y2="${cB.y}" stroke="${GEO_THEME.stroke}" stroke-width="${GEO_THEME.strokeWidthThick}" stroke-linecap="round"/>`;
+  for (let x = cA.x + 5; x <= cB.x; x += 10) {
+    content += `<line x1="${x}" y1="${pivot.y}" x2="${x + 6}" y2="${pivot.y - 8}" stroke="${GEO_THEME.draftingLine}" stroke-width="1.2"/>`;
+  }
+
+  // 2. Pivot
+  content += `<circle cx="${pivot.x}" cy="${pivot.y}" r="3.5" fill="${GEO_THEME.stroke}"/>`;
+
+  // 3. Vertical dashed equilibrium line
+  const eqBottom: Point = { x: pivot.x, y: pivot.y + visualLength + 15 };
+  content += renderDashedLine(pivot, eqBottom);
+
+  // 4. Equilibrium ghost bob
+  content += `<circle cx="${pivot.x}" cy="${pivot.y + visualLength}" r="${bobRadius}" fill="none" stroke="${GEO_THEME.dashed}" stroke-width="1" stroke-dasharray="3,3"/>`;
+
+  // 5. Angle Arc
+  const arcR = Math.min(36, visualLength * 0.4);
+  const arcEnd: Point = {
+    x: pivot.x + arcR * Math.sin(angleRad),
+    y: pivot.y + arcR * Math.cos(angleRad),
+  };
+  const sweep = angleDeg >= 0 ? 0 : 1;
+  content += `<path d="M ${pivot.x} ${pivot.y + arcR} A ${arcR} ${arcR} 0 0 ${sweep} ${arcEnd.x} ${arcEnd.y}" fill="none" stroke="${GEO_THEME.angleArc}" stroke-width="1.5"/>`;
+
+  const midAngleRad = angleRad / 2;
+  const labelDist = arcR + 12;
+  const labelX = pivot.x + labelDist * Math.sin(midAngleRad);
+  const labelY = pivot.y + labelDist * Math.cos(midAngleRad) + 3;
+  const angleText = angleDeg !== 15 ? `${angleDeg}°` : 'θ';
+  content += `<text x="${labelX}" y="${labelY}" font-family="${GEO_THEME.fontFamily}" font-size="11" font-weight="600" fill="${GEO_THEME.angleArc}" text-anchor="middle">${angleText}</text>`;
+
+  // 6. Suspended string
+  content += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${bob.x}" y2="${bob.y}" stroke="${GEO_THEME.stroke}" stroke-width="1.8"/>`;
+
+  // Length label along string
+  const midX = (pivot.x + bob.x) / 2 + (angleDeg >= 0 ? 12 : -12);
+  const midY = (pivot.y + bob.y) / 2;
+  content += `<text x="${midX}" y="${midY}" font-family="${GEO_THEME.fontFamily}" font-size="11" font-style="italic" fill="${GEO_THEME.label}" text-anchor="middle">${lengthDisplay}</text>`;
+
+  // 7. Bob
+  content += `
+    <circle cx="${bob.x}" cy="${bob.y}" r="${bobRadius}" fill="#2C3E50" stroke="#1A252F" stroke-width="1.5"/>
+    <circle cx="${bob.x - bobRadius * 0.3}" cy="${bob.y - bobRadius * 0.3}" r="${bobRadius * 0.35}" fill="#ffffff" opacity="0.4"/>
+    <text x="${bob.x}" y="${bob.y + bobRadius + 14}" font-family="${GEO_THEME.fontFamily}" font-size="10" font-weight="600" fill="${GEO_THEME.label}" text-anchor="middle">m</text>
+  `;
+
+  return wrapSvg(content, w, h, hatchId, options);
+}
+
 // Registry map of generators
 export const GEOMETRY_GENERATORS: Record<string, (options: GeometryOptions) => RenderedGeometry> = {
   'right-triangle': renderRightTriangle,
@@ -1516,4 +1613,5 @@ export const GEOMETRY_GENERATORS: Record<string, (options: GeometryOptions) => R
   'cone': renderCone,
   'sphere': renderSphere,
   'cube': renderCube,
+  'pendulum': renderPendulum,
 };

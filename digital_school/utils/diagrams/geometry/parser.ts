@@ -104,6 +104,10 @@ const SHAPE_ALIASES: Record<string, GeometryShapeType> = {
   'ellipse': 'circle-radius',
   'vernier': 'rectangle',
   'screw-gauge': 'cylinder',
+
+  // Mechanics & Physics
+  'pendulum': 'pendulum',
+  'simple-pendulum': 'pendulum',
 };
 
 const SIZE_MODIFIERS: Record<string, DiagramSize> = {

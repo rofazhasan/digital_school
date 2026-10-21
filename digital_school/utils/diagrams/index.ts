@@ -356,6 +356,17 @@ import {
 } from './svg-components/mathematics/graphs';
 
 import {
+    createVectorAddition,
+    createCrossProduct,
+    createVectorComponents,
+    createDotProduct,
+} from './svg-components/mathematics/vectors';
+
+import {
+    createElectricField,
+} from './svg-components/physics/electricity';
+
+import {
     createInclineFrictionKinetic,
     createInclineFrictionStatic,
     createBlockStacked,
@@ -847,6 +858,72 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     }),
     'stellar-parallax': (id: string) => createTriangle(id, 'right'),
 
+    // Vector operations
+    'vector-addition': (id: string) => ({
+        id,
+        width: 220,
+        height: 180,
+        points: [],
+        forces: [],
+        moments: [],
+        showAxes: false,
+        showGrid: false,
+        customSVG: createVectorAddition({ width: 220, height: 160 })
+    }),
+    'vector-cross': (id: string) => ({
+        id,
+        width: 220,
+        height: 180,
+        points: [],
+        forces: [],
+        moments: [],
+        showAxes: false,
+        showGrid: false,
+        customSVG: createCrossProduct({ width: 220, height: 160 })
+    }),
+    'vector-components': (id: string) => ({
+        id,
+        width: 200,
+        height: 180,
+        points: [],
+        forces: [],
+        moments: [],
+        showAxes: false,
+        showGrid: false,
+        customSVG: createVectorComponents({ width: 200, height: 160 })
+    }),
+    'vector-dot': (id: string) => ({
+        id,
+        width: 220,
+        height: 180,
+        points: [],
+        forces: [],
+        moments: [],
+        showAxes: false,
+        showGrid: false,
+        customSVG: createDotProduct({ width: 220, height: 160 })
+    }),
+
+    // Electricity & Fields
+    'electric-field': (id: string, charge?: string) => ({
+        id,
+        width: 180,
+        height: 180,
+        points: [],
+        forces: [],
+        moments: [],
+        showAxes: false,
+        showGrid: false,
+        customSVG: createElectricField(charge === 'negative' ? 'negative' : 'positive', { width: 160, height: 160 })
+    }),
+
+    // Mechanics & Oscillations aliases
+    'standing-wave': createStandingWave,
+    'simple-pendulum': createPendulum,
+    'spring-mass-system': createSpringMass,
+    'circular-conical-pendulum': createConicalPendulum,
+    'projectile-motion': createProjectile,
+
     // ===== BULK GENERATED PRESETS (Standardized Variants) =====
     ...generateInclineVariants(),
     ...generateParabolaVariants(),
@@ -921,12 +998,38 @@ export function getPresetsByCategory(): Record<string, string[]> {
  * Check if a preset exists
  */
 export function hasPreset(name: string): boolean {
-    return name in DIAGRAM_PRESETS;
+    if (!name) return false;
+    return Boolean(getPreset(name));
 }
 
 /**
- * Get preset generator function
+ * Get preset generator function (with case-insensitive and alias resolution)
  */
 export function getPreset(name: string): PresetGenerator | undefined {
-    return DIAGRAM_PRESETS[name];
+    if (!name) return undefined;
+    if (DIAGRAM_PRESETS[name]) return DIAGRAM_PRESETS[name];
+
+    const normalized = name.toLowerCase().trim();
+    if (DIAGRAM_PRESETS[normalized]) return DIAGRAM_PRESETS[normalized];
+
+    const aliases: Record<string, string> = {
+        'standing-wave': 'wave-standing',
+        'wave-standing': 'standing-wave',
+        'simple-pendulum': 'pendulum',
+        'spring-mass-system': 'spring',
+        'circular-conical-pendulum': 'conical-pendulum',
+        'projectile-motion': 'projectile',
+        'vector-addition': 'vector-addition',
+        'vector-cross': 'vector-cross',
+        'vector-components': 'vector-components',
+        'vector-dot': 'vector-dot',
+        'electric-field': 'electric-field',
+    };
+
+    const target = aliases[normalized];
+    if (target && DIAGRAM_PRESETS[target]) {
+        return DIAGRAM_PRESETS[target];
+    }
+
+    return undefined;
 }

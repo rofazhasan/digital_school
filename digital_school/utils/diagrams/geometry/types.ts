@@ -48,7 +48,9 @@ export type GeometryShapeType =
   | 'cone'
   | 'sphere'
   | 'cube'
-  | 'rectangular-prism';
+  | 'rectangular-prism'
+  // Mechanics & Physics
+  | 'pendulum';
 
 export type DiagramStyleMode = 'drafting' | 'hand-drawn' | 'textbook' | 'monochrome';
 export type DiagramSize = 'tiny' | 'small' | 'compact' | 'medium' | 'large';
