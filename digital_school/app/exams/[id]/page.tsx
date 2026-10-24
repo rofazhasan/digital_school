@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers, Shuffle, Lock, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight, FileSpreadsheet, Plus, Sparkles, Camera, Check, Filter, Settings, CheckCircle2, Sliders, Layers, Shuffle, Lock, ShieldCheck, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -531,7 +531,7 @@ export default function ExamBuilderPage() {
   const [previewSet, setPreviewSet] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [bulkDialogTab, setBulkDialogTab] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt'>('file');
+  const [bulkDialogTab, setBulkDialogTab] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt' | 'blind-ai'>('file');
   const [questionSubjectOverrides, setQuestionSubjectOverrides] = useState<Record<string, string>>({});
   const [configureSubjectsOpen, setConfigureSubjectsOpen] = useState(false);
   const [editingSubjects, setEditingSubjects] = useState<SubjectConfigItem[]>([]);
@@ -1655,6 +1655,25 @@ export default function ExamBuilderPage() {
                   <Button
                     variant="default"
                     size="sm"
+                    onClick={() => router.push(`/exams/online/${examId}`)}
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black shadow-md shadow-emerald-600/30 active:scale-95 transition-all gap-1.5"
+                  >
+                    <Play className="h-4 w-4 fill-white" /> Take Exam (Give Exam)
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setBulkDialogTab('blind-ai');
+                      setBulkDialogOpen(true);
+                    }}
+                    className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold shadow-md shadow-purple-600/30 active:scale-95 transition-all gap-1.5"
+                  >
+                    <ShieldCheck className="h-4 w-4" /> 🛡️ Blind AI (Zero-Knowledge)
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
                     onClick={() => {
                       setBulkDialogTab('file');
                       setBulkDialogOpen(true);
@@ -2186,6 +2205,15 @@ export default function ExamBuilderPage() {
                         <th key={set.name} className="border px-2 py-1 flex items-center gap-2 justify-between">
                           <span>{set.name}</span>
                           <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => router.push(`/exams/online/${examId}`)}
+                              title={`Take live exam with set ${set.name}`}
+                              className="hover:bg-emerald-500/10 hover:text-emerald-500"
+                            >
+                              <Play className="w-4 h-4 text-emerald-600 fill-emerald-600/20" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"

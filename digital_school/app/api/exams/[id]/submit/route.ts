@@ -10,7 +10,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const studentId = tokenData.user.studentProfile?.id || tokenData.user.id;
+  let studentId = tokenData.user.studentProfile?.id;
+  if (!studentId) {
+    const profile = await prisma.studentProfile.findUnique({
+      where: { userId: tokenData.user.id }
+    });
+    studentId = profile?.id || tokenData.user.id;
+  }
   let data;
 
   try {

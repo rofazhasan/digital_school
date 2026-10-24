@@ -47,6 +47,8 @@ import { cleanupMath } from "@/lib/utils";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { AI_ENCRYPTED_EXCEL_PROMPT } from "@/lib/encryption";
 
+import { useRouter } from "next/navigation";
+
 export type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'CODING';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
@@ -94,7 +96,7 @@ interface BulkAddExamQuestionsDialogProps {
   };
   onAddQuestionsToSet: (questions: any[]) => void;
   onQuestionsPermanentlySaved?: () => void;
-  initialTab?: 'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt';
+  initialTab?: 'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt' | 'blind-ai';
 }
 
 export function BulkAddExamQuestionsDialog({
@@ -105,7 +107,8 @@ export function BulkAddExamQuestionsDialog({
   onQuestionsPermanentlySaved,
   initialTab = 'file'
 }: BulkAddExamQuestionsDialogProps) {
-  const [inputType, setInputType] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt'>(initialTab || 'file');
+  const router = useRouter();
+  const [inputType, setInputType] = useState<'file' | 'encrypted-file' | 'json' | 'text' | 'encrypt' | 'blind-ai'>(initialTab || 'file');
   const [file, setFile] = useState<File | null>(null);
   const [jsonInput, setJsonInput] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -234,6 +237,74 @@ export function BulkAddExamQuestionsDialog({
     const words = exam.name.split(" ");
     return words[0] || "General";
   }, [exam.name]);
+
+  // Zero-Knowledge Blind AI Generator State
+  const [blindSubject, setBlindSubject] = useState(defaultSubject);
+  const [blindTopic, setBlindTopic] = useState('');
+  const [blindDifficulty, setBlindDifficulty] = useState<Difficulty>('MEDIUM');
+  const [blindQuestionType, setBlindQuestionType] = useState<QuestionType>('MCQ');
+  const [blindCount, setBlindCount] = useState(10);
+  const [blindCustomFocus, setBlindCustomFocus] = useState('');
+  const [isBlindGenerating, setIsBlindGenerating] = useState(false);
+  const [blindAuditCertificate, setBlindAuditCertificate] = useState<any | null>(null);
+  const [blindStagedQuestions, setBlindStagedQuestions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (defaultSubject && !blindSubject) {
+      setBlindSubject(defaultSubject);
+    }
+  }, [defaultSubject]);
+
+  const handleGenerateBlindQuestions = async (autoSaveAndTakeExam: boolean = false) => {
+    setIsBlindGenerating(true);
+    try {
+      const res = await fetch('/api/exams/blind-generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId: exam.id,
+          subject: blindSubject || defaultSubject || 'General',
+          topic: blindTopic || 'Core Syllabus',
+          difficulty: blindDifficulty,
+          questionType: blindQuestionType,
+          count: blindCount,
+          className: defaultClassName,
+          setName: `Blind Set ${Date.now().toString().slice(-4)}`,
+          autoAddToExam: autoSaveAndTakeExam,
+          customFocus: blindCustomFocus
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate blind questions');
+
+      setBlindStagedQuestions(data.questions || []);
+      setBlindAuditCertificate(data.auditCertificate || null);
+
+      if (autoSaveAndTakeExam) {
+        toast.success("Zero-Knowledge Exam Set created! Redirecting to live test environment...");
+        onOpenChange(false);
+        if (onQuestionsPermanentlySaved) onQuestionsPermanentlySaved();
+        router.push(`/exams/online/${exam.id}`);
+      } else {
+        toast.success(`Generated and blind-sealed ${data.questions.length} questions with AES-256-GCM!`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Generation failed');
+    } finally {
+      setIsBlindGenerating(false);
+    }
+  };
+
+  const handleAddBlindToSet = () => {
+    if (blindStagedQuestions.length === 0) {
+      toast.error("No blind questions generated yet.");
+      return;
+    }
+    onAddQuestionsToSet(blindStagedQuestions);
+    toast.success(`Added ${blindStagedQuestions.length} zero-knowledge blind questions to exam set!`);
+    onOpenChange(false);
+  };
 
   const sampleJson = [
     {
@@ -771,7 +842,7 @@ Answer: Read a and b, output a+b`;
             /* Input Mode */
             <div className="space-y-6">
               {/* Mode Selectors */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setInputType('file')}
@@ -831,6 +902,18 @@ Answer: Read a and b, output a+b`;
                 >
                   <Sparkles className="h-4 w-4 text-amber-500" />
                   AI Studio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputType('blind-ai')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    inputType === 'blind-ai'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/20'
+                      : 'text-purple-600 dark:text-purple-400 hover:text-foreground hover:bg-purple-50/50 dark:hover:bg-purple-950/20'
+                  }`}
+                >
+                  <ShieldCheck className="h-4 w-4 text-purple-400" />
+                  🛡️ Blind AI (Zero-Knowledge)
                 </button>
               </div>
 
@@ -1187,6 +1270,307 @@ Answer: Read a and b, output a+b`;
                       {AI_ENCRYPTED_EXCEL_PROMPT}
                     </pre>
                   </div>
+                </div>
+              )}
+
+              {/* Mode 6: Zero-Knowledge Blind AI Generator */}
+              {inputType === 'blind-ai' && (
+                <div className="space-y-6">
+                  {/* Hero Information Card */}
+                  <div className="p-5 rounded-3xl bg-gradient-to-br from-purple-900/20 via-indigo-900/15 to-slate-900/40 border border-purple-500/30 shadow-lg space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-2xl bg-purple-600/20 border border-purple-400/30 text-purple-400">
+                          <ShieldCheck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                            Zero-Knowledge Blind Exam Mode
+                            <Badge className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] py-0.5 px-2.5 border-0 shadow-sm">
+                              AES-256-GCM SEALED
+                            </Badge>
+                          </h4>
+                          <p className="text-xs text-muted-foreground">
+                            Purely encrypted from generation to delivery • 100% Blind Self-Assessment Efficiency
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-purple-500/20 text-xs text-slate-300 leading-relaxed space-y-1">
+                      <p>
+                        🔒 <strong className="text-purple-300">Absolute Confidentiality for Authors:</strong> When you generate in this mode, you (even as Admin or Teacher) will have <strong>zero clues</strong> of the question stems, options, or answers.
+                      </p>
+                      <p>
+                        🤖 <strong className="text-indigo-300">Automated AI Quality & LaTeX Auditor:</strong> AI runs an automated background audit pass before encryption, detecting and auto-repairing broken LaTeX ($$...$$), verifying unambiguous options, and checking step-by-step model answers.
+                      </p>
+                      <p>
+                        🎯 <strong className="text-emerald-300">Objective Self-Testing:</strong> You can directly sit for this exam under timed, proctored conditions to objectively evaluate your true mastery and speed!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Generation Configuration Form */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Subject */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Subject
+                      </label>
+                      <Input
+                        value={blindSubject}
+                        onChange={(e) => setBlindSubject(e.target.value)}
+                        placeholder="e.g. Physics, Higher Math, ICT"
+                        className="rounded-xl bg-slate-50 dark:bg-slate-900 text-xs font-semibold"
+                      />
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        {['Physics', 'Higher Math', 'Chemistry', 'Biology', 'ICT'].map((sub) => (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => setBlindSubject(sub)}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-colors ${
+                              blindSubject === sub
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            {sub}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Topic */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Topic / Chapter
+                      </label>
+                      <Input
+                        value={blindTopic}
+                        onChange={(e) => setBlindTopic(e.target.value)}
+                        placeholder="e.g. Newtonian Mechanics, Calculus"
+                        className="rounded-xl bg-slate-50 dark:bg-slate-900 text-xs font-semibold"
+                      />
+                    </div>
+
+                    {/* Question Type */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Question Type
+                      </label>
+                      <Select
+                        value={blindQuestionType}
+                        onValueChange={(val: any) => setBlindQuestionType(val)}
+                      >
+                        <SelectTrigger className="rounded-xl bg-slate-50 dark:bg-slate-900 text-xs font-semibold">
+                          <SelectValue placeholder="Select Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MCQ">MCQ (Single Choice)</SelectItem>
+                          <SelectItem value="MC">MC (Multiple Answer)</SelectItem>
+                          <SelectItem value="INT">INT (Numerical Integer)</SelectItem>
+                          <SelectItem value="CQ">CQ (Creative Question)</SelectItem>
+                          <SelectItem value="SQ">SQ (Short Question)</SelectItem>
+                          <SelectItem value="CODING">CODING (Programming Contest)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Difficulty */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Difficulty
+                      </label>
+                      <Select
+                        value={blindDifficulty}
+                        onValueChange={(val: any) => setBlindDifficulty(val)}
+                      >
+                        <SelectTrigger className="rounded-xl bg-slate-50 dark:bg-slate-900 text-xs font-semibold">
+                          <SelectValue placeholder="Select Difficulty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EASY">EASY (Foundational)</SelectItem>
+                          <SelectItem value="MEDIUM">MEDIUM (Standard Exam Level)</SelectItem>
+                          <SelectItem value="HARD">HARD (Olympiad / High-Rigor)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Question Count */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Question Count
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        {[5, 10, 15, 20, 25].map((cnt) => (
+                          <button
+                            key={cnt}
+                            type="button"
+                            onClick={() => setBlindCount(cnt)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                              blindCount === cnt
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-900 text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            {cnt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Syllabus / Focus details */}
+                    <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Optional Syllabus Focus / Exam Instructions
+                      </label>
+                      <Input
+                        value={blindCustomFocus}
+                        onChange={(e) => setBlindCustomFocus(e.target.value)}
+                        placeholder="e.g. Focus on rotational dynamics, work-energy theorem with numerical applications"
+                        className="rounded-xl bg-slate-50 dark:bg-slate-900 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Generation Trigger Buttons */}
+                  <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                    <Button
+                      type="button"
+                      disabled={isBlindGenerating}
+                      onClick={() => handleGenerateBlindQuestions(false)}
+                      variant="outline"
+                      className="rounded-xl font-bold border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30 h-10 px-5 gap-2"
+                    >
+                      {isBlindGenerating ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      )}
+                      Generate & Audit Blind Questions
+                    </Button>
+
+                    <Button
+                      type="button"
+                      disabled={isBlindGenerating}
+                      onClick={() => handleGenerateBlindQuestions(true)}
+                      className="rounded-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md shadow-purple-500/20 h-10 px-6 gap-2"
+                    >
+                      {isBlindGenerating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 text-amber-300" />
+                      )}
+                      1-Click Blind Generate & Sit for Exam Now
+                    </Button>
+                  </div>
+
+                  {/* AI Audit & Integrity Certificate */}
+                  {blindAuditCertificate && (
+                    <div className="p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                          <h5 className="text-sm font-bold text-foreground">
+                            AI Quality & LaTeX Audit Certificate: {blindAuditCertificate.auditId}
+                          </h5>
+                        </div>
+                        <Badge className="bg-emerald-600 text-white font-mono text-[10px]">
+                          100% VERIFIED
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                        <div className="p-2.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-emerald-200 dark:border-emerald-900/60">
+                          <div className="font-black text-foreground text-sm">{blindAuditCertificate.totalQuestions}</div>
+                          <div className="text-[11px] text-muted-foreground">Total Questions</div>
+                        </div>
+                        <div className="p-2.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-emerald-200 dark:border-emerald-900/60">
+                          <div className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                            {blindAuditCertificate.latexErrorsFixed} Fixed
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">LaTeX Syntax Check</div>
+                        </div>
+                        <div className="p-2.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-emerald-200 dark:border-emerald-900/60">
+                          <div className="font-black text-indigo-600 dark:text-indigo-400 text-sm">Distinct & Clear</div>
+                          <div className="text-[11px] text-muted-foreground">Options Integrity</div>
+                        </div>
+                        <div className="p-2.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-emerald-200 dark:border-emerald-900/60">
+                          <div className="font-black text-purple-600 dark:text-purple-400 text-sm font-mono text-[10px]">
+                            {blindAuditCertificate.integrityHash}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">SHA-256 Seal Hash</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Masked Blind Questions Cards */}
+                  {blindStagedQuestions.length > 0 && (
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Lock className="h-4 w-4 text-purple-500" />
+                          Masked Question Vault ({blindStagedQuestions.length} Items Sealed)
+                        </h5>
+                        <Button
+                          type="button"
+                          onClick={handleAddBlindToSet}
+                          className="h-8 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white text-xs gap-1.5 px-4 shadow-sm"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Sealed Questions to Exam Set
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                        {blindStagedQuestions.map((q: any, i: number) => (
+                          <div
+                            key={q.id || i}
+                            className="p-3.5 rounded-2xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-800 text-[10px] font-bold">
+                                  #{i + 1} {q.type}
+                                </Badge>
+                                <span className="text-xs font-bold text-foreground">
+                                  {q.subject} • {q.topic}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {q.marks} Mark{q.marks > 1 ? 's' : ''}
+                                </Badge>
+                                <Badge className="bg-purple-600 text-white text-[10px] py-0 px-2">
+                                  AES-256 SEALED
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <p className="text-xs font-mono text-purple-700 dark:text-purple-300 bg-purple-500/5 p-2 rounded-xl border border-purple-200/50 dark:border-purple-900/50">
+                              {q.questionText}
+                            </p>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] text-muted-foreground font-mono">
+                              <div className="p-1.5 rounded-lg bg-background/50 border text-center">
+                                Option A [🔒 Sealed]
+                              </div>
+                              <div className="p-1.5 rounded-lg bg-background/50 border text-center">
+                                Option B [🔒 Sealed]
+                              </div>
+                              <div className="p-1.5 rounded-lg bg-background/50 border text-center">
+                                Option C [🔒 Sealed]
+                              </div>
+                              <div className="p-1.5 rounded-lg bg-background/50 border text-center">
+                                Option D [🔒 Sealed]
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

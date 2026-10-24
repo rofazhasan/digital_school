@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const studentId = tokenData.user.studentProfile?.id || tokenData.user.id;
+  let studentId = tokenData.user.studentProfile?.id || tokenData.user.id;
 
   try {
     const exam = await prisma.exam.findUnique({
@@ -42,7 +42,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     });
 
-    const studentProfile = user?.studentProfile || (studentId ? await prisma.studentProfile.findUnique({ where: { id: studentId }, include: { class: true } }) : null);
+    let studentProfile = user?.studentProfile || (studentId ? await prisma.studentProfile.findUnique({ where: { id: studentId }, include: { class: true } }) : null);
+
+    // If user is Admin/Teacher/Superadmin taking the exam for self-assessment, auto-provision a test StudentProfile
+    if (!studentProfile && user) {
+      try {
+        const targetClassId = exam.classId || (await prisma.class.findFirst())?.id;
+        if (targetClassId) {
+          studentProfile = await prisma.studentProfile.create({
+            data: {
+              userId: user.id,
+              roll: "01",
+              registrationNo: `REG-${user.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+              guardianName: user.name || "Self",
+              guardianPhone: user.phone || "01700000000",
+              classId: targetClassId
+            },
+            include: { class: true }
+          });
+        }
+      } catch (errProfile) {
+        console.warn("[OnlineExamAPI] Auto-provisioning StudentProfile notice:", errProfile);
+      }
+    }
+
+    if (studentProfile) {
+      studentId = studentProfile.id;
+    }
+
     const studentName = user?.name || (user as any)?.username || tokenData.user.name || "পরীক্ষার্থী";
     const studentRoll = studentProfile?.roll || tokenData.user.studentProfile?.roll || tokenData.user.roll || "01";
     const studentReg = studentProfile?.registrationNo || tokenData.user.studentProfile?.registrationNo || "";
@@ -375,6 +402,47 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       exam.subjectsConfig && ((exam.subjectsConfig as any)?.subjects || []).length > 0
     );
 
+    // World-Class Zero-Knowledge Live Exam Security:
+    // If exam is NOT yet submitted, hide answers, explanations, and isCorrect flags from client memory/network
+    const sanitizedQuestions = hasSubmitted
+      ? questions
+      : questions.map((q: any) => {
+          const cleanQ = { ...q };
+          delete cleanQ.modelAnswer;
+          delete cleanQ.explanation;
+          delete cleanQ.assertion;
+          delete cleanQ.reason;
+          if (Array.isArray(cleanQ.options)) {
+            cleanQ.options = cleanQ.options.map((opt: any) => {
+              if (typeof opt === 'string') return opt;
+              const { isCorrect, explanation, ...restOpt } = opt;
+              return restOpt;
+            });
+          }
+          return cleanQ;
+        });
+
+    const sanitizedAllSets = hasSubmitted
+      ? allSets
+      : allSets.map(s => ({
+          ...s,
+          questions: (s.questions || []).map((q: any) => {
+            const cleanQ = { ...q };
+            delete cleanQ.modelAnswer;
+            delete cleanQ.explanation;
+            delete cleanQ.assertion;
+            delete cleanQ.reason;
+            if (Array.isArray(cleanQ.options)) {
+              cleanQ.options = cleanQ.options.map((opt: any) => {
+                if (typeof opt === 'string') return opt;
+                const { isCorrect, explanation, ...restOpt } = opt;
+                return restOpt;
+              });
+            }
+            return cleanQ;
+          })
+        }));
+
     return NextResponse.json({
       id: exam.id,
       name: exam.name,
@@ -393,11 +461,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       assignedSet: assignedExamSet ? { id: assignedExamSet.id, name: assignedExamSet.name } : null,
       examSets: exam.examSets?.map(s => ({ id: s.id, name: s.name })),
-      allSets,
+      allSets: sanitizedAllSets,
       subject: isExamMS ? 'বহু-বিষয়ক পরীক্ষা (Multi-Subject)' : ((questions[0] as any)?.subject || exam.class?.name || ''),
       subjectType: exam.subjectType || (isExamMS ? 'MS' : 'SS'),
       subjectsConfig: isExamMS ? (exam.subjectsConfig || null) : null,
-      questions,
+      questions: sanitizedQuestions,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
       // Derive startedAt from either objective or cqSq start time
