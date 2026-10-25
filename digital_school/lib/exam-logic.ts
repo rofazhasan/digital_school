@@ -1320,3 +1320,95 @@ export async function finalizeAndReleaseExam(examId: string) {
     // Now release results to students for objective-only exams
     await releaseExamResults(examId);
 }
+
+/**
+ * Automatically evaluates and releases results for an objective-only exam
+ * if all students of that class (or mapped students) have ended their exam,
+ * or if the overall scheduled exam time has expired.
+ */
+export async function checkAndAutoReleaseExam(examId: string): Promise<boolean> {
+    try {
+        const exam = await prisma.exam.findUnique({
+            where: { id: examId },
+            include: {
+                examSets: true,
+                examStudentMaps: { select: { studentId: true } },
+                results: { select: { id: true, isPublished: true } }
+            }
+        });
+
+        if (!exam) return false;
+
+        // Never auto-release exams that contain CQ/SQ/Descriptive questions
+        if (hasCqSqQuestions(exam, exam.examSets || [])) {
+            console.log(`[Auto-Release] Exam ${examId} contains CQ/SQ. Results held for manual evaluation.`);
+            return false;
+        }
+
+        // Auto-submit any expired in-progress sessions first
+        const inProgressSubmissions = await prisma.examSubmission.findMany({
+            where: { examId, status: SubmissionStatus.IN_PROGRESS }
+        });
+
+        for (const sub of inProgressSubmissions) {
+            await autoSubmitExpiredSections(sub, exam);
+        }
+
+        // Re-query current submissions
+        const submissions = await prisma.examSubmission.findMany({
+            where: { examId },
+            select: { id: true, studentId: true, status: true }
+        });
+
+        const submittedCount = submissions.filter(s => s.status === SubmissionStatus.SUBMITTED).length;
+        const stillActiveCount = submissions.filter(s => s.status === SubmissionStatus.IN_PROGRESS).length;
+
+        // If there are still active students taking the exam whose time has not expired, wait
+        if (stillActiveCount > 0) {
+            console.log(`[Auto-Release] Exam ${examId} still has ${stillActiveCount} active session(s).`);
+            return false;
+        }
+
+        // If no one has submitted, do not release
+        if (submittedCount === 0) {
+            return false;
+        }
+
+        // Determine target students
+        const mappedStudentIds = exam.examStudentMaps?.map(m => m.studentId) || [];
+        let targetStudentsCount = 0;
+
+        if (mappedStudentIds.length > 0) {
+            targetStudentsCount = mappedStudentIds.length;
+        } else if (exam.classId) {
+            // Count active students in the class with role STUDENT (strictly exclude SUPER_USER, ADMIN, TEACHER)
+            targetStudentsCount = await prisma.studentProfile.count({
+                where: {
+                    classId: exam.classId,
+                    user: {
+                        isActive: true,
+                        role: 'STUDENT'
+                    }
+                }
+            });
+        }
+
+        const isTimeOver = exam.endTime ? (new Date() > new Date(exam.endTime)) : false;
+        const allTargetSubmitted = targetStudentsCount > 0 && submittedCount >= targetStudentsCount;
+        const allActiveEnded = stillActiveCount === 0 && submittedCount > 0 && (allTargetSubmitted || isTimeOver || (targetStudentsCount > 0 && submittedCount >= targetStudentsCount));
+
+        // Release if all target students submitted, time is over, or all mapped students submitted
+        const shouldRelease = allTargetSubmitted || isTimeOver || (mappedStudentIds.length > 0 && submittedCount >= mappedStudentIds.length && stillActiveCount === 0);
+
+        if (shouldRelease) {
+            console.log(`🚀 [Auto-Release] Triggering release for objective exam ${examId}. Target: ${targetStudentsCount}, Submitted: ${submittedCount}, TimeOver: ${isTimeOver}`);
+            await finalizeAndReleaseExam(examId);
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error(`[Auto-Release] Error in checkAndAutoReleaseExam for exam ${examId}:`, error);
+        return false;
+    }
+}

@@ -61,6 +61,14 @@ export async function GET(
             return NextResponse.json({ error: "Exam not found" }, { status: 404 });
         }
 
+        // Proactively check and trigger auto-release if all students have ended their objective exam
+        try {
+            const { checkAndAutoReleaseExam } = await import("@/lib/exam-logic");
+            await checkAndAutoReleaseExam(examId);
+        } catch (e) {
+            console.error("[LiveMonitor] Auto-release check notice:", e);
+        }
+
         // Fast In-Memory Lookups
         const studentSetMap = new Map<string, string>();
         if (exam.examStudentMaps) {

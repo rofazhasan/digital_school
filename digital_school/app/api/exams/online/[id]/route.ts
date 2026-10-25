@@ -309,10 +309,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    // Collect all question IDs needing subject lookup
+    // Collect all question IDs needing subject or AR (Assertion-Reason) lookup
     const allQuestionIdsToLookup = new Set<string>();
     questions.forEach((q: any) => {
-      if (q?.id && (!q.subject || typeof q.subject !== 'string' || !q.subject.trim())) {
+      const isMissingSubject = !q.subject || typeof q.subject !== 'string' || !q.subject.trim();
+      const isArMissingContent = (String(q.type || '').toUpperCase() === 'AR') && (!q.assertion || !q.reason);
+      if (q?.id && (isMissingSubject || isArMissingContent)) {
         allQuestionIdsToLookup.add(q.id);
       }
     });
@@ -357,7 +359,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         setQuestions = [];
       }
       setQuestions.forEach((q: any) => {
-        if (q?.id && (!q.subject || typeof q.subject !== 'string' || !q.subject.trim())) {
+        const isMissingSubject = !q.subject || typeof q.subject !== 'string' || !q.subject.trim();
+        const isArMissingContent = (String(q.type || '').toUpperCase() === 'AR') && (!q.assertion || !q.reason);
+        if (q?.id && (isMissingSubject || isArMissingContent)) {
           allQuestionIdsToLookup.add(q.id);
         }
       });
@@ -369,30 +373,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       };
     });
 
-    // Backfill missing subjects from database if any questions lack subject
+    // Backfill missing subjects, assertions, and reasons from database if any questions lack them
     if (allQuestionIdsToLookup.size > 0) {
       try {
         const dbQuestions = await prisma.question.findMany({
           where: { id: { in: Array.from(allQuestionIdsToLookup) } },
-          select: { id: true, subject: true }
+          select: { id: true, subject: true, assertion: true, reason: true }
         });
-        const subMap = new Map(dbQuestions.map(dq => [dq.id, dq.subject]));
+        const qMap = new Map(dbQuestions.map(dq => [dq.id, dq]));
         questions = questions.map((q: any) => {
-          if ((!q.subject || !String(q.subject).trim()) && subMap.has(q.id)) {
-            return { ...q, subject: subMap.get(q.id) };
-          }
-          return q;
+          const dbQ = qMap.get(q.id);
+          if (!dbQ) return q;
+          return {
+            ...q,
+            subject: (!q.subject || !String(q.subject).trim()) ? dbQ.subject : q.subject,
+            assertion: (!q.assertion && dbQ.assertion) ? dbQ.assertion : q.assertion,
+            reason: (!q.reason && dbQ.reason) ? dbQ.reason : q.reason,
+          };
         });
         allSetsRaw.forEach(set => {
           set.questions = set.questions.map((q: any) => {
-            if ((!q.subject || !String(q.subject).trim()) && subMap.has(q.id)) {
-              return { ...q, subject: subMap.get(q.id) };
-            }
-            return q;
+            const dbQ = qMap.get(q.id);
+            if (!dbQ) return q;
+            return {
+              ...q,
+              subject: (!q.subject || !String(q.subject).trim()) ? dbQ.subject : q.subject,
+              assertion: (!q.assertion && dbQ.assertion) ? dbQ.assertion : q.assertion,
+              reason: (!q.reason && dbQ.reason) ? dbQ.reason : q.reason,
+            };
           });
         });
       } catch (e) {
-        console.warn("[OnlineExamAPI] Could not backfill question subjects:", e);
+        console.warn("[OnlineExamAPI] Could not backfill question details:", e);
       }
     }
 
@@ -404,14 +416,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // World-Class Zero-Knowledge Live Exam Security:
     // If exam is NOT yet submitted, hide answers, explanations, and isCorrect flags from client memory/network
+    // NOTE: Assertion (A) and Reason (R) are the question prompt/stem for AR questions and MUST NEVER be deleted!
     const sanitizedQuestions = hasSubmitted
       ? questions
       : questions.map((q: any) => {
           const cleanQ = { ...q };
           delete cleanQ.modelAnswer;
           delete cleanQ.explanation;
-          delete cleanQ.assertion;
-          delete cleanQ.reason;
           if (Array.isArray(cleanQ.options)) {
             cleanQ.options = cleanQ.options.map((opt: any) => {
               if (typeof opt === 'string') return opt;
@@ -430,8 +441,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             const cleanQ = { ...q };
             delete cleanQ.modelAnswer;
             delete cleanQ.explanation;
-            delete cleanQ.assertion;
-            delete cleanQ.reason;
             if (Array.isArray(cleanQ.options)) {
               cleanQ.options = cleanQ.options.map((opt: any) => {
                 if (typeof opt === 'string') return opt;

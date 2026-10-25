@@ -175,29 +175,12 @@ export async function GET(
     // -------------------------------------------------------------------------
     // AUTO-RELEASE TRIGGER (Teacher View & Evaluation Load Fallback)
     // -------------------------------------------------------------------------
+    let didAutoRelease = false;
     try {
-      // Never auto-release results on evaluation load for exams with CQ/SQ!
-      // Teachers must manually review and click 'Release Results'.
-      if (!containsCqSq) {
-        const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
-        const isTimeOver = (new Date() > new Date(exam.endTime));
-
-        const totalClassStudents = await prisma.studentProfile.count({
-          where: { classId: exam.classId, user: { isActive: true } }
-        });
-        const submittedCount = await prisma.examSubmission.count({
-          where: { examId: exam.id, status: 'SUBMITTED' }
-        });
-        const allSubmitted = totalClassStudents > 0 && submittedCount >= totalClassStudents;
-
-        // Trigger full sweep and release if time is over OR all class students completed
-        if (isTimeOver || allSubmitted) {
-          await finalizeAndReleaseExam(exam.id);
-        }
-      }
+      const { checkAndAutoReleaseExam } = await import("@/lib/exam-logic");
+      didAutoRelease = await checkAndAutoReleaseExam(exam.id);
     } catch (e) {
       console.error("Auto-release trigger failed in evaluation API:", e);
-      // Continue loading page even if trigger fails
     }
     // -------------------------------------------------------------------------
 
@@ -241,8 +224,6 @@ export async function GET(
       }
     }
 
-
-
     // RESULT & MAP PROCESSING ------------------
     let examStudentMaps: { studentId: string, examSetId: string | null }[] = [];
 
@@ -263,27 +244,47 @@ export async function GET(
       if (map.examSetId) studentExamSetMap.set(map.studentId, map.examSetId);
     });
 
-    const examResults = await resultsPromise;
+    // If auto-release was triggered, fetch updated results with isPublished: true
+    const examResults = didAutoRelease
+      ? await prisma.result.findMany({
+          where: auxiliaryWhere,
+          select: {
+            studentId: true,
+            mcqMarks: true,
+            cqMarks: true,
+            sqMarks: true,
+            total: true,
+            percentage: true,
+            grade: true,
+            isPublished: true
+          }
+        })
+      : await resultsPromise;
+
     const studentResultMap = new Map<string, any>();
     examResults.forEach(res => {
       studentResultMap.set(res.studentId, res);
     });
 
-    // Collect and fetch fresh question details
+    // Collect and fetch fresh question details (explanations, assertions, reasons)
     const questionIds = new Set<string>();
     allQuestions.forEach(q => {
       if (q && q.id) questionIds.add(q.id);
     });
 
-    const questionDetailsMap = new Map<string, string>();
+    const questionDetailsMap = new Map<string, { explanation?: string; assertion?: string; reason?: string }>();
     if (questionIds.size > 0) {
       try {
         const dbQuestions = await prisma.question.findMany({
           where: { id: { in: Array.from(questionIds) } },
-          select: { id: true, explanation: true }
+          select: { id: true, explanation: true, assertion: true, reason: true }
         });
         dbQuestions.forEach(q => {
-          if (q.explanation) questionDetailsMap.set(q.id, q.explanation);
+          questionDetailsMap.set(q.id, {
+            explanation: q.explanation || undefined,
+            assertion: q.assertion || undefined,
+            reason: q.reason || undefined
+          });
         });
       } catch (error) {
         console.error("Error fetching question details:", error);
@@ -534,7 +535,8 @@ export async function GET(
       }
 
       // Extract explanation: DB > Question Level > Option Level
-      let explanation = questionDetailsMap.get(q.id) || q.explanation;
+      const extraDetails = questionDetailsMap.get(q.id);
+      let explanation = extraDetails?.explanation || q.explanation;
       if (!explanation && Array.isArray(parsedOptions)) {
         const correctOpt = parsedOptions.find((opt: any) => opt && opt.isCorrect);
         if (correctOpt && correctOpt.explanation) {
@@ -556,8 +558,8 @@ export async function GET(
         sub_questions: parsedSubQuestions,
         modelAnswer: q.modelAnswer || q.answer || q.q_ans || q.ans || null,
         explanation: explanation || null,
-        assertion: q.assertion || null,
-        reason: q.reason || null,
+        assertion: q.assertion || extraDetails?.assertion || null,
+        reason: q.reason || extraDetails?.reason || null,
         correctOption: resolvedCorrect,
         pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
         leftColumn: q.leftColumn,

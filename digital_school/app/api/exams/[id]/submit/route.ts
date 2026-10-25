@@ -281,38 +281,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       console.log(`✅ Auto-graded/evaluated submission ${submission.id} (isFinal: ${isFinalSubmission})`);
 
       if (isFinalSubmission) {
-        // Check Auto-Release Conditions:
-        // Exams containing CQ/SQ questions must NEVER auto-publish when students submit;
-        // they require manual teacher grading and manual release.
-        const { hasCqSqQuestions } = await import("@/lib/exam-logic");
-        const containsCqSq = hasCqSqQuestions(exam, exam.examSets);
-
-        if (!containsCqSq) {
-          // Condition A: All active students in the class have submitted
-          // Condition B: Time is over
-          const totalStudentsCount = await prisma.studentProfile.count({
-            where: { classId: exam.classId, user: { isActive: true } }
-          });
-
-          const submittedCount = await prisma.examSubmission.count({
-            where: {
-              examId: examId,
-              status: 'SUBMITTED'
-            }
-          });
-
-          const isTimeOver = new Date() > new Date(exam.endTime);
-          const allSubmitted = totalStudentsCount > 0 && submittedCount >= totalStudentsCount;
-
-          console.log(`[Auto-Release Check] Objective Exam ${examId}: Submitted ${submittedCount}/${totalStudentsCount}, TimeOver: ${isTimeOver}`);
-
-          if (allSubmitted || isTimeOver) {
-            console.log(`🚀 Triggering Auto-Release for Objective Exam ${examId}`);
-            await finalizeAndReleaseExam(examId);
-          }
-        } else {
-          console.log(`[Auto-Release Check] Exam ${examId} contains CQ/SQ. Auto-release disabled for manual teacher evaluation.`);
-        }
+        // Auto-release check for objective exams if all students of that class ended or time is over
+        const { checkAndAutoReleaseExam } = await import("@/lib/exam-logic");
+        await checkAndAutoReleaseExam(examId);
       }
 
     } catch (evalError) {
