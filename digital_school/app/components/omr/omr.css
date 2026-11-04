@@ -1,0 +1,1000 @@
+
+.generator-split-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.generator-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-height: 850px;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.sidebar-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: white;
+}
+
+.theme-color-picker {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.theme-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.theme-dot.active {
+  border-color: white;
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+}
+
+.checkbox-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.checkbox-field label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.input-field.sm {
+  width: 110px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Printable A4 Sheet Viewport */
+.generator-sheet-viewport {
+  display: flex;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 20px;
+  padding: 2rem 1rem;
+  overflow: auto;
+}
+
+.generator-top-panel {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.75rem;
+}
+
+.generator-split-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.generator-sidebar {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.layout-toggle-group {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+}
+
+.btn-toggle-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-toggle-option.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.4);
+}
+
+.generator-sheet-viewport {
+  background: #1e1b4b;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 2rem 1rem;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   BANGLADESH OFFICIAL OMR PRINTABLE SHEET (PIXEL-PERFECT A4 210mm x 297mm)
+   Authentic Board HSC/SSC & University Standard with Alternating Stripes & Zero Voids
+   ========================================================================== */
+
+.bd-omr-printable-sheet {
+  width: 820px;
+  height: 1160px;
+  max-height: 1160px;
+  background: #ffffff;
+  color: #000000;
+  position: relative;
+  padding: 18px 22px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'NikoshBAN', 'Hind Siliguri', 'Kalpurush', system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.bd-omr-printable-sheet * {
+  font-family: inherit !important;
+  box-sizing: border-box;
+}
+
+/* 4 Corner High-Precision Optical Registration Markers */
+.fiducial-marker {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.fiducial-marker.top-left { top: 8px; left: 8px; }
+.fiducial-marker.top-right { top: 8px; right: 8px; }
+.fiducial-marker.bottom-left { bottom: 8px; left: 8px; }
+.fiducial-marker.bottom-right { bottom: 8px; right: 8px; }
+
+.marker-cross-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.8px solid #000;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marker-cross-circle::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #000;
+}
+
+.cross-line-h {
+  position: absolute;
+  width: 26px;
+  height: 1.4px;
+  background: #000;
+}
+
+.cross-line-v {
+  position: absolute;
+  height: 26px;
+  width: 1.4px;
+  background: #000;
+}
+
+/* Continuous Lateral Timing Tracks (Clocking Bars) */
+.timing-tracks {
+  position: absolute;
+  top: 110px;
+  bottom: 80px;
+  width: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timing-tracks.left { left: 8px; }
+.timing-tracks.right { right: 8px; }
+
+.timing-block {
+  width: 12px;
+  height: 3.5px;
+  background: #000000;
+}
+
+.timing-marker-bottom-center {
+  width: 32px;
+  height: 5px;
+  background: #000000;
+  margin: 3px auto 0 auto;
+}
+
+/* Sheet Header Area */
+.sheet-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.header-year-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.exam-dotted-line {
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.year-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+}
+
+.digits-boxes {
+  display: flex;
+  border: 1.5px solid #000;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.digit-cell {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  border-right: 1px solid #000;
+  background: #fff;
+}
+
+.digit-cell:last-child {
+  border-right: none;
+}
+
+.header-titles {
+  text-align: center;
+  width: 100%;
+}
+
+.institute-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1px;
+}
+
+.exam-main-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--omr-theme);
+  margin-bottom: 3px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.warning-banner-top {
+  background: #000000;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 18px;
+  margin: 2px auto;
+  display: inline-block;
+  border-radius: 2px;
+  letter-spacing: 0.02em;
+}
+
+.pen-instruction-banner {
+  border: 1.5px solid var(--omr-theme);
+  color: var(--omr-theme);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1.5px 20px;
+  margin: 2px auto 0 auto;
+  display: inline-block;
+}
+
+/* ==========================================================================
+   LAYOUT BRANCH 1: BOARD SPLIT LAYOUT (50-Q HSC/SSC)
+   Alternating Horizontal Stripes on Questions, Vertical on Roll/Reg
+   ========================================================================== */
+
+.sheet-content-grid.split-layout {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  margin-top: 6px;
+  height: 975px;
+  max-height: 975px;
+}
+
+.split-layout .questions-layout-area {
+  width: 412px;
+  display: grid;
+  gap: 8px;
+  height: 100%;
+}
+
+.questions-column {
+  border: 1.5px solid var(--omr-theme);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.col-header-row {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  text-align: center;
+  border-bottom: 1.5px solid var(--omr-theme);
+  background: #fff;
+  color: var(--omr-theme);
+}
+
+.th-q {
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 3px 0;
+  border-right: 1.5px solid var(--omr-theme);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.th-ans {
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.02em;
+}
+
+.questions-rows-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.omr-q-row {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  flex: 1;
+  border-bottom: 0.5px solid #f1f5f9;
+}
+
+/* Authentic Board Alternating Horizontal Pink Stripe */
+.omr-q-row.row-stripe {
+  background: var(--omr-theme-stripe);
+}
+
+.q-number-box {
+  font-size: 13px;
+  font-weight: 800;
+  color: #000;
+  text-align: center;
+  border-right: 1.5px solid var(--omr-theme);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.q-bubbles-group {
+  display: flex;
+  justify-content: space-around;
+  padding: 0 4px;
+}
+
+.omr-bubble-circle {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1.4px solid var(--omr-theme);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--omr-theme);
+  background: #ffffff;
+}
+
+/* Right Section: Identity Grids, Signatures, Barcode & Rules */
+.split-layout .identity-and-rules-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  height: 100%;
+}
+
+.id-blocks-row {
+  display: flex;
+  gap: 5px;
+  align-items: flex-start;
+}
+
+.timing-divider-dash {
+  width: 10px;
+  height: 5px;
+  background: #000;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.vertical-grid-card {
+  border: 1.5px solid var(--omr-theme);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.grid-card-title {
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #000;
+  border-bottom: 1.5px solid var(--omr-theme);
+  padding: 2px 0;
+  background: #fff;
+}
+
+/* Contiguous Crisp Write-In Boxes */
+.write-boxes-table {
+  display: flex;
+  border-bottom: 1.5px solid var(--omr-theme);
+  background: #fff;
+}
+
+.roll-grid .write-boxes-table,
+.roll-grid .bubbles-matrix-columns {
+  display: grid;
+  grid-template-columns: repeat(6, 18px);
+  width: 108px;
+}
+
+.reg-grid .write-boxes-table,
+.reg-grid .bubbles-matrix-columns {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  width: 180px;
+}
+
+.sub-grid .write-boxes-table,
+.sub-grid .bubbles-matrix-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 18px);
+  width: 54px;
+}
+
+.write-box-cell {
+  width: 18px;
+  height: 20px;
+  border-right: 1px solid var(--omr-theme);
+  background: #fff;
+}
+
+.write-box-cell:last-child {
+  border-right: none;
+}
+
+.write-boxes-table.single .write-box-cell {
+  width: 26px;
+  height: 22px;
+}
+
+/* Bubble Matrix Columns with Alternating Vertical Stripes */
+.bubbles-matrix-columns {
+  display: flex;
+}
+
+.digit-column-strip {
+  width: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+  background: #ffffff;
+}
+
+.digit-column-strip.col-stripe {
+  background: var(--omr-theme-stripe);
+}
+
+.digit-column-strip.single {
+  width: 26px;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.matrix-bubble {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.2px solid var(--omr-theme);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--omr-theme);
+  background: #fff;
+  line-height: 1;
+}
+
+.matrix-bubble.set-bubble {
+  width: 19px;
+  height: 19px;
+  font-size: 11px;
+}
+
+/* Invigilator Signature Block beside Set Code */
+.invigilator-signature-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.sign-box-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sign-rectangular-box {
+  width: 100%;
+  height: 32px;
+  border: 1.5px solid var(--omr-theme);
+  background: #fff;
+}
+
+.sign-caption {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #000;
+  margin-top: 2px;
+  text-align: center;
+}
+
+.side-timing-sync-bar {
+  width: 14px;
+  height: 5px;
+  background: #000;
+  align-self: flex-end;
+  margin-top: 4px;
+}
+
+/* Candidate Signature & Barcode Row */
+.candidate-barcode-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.candidate-sign-container {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.candidate-sign-container .sign-rectangular-box {
+  height: 28px;
+}
+
+.barcode-badge-container {
+  flex: 1.3;
+  border: 1.5px solid #000;
+  padding: 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+}
+
+.barcode-svg-wrap {
+  width: 100%;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.barcode-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #000;
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+}
+
+/* Official Board Instructions Section (Exact Match to Bangladesh Board SSC/HSC) */
+.official-instructions-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 2px;
+}
+
+.instructions-red-warning {
+  color: #dc2626;
+  font-weight: 800;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 2px;
+  letter-spacing: 0.02em;
+}
+
+.red-divider-line {
+  width: 100%;
+  height: 2px;
+  background: #dc2626;
+  margin-top: 3px;
+}
+
+.rules-heading-title {
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-bottom: 3px;
+  color: #000;
+}
+
+.official-rule-item {
+  margin-bottom: 2px;
+}
+
+.rule-text {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #000;
+  font-weight: 600;
+}
+
+.board-compliance-footer {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 4px;
+  margin-top: auto;
+}
+
+.fill-diagram-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 3px 0 2px 14px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.diagram-method {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wrong-samples-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fill-circle {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.2px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.fill-circle.solid-black {
+  background: #000000;
+}
+
+.fill-circle.wrong-dot {
+  position: relative;
+}
+
+.dot-inner {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #000;
+}
+
+.fill-circle.wrong-letter {
+  color: #d91884;
+  border-color: #d91884;
+}
+
+.fill-circle.wrong-check {
+  color: #15803d;
+  font-size: 10px;
+}
+
+.fill-circle.wrong-cross {
+  color: #dc2626;
+  font-size: 10px;
+}
+
+/* ==========================================================================
+   LAYOUT BRANCH 2: STACKED ADMISSION LAYOUT (100-Q ADMISSION TESTS)
+   ========================================================================== */
+
+.sheet-content-grid.stacked-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  height: 975px;
+  max-height: 975px;
+}
+
+.admission-top-id-band {
+  display: flex;
+  gap: 6px;
+  height: 250px;
+  max-height: 250px;
+}
+
+.admission-top-id-band .vertical-grid-card.compact .write-box-cell {
+  width: 15px;
+  height: 16px;
+}
+
+.admission-top-id-band .vertical-grid-card.compact .matrix-bubble {
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+}
+
+.signatures-stacked-group {
+  width: 170px;
+  border: 1.5px solid var(--omr-theme);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  background: #fff;
+}
+
+.admission-compact-rules {
+  flex: 1;
+  border: 1.5px solid #000;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #fff;
+}
+
+.instructions-red-warning.compact {
+  font-size: 10.5px;
+}
+
+.rules-heading-title.compact {
+  font-size: 11px;
+}
+
+.admission-rules-bullets {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.sample-mini-dot {
+  font-size: 12px;
+  color: #000;
+}
+
+.admission-barcode-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 0.5px solid #cbd5e1;
+  padding-top: 2px;
+}
+
+.barcode-serial-text {
+  font-size: 8.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.questions-layout-area.full-width {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  height: 715px;
+}
+
+/* ==========================================================================
+   STRICT SINGLE-PAGE A4 PRINT CONFIGURATION (PERFECT SYMMETRY & ZERO DRIFT)
+   ========================================================================== */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+  }
+
+  /* Neutralize all ancestor containers to prevent any layout offset, padding, or transform containing blocks */
+  #root,
+  .app-container,
+  .main-content,
+  .bangladesh-omr-generator,
+  .generator-split-layout,
+  .generator-sheet-viewport {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
+    transform: none !important;
+    filter: none !important;
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .no-print, header, nav, .studio-header, .generator-top-panel, .generator-sidebar {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  /* Printable Sheet: Fixed full A4 page, centered with exact symmetric horizontal margins */
+  .bd-omr-printable-sheet,
+  .bd-omr-printable-sheet * {
+    visibility: visible !important;
+  }
+
+  .bd-omr-printable-sheet {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 8mm 14mm 14mm 14mm !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  /* Compact header for print to ensure generous vertical clearance for questions */
+  .bd-omr-printable-sheet .sheet-header {
+    margin-bottom: 3px !important;
+  }
+
+  .bd-omr-printable-sheet .exam-main-title {
+    font-size: 16px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .bd-omr-printable-sheet .warning-banner-top {
+    font-size: 10.5px !important;
+    padding: 1.5px 14px !important;
+    margin: 1.5px auto !important;
+  }
+
+  .bd-omr-printable-sheet .pen-instruction-banner {
+    font-size: 11px !important;
+    padding: 1px 16px !important;
+    margin: 1.5px auto 0 auto !important;
+  }
+
+  /* Calibrated Grid Heights to Guarantee Zero Overlap with Bottom Markers */
+  .bd-omr-printable-sheet .sheet-content-grid.split-layout {
+    height: 865px !important;
+    max-height: 865px !important;
+    margin-top: 3px !important;
+    gap: 10px !important;
+  }

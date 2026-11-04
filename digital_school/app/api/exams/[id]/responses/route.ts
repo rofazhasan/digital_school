@@ -19,10 +19,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Missing answers" }, { status: 400 });
   }
   try {
+    const updateData: any = { answers: data.answers };
+    if (data.examSetId) {
+      updateData.examSetId = data.examSetId;
+      await prisma.examStudentMap.upsert({
+        where: { studentId_examId: { studentId, examId } },
+        update: { examSetId: data.examSetId },
+        create: { studentId, examId, examSetId: data.examSetId },
+      }).catch(err => console.warn("Could not sync examStudentMap on autosave:", err));
+    }
+
     const submission = await prisma.examSubmission.upsert({
       where: { studentId_examId: { studentId, examId } },
-      update: { answers: data.answers },
-      create: { studentId, examId, answers: data.answers },
+      update: updateData,
+      create: { studentId, examId, ...updateData },
     });
     return NextResponse.json({ success: true, submission });
   } catch (e) {

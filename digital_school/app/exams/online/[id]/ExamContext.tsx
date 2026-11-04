@@ -131,6 +131,87 @@ export interface OptionalNotice {
   isExceeded?: boolean;
 }
 
+export function prepareQuestionsForFullExam(
+  origQuestions: any[],
+  seed: string,
+  isPropMS: boolean,
+  shuffleQuestions: boolean = true,
+  subjectsConfig: any = null
+): any[] {
+  if (!origQuestions || !Array.isArray(origQuestions) || origQuestions.length === 0) return [];
+
+  if (!isPropMS) {
+    // Single Subject:
+    // CQ questions MUST NEVER be shuffled because subsections define question ranges (e.g. 1 to 3, 4 to 6).
+    // Shuffling changes the section order and breaks which question number goes to which section.
+    const nonCq = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
+    const cqs = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+
+    const shuffledNonCq = shuffleQuestions !== false
+      ? shuffleArrayWithSeed(nonCq, `${seed}_noncq`)
+      : nonCq;
+
+    // Keep CQs strictly in their authored order without any shuffling
+    return [...shuffledNonCq, ...cqs];
+  } else {
+    // FOR MS EXAMS:
+    // Keep questions strictly grouped by subject. If shuffling is enabled, shuffle WITHIN each subject.
+    const parsedCfg = parseSubjectsConfig(subjectsConfig);
+    const configuredSubs: any[] = Array.isArray(parsedCfg?.subjects) && parsedCfg.subjects.length > 0
+      ? parsedCfg.subjects
+      : [];
+    
+    const distinctSubNames: string[] = [];
+    if (configuredSubs.length > 0) {
+      configuredSubs.forEach((s: any) => {
+        if (s?.name && !distinctSubNames.some(d => matchSubject(s.name, d))) {
+          distinctSubNames.push(s.name);
+        }
+      });
+    } else {
+      const rawSubs = origQuestions.map((q: any) => (q.subject || q.subjectName || '').trim()).filter(Boolean);
+      rawSubs.forEach((rs: string) => {
+        if (!distinctSubNames.some(d => matchSubject(rs, d))) {
+          distinctSubNames.push(rs);
+        }
+      });
+    }
+
+    const groupedResult: any[] = [];
+    const matchedIds = new Set<string>();
+
+    distinctSubNames.forEach((subName, subIdx) => {
+      const subQuestions = origQuestions.filter((q: any) => {
+        const qSub = q.subject || q.subjectName || '';
+        const matches = matchSubject(qSub, subName);
+        if (matches && q.id) matchedIds.add(q.id);
+        return matches;
+      });
+
+      if (subQuestions.length > 0) {
+        const subCqs = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+        const subNonCq = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
+        const subShuffled = shuffleQuestions !== false
+          ? shuffleArrayWithSeed(subNonCq, `${seed}_sub_${subIdx}_${subName}`)
+          : subNonCq;
+        groupedResult.push(...subShuffled, ...subCqs);
+      }
+    });
+
+    const remainingQuestions = origQuestions.filter((q: any) => q.id && !matchedIds.has(q.id));
+    if (remainingQuestions.length > 0) {
+      const remCqs = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
+      const remNonCq = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
+      const remShuffled = shuffleQuestions !== false
+        ? shuffleArrayWithSeed(remNonCq, `${seed}_sub_rem`)
+        : remNonCq;
+      groupedResult.push(...remShuffled, ...remCqs);
+    }
+
+    return groupedResult;
+  }
+}
+
 export function ExamContextProvider({
   exam: examProp,
   children
@@ -138,87 +219,55 @@ export function ExamContextProvider({
   exam: any;
   children: React.ReactNode;
 }) {
-  // Keep exam as state so we can patch timestamps after start API returns
-  const [exam, setExamState] = useState<any>(() => {
-    const origQuestions = examProp.questions || [];
-    const seed = examProp.studentId || examProp.submissionId || examProp.id || 'default_seed';
-    const isPropMS = detectIsMS(examProp);
+  const seed = examProp.studentId || examProp.submissionId || examProp.id || 'default_seed';
+  const isPropMS = detectIsMS(examProp);
 
-    let preparedQuestions: any[];
+  // Helper to resolve the initial raw, un-shuffled questions of the assigned set from allSets
+  const resolveInitialSet = () => {
+    const targetSetId = examProp.assignedExamSetId || examProp.assignedSet?.id || null;
+    const targetSetName = examProp.setName || examProp.assignedSet?.name || 'A';
 
-    if (!isPropMS) {
-      // CQ questions MUST NEVER be shuffled because subsections define question ranges (e.g. 1 to 3, 4 to 6).
-      // Shuffling changes the section order and breaks which question number goes to which section.
-      const nonCq = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
-      const cqs = origQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
-
-      const shuffledNonCq = examProp.shuffleQuestions !== false
-        ? shuffleArrayWithSeed(nonCq, `${seed}_noncq`)
-        : nonCq;
-
-      // Keep CQs strictly in their authored order without any shuffling
-      preparedQuestions = [...shuffledNonCq, ...cqs];
-    } else {
-      // FOR MS EXAMS:
-      // Keep questions strictly grouped by subject. If shuffling is enabled, shuffle WITHIN each subject.
-      const parsedCfg = parseSubjectsConfig(examProp.subjectsConfig);
-      const configuredSubs: any[] = Array.isArray(parsedCfg?.subjects) && parsedCfg.subjects.length > 0
-        ? parsedCfg.subjects
-        : [];
-      
-      const distinctSubNames: string[] = [];
-      if (configuredSubs.length > 0) {
-        configuredSubs.forEach((s: any) => {
-          if (s?.name && !distinctSubNames.some(d => matchSubject(s.name, d))) {
-            distinctSubNames.push(s.name);
-          }
-        });
-      } else {
-        const rawSubs = origQuestions.map((q: any) => (q.subject || q.subjectName || '').trim()).filter(Boolean);
-        rawSubs.forEach((rs: string) => {
-          if (!distinctSubNames.some(d => matchSubject(rs, d))) {
-            distinctSubNames.push(rs);
-          }
-        });
+    if (Array.isArray(examProp.allSets) && examProp.allSets.length > 0) {
+      const matched = examProp.allSets.find((s: any) =>
+        (targetSetId && s.id === targetSetId) ||
+        (targetSetName && s.name?.toUpperCase() === targetSetName.toUpperCase())
+      );
+      if (matched && Array.isArray(matched.questions) && matched.questions.length > 0) {
+        return {
+          id: matched.id,
+          name: matched.name,
+          questions: matched.questions
+        };
       }
-
-      const groupedResult: any[] = [];
-      const matchedIds = new Set<string>();
-
-      distinctSubNames.forEach((subName, subIdx) => {
-        const subQuestions = origQuestions.filter((q: any) => {
-          const qSub = q.subject || q.subjectName || '';
-          const matches = matchSubject(qSub, subName);
-          if (matches && q.id) matchedIds.add(q.id);
-          return matches;
-        });
-
-        if (subQuestions.length > 0) {
-          const subCqs = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
-          const subNonCq = subQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
-          const subShuffled = examProp.shuffleQuestions !== false
-            ? shuffleArrayWithSeed(subNonCq, `${seed}_sub_${subIdx}_${subName}`)
-            : subNonCq;
-          groupedResult.push(...subShuffled, ...subCqs);
-        }
-      });
-
-      const remainingQuestions = origQuestions.filter((q: any) => q.id && !matchedIds.has(q.id));
-      if (remainingQuestions.length > 0) {
-        const remCqs = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() === 'cq');
-        const remNonCq = remainingQuestions.filter((q: any) => (q.type || q.questionType || '').toLowerCase() !== 'cq');
-        const remShuffled = examProp.shuffleQuestions !== false
-          ? shuffleArrayWithSeed(remNonCq, `${seed}_sub_rem`)
-          : remNonCq;
-        groupedResult.push(...remShuffled, ...remCqs);
-      }
-
-      preparedQuestions = groupedResult;
     }
 
     return {
+      id: targetSetId || examProp.allSets?.[0]?.id || null,
+      name: targetSetName || examProp.allSets?.[0]?.name || 'A',
+      questions: Array.isArray(examProp.questions) ? examProp.questions : []
+    };
+  };
+
+  const initialSet = resolveInitialSet();
+  const [unshuffledQuestions, setUnshuffledQuestions] = useState<any[]>(initialSet.questions);
+
+  // Keep exam as state so we can patch timestamps after start API returns
+  const [exam, setExamState] = useState<any>(() => {
+    // For Full Exam Mode: prepare questions according to full exam system (shuffled per student seed)
+    const preparedQuestions = prepareQuestionsForFullExam(
+      initialSet.questions,
+      seed,
+      isPropMS,
+      examProp.shuffleQuestions !== false,
+      examProp.subjectsConfig
+    );
+
+    return {
       ...examProp,
-      questions: preparedQuestions,
+      assignedExamSetId: initialSet.id,
+      setName: initialSet.name,
+      questions: preparedQuestions, // Full exam mode questions
+      unshuffledQuestions: initialSet.questions, // Authentic physical print parity questions
     };
   });
 
@@ -509,21 +558,74 @@ export function ExamContextProvider({
     }
   }, [fullSortedQuestions, activeSection]);
 
-  // Exact generated set sequence (preserving original question order of the physical/generated set)
+  // Exact physical set sequence strictly matching print layout (NEVER shuffled)
   const setOrderedQuestions = useMemo(() => {
-    const raw = exam.questions || [];
+    const raw = (unshuffledQuestions && unshuffledQuestions.length > 0)
+      ? unshuffledQuestions
+      : (initialSet.questions || []);
+
     if (activeSection === 'objective') {
-      return raw.filter((q: any) => {
+      const objOnly = raw.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
         return !['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
+
+      if (!isMS) {
+        // Single Subject: exact authored order of the set from print
+        return objOnly;
+      }
+
+      // Multi-Subject (MS): strictly ordered by configured subjects (compulsory first, then optional),
+      // preserving exact authored order within each subject (100% matches exam/[id]/print)
+      const parsedCfg = parseSubjectsConfig(exam.subjectsConfig);
+      const configuredSubs: any[] = Array.isArray(parsedCfg?.subjects) && parsedCfg.subjects.length > 0
+        ? parsedCfg.subjects
+        : [];
+
+      if (configuredSubs.length === 0) {
+        return objOnly;
+      }
+
+      const orderedList: any[] = [];
+      const assignedIds = new Set<string>();
+
+      configuredSubs.forEach((subConfig: any) => {
+        const subName = (subConfig.name || '').trim();
+        const subQs = objOnly.filter((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          if (assignedIds.has(qId)) return false;
+          const qSub = (q.subject || q.subjectName || '').trim();
+          return matchSubject(qSub, subName);
+        });
+
+        subQs.forEach((q: any) => {
+          const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+          assignedIds.add(qId);
+          orderedList.push({
+            ...q,
+            _canonicalSubject: subName,
+            _subConfig: subConfig
+          });
+        });
+      });
+
+      // Any remaining unassigned questions
+      objOnly.forEach((q: any) => {
+        const qId = q.id || `${q.type}_${q.q || q.questionText}`;
+        if (!assignedIds.has(qId)) {
+          orderedList.push(q);
+        }
+      });
+
+      return orderedList;
     } else {
+      // CQ/SQ section: exact authored order of subjective questions
       return raw.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
         return ['cq', 'sq', 'descriptive', 'coding'].includes(type);
       });
     }
-  }, [exam.questions, activeSection]);
+  }, [unshuffledQuestions, initialSet.questions, activeSection, isMS, exam.subjectsConfig]);
 
   // Switch active exam set (e.g. from OMR Set selector)
   const switchExamSet = useCallback((setNameOrCode: string) => {
@@ -542,14 +644,32 @@ export function ExamContextProvider({
     });
 
     if (matchedSet && matchedSet.questions && matchedSet.questions.length > 0) {
+      const rawQs = matchedSet.questions;
+      setUnshuffledQuestions(rawQs);
+
+      const newFullExamQuestions = prepareQuestionsForFullExam(
+        rawQs,
+        seed,
+        isPropMS,
+        exam.shuffleQuestions !== false,
+        exam.subjectsConfig
+      );
+
       patchExam({
         setName: matchedSet.name,
         assignedExamSetId: matchedSet.id,
-        questions: matchedSet.questions,
+        questions: newFullExamQuestions,
+        unshuffledQuestions: rawQs,
         assignedSet: { id: matchedSet.id, name: matchedSet.name }
       });
+
+      if (typeof window !== 'undefined') {
+        const subId = exam.submissionId || 'active';
+        localStorage.setItem(`exam-set-${exam.id}-${subId}`, matchedSet.id);
+        localStorage.setItem(`exam-set-name-${exam.id}-${subId}`, matchedSet.name);
+      }
     }
-  }, [exam.allSets, patchExam]);
+  }, [exam.allSets, exam.id, exam.submissionId, exam.shuffleQuestions, exam.subjectsConfig, isPropMS, seed, patchExam]);
 
   // Server perspective: only sync periodically
   const saveAnswers = useCallback(async (answersToSave: any) => {
@@ -561,7 +681,10 @@ export function ExamContextProvider({
       const response = await fetch(`/api/exams/${exam.id}/responses`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: answersToSave }),
+        body: JSON.stringify({
+          answers: answersToSave,
+          examSetId: exam.assignedExamSetId
+        }),
       });
 
       if (response.status === 403) {
@@ -814,6 +937,7 @@ export function ExamContextProvider({
     sortedQuestions,
     filteredSortedQuestions,
     setOrderedQuestions,
+    unshuffledQuestions,
     switchExamSet,
     fullSortedQuestions,
     groupedQuestions,
@@ -860,6 +984,7 @@ export function ExamContextProvider({
     sortedQuestions,
     filteredSortedQuestions,
     setOrderedQuestions,
+    unshuffledQuestions,
     switchExamSet,
     fullSortedQuestions,
     groupedQuestions,

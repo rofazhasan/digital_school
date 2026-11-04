@@ -169,6 +169,7 @@ export default function ExamLayout() {
     warnings: contextWarnings,
     setWarnings: setContextWarnings,
     sortedQuestions,
+    filteredSortedQuestions,
     fontSize,
     setFontSize,
     activeSection,
@@ -297,6 +298,17 @@ export default function ExamLayout() {
     });
   }, [examModeStorageKey]);
 
+  const handleToggleToFull = useCallback((targetQuestionId?: string) => {
+    setExamViewMode('full');
+    if (targetQuestionId) {
+      const allQs = filteredSortedQuestions || sortedQuestions || [];
+      const idx = allQs.findIndex((q: any) => q.id === targetQuestionId);
+      if (idx >= 0) {
+        navigateToQuestion(idx);
+      }
+    }
+  }, [setExamViewMode, filteredSortedQuestions, sortedQuestions, navigateToQuestion]);
+
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 
@@ -353,7 +365,8 @@ export default function ExamLayout() {
             },
             isManual: !forced,
             forced: forced,
-            section: isPractice ? undefined : activeSection
+            section: isPractice ? undefined : activeSection,
+            examSetId: exam.assignedExamSetId || undefined
           }),
         });
 
@@ -1125,18 +1138,20 @@ export default function ExamLayout() {
                   variant="outline"
                   size="sm"
                   onClick={() => setExamViewMode(prev => prev === 'omr' ? 'full' : 'omr')}
-                  className="hidden sm:flex items-center gap-1.5 h-8 px-3 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 text-xs font-bold transition-all"
-                  title="ওএমআর শিট এবং প্রশ্ন ভিউ এর মধ্যে পরিবর্তন করুন"
+                  className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-xl border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/80 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-bold transition-all shadow-sm ring-1 ring-indigo-500/20"
+                  title="ওএমআর শিট এবং সম্পূর্ণ প্রশ্ন ভিউ এর মধ্যে পরিবর্তন করুন"
                 >
                   {examViewMode === 'omr' ? (
                     <>
                       <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>প্রশ্ন দেখুন (Full View)</span>
+                      <span className="hidden xs:inline">সম্পূর্ণ প্রশ্ন</span>
+                      <span className="xs:hidden">প্রশ্ন</span>
                     </>
                   ) : (
                     <>
                       <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      <span>ওএমআর শিট (Only OMR)</span>
+                      <span className="hidden xs:inline">ওএমআর শিট</span>
+                      <span className="xs:hidden">OMR</span>
                     </>
                   )}
                 </Button>
@@ -1171,7 +1186,7 @@ export default function ExamLayout() {
               instituteName={instituteName}
               instituteLogo={instituteLogo}
               onSubmit={handleSubmit}
-              onToggleViewMode={() => setExamViewMode('full')}
+              onToggleViewMode={handleToggleToFull}
               isSubmitting={isSubmitting}
             />
           </div>

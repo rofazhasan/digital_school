@@ -31,7 +31,8 @@ import {
   CheckCircle2,
   CircleDot,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen
 } from "lucide-react";
 import { useExamContext } from "./ExamContext";
 import { toBengaliNumerals, toBengaliAlphabets } from "@/utils/numeralConverter";
@@ -57,7 +58,7 @@ interface OMRExamSheetProps {
   instituteName?: string;
   instituteLogo?: string;
   onSubmit: (forced?: boolean) => void;
-  onToggleViewMode?: () => void;
+  onToggleViewMode?: (targetQuestionId?: string) => void;
   isSubmitting?: boolean;
 }
 
@@ -89,8 +90,10 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
 
   const [selectedOmrSubject, setSelectedOmrSubject] = useState<string>('ALL');
 
-  // In Only OMR mode: strictly adhere to the physical generated set's exact question order (1, 2, 3, 4...)
-  const questions = setOrderedQuestions || sortedQuestions || [];
+  // In Only OMR mode: strictly adhere to the physical generated set's exact question order (1, 2, 3, 4...) matching print exactly
+  const questions = (setOrderedQuestions && setOrderedQuestions.length > 0)
+    ? setOrderedQuestions
+    : (sortedQuestions || []);
   const totalQuestions = questions.length;
 
   const optionalSubjects = useMemo(() => {
@@ -594,12 +597,13 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={onToggleViewMode}
-                  className="rounded-xl border-slate-300 dark:border-slate-700 text-xs font-semibold gap-1 hidden md:flex h-9"
-                  title="সম্পূর্ণ ডিজিটাল প্রশ্ন দেখুন"
+                  onClick={() => onToggleViewMode()}
+                  className="rounded-xl border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold gap-1.5 flex items-center h-8 sm:h-9 px-2.5 sm:px-3 shadow-sm transition-all ring-1 ring-indigo-500/20"
+                  title="সম্পূর্ণ ডিজিটাল প্রশ্ন কার্ড দেখুন (Full Exam)"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>প্রশ্ন দেখুন</span>
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="hidden xs:inline">সম্পূর্ণ প্রশ্ন দেখুন</span>
+                  <span className="xs:hidden">প্রশ্ন দেখুন</span>
                 </Button>
               )}
 
@@ -1204,6 +1208,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                             onMPCStageChange={handleMPCStageChange}
                                             onARSelect={handleARSelect}
                                             onClearAnswer={handleClearAnswer}
+                                            onViewFullQuestion={onToggleViewMode}
                                             disabled={isSubmitting}
                                           />
                                         </div>
@@ -1278,6 +1283,7 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                                   onMPCStageChange={handleMPCStageChange}
                                   onARSelect={handleARSelect}
                                   onClearAnswer={handleClearAnswer}
+                                  onViewFullQuestion={onToggleViewMode}
                                   disabled={isSubmitting}
                                 />
                               </div>
@@ -1358,11 +1364,25 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
           variant="outline"
           size="sm"
           onClick={() => setShowQuickNavModal(true)}
-          className="h-10 px-3 rounded-xl border-slate-300 dark:border-slate-700 text-xs font-bold gap-1.5 shrink-0 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+          className="h-10 px-2.5 sm:px-3 rounded-xl border-slate-300 dark:border-slate-700 text-xs font-bold gap-1 shrink-0 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
         >
           <LayoutGrid className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           <span>{toBengaliNumerals(answeredCount)}/{toBengaliNumerals(totalQuestions)}</span>
         </Button>
+
+        {/* Toggle to Full View Button on Mobile */}
+        {onToggleViewMode && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onToggleViewMode()}
+            className="h-10 px-2.5 rounded-xl border-indigo-200 dark:border-indigo-800 text-xs font-bold gap-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shrink-0 shadow-sm"
+            title="সম্পূর্ণ ডিজিটাল প্রশ্ন কার্ড দেখুন (Full Exam)"
+          >
+            <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span className="text-[11px]">প্রশ্ন দেখুন</span>
+          </Button>
+        )}
 
         {/* Small Live Timer */}
         <div className="shrink-0 scale-90">
@@ -1498,7 +1518,19 @@ export const OMRExamSheet: React.FC<OMRExamSheetProps> = ({
                 </div>
               )}
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-3">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-3 space-y-2">
+                {onToggleViewMode && (
+                  <Button
+                    onClick={() => {
+                      setShowQuickNavModal(false);
+                      onToggleViewMode();
+                    }}
+                    className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold h-10 gap-2 shadow-md shadow-indigo-500/20"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>সম্পূর্ণ প্রশ্ন কার্ডে যান (Full Exam Mode)</span>
+                  </Button>
+                )}
                 <Button
                   onClick={() => setShowQuickNavModal(false)}
                   variant="outline"
@@ -1532,6 +1564,7 @@ interface OMRQuestionRowProps {
   onMPCStageChange: (qId: string, stageId: string, val: string, isOptionSelect?: boolean) => void;
   onARSelect: (qId: string, optNum: number) => void;
   onClearAnswer: (q: any) => void;
+  onViewFullQuestion?: (qId: string) => void;
   disabled: boolean;
 }
 
@@ -1551,6 +1584,7 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
   onMPCStageChange,
   onARSelect,
   onClearAnswer,
+  onViewFullQuestion,
   disabled
 }) => {
   const qId = question.id;
@@ -1570,10 +1604,18 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
         isAnswered && "bg-indigo-50/20 dark:bg-indigo-950/10"
       )}>
         {/* Question Number */}
-        <div className="w-10 sm:w-12 font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 text-center flex flex-col items-center shrink-0">
-          <span>{toBengaliNumerals(index + 1)}</span>
-          <span className="text-[9px] font-mono text-slate-400">({index + 1})</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => onViewFullQuestion?.(qId)}
+          title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+          className="w-10 sm:w-12 font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 text-center flex flex-col items-center shrink-0 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors group/num cursor-pointer"
+        >
+          <span className="group-hover/num:underline">{toBengaliNumerals(index + 1)}</span>
+          <span className="text-[9px] font-mono text-slate-400 flex items-center gap-0.5">
+            ({index + 1})
+            {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-0 group-hover/num:opacity-100 text-indigo-500 transition-opacity" />}
+          </span>
+        </button>
 
         {/* 4 or 5 OMR Bubbles */}
         <div className="flex-1 flex justify-around items-center px-0.5 sm:px-1">
@@ -1627,9 +1669,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
       <div className="py-2 px-1.5 sm:px-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors rounded-xl">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
-            <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200">
-              {toBengaliNumerals(index + 1)}. ({index + 1})
-            </span>
+            <button
+              type="button"
+              onClick={() => onViewFullQuestion?.(qId)}
+              title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+              className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span className="hover:underline">{toBengaliNumerals(index + 1)}. ({index + 1})</span>
+              {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-indigo-500" />}
+            </button>
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-300">
               বহুপদী (Multi)
             </Badge>
@@ -1668,9 +1716,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     return (
       <div className="py-2 px-1.5 sm:px-2 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl my-1 border border-indigo-100 dark:border-indigo-900/30 space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="font-black text-[11px] sm:text-xs text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onViewFullQuestion?.(qId)}
+            title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+            className="font-black text-[11px] sm:text-xs text-indigo-900 dark:text-indigo-300 flex items-center gap-1 hover:underline cursor-pointer"
+          >
             <Layers className="w-3 h-3" /> প্রশ্ন {toBengaliNumerals(index + 1)} (উদ্দীপকভিত্তিক SMCQ)
-          </span>
+            {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-indigo-500" />}
+          </button>
           <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
             {toBengaliNumerals(subQs.length)} টি প্রশ্ন
           </Badge>
@@ -1739,9 +1793,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     return (
       <div className="py-2 px-1.5 sm:px-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl my-1 border border-slate-200 dark:border-slate-700 space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="font-black text-[11px] sm:text-xs text-slate-800 dark:text-slate-200">
-            প্রশ্ন {toBengaliNumerals(index + 1)}: মিলকরণ (MTF Matrix)
-          </span>
+          <button
+            type="button"
+            onClick={() => onViewFullQuestion?.(qId)}
+            title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+            className="font-black text-[11px] sm:text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1 hover:underline cursor-pointer"
+          >
+            <span>প্রশ্ন {toBengaliNumerals(index + 1)}: মিলকরণ (MTF Matrix)</span>
+            {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-indigo-500" />}
+          </button>
           <button
             type="button"
             onClick={() => onClearAnswer(question)}
@@ -1799,9 +1859,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
     return (
       <div className="py-2 px-1.5 sm:px-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl my-1 border border-slate-200 dark:border-slate-700 space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="font-black text-[11px] sm:text-xs text-slate-800 dark:text-slate-200">
-            প্রশ্ন {toBengaliNumerals(index + 1)}: সংখ্যাগত মান (Numeric OMR)
-          </span>
+          <button
+            type="button"
+            onClick={() => onViewFullQuestion?.(qId)}
+            title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+            className="font-black text-[11px] sm:text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1 hover:underline cursor-pointer"
+          >
+            <span>প্রশ্ন {toBengaliNumerals(index + 1)}: সংখ্যাগত মান (Numeric OMR)</span>
+            {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-indigo-500" />}
+          </button>
           <button
             type="button"
             onClick={() => onClearAnswer(question)}
@@ -1856,9 +1922,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
       <div className="py-3 px-2 sm:px-3 bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-900/40 rounded-2xl my-2 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200">
-              {toBengaliNumerals(index + 1)}. ({index + 1})
-            </span>
+            <button
+              type="button"
+              onClick={() => onViewFullQuestion?.(qId)}
+              title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+              className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span className="hover:underline">{toBengaliNumerals(index + 1)}. ({index + 1})</span>
+              {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-purple-500" />}
+            </button>
             <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border-purple-300">
               Assertion-Reason
             </Badge>
@@ -1947,9 +2019,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
       <div className="py-2.5 px-2 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl my-1.5 border border-indigo-100 dark:border-indigo-900/30 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="font-black text-xs sm:text-sm text-indigo-950 dark:text-indigo-200">
-              প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় উত্তর (CMA Parts)
-            </span>
+            <button
+              type="button"
+              onClick={() => onViewFullQuestion?.(qId)}
+              title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+              className="font-black text-xs sm:text-sm text-indigo-950 dark:text-indigo-200 flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              <span>প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় উত্তর (CMA Parts)</span>
+              {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-indigo-500" />}
+            </button>
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
               {toBengaliNumerals(parts.length)} টি অংশ
             </Badge>
@@ -2036,9 +2114,15 @@ const OMRQuestionRow: React.FC<OMRQuestionRowProps> = memo(({
       <div className="py-2.5 px-2 bg-purple-50/40 dark:bg-purple-950/20 rounded-xl my-1.5 border border-purple-100 dark:border-purple-900/30 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="font-black text-xs sm:text-sm text-purple-950 dark:text-purple-200">
-              প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় সমস্যা (MPC Stages)
-            </span>
+            <button
+              type="button"
+              onClick={() => onViewFullQuestion?.(qId)}
+              title="সম্পূর্ণ কার্ডে এই প্রশ্নটি দেখুন"
+              className="font-black text-xs sm:text-sm text-purple-950 dark:text-purple-200 flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              <span>প্রশ্ন {toBengaliNumerals(index + 1)}: বহুস্তরীয় সমস্যা (MPC Stages)</span>
+              {onViewFullQuestion && <Eye className="w-2.5 h-2.5 opacity-60 text-purple-500" />}
+            </button>
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200">
               {toBengaliNumerals(stages.length)} টি ধাপ
             </Badge>

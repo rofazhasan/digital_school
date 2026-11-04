@@ -43,6 +43,8 @@ import {
   SlidersHorizontal,
   X,
   Layers,
+  ScanLine,
+  Camera,
   Sparkles,
   RotateCcw,
   Printer
@@ -831,6 +833,16 @@ export default function ExamsPage() {
                   <BarChart3 className="h-4 w-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
                   Bulk Result
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/omr-templates')}
+                  className="rounded-xl border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/30 font-semibold text-purple-700 dark:text-purple-300 shadow-xs hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all"
+                  title="বাংলাদেশ স্ট্যান্ডার্ড OMR টেমপ্লেট গ্যালারি"
+                >
+                  <ScanLine className="h-4 w-4 mr-1.5 text-purple-600 dark:text-purple-400" />
+                  OMR টেমপ্লেটসমূহ
+                </Button>
                 {userRole !== 'TEACHER' && (
                   <Button
                     onClick={handleCreate}
@@ -1462,6 +1474,10 @@ export default function ExamsPage() {
                                   <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => window.open(`/exams/${exam.id}/print`, '_blank')}>
                                     <Printer className="w-4 h-4 text-violet-500" />
                                     <span>Print Exam & Cards</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-bold text-indigo-600 dark:text-indigo-400 cursor-pointer" onClick={() => router.push(`/exams/${exam.id}/omr-scan`)}>
+                                    <Camera className="w-4 h-4 text-indigo-500" />
+                                    <span>OMR ব্যাচ স্ক্যান ও অটো-গ্রেড</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem className="rounded-xl flex items-center gap-2 font-medium cursor-pointer" onClick={() => router.push(`/exams/bulk-print?ids=${exam.id}`)}>
                                     <Layers className="w-4 h-4 text-blue-500" />

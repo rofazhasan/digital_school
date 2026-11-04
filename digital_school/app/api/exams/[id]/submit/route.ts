@@ -42,13 +42,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Determine Exam Set ID
-    // 1. Try finding it from the map
-    const examStudentMap = await prisma.examStudentMap.findUnique({
-      where: { studentId_examId: { studentId, examId } },
-      select: { examSetId: true }
-    });
+    // 0. If client explicitly specified examSetId (e.g. from OMR Set selector or submission)
+    let targetExamSetId: string | null = null;
+    const requestedSetId = data.examSetId || null;
 
-    let targetExamSetId = examStudentMap?.examSetId || null;
+    if (requestedSetId && Array.isArray(exam.examSets)) {
+      const cleanRequested = String(requestedSetId).replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase();
+      const matched = exam.examSets.find((s: any) =>
+        s.id === requestedSetId ||
+        s.name?.toUpperCase() === String(requestedSetId).toUpperCase() ||
+        s.name?.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase() === cleanRequested
+      );
+      if (matched) {
+        targetExamSetId = matched.id;
+        // Keep student mapping updated to this chosen set
+        await prisma.examStudentMap.upsert({
+          where: { studentId_examId: { studentId, examId } },
+          update: { examSetId: matched.id },
+          create: { studentId, examId, examSetId: matched.id }
+        }).catch(err => console.warn("Could not sync examStudentMap on submit:", err));
+      }
+    }
+
+    // 1. Try finding it from the map if not explicitly resolved
+    if (!targetExamSetId) {
+      const examStudentMap = await prisma.examStudentMap.findUnique({
+        where: { studentId_examId: { studentId, examId } },
+        select: { examSetId: true }
+      });
+      targetExamSetId = examStudentMap?.examSetId || null;
+    }
 
     // 2. If not in map or for validation, try finding it from existing submission
     const existingSubmission = (await prisma.examSubmission.findUnique({

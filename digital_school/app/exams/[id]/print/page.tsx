@@ -12,6 +12,7 @@ import Head from 'next/head';
 import QuestionPaper from '../../../components/QuestionPaper';
 import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper';
 import OMRSheet from '../../../components/OMRSheet';
+import { A3MasterExamPaper } from '@/app/components/A3MasterExamPaper';
 import { estimateSqVisualUnits } from '@/utils/engineeringAnswerBox';
 
 import "./print.css";
@@ -683,6 +684,7 @@ export default function PrintExamPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   // Paper Size & Booklet Options State
+  const [printFormat, setPrintFormat] = useState<'normal' | 'a3_master'>('normal');
   const [paperSize, setPaperSize] = useState<'legal' | 'a4' | 'a3' | 'letter'>('a4');
   const [layoutMode, setLayoutMode] = useState<'standard' | 'booklet_4page' | 'booklet_6page' | 'booklet_2up'>('standard');
   const [bookletPagesChoice, setBookletPagesChoice] = useState<'auto' | 4 | 8 | 12 | 16>('auto');
@@ -702,6 +704,11 @@ export default function PrintExamPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      const savedFormat = localStorage.getItem('print_format_choice');
+      if (savedFormat === 'a3_master' || savedFormat === 'normal') {
+        setPrintFormat(savedFormat as any);
+        if (savedFormat === 'a3_master') setPaperSize('a3');
+      }
       const savedPaper = localStorage.getItem('print_paper_size');
       if (savedPaper) setPaperSize(savedPaper as any);
       const savedLayout = localStorage.getItem('print_layout_mode');
@@ -721,6 +728,10 @@ export default function PrintExamPage() {
       // Also check URL search parameter
       if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('format') === 'a3_master' || urlParams.get('a3_master') === 'true') {
+          setPrintFormat('a3_master');
+          setPaperSize('a3');
+        }
         if (urlParams.get('engineeringBoxes') === 'true' || urlParams.get('engineeringExam') === 'true') {
           setEngineeringExamBoxes(true);
         }
@@ -738,6 +749,14 @@ export default function PrintExamPage() {
       console.error(e);
     }
   }, [examId]);
+
+  const handlePrintFormatChange = (val: 'normal' | 'a3_master') => {
+    setPrintFormat(val);
+    if (val === 'a3_master') {
+      setPaperSize('a3');
+    }
+    try { localStorage.setItem('print_format_choice', val); } catch (e) {}
+  };
 
   const handlePaperSizeChange = (val: 'legal' | 'a4' | 'a3' | 'letter') => {
     setPaperSize(val);
@@ -940,14 +959,18 @@ export default function PrintExamPage() {
           @media print {
             @page {
               size: ${
-                isBooklet
-                  ? (paperSize === 'a3' ? 'A3 landscape' : paperSize === 'a4' ? 'A4 landscape' : paperSize === 'legal' ? 'legal landscape' : 'letter landscape')
-                  : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
+                printFormat === 'a3_master'
+                  ? 'A3 landscape'
+                  : isBooklet
+                    ? (paperSize === 'a3' ? 'A3 landscape' : paperSize === 'a4' ? 'A4 landscape' : paperSize === 'legal' ? 'legal landscape' : 'letter landscape')
+                    : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
               };
               margin: ${
-                isBooklet
-                  ? (paperSize === 'a3' ? '8mm' : '5mm')
-                  : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
+                printFormat === 'a3_master'
+                  ? '0mm'
+                  : isBooklet
+                    ? (paperSize === 'a3' ? '8mm' : '5mm')
+                    : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
               };
             }
             body {
@@ -986,6 +1009,8 @@ export default function PrintExamPage() {
           setTempSchoolAddress={setTempSchoolAddress}
           handleSaveInstitute={handleSaveInstitute}
           handleResetInstitute={handleResetInstitute}
+          printFormat={printFormat}
+          setPrintFormat={handlePrintFormatChange}
           paperSize={paperSize}
           setPaperSize={handlePaperSizeChange}
           layoutMode={layoutMode}
@@ -1013,6 +1038,7 @@ export default function PrintExamPage() {
             setEngineeringBoxStyle(val);
             try { localStorage.setItem('print_engineering_box_style', val); } catch (e) {}
           }}
+          examId={examId}
           t={t}
         />
 
@@ -1057,9 +1083,38 @@ export default function PrintExamPage() {
         <div ref={printRef} className="relative z-10 my-4">
           
           {/* ==============================================================
-              CASE 1: STANDARD 1-PAGE VERTICAL CONTINUOUS PRINTING
+              CASE 0: A3 MASTER FORMAT (World-Class B&W Medical & Admission Master Spread)
              ============================================================== */}
-          {layoutMode === 'standard' && (
+          {printFormat === 'a3_master' ? (
+            <div className="a3-master-container">
+              {nonEmptySets.map((set: any) => (
+                <A3MasterExamPaper
+                  key={`a3-master-${set.setId}`}
+                  examInfo={{
+                    schoolName: !hideInstitute ? (customSchoolName || examInfo.schoolName || '') : '',
+                    schoolAddress: !hideInstitute ? (customSchoolAddress || examInfo.schoolAddress || '') : '',
+                    title: examInfo.title,
+                    subject: examInfo.subject,
+                    class: examInfo.class,
+                    date: showDate ? examInfo.date : undefined,
+                    set: set.setName,
+                    duration: examInfo.duration,
+                    totalMarks: examInfo.totalMarks,
+                    mcqNegativeMarking: examInfo.mcqNegativeMarking,
+                    objectiveTime: examInfo.objectiveTime,
+                  }}
+                  questions={set.orderedObjective || []}
+                  fontSize={objectiveFontSize}
+                  hideInstitute={hideInstitute}
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* ==============================================================
+                  CASE 1: STANDARD 1-PAGE VERTICAL CONTINUOUS PRINTING
+                 ============================================================== */}
+              {layoutMode === 'standard' && (
             <>
               {!showAnswers ? (
                 // Question Papers (Standard)
@@ -1642,6 +1697,9 @@ export default function PrintExamPage() {
             </>
           )}
 
+            </>
+          )}
+
         </div>
 
         {/* Booklet & Paper Size Advisory Modal */}
@@ -1708,12 +1766,14 @@ const PrintControls = ({
   showEditInstituteModal, setShowEditInstituteModal,
   tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
   handleSaveInstitute, handleResetInstitute,
+  printFormat, setPrintFormat,
   paperSize, setPaperSize, layoutMode, setLayoutMode,
   bookletPagesChoice, setBookletPagesChoice,
   showFoldGuide, toggleFoldGuide, openBookletGuide,
   engineeringExamBoxes, setEngineeringExamBoxes,
   engineeringBoxScale, setEngineeringBoxScale,
   engineeringBoxStyle, setEngineeringBoxStyle,
+  examId,
   t
 }: any) => {
   const updateGlobalFontSize = (delta: number) => {
@@ -1743,6 +1803,35 @@ const PrintControls = ({
           >
             {showAnswers ? 'উত্তরপত্র' : 'প্রশ্নপত্র'}
           </button>
+        </div>
+
+        {/* Section: Format Selector (Normal vs A3 Master Booklet) */}
+        <div className="border-t border-gray-200 pt-2 space-y-1.5">
+          <span className="block font-bold text-gray-800 text-[11px]">
+            {language === 'en' ? 'Print Format Style:' : 'প্রিন্ট ফরম্যাট স্টাইল:'}
+          </span>
+          <div className="grid grid-cols-2 gap-1.5 bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setPrintFormat('normal')}
+              className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${printFormat === 'normal' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
+            >
+              {language === 'en' ? 'Normal (Default)' : 'নরমাল (ডিফল্ট)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintFormat('a3_master')}
+              className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${printFormat === 'a3_master' ? 'bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-500' : 'text-gray-700 hover:bg-gray-200'}`}
+              title="A3 Master Format with detachable OMR & 12 Conduct Rules (Medical & Dental Admission Style)"
+            >
+              {language === 'en' ? 'A3 Master 🌟' : 'A3 মাস্টার 🌟'}
+            </button>
+          </div>
+          {printFormat === 'a3_master' && (
+            <p className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 border border-emerald-200 p-1.5 rounded-lg leading-tight">
+              🩺 মেডিকেল ও বিশ্ববিদ্যালয় ভর্তি পরীক্ষার A3 ল্যান্ডস্কেপ ফরম্যাট সক্রিয়। বাঁয়ে ডিট্যাচেবল OMR এবং পিঠে ১২টি আচরণবিধি বক্স সহ সাজানো।
+            </p>
+          )}
         </div>
 
         {/* Section: Paper Size & Booklet Setup */}
@@ -2100,6 +2189,26 @@ const PrintControls = ({
             </div>
           </div>
         )}
+
+        {/* Quick OMR Tools Navigation */}
+        <div className="border-t border-gray-200 pt-2 flex flex-col gap-1.5">
+          {examId && (
+            <a
+              href={`/exams/${examId}/omr-scan`}
+              className="w-full text-center py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-lg font-bold text-[10.5px] transition flex items-center justify-center gap-1"
+            >
+              <span>📷</span>
+              <span>OMR ব্যাচ স্ক্যান ও গ্রেডিং</span>
+            </a>
+          )}
+          <a
+            href="/exams/omr-templates"
+            className="w-full text-center py-1 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-semibold text-[10px] transition flex items-center justify-center gap-1"
+          >
+            <span>📋</span>
+            <span>OMR টেমপ্লেট গ্যালারি</span>
+          </a>
+        </div>
 
         {/* Print Button */}
         <button

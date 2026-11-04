@@ -1,0 +1,248 @@
+import type { Template, EvaluationConfig } from './types';
+
+export interface PresetData {
+  id: string;
+  name: string;
+  description: string;
+  template: Template;
+  evaluationConfig: EvaluationConfig;
+}
+
+export const PRESET_TEMPLATES: PresetData[] = [
+  {
+    id: 'medical_admission_100q',
+    name: '🩺 Medical Admission Model Test (100 Qs - MT-01 to MT-13)',
+    description: 'Standard 100-Question Bangladesh Medical & Dental Admission format with 7-digit Roll Number, 6-digit Serial Number, and 100 MCQs (4 choices: A, B, C, D). Supports full Master exam PDFs or individual cropped OMR scans.',
+    template: {
+      pageDimensions: [1060, 2034],
+      bubbleDimensions: [20, 20],
+      preProcessors: [{ name: 'CropLeftOMRSpread' }, { name: 'DirectPass' }],
+      customLabels: {
+        Roll: ['roll1..7'],
+        Serial: ['serial1..6'],
+      },
+      fieldBlocks: {
+        Roll: {
+          origin: [64, 400],
+          bubblesGap: 42.44,
+          labelsGap: 28.38,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['roll1..7'],
+          section: 'Roll Number',
+        },
+        Serial: {
+          origin: [315, 400],
+          bubblesGap: 42.44,
+          labelsGap: 28.38,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['serial1..6'],
+          section: 'Serial Number',
+        },
+        QPart1_Col1: { origin: [111, 1147], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q1..10'], bubbleValues: ['A','B','C','D'], section: 'Part 1 (Q01-10)' },
+        QPart1_Col2: { origin: [311, 1147], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q11..20'], bubbleValues: ['A','B','C','D'], section: 'Part 1 (Q11-20)' },
+        QPart1_Col3: { origin: [511, 1147], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q21..30'], bubbleValues: ['A','B','C','D'], section: 'Part 1 (Q21-30)' },
+        QPart1_Col4: { origin: [711, 1147], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q31..40'], bubbleValues: ['A','B','C','D'], section: 'Part 1 (Q31-40)' },
+        QPart1_Col5: { origin: [911, 1147], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q41..50'], bubbleValues: ['A','B','C','D'], section: 'Part 1 (Q41-50)' },
+
+        QPart2_Col1: { origin: [111, 1583], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q51..60'], bubbleValues: ['A','B','C','D'], section: 'Part 2 (Q51-60)' },
+        QPart2_Col2: { origin: [311, 1583], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q61..70'], bubbleValues: ['A','B','C','D'], section: 'Part 2 (Q61-70)' },
+        QPart2_Col3: { origin: [511, 1583], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q71..80'], bubbleValues: ['A','B','C','D'], section: 'Part 2 (Q71-80)' },
+        QPart2_Col4: { origin: [711, 1583], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q81..90'], bubbleValues: ['A','B','C','D'], section: 'Part 2 (Q81-90)' },
+        QPart2_Col5: { origin: [911, 1583], bubblesGap: 28.65, labelsGap: 26.92, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q91..100'], bubbleValues: ['A','B','C','D'], section: 'Part 2 (Q91-100)' },
+      },
+    },
+    evaluationConfig: {
+      examName: 'Medical Admission Model Test (100 MCQs)',
+      examCode: 'ROFAZ-MED-100',
+      rollNumberField: 'Roll',
+      serialNumberField: 'Serial',
+      markingSchemes: {
+        default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
+      },
+      answerKey: {},
+    },
+  },
+  {
+    id: 'bangladesh_board_hsc',
+    name: '🇧🇩 Bangladesh HSC / SSC Board (50 Qs)',
+    description: 'Official Bangladesh Education Board standard format with 6-digit Roll, 10-digit Registration, 3-digit Subject Code, Set Code (ক, খ, গ, ঘ) and 50 MCQs.',
+    template: {
+      pageDimensions: [1240, 1754],
+      bubbleDimensions: [22, 22],
+      preProcessors: [{ name: 'CropOnMarkers' }],
+      customLabels: {
+        Roll: ['roll1..6'],
+        Registration: ['reg1..10'],
+        SubjectCode: ['sub1..3'],
+        Set: ['Set'],
+      },
+      fieldBlocks: {
+        Roll: {
+          origin: [680, 260],
+          bubblesGap: 28,
+          labelsGap: 34,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['roll1..6'],
+          section: 'Roll Number',
+        },
+        SetCode: {
+          origin: [920, 260],
+          bubblesGap: 28,
+          labelsGap: 0,
+          bubbleValues: ['ক', 'খ', 'গ', 'ঘ'],
+          direction: 'horizontal',
+          fieldLabels: ['Set'],
+          section: 'Set Code',
+        },
+        Registration: {
+          origin: [680, 680],
+          bubblesGap: 28,
+          labelsGap: 32,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['reg1..10'],
+          section: 'Registration Number',
+        },
+        SubjectCode: {
+          origin: [1020, 680],
+          bubblesGap: 28,
+          labelsGap: 34,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['sub1..3'],
+          section: 'Subject Code',
+        },
+        QuestionsCol1: {
+          origin: [60, 220],
+          bubblesGap: 32,
+          labelsGap: 28,
+          fieldType: 'QTYPE_MCQ4',
+          direction: 'horizontal',
+          fieldLabels: ['q1..25'],
+          bubbleValues: ['ক', 'খ', 'গ', 'ঘ'],
+          section: 'Part 1 (Questions 1-25)',
+        },
+        QuestionsCol2: {
+          origin: [340, 220],
+          bubblesGap: 32,
+          labelsGap: 28,
+          fieldType: 'QTYPE_MCQ4',
+          direction: 'horizontal',
+          fieldLabels: ['q26..50'],
+          bubbleValues: ['ক', 'খ', 'গ', 'ঘ'],
+          section: 'Part 2 (Questions 26-50)',
+        },
+      },
+    },
+    evaluationConfig: {
+      examName: 'উচ্চ মাধ্যমিক সার্টিফিকেট পরীক্ষা (HSC Exam)',
+      examCode: 'HSC-2026',
+      rollNumberField: 'Roll',
+      setNameField: 'Set',
+      markingSchemes: {
+        default: { correct: 1, incorrect: -0.25, unmarked: 0, bonus: 1 },
+      },
+      answerKey: {},
+    },
+  },
+  {
+    id: 'sample1_standard',
+    name: 'Standard Academic Exam (45 Qs)',
+    description: 'Medium selector, 9-digit roll number, and 45 MCQs with sectional layout.',
+    template: {
+      pageDimensions: [1846, 1500],
+      bubbleDimensions: [40, 40],
+      preProcessors: [{ name: 'CropOnMarkers' }],
+      customLabels: {
+        Roll: ['Medium', 'roll1..9'],
+      },
+      fieldBlocks: {
+        Roll: {
+          origin: [286, 282],
+          bubblesGap: 46,
+          labelsGap: 58,
+          fieldType: 'QTYPE_INT',
+          direction: 'vertical',
+          fieldLabels: ['roll1..9'],
+        },
+        SectionA: {
+          origin: [168, 804],
+          bubblesGap: 51,
+          labelsGap: 43,
+          fieldType: 'QTYPE_MCQ4',
+          direction: 'horizontal',
+          fieldLabels: ['q1..15'],
+          section: 'Section A - Physics',
+        },
+        SectionB: {
+          origin: [608, 804],
+          bubblesGap: 51,
+          labelsGap: 43,
+          fieldType: 'QTYPE_MCQ4',
+          direction: 'horizontal',
+          fieldLabels: ['q16..30'],
+          section: 'Section B - Chemistry',
+        },
+        SectionC: {
+          origin: [1048, 804],
+          bubblesGap: 51,
+          labelsGap: 43,
+          fieldType: 'QTYPE_MCQ4',
+          direction: 'horizontal',
+          fieldLabels: ['q31..45'],
+          section: 'Section C - Mathematics',
+        },
+      },
+    },
+    evaluationConfig: {
+      examName: 'All-India Mock Assessment Test',
+      examCode: 'AIMAT-2026',
+      rollNumberField: 'Roll',
+      markingSchemes: {
+        default: { correct: 1, incorrect: -0.25, unmarked: 0, bonus: 1 },
+      },
+      answerKey: {},
+    },
+  },
+  {
+    id: 'sample2_adrian',
+    name: 'Adrian Compact 50-Q Quiz',
+    description: 'Compact 50-question 5-choice OMR layout with 2 columns.',
+    template: {
+      pageDimensions: [1050, 750],
+      bubbleDimensions: [24, 24],
+      preProcessors: [{ name: 'CropOnMarkers' }],
+      fieldBlocks: {
+        Col1: {
+          origin: [70, 100],
+          bubblesGap: 30,
+          labelsGap: 35,
+          fieldType: 'QTYPE_MCQ5',
+          direction: 'horizontal',
+          fieldLabels: ['q1..25'],
+          section: 'General Knowledge',
+        },
+        Col2: {
+          origin: [420, 100],
+          bubblesGap: 30,
+          labelsGap: 35,
+          fieldType: 'QTYPE_MCQ5',
+          direction: 'horizontal',
+          fieldLabels: ['q26..50'],
+          section: 'Quantitative Reasoning',
+        },
+      },
+    },
+    evaluationConfig: {
+      examName: 'Compact 50-Q Assessment',
+      examCode: 'ADR-50',
+      markingSchemes: {
+        default: { correct: 1, incorrect: -0.25, unmarked: 0, bonus: 1 },
+      },
+      answerKey: {},
+    },
+  },
+];

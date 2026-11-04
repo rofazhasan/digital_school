@@ -1702,12 +1702,21 @@ export default function ExamBuilderPage() {
                     <Printer className="mr-2 h-4 w-4" /> Print OMR & Sets ({exam.examSets.length})
                   </Button>
                   <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold shadow-md shadow-indigo-600/20"
+                    onClick={() => router.push(`/exams/${examId}/omr-scan`)}
+                    title="পরীক্ষার OMR শিট সরাসরি ক্যামেরা বা ফাইল দিয়ে ব্যাচ স্ক্যান ও অটো-গ্রেড করুন"
+                  >
+                    <Camera className="mr-2 h-4 w-4" /> OMR ব্যাচ স্ক্যান ও গ্রেডিং
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
-                    className="border-indigo-500/40 text-indigo-400 hover:bg-indigo-950/40 font-bold"
-                    onClick={() => router.push('/scanner')}
+                    className="border-slate-600 text-slate-300 hover:bg-slate-800 font-semibold text-xs"
+                    onClick={() => router.push('/exams/omr-templates')}
                   >
-                    <Camera className="mr-2 h-4 w-4" /> Open OMR Scanner
+                    <Layers className="mr-2 h-4 w-4" /> OMR টেমপ্লেটসমূহ
                   </Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
