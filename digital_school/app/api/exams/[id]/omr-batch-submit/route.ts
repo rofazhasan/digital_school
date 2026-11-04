@@ -59,6 +59,7 @@ export async function POST(
           select: {
             id: true,
             name: true,
+            questionsJson: true,
           },
         },
       },
@@ -257,11 +258,28 @@ export async function POST(
         }).catch(err => console.warn('Could not sync examStudentMap:', err));
       }
 
-      // 4c. Upsert ExamSubmission
+      // 4c. Construct normalized answers mapping questionId, qKey, and 1-based index
+      const rawAns = scan.answers || scan.rawAnswers || {};
+      const answersPayload: Record<string, any> = { ...rawAns };
+
+      const setQuestions = Array.isArray(matchedSet?.questionsJson) ? (matchedSet.questionsJson as any[]) : [];
+      setQuestions.forEach((q: any, idx: number) => {
+        const qKey = `q${idx + 1}`;
+        const numKey = String(idx + 1);
+        let val = rawAns[q.id] ?? rawAns[qKey] ?? rawAns[numKey];
+        if (Array.isArray(val) && val.length > 0) val = val[0];
+        if (val !== undefined && val !== null) {
+          answersPayload[q.id] = val;
+          answersPayload[qKey] = val;
+          answersPayload[numKey] = val;
+        }
+      });
+
+      // 4d. Upsert ExamSubmission
       const submission = await prismadb.examSubmission.upsert({
         where: { studentId_examId: { studentId: student.id, examId: exam.id } },
         update: {
-          answers: scan.answers || {},
+          answers: answersPayload,
           score,
           examSetId: matchedSet?.id || null,
           status: 'SUBMITTED',
@@ -273,7 +291,7 @@ export async function POST(
           studentId: student.id,
           examId: exam.id,
           examSetId: matchedSet?.id || null,
-          answers: scan.answers || {},
+          answers: answersPayload,
           score,
           status: 'SUBMITTED',
           evaluatedAt: new Date(),

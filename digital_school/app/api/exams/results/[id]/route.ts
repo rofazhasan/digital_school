@@ -232,10 +232,21 @@ export async function GET(
     }
 
     // 7. Process questions (Full View)
-    const processedQuestions = (questions as any[]).map((question: any) => {
+    const processedQuestions = (questions as any[]).map((question: any, index: number) => {
       const questionId = question.id;
       const type = (question.type || '').toUpperCase();
       let studentAnswer = (studentAnswers as any)[questionId];
+
+      // OMR / Scanned exam key fallback (q1, q2... or 1, 2...)
+      if (studentAnswer === undefined || studentAnswer === null) {
+        studentAnswer = (studentAnswers as any)[`q${index + 1}`] ?? (studentAnswers as any)[String(index + 1)];
+      }
+
+      // If answer is wrapped in an array like ["B"], unwrap it
+      if (Array.isArray(studentAnswer) && studentAnswer.length > 0) {
+        studentAnswer = studentAnswer[0];
+      }
+
       if (studentAnswer === undefined && (type === 'CMA' || type === 'MPC')) {
         const prefix = `${questionId}_`;
         const subKeys = Object.keys(studentAnswers as any).filter(k => k.startsWith(prefix) && !k.endsWith('_marks'));

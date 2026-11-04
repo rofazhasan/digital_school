@@ -85,12 +85,17 @@ export async function GET(req: NextRequest) {
       dbNotices,
       dbSettings
     ] = await Promise.all([
-      // 1. Class Exams (Scheduled, Live & Upcoming for this student's class only)
+      // 1. Class Exams (Scheduled, Live & Offline/Mixed for this student's class)
       effectiveClassId
         ? prisma.exam.findMany({
             where: {
               classId: effectiveClassId,
-              isActive: true
+              OR: [
+                { isActive: true },
+                { type: { in: ['OFFLINE', 'MIXED'] } },
+                { results: { some: { studentId } } },
+                { examSubmissions: { some: { studentId } } },
+              ],
             },
             select: {
               id: true,
@@ -289,8 +294,8 @@ export async function GET(req: NextRequest) {
         examId: r.examId,
         examTitle: r.exam?.name || "Academic Exam",
         subject,
-        type: isOmr ? "OMR" : (r.exam?.type || "ONLINE"),
-        source: isOmr ? "OMR" : "ONLINE",
+        type: r.exam?.type || (isOmr ? "OFFLINE" : "ONLINE"),
+        source: isOmr ? "OMR" : (r.exam?.type || "ONLINE"),
         setName,
         totalMarks,
         score,

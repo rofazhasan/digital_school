@@ -529,7 +529,16 @@ export default function StudentDashboardPage() {
     return exams.filter(exam => {
       // Exclude exams not belonging to this student's class
       if (studentClassId && exam.classId && exam.classId !== studentClassId) return false;
-      if (examTypeFilter !== 'all' && exam.type !== examTypeFilter) return false;
+      if (examTypeFilter !== 'all') {
+        const isOffline = exam.type === 'OFFLINE' || (exam as any).type === 'OMR';
+        const isOnline = exam.type === 'ONLINE';
+        const isMixed = exam.type === 'MIXED';
+
+        if (examTypeFilter === 'OMR' && !isOffline) return false;
+        if (examTypeFilter === 'OFFLINE' && !isOffline) return false;
+        if (examTypeFilter === 'ONLINE' && !isOnline) return false;
+        if (examTypeFilter === 'MIXED' && !isMixed) return false;
+      }
       if (examSearchQuery.trim()) {
         const q = examSearchQuery.toLowerCase();
         const mTitle = exam.name?.toLowerCase().includes(q);
@@ -548,8 +557,14 @@ export default function StudentDashboardPage() {
   const filteredExamResults = useMemo(() => {
     return results.filter(result => {
       if (examTypeFilter !== 'all') {
-        const isMatch = (examTypeFilter === 'OMR' && (result.type === 'OMR' || result.source === 'OMR')) ||
-                        (examTypeFilter === 'ONLINE' && (result.type === 'ONLINE' || result.source === 'ONLINE')) ||
+        const isOffline = result.type === 'OFFLINE' || result.type === 'OMR' || result.source === 'OMR' || Boolean((result as any).omrScanId);
+        const isOnline = (result.type === 'ONLINE' || result.source === 'ONLINE') && !isOffline;
+        const isMixed = result.type === 'MIXED';
+
+        const isMatch = (examTypeFilter === 'OMR' && isOffline) ||
+                        (examTypeFilter === 'OFFLINE' && isOffline) ||
+                        (examTypeFilter === 'ONLINE' && isOnline) ||
+                        (examTypeFilter === 'MIXED' && isMixed) ||
                         (result.type?.toUpperCase() === examTypeFilter.toUpperCase());
         if (!isMatch) return false;
       }

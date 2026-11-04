@@ -80,7 +80,15 @@ export default function StudentResultsPortalPage() {
 
   const filtered = useMemo(() => {
     return results.filter((r) => {
-      if (typeFilter !== "all" && r.type !== typeFilter) return false;
+      if (typeFilter !== "all") {
+        const isOffline = r.type === "OFFLINE" || (r as any).type === "OMR" || (r as any).source === "OMR" || Boolean((r as any).omrScanId);
+        const isOnline = (r.type === "ONLINE" || (r as any).source === "ONLINE") && !isOffline;
+        const isMixed = r.type === "MIXED";
+
+        if (typeFilter === "OFFLINE" && !isOffline) return false;
+        if (typeFilter === "ONLINE" && !isOnline) return false;
+        if (typeFilter === "MIXED" && !isMixed) return false;
+      }
       if (subjectFilter !== "all" && r.subject?.toLowerCase() !== subjectFilter.toLowerCase()) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
