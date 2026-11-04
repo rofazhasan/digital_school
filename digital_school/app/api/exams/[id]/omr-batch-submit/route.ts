@@ -70,20 +70,24 @@ export async function POST(
     }
 
     // 2. Initialize OMRScanSession for audit and batch tracking
-    const session = await prismadb.omrScanSession.create({
-      data: {
-        sessionName: `Batch Scan - ${exam.name} - ${new Date().toLocaleDateString('bn-BD')}`,
-        examinerId: exam.createdById || 'SYSTEM',
-        examId: exam.id,
-        totalFiles: scans.length,
-        processedFiles: 0,
-        status: 'PROCESSING',
-        isCompleted: false,
-      },
-    }).catch(err => {
-      console.warn('Could not initialize OMRScanSession (continuing):', err);
-      return null;
-    });
+    const sessionModel = (prismadb as any).oMRScanSession || (prismadb as any).omrScanSession;
+    let session: any = null;
+    if (sessionModel) {
+      session = await sessionModel.create({
+        data: {
+          sessionName: `Batch Scan - ${exam.name} - ${new Date().toLocaleDateString('bn-BD')}`,
+          examinerId: exam.createdById || 'SYSTEM',
+          examId: exam.id,
+          totalFiles: scans.length,
+          processedFiles: 0,
+          status: 'PROCESSING',
+          isCompleted: false,
+        },
+      }).catch((err: any) => {
+        console.warn('Could not initialize OMRScanSession (continuing):', err);
+        return null;
+      });
+    }
 
     // 3. Batch Pre-fetch all candidate profiles in a single query (eliminates N+1 egress bottleneck)
     const rollVariants = new Set<string>();
@@ -124,7 +128,7 @@ export async function POST(
     });
 
     // Fast O(1) in-memory lookup map
-    const studentMap = new Map<string, typeof candidateProfiles[0]>();
+    const studentMap = new Map<string, any>();
     candidateProfiles.forEach(sp => {
       if (sp.roll) {
         studentMap.set(sp.roll, sp);
@@ -150,33 +154,29 @@ export async function POST(
       const cleanSet = rawSet.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim();
 
       // Resolve student from pre-fetched map
-      let student = studentMap.get(cleanRoll) || studentMap.get(strippedRoll) || studentMap.get(rawRoll);
+      let student: any = studentMap.get(cleanRoll) || studentMap.get(strippedRoll) || studentMap.get(rawRoll);
 
       // Create placeholder student if not found in DB
       if (!student) {
         try {
           const dummyReg = `AUTO_OMR_${cleanRoll}_${Date.now().toString().slice(-4)}`;
-          const created = await prismadb.studentProfile.create({
+          const created: any = await prismadb.studentProfile.create({
             data: {
               roll: strippedRoll || cleanRoll || '000000',
               registrationNo: dummyReg,
               guardianName: 'Guardian',
               guardianPhone: '01700000000',
-              classId: exam.classId,
+              class: { connect: { id: exam.classId } },
               user: {
                 create: {
                   name: `Student Roll ${strippedRoll || cleanRoll || 'Unknown'}`,
                   email: `student_${cleanRoll || uuidv4().slice(0, 6)}@school.local`,
-                  role: 'STUDENT',
+                  role: 'STUDENT' as any,
                   password: '$2a$10$dummyHashPlaceholderPasswordForOMRScanOnly',
                 },
               },
-            },
-            select: {
-              id: true,
-              roll: true,
-              registrationNo: true,
-              classId: true,
+            } as any,
+            include: {
               user: {
                 select: { id: true, name: true, email: true },
               },
@@ -358,8 +358,8 @@ export async function POST(
     }
 
     // 6. Update OMRScanSession final status
-    if (session) {
-      await prismadb.omrScanSession.update({
+    if (session && sessionModel) {
+      await sessionModel.update({
         where: { id: session.id },
         data: {
           processedFiles: successCount,
@@ -369,7 +369,7 @@ export async function POST(
           completedAt: new Date(),
           publishedAt: new Date(),
         },
-      }).catch(err => console.warn('Could not finalize OMRScanSession:', err));
+      }).catch((err: any) => console.warn('Could not finalize OMRScanSession:', err));
     }
 
     return NextResponse.json({
