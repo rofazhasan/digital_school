@@ -75,3 +75,4 @@ export function loadOpenCV(): Promise<any> {
 
   return cvLoadPromise;
 }
+

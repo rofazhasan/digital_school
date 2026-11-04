@@ -998,3 +998,135 @@
     margin-top: 3px !important;
     gap: 10px !important;
   }
+
+  .bd-omr-printable-sheet .split-layout .questions-layout-area {
+    width: 388px !important;
+    gap: 6px !important;
+  }
+
+  .bd-omr-printable-sheet .split-layout .identity-and-rules-area {
+    gap: 5px !important;
+  }
+
+  .bd-omr-printable-sheet .official-instructions-section {
+    padding: 4px 6px !important;
+    gap: 3px !important;
+  }
+
+  .bd-omr-printable-sheet .rules-heading-title {
+    font-size: 12px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .bd-omr-printable-sheet .rule-text {
+    font-size: 10.5px !important;
+    line-height: 1.3 !important;
+  }
+
+  .bd-omr-printable-sheet .board-compliance-footer {
+    font-size: 8.5px !important;
+    padding-top: 2px !important;
+  }
+
+  /* Stacked Mode Height Scaling */
+  .bd-omr-printable-sheet .sheet-content-grid.stacked-layout {
+    height: 865px !important;
+    max-height: 865px !important;
+    margin-top: 3px !important;
+    gap: 6px !important;
+  }
+
+  .bd-omr-printable-sheet .admission-top-id-band {
+    height: 220px !important;
+    max-height: 220px !important;
+  }
+
+  .bd-omr-printable-sheet .questions-layout-area.full-width {
+    height: 635px !important;
+  }
+
+  /* Symmetrical Optical Fiducial Corner Markers (Never Collide with Content) */
+  .bd-omr-printable-sheet .fiducial-marker {
+    width: 22px !important;
+    height: 22px !important;
+    z-index: 20 !important;
+  }
+  .bd-omr-printable-sheet .marker-cross-circle {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .bd-omr-printable-sheet .cross-line-h {
+    width: 22px !important;
+  }
+  .bd-omr-printable-sheet .cross-line-v {
+    height: 22px !important;
+  }
+
+  .bd-omr-printable-sheet .fiducial-marker.top-left {
+    top: 6mm !important;
+    left: 6mm !important;
+    right: auto !important;
+    bottom: auto !important;
+  }
+  .bd-omr-printable-sheet .fiducial-marker.top-right {
+    top: 6mm !important;
+    right: 6mm !important;
+    left: auto !important;
+    bottom: auto !important;
+  }
+  .bd-omr-printable-sheet .fiducial-marker.bottom-left {
+    bottom: 6mm !important;
+    left: 6mm !important;
+    top: auto !important;
+    right: auto !important;
+  }
+  .bd-omr-printable-sheet .fiducial-marker.bottom-right {
+    bottom: 6mm !important;
+    right: 6mm !important;
+    top: auto !important;
+    left: auto !important;
+  }
+
+  /* Symmetrical Lateral Timing Tracks (Isolated Between Markers and Content) */
+  .bd-omr-printable-sheet .timing-tracks {
+    top: 36mm !important;
+    bottom: 22mm !important;
+    width: 10px !important;
+  }
+  .bd-omr-printable-sheet .timing-tracks.left {
+    left: 7.5mm !important;
+    right: auto !important;
+  }
+  .bd-omr-printable-sheet .timing-tracks.right {
+    right: 7.5mm !important;
+    left: auto !important;
+  }
+  .bd-omr-printable-sheet .timing-block {
+    width: 10px !important;
+    height: 3px !important;
+  }
+
+  /* Bottom Optical Registration Bar */
+  .bd-omr-printable-sheet .timing-marker-bottom-center {
+    width: 34px !important;
+    height: 4.5px !important;
+    background: #000000 !important;
+    margin: 2mm auto 0 auto !important;
+  }
+
+  /* Legacy Scorecard Support */
+  #printable-scorecard,
+  #printable-scorecard * {
+    visibility: visible !important;
+  }
+  #printable-scorecard {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
