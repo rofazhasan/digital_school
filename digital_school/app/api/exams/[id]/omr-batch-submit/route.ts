@@ -330,6 +330,7 @@ export async function POST(
       successCount++;
       savedResults.push({
         rollNumber: cleanRoll,
+        studentId: student.id,
         studentName: student.user?.name || `Roll ${cleanRoll}`,
         score,
         percentage,

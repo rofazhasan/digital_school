@@ -64,6 +64,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'users', label: 'Users', icon: Users, href: '/admin/users' },
   { id: 'classes', label: 'Classes', icon: GraduationCap, href: '#classes' },
   { id: 'exams', label: 'Exams', icon: FileText, href: '/exams' },
+  { id: 'omr-templates', label: 'OMR Templates', icon: Scan, href: '/exams/omr-templates' },
   { id: 'questions', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
   { id: 'admit-cards', label: 'Admit Cards', icon: ClipboardList, href: '#admit-cards' },
   { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },

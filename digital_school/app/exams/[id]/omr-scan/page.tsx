@@ -21,7 +21,8 @@ import {
   Zap,
   BarChart3,
   ShieldCheck,
-  FileText
+  FileText,
+  Clock
 } from 'lucide-react';
 
 import type {
@@ -50,6 +51,7 @@ export default function ExamBatchScanPage() {
   const [exam, setExam] = useState<any>(null);
   const [loadingExam, setLoadingExam] = useState<boolean>(true);
   const [examError, setExamError] = useState<string | null>(null);
+  const [studentDirectory, setStudentDirectory] = useState<Map<string, { id: string; name: string }>>(new Map());
 
   // OMR Config state
   const [selectedPresetId, setSelectedPresetId] = useState<string>('medical_admission_100q');
@@ -98,8 +100,24 @@ export default function ExamBatchScanPage() {
         setLoadingExam(true);
         const res = await fetch(`/api/exams/${examId}`);
         if (!res.ok) throw new Error(`Exam not found (HTTP ${res.status})`);
-        const data = await res.json();
+        const rawData = await res.json();
+        const data = rawData.exam || rawData;
         setExam(data);
+
+        // Pre-build Student Directory Map from exam's class roster
+        const dirMap = new Map<string, { id: string; name: string }>();
+        if (Array.isArray(data.students)) {
+          data.students.forEach((st: any) => {
+            if (st.roll) {
+              const cleanR = String(st.roll).trim();
+              const strippedR = cleanR.replace(/^0+/, '') || cleanR;
+              const name = st.user?.name || `Roll ${cleanR}`;
+              dirMap.set(cleanR, { id: st.id, name });
+              dirMap.set(strippedR, { id: st.id, name });
+            }
+          });
+        }
+        setStudentDirectory(dirMap);
 
         // Compile Answer Key from Exam Questions / Sets
         const multiSetKeys: Record<string, Record<string, string>> = {};
@@ -294,6 +312,15 @@ export default function ExamBatchScanPage() {
           scanRes.flags
         );
 
+        // Pre-resolve candidate name and ID from student directory
+        const rollStr = card.rollNumber || '';
+        const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
+        const matched = studentDirectory.get(rollStr) || studentDirectory.get(strippedRoll);
+        if (matched) {
+          card.studentId = matched.id;
+          card.studentName = matched.name;
+        }
+
         newScoreCards.push(card);
         successCount++;
 
@@ -395,6 +422,15 @@ export default function ExamBatchScanPage() {
         scanRes.flags
       );
 
+      // Pre-resolve candidate name and ID from student directory
+      const rollStr = card.rollNumber || '';
+      const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
+      const matched = studentDirectory.get(rollStr) || studentDirectory.get(strippedRoll);
+      if (matched) {
+        card.studentId = matched.id;
+        card.studentName = matched.name;
+      }
+
       const updated = EvaluationEngine.rankCohort([...scoreCards, card]);
       setScanResults(prev => ({ ...prev, [scanRes.sheetId]: scanRes }));
       setScoreCards(updated);
@@ -459,6 +495,32 @@ export default function ExamBatchScanPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Sync failed');
 
+      // Update local score cards with database IDs and synced state
+      if (Array.isArray(data.results)) {
+        const resultMap = new Map<string, any>();
+        data.results.forEach((r: any) => {
+          if (r.rollNumber) {
+            resultMap.set(String(r.rollNumber), r);
+            resultMap.set(String(r.rollNumber).replace(/^0+/, ''), r);
+          }
+        });
+
+        setScoreCards(prev => prev.map(card => {
+          const rMatch = resultMap.get(card.rollNumber) || resultMap.get(card.rollNumber.replace(/^0+/, ''));
+          if (rMatch) {
+            return {
+              ...card,
+              studentId: rMatch.studentId || card.studentId,
+              studentName: rMatch.studentName || card.studentName,
+              submissionId: rMatch.submissionId,
+              resultId: rMatch.resultId,
+              synced: true,
+            };
+          }
+          return { ...card, synced: true };
+        }));
+      }
+
       setSyncStatus({
         success: true,
         message: data.message || `সাফল্যের সাথে ${data.processedCount} টি খাতা ডাটাবেসে সেভ হয়েছে!`,
@@ -480,6 +542,7 @@ export default function ExamBatchScanPage() {
     const csvData = scoreCards.map(c => ({
       'Rank': c.rank,
       'Roll Number': c.rollNumber,
+      'Student Name': c.studentName || 'N/A',
       'Exam Set': c.examSet,
       'Total Score': c.totalScore,
       'Max Score': c.maxScore,
@@ -487,6 +550,7 @@ export default function ExamBatchScanPage() {
       'Correct': c.correctCount,
       'Incorrect': c.incorrectCount,
       'Unmarked': c.unmarkedCount,
+      'Status': c.synced ? 'Synced' : 'Local Only',
       'Filename': c.filename,
       'Flags': c.flags.join('; '),
     }));
@@ -506,6 +570,7 @@ export default function ExamBatchScanPage() {
     if (!searchFilter.trim()) return true;
     const q = searchFilter.toLowerCase();
     return c.rollNumber.toLowerCase().includes(q) ||
+           (c.studentName && c.studentName.toLowerCase().includes(q)) ||
            c.examSet.toLowerCase().includes(q) ||
            c.filename.toLowerCase().includes(q);
   });
@@ -565,13 +630,19 @@ export default function ExamBatchScanPage() {
             href={`/exams/${examId}/print`}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-semibold text-slate-300"
           >
-            <Printer className="w-3.5 h-3.5" /> প্রিন্ট / OMR
+            <Printer className="w-3.5 h-3.5" /> প্রিন্ট / A3 মাস্টার
           </Link>
           <Link
-            href={`/exams/results`}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-semibold text-slate-300"
+            href="/exams/omr-templates"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-semibold text-slate-300"
           >
-            <BarChart3 className="w-3.5 h-3.5" /> ফলাফল বোর্ড
+            <Layers className="w-3.5 h-3.5" /> OMR গ্যালারি
+          </Link>
+          <Link
+            href={`/exams/results/${examId}`}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-700/60 bg-indigo-950/30 hover:bg-indigo-900/40 text-xs font-semibold text-indigo-300"
+          >
+            <BarChart3 className="w-3.5 h-3.5" /> পরীক্ষা ফলাফল
           </Link>
         </div>
       </header>
@@ -853,12 +924,14 @@ export default function ExamBatchScanPage() {
                     <tr>
                       <th className="py-2.5 px-3 font-bold text-center">মেধা ক্রম</th>
                       <th className="py-2.5 px-3 font-bold">রোল নম্বর</th>
+                      <th className="py-2.5 px-3 font-bold">পরীক্ষার্থীর নাম</th>
                       <th className="py-2.5 px-3 font-bold text-center">সেট</th>
                       <th className="py-2.5 px-3 font-bold text-center">সঠিক</th>
                       <th className="py-2.5 px-3 font-bold text-center">ভুল</th>
                       <th className="py-2.5 px-3 font-bold text-center">ফাঁকা</th>
                       <th className="py-2.5 px-3 font-bold text-right">মোট নম্বর</th>
                       <th className="py-2.5 px-3 font-bold text-right">শতাংশ (%)</th>
+                      <th className="py-2.5 px-3 font-bold text-center">স্ট্যাটাস</th>
                       <th className="py-2.5 px-3 font-bold text-center">অ্যাকশন</th>
                     </tr>
                   </thead>
@@ -870,6 +943,11 @@ export default function ExamBatchScanPage() {
                         </td>
                         <td className="py-2 px-3 font-bold text-white">
                           {card.rollNumber}
+                        </td>
+                        <td className="py-2 px-3 font-medium text-slate-200">
+                          {card.studentName || (
+                            <span className="text-slate-500 italic">শিক্ষার্থী প্রোফাইল</span>
+                          )}
                         </td>
                         <td className="py-2 px-3 text-center">
                           <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-200">
@@ -892,14 +970,35 @@ export default function ExamBatchScanPage() {
                           {toBengaliNumerals(card.percentage)}%
                         </td>
                         <td className="py-2 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedScoreCard(card)}
-                            className="p-1 rounded hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-                            title="উত্তর বিশ্লেষণ দেখুন"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          {card.synced ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80">
+                              <CheckCircle2 className="w-3 h-3" /> সিঙ্কড
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/80">
+                              <Clock className="w-3 h-3" /> লোকাল
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedScoreCard(card)}
+                              className="p-1.5 rounded hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                              title="উত্তর বিশ্লেষণ দেখুন"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <Link
+                              href={`/exams/results/${examId}${card.studentId ? `?studentId=${card.studentId}` : ''}`}
+                              target="_blank"
+                              className="p-1.5 rounded hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 transition-colors inline-flex items-center"
+                              title="পূর্ণাঙ্গ ফলাফল ও ভুল পর্যালোচনা পেজ দেখুন"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -918,7 +1017,7 @@ export default function ExamBatchScanPage() {
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-sm text-white">
-                  রোল: {selectedScoreCard.rollNumber} — বিস্তারিত মূল্যায়ন
+                  রোল: {selectedScoreCard.rollNumber} {selectedScoreCard.studentName ? `• ${selectedScoreCard.studentName}` : ''} — বিস্তারিত মূল্যায়ন
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   সেট: {selectedScoreCard.examSet} • স্কোর: {toBengaliNumerals(selectedScoreCard.totalScore)} / {toBengaliNumerals(selectedScoreCard.maxScore)}
@@ -927,7 +1026,7 @@ export default function ExamBatchScanPage() {
               <button
                 type="button"
                 onClick={() => setSelectedScoreCard(null)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -986,11 +1085,19 @@ export default function ExamBatchScanPage() {
               </div>
             </div>
 
-            <div className="p-3 border-t border-slate-800 bg-slate-950 flex justify-end">
+            <div className="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between gap-3">
+              <Link
+                href={`/exams/results/${examId}${selectedScoreCard.studentId ? `?studentId=${selectedScoreCard.studentId}` : ''}`}
+                target="_blank"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                পূর্ণাঙ্গ ভুল পর্যালোচনা পেজ দেখুন
+              </Link>
               <button
                 type="button"
                 onClick={() => setSelectedScoreCard(null)}
-                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold"
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
                 বন্ধ করুন
               </button>

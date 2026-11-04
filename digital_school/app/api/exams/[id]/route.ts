@@ -162,8 +162,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       prisma.question.count({ where: whereClause }),
     ]);
 
+    // Fetch students for the class to support instant OMR student resolution
+    const classStudents = exam.classId ? await prisma.studentProfile.findMany({
+      where: { classId: exam.classId },
+      select: {
+        id: true,
+        roll: true,
+        registrationNo: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    }) : [];
+
     const sanitizedExam = exam ? {
       ...exam,
+      students: classStudents,
       subjectsConfig: exam.subjectType === 'MS' ? exam.subjectsConfig : null
     } : null;
 

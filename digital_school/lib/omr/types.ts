@@ -128,6 +128,10 @@ export interface StudentScoreCard {
   rollNumber: string;
   serialNo?: string;
   studentName?: string;
+  studentId?: string;
+  submissionId?: string;
+  resultId?: string;
+  synced?: boolean;
   examSet: string;
   totalScore: number;
   maxScore: number;
