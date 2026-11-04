@@ -56,7 +56,12 @@ export async function POST(
     let successCount = 0;
 
     for (const scan of scans) {
-      const cleanRoll = String(scan.rollNumber || '').trim();
+      // Normalize roll number (support Bengali digits, English digits, and strip leading zeros)
+      const rawRoll = String(scan.rollNumber || '').trim();
+      const englishRoll = rawRoll.replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
+      const strippedRoll = String(parseInt(englishRoll, 10) || englishRoll);
+      const cleanRoll = englishRoll;
+
       const rawSet = String(scan.examSet || 'A').trim().toUpperCase();
       const cleanSet = rawSet.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim();
 
@@ -65,8 +70,10 @@ export async function POST(
         where: {
           OR: [
             { roll: cleanRoll },
-            { roll: String(parseInt(cleanRoll, 10) || cleanRoll) },
+            { roll: strippedRoll },
+            { roll: rawRoll },
             { registrationNo: cleanRoll },
+            { registrationNo: strippedRoll },
           ],
         },
         include: { user: true },
@@ -79,6 +86,8 @@ export async function POST(
             classId: exam.classId,
             OR: [
               { roll: cleanRoll },
+              { roll: strippedRoll },
+              { roll: rawRoll },
               { registrationNo: cleanRoll },
             ],
           },
@@ -93,14 +102,14 @@ export async function POST(
         const dummyReg = `AUTO_OMR_${cleanRoll}_${Date.now().toString().slice(-4)}`;
         student = await prismadb.studentProfile.create({
           data: {
-            roll: cleanRoll || '000000',
+            roll: strippedRoll || cleanRoll || '000000',
             registrationNo: dummyReg,
             guardianName: 'Guardian',
             guardianPhone: '01700000000',
             classId: exam.classId,
             user: {
               create: {
-                name: `Student Roll ${cleanRoll || 'Unknown'}`,
+                name: `Student Roll ${strippedRoll || cleanRoll || 'Unknown'}`,
                 email: `student_${cleanRoll || uuidv4().slice(0, 6)}@school.local`,
                 role: 'STUDENT',
                 password: '$2a$10$dummyHashPlaceholderPasswordForOMRScanOnly',
@@ -119,10 +128,16 @@ export async function POST(
         continue;
       }
 
-      // Match exam set
+      // Match exam set (supports 'A', 'Set A', 'A A', 'B A', etc.)
       let matchedSet = exam.examSets.find((s: any) => {
         const sName = s.name.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase();
-        return sName === cleanSet || s.id === scan.examSetId;
+        const firstToken = sName.split(/\s+/)[0];
+        return (
+          sName === cleanSet ||
+          firstToken === cleanSet ||
+          sName.startsWith(cleanSet) ||
+          s.id === scan.examSetId
+        );
       }) || exam.examSets[0] || null;
 
       const score = Number(scan.totalScore) || 0;

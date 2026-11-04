@@ -119,7 +119,12 @@ export default function ExamBatchScanPage() {
             const qKey = `q${idx + 1}`;
             let correctLetter = 'A';
 
-            if (Array.isArray(q.options)) {
+            if (q.correctAnswer && typeof q.correctAnswer === 'string') {
+              const cl = q.correctAnswer.trim().toUpperCase();
+              if (['A', 'B', 'C', 'D', 'E'].includes(cl)) {
+                correctLetter = cl;
+              }
+            } else if (Array.isArray(q.options)) {
               const correctIdx = q.options.findIndex((opt: any) => {
                 if (typeof opt === 'object' && opt !== null) {
                   return opt.isCorrect === true || opt.correct === true;
@@ -151,13 +156,15 @@ export default function ExamBatchScanPage() {
         if (examSets.length > 0) {
           examSets.forEach((s: any) => {
             const rawName = s.name.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase() || 'A';
+            const firstLetter = rawName.charAt(0);
             const qs = Array.isArray(s.questionsJson) 
               ? s.questionsJson 
               : (Array.isArray(s.questions) ? s.questions : []);
             
             const setKey = extractAnswersFromQuestions(qs);
             multiSetKeys[rawName] = setKey;
-            if (rawName === 'A' || !defaultKey['q1']) {
+            multiSetKeys[firstLetter] = setKey;
+            if (rawName === 'A' || firstLetter === 'A' || !defaultKey['q1']) {
               Object.assign(defaultKey, setKey);
             }
           });
