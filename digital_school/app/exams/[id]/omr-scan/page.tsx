@@ -44,7 +44,7 @@ import Papa from 'papaparse';
 
 export default function ExamBatchScanPage() {
   const params = useParams();
-  const examId = params?.id as string;
+  const examId = (Array.isArray(params?.id) ? params.id[0] : params?.id) as string;
   const router = useRouter();
 
   // Exam state from DB
@@ -135,14 +135,24 @@ export default function ExamBatchScanPage() {
           const map: Record<string, string> = {};
           qList.forEach((q: any, idx: number) => {
             const qKey = `q${idx + 1}`;
-            let correctLetter = 'A';
+            let correctLetter = '';
 
-            if (q.correctAnswer && typeof q.correctAnswer === 'string') {
-              const cl = q.correctAnswer.trim().toUpperCase();
-              if (['A', 'B', 'C', 'D', 'E'].includes(cl)) {
-                correctLetter = cl;
+            // 1. Try correctAnswer field (supports 'A', 'BCD' -> 'B', 'ক' -> 'A')
+            if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
+              const caStr = String(q.correctAnswer).trim().toUpperCase();
+              const firstChar = caStr.charAt(0);
+              if (['A', 'B', 'C', 'D', 'E'].includes(caStr)) {
+                correctLetter = caStr;
+              } else if (['A', 'B', 'C', 'D', 'E'].includes(firstChar)) {
+                correctLetter = firstChar;
+              } else if (['ক', 'খ', 'গ', 'ঘ'].includes(firstChar)) {
+                const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+                correctLetter = bnMap[firstChar] || '';
               }
-            } else if (Array.isArray(q.options)) {
+            }
+
+            // 2. Try options array if not yet resolved
+            if (!correctLetter && Array.isArray(q.options)) {
               const correctIdx = q.options.findIndex((opt: any) => {
                 if (typeof opt === 'object' && opt !== null) {
                   return opt.isCorrect === true || opt.correct === true;
@@ -152,21 +162,28 @@ export default function ExamBatchScanPage() {
 
               if (correctIdx >= 0) {
                 correctLetter = indexToLetter(correctIdx);
-              } else if (q.correctOption !== undefined) {
-                if (typeof q.correctOption === 'number') {
-                  correctLetter = indexToLetter(q.correctOption - 1);
-                } else if (typeof q.correctOption === 'string') {
-                  const cleaned = q.correctOption.trim().toUpperCase();
-                  if (['A', 'B', 'C', 'D', 'E'].includes(cleaned)) {
-                    correctLetter = cleaned;
-                  } else if (['ক', 'খ', 'গ', 'ঘ'].includes(cleaned)) {
-                    const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
-                    correctLetter = bnMap[cleaned] || 'A';
-                  }
+              }
+            }
+
+            // 3. Try correctOption field (1-based index, letter, or Bengali)
+            if (!correctLetter && q.correctOption !== undefined && q.correctOption !== null) {
+              if (typeof q.correctOption === 'number') {
+                correctLetter = indexToLetter(q.correctOption - 1);
+              } else if (typeof q.correctOption === 'string') {
+                const cleaned = q.correctOption.trim().toUpperCase();
+                const f = cleaned.charAt(0);
+                if (['A', 'B', 'C', 'D', 'E'].includes(cleaned)) {
+                  correctLetter = cleaned;
+                } else if (['A', 'B', 'C', 'D', 'E'].includes(f)) {
+                  correctLetter = f;
+                } else if (['ক', 'খ', 'গ', 'ঘ'].includes(f)) {
+                  const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+                  correctLetter = bnMap[f] || '';
                 }
               }
             }
-            map[qKey] = correctLetter;
+
+            map[qKey] = correctLetter || 'A';
           });
           return map;
         };
@@ -186,6 +203,14 @@ export default function ExamBatchScanPage() {
               Object.assign(defaultKey, setKey);
             }
           });
+        }
+
+        // Auto-select template preset based on question count
+        const totalQuestionCount = Object.keys(defaultKey).length || Number(data.totalMarks) || 100;
+        if (totalQuestionCount <= 50) {
+          setSelectedPresetId('bangladesh_board_hsc');
+        } else {
+          setSelectedPresetId('medical_admission_100q');
         }
 
         const negMark = data.mcqNegativeMarking !== undefined ? Number(data.mcqNegativeMarking) : 0.25;

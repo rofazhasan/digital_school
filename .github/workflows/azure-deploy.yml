@@ -38,8 +38,8 @@ jobs:
 
       - name: Deploy / Restart Azure Web App
         uses: azure/webapps-deploy@v3
-        continue-on-error: true
         with:
           app-name: 'digital-school-app'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           images: '${{ secrets.AZURE_CONTAINER_REGISTRY_LOGIN_SERVER }}/digital-school:latest'
 
