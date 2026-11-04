@@ -296,9 +296,15 @@ export default function ExamBatchScanPage() {
 
         newScoreCards.push(card);
         successCount++;
+
+        // Free canvas bitmap memory
+        item.canvas.width = 0;
+        item.canvas.height = 0;
       } catch (err: any) {
         console.error(`Error scanning ${item.name}:`, err);
         failCount++;
+        item.canvas.width = 0;
+        item.canvas.height = 0;
       }
     }
 
@@ -312,15 +318,17 @@ export default function ExamBatchScanPage() {
 
   const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = e.target?.result as string;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      img.onerror = (err) => {
+        URL.revokeObjectURL(url);
+        reject(err);
+      };
+      img.src = url;
     });
   };
 

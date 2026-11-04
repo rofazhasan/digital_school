@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { calculateGrade } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+
+// Strict Zod schema for batch OMR submission payload
+const omrScanItemSchema = z.object({
+  sheetId: z.string().optional(),
+  rollNumber: z.string().min(1, 'Roll number is required'),
+  examSet: z.string().optional().default('A'),
+  examSetId: z.string().optional(),
+  totalScore: z.number(),
+  maxScore: z.number().positive().optional(),
+  rawAnswers: z.record(z.any()).optional(),
+  answers: z.record(z.any()).optional(),
+  evaluatedAnswers: z.record(z.any()).optional(),
+  templateId: z.string().optional(),
+  accuracyPercentage: z.number().optional(),
+});
+
+const omrBatchPayloadSchema = z.object({
+  scans: z.array(omrScanItemSchema).min(1, 'At least one scan result must be provided in payload'),
+});
 
 export async function POST(
   request: NextRequest,
@@ -9,23 +29,38 @@ export async function POST(
 ) {
   try {
     const { id: examId } = await params;
-    const body = await request.json();
-    const { scans } = body;
 
     if (!examId) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
     }
 
-    if (!Array.isArray(scans) || scans.length === 0) {
-      return NextResponse.json({ error: 'No scan items provided in payload' }, { status: 400 });
+    const rawBody = await request.json();
+    const validation = omrBatchPayloadSchema.safeParse(rawBody);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Invalid payload structure', details: validation.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    // 1. Fetch the exam details and all its sets
+    const { scans } = validation.data;
+
+    // 1. Fetch the exam details with minimal egress
     const exam = await prismadb.exam.findUnique({
       where: { id: examId },
-      include: {
-        examSets: true,
-        class: true,
+      select: {
+        id: true,
+        name: true,
+        totalMarks: true,
+        classId: true,
+        createdById: true,
+        examSets: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -33,30 +68,78 @@ export async function POST(
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
 
-    // Create a new OMRScanSession for this batch
+    // 2. Initialize OMRScanSession for audit and batch tracking
     const session = await prismadb.omrScanSession.create({
       data: {
         sessionName: `Batch Scan - ${exam.name} - ${new Date().toLocaleDateString('bn-BD')}`,
         examinerId: exam.createdById || 'SYSTEM',
         examId: exam.id,
         totalFiles: scans.length,
-        processedFiles: scans.length,
-        status: 'PUBLISHED',
-        isCompleted: true,
-        completedAt: new Date(),
-        publishedAt: new Date(),
-        publishedCount: scans.length,
+        processedFiles: 0,
+        status: 'PROCESSING',
+        isCompleted: false,
       },
     }).catch(err => {
-      console.warn('Could not create OMRScanSession (continuing):', err);
+      console.warn('Could not initialize OMRScanSession (continuing):', err);
       return null;
+    });
+
+    // 3. Batch Pre-fetch all candidate profiles in a single query (eliminates N+1 egress bottleneck)
+    const rollVariants = new Set<string>();
+    scans.forEach(scan => {
+      const rawRoll = String(scan.rollNumber || '').trim();
+      const englishRoll = rawRoll.replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
+      const strippedRoll = String(parseInt(englishRoll, 10) || englishRoll);
+      rollVariants.add(rawRoll);
+      rollVariants.add(englishRoll);
+      rollVariants.add(strippedRoll);
+      // Zero-padded variants
+      if (strippedRoll.length <= 7) {
+        rollVariants.add(strippedRoll.padStart(6, '0'));
+        rollVariants.add(strippedRoll.padStart(7, '0'));
+      }
+    });
+
+    const candidateProfiles = await prismadb.studentProfile.findMany({
+      where: {
+        OR: [
+          { roll: { in: Array.from(rollVariants) } },
+          { registrationNo: { in: Array.from(rollVariants) } },
+        ],
+      },
+      select: {
+        id: true,
+        roll: true,
+        registrationNo: true,
+        classId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Fast O(1) in-memory lookup map
+    const studentMap = new Map<string, typeof candidateProfiles[0]>();
+    candidateProfiles.forEach(sp => {
+      if (sp.roll) {
+        studentMap.set(sp.roll, sp);
+        const stripped = String(parseInt(sp.roll, 10) || sp.roll);
+        studentMap.set(stripped, sp);
+      }
+      if (sp.registrationNo) {
+        studentMap.set(sp.registrationNo, sp);
+      }
     });
 
     const savedResults: any[] = [];
     let successCount = 0;
 
+    // 4. Process cohort evaluations
     for (const scan of scans) {
-      // Normalize roll number (support Bengali digits, English digits, and strip leading zeros)
       const rawRoll = String(scan.rollNumber || '').trim();
       const englishRoll = rawRoll.replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
       const strippedRoll = String(parseInt(englishRoll, 10) || englishRoll);
@@ -65,71 +148,54 @@ export async function POST(
       const rawSet = String(scan.examSet || 'A').trim().toUpperCase();
       const cleanSet = rawSet.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim();
 
-      // Find student by roll or registration number
-      let student = await prismadb.studentProfile.findFirst({
-        where: {
-          OR: [
-            { roll: cleanRoll },
-            { roll: strippedRoll },
-            { roll: rawRoll },
-            { registrationNo: cleanRoll },
-            { registrationNo: strippedRoll },
-          ],
-        },
-        include: { user: true },
-      });
+      // Resolve student from pre-fetched map
+      let student = studentMap.get(cleanRoll) || studentMap.get(strippedRoll) || studentMap.get(rawRoll);
 
-      // If student not found in global, try finding in class
-      if (!student && exam.classId) {
-        student = await prismadb.studentProfile.findFirst({
-          where: {
-            classId: exam.classId,
-            OR: [
-              { roll: cleanRoll },
-              { roll: strippedRoll },
-              { roll: rawRoll },
-              { registrationNo: cleanRoll },
-            ],
-          },
-          include: { user: true },
-        });
-      }
-
-      // If still not found, look for any student or create an emergency placeholder
+      // Create placeholder student if not found in DB
       if (!student) {
-        console.warn(`[OMR Batch] Student with Roll/Reg '${cleanRoll}' not found in DB. Creating placeholder profile.`);
-        // Try finding or creating a placeholder user
-        const dummyReg = `AUTO_OMR_${cleanRoll}_${Date.now().toString().slice(-4)}`;
-        student = await prismadb.studentProfile.create({
-          data: {
-            roll: strippedRoll || cleanRoll || '000000',
-            registrationNo: dummyReg,
-            guardianName: 'Guardian',
-            guardianPhone: '01700000000',
-            classId: exam.classId,
-            user: {
-              create: {
-                name: `Student Roll ${strippedRoll || cleanRoll || 'Unknown'}`,
-                email: `student_${cleanRoll || uuidv4().slice(0, 6)}@school.local`,
-                role: 'STUDENT',
-                password: '$2a$10$dummyHashPlaceholderPasswordForOMRScanOnly',
+        try {
+          const dummyReg = `AUTO_OMR_${cleanRoll}_${Date.now().toString().slice(-4)}`;
+          const created = await prismadb.studentProfile.create({
+            data: {
+              roll: strippedRoll || cleanRoll || '000000',
+              registrationNo: dummyReg,
+              guardianName: 'Guardian',
+              guardianPhone: '01700000000',
+              classId: exam.classId,
+              user: {
+                create: {
+                  name: `Student Roll ${strippedRoll || cleanRoll || 'Unknown'}`,
+                  email: `student_${cleanRoll || uuidv4().slice(0, 6)}@school.local`,
+                  role: 'STUDENT',
+                  password: '$2a$10$dummyHashPlaceholderPasswordForOMRScanOnly',
+                },
               },
             },
-          },
-          include: { user: true },
-        }).catch(err => {
-          console.error(`[OMR Batch] Error creating emergency student profile:`, err);
-          return null;
-        });
+            select: {
+              id: true,
+              roll: true,
+              registrationNo: true,
+              classId: true,
+              user: {
+                select: { id: true, name: true, email: true },
+              },
+            },
+          });
+          student = created;
+          studentMap.set(cleanRoll, created);
+          studentMap.set(strippedRoll, created);
+        } catch (createErr) {
+          console.error(`[OMR Batch] Failed to create student for roll ${cleanRoll}:`, createErr);
+        }
       }
 
       if (!student) {
-        console.error(`[OMR Batch] Skipped scan for roll ${cleanRoll}: Could not associate student.`);
+        console.error(`[OMR Batch] Skipped scan for roll ${cleanRoll}: student could not be resolved.`);
         continue;
       }
 
       // Match exam set (supports 'A', 'Set A', 'A A', 'B A', etc.)
-      let matchedSet = exam.examSets.find((s: any) => {
+      const matchedSet = exam.examSets.find((s) => {
         const sName = s.name.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase();
         const firstToken = sName.split(/\s+/)[0];
         return (
@@ -145,7 +211,7 @@ export async function POST(
       const percentage = maxScore > 0 ? parseFloat(((score / maxScore) * 100).toFixed(2)) : 0;
       const grade = calculateGrade(percentage);
 
-      // 1. Create OMRScan record for audit
+      // 4a. Create OMRScan audit record
       const scanUuid = scan.sheetId || uuidv4();
       const omrScan = await prismadb.oMRScan.upsert({
         where: { scanUuid },
@@ -182,16 +248,16 @@ export async function POST(
         return null;
       });
 
-      // 2. Upsert ExamStudentMap to persist set assignment
+      // 4b. Sync ExamStudentMap
       if (matchedSet) {
         await prismadb.examStudentMap.upsert({
           where: { studentId_examId: { studentId: student.id, examId: exam.id } },
           update: { examSetId: matchedSet.id },
           create: { studentId: student.id, examId: exam.id, examSetId: matchedSet.id },
-        }).catch(err => console.warn('Could not sync examStudentMap on OMR batch:', err));
+        }).catch(err => console.warn('Could not sync examStudentMap:', err));
       }
 
-      // 3. Upsert ExamSubmission
+      // 4c. Upsert ExamSubmission
       const submission = await prismadb.examSubmission.upsert({
         where: { studentId_examId: { studentId: student.id, examId: exam.id } },
         update: {
@@ -216,7 +282,7 @@ export async function POST(
         },
       });
 
-      // 4. Upsert Result (Instant Dashboard Visibility!)
+      // 4d. Upsert Result (Immediate Dashboard Visibility)
       const result = await prismadb.result.upsert({
         where: { studentId_examId: { studentId: student.id, examId: exam.id } },
         update: {
@@ -255,21 +321,36 @@ export async function POST(
       });
     }
 
-    // 5. Update Cohort Rankings in Result table
+    // 5. Atomic Cohort Ranking (Single Postgres window function query instead of N round-trips)
     try {
-      const allResults = await prismadb.result.findMany({
-        where: { examId: exam.id },
-        orderBy: { total: 'desc' },
-      });
-
-      for (let i = 0; i < allResults.length; i++) {
-        await prismadb.result.update({
-          where: { id: allResults[i].id },
-          data: { rank: i + 1 },
-        });
-      }
+      await prismadb.$executeRaw`
+        WITH ranked AS (
+          SELECT id, DENSE_RANK() OVER (ORDER BY total DESC) as calc_rank
+          FROM results
+          WHERE "examId" = ${exam.id}
+        )
+        UPDATE results r
+        SET rank = ranked.calc_rank
+        FROM ranked
+        WHERE r.id = ranked.id;
+      `;
     } catch (rankErr) {
-      console.warn('Could not recalculate cohort ranks:', rankErr);
+      console.warn('Could not execute atomic cohort ranking:', rankErr);
+    }
+
+    // 6. Update OMRScanSession final status
+    if (session) {
+      await prismadb.omrScanSession.update({
+        where: { id: session.id },
+        data: {
+          processedFiles: successCount,
+          publishedCount: successCount,
+          status: 'PUBLISHED',
+          isCompleted: true,
+          completedAt: new Date(),
+          publishedAt: new Date(),
+        },
+      }).catch(err => console.warn('Could not finalize OMRScanSession:', err));
     }
 
     return NextResponse.json({
@@ -286,4 +367,3 @@ export async function POST(
     );
   }
 }
-
