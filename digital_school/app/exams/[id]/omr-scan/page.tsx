@@ -37,10 +37,8 @@ import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
 import { processOMR } from '@/lib/omr/omrEngine';
-import { renderPdfToCanvases } from '@/lib/omr/pdfLoader';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
-import Papa from 'papaparse';
 
 export default function ExamBatchScanPage() {
   const nextParams = useParams();
@@ -127,191 +125,198 @@ export default function ExamBatchScanPage() {
     setParsedBubbles(parsed.bubbles);
   }, [selectedPresetId]);
 
-  // Fetch Exam Data & Compile Authentic Answer Key from DB
+  // Memoized function to configure student directory and answer key
+  const compileExamData = useCallback((data: any) => {
+    if (!data) return;
+    setExam(data);
+
+    // 1. Build Student Directory Map
+    const dirMap = new Map<string, { id: string; name: string }>();
+    if (Array.isArray(data.students)) {
+      data.students.forEach((st: any) => {
+        if (st && st.roll) {
+          const cleanR = String(st.roll).trim();
+          const strippedR = cleanR.replace(/^0+/, '') || cleanR;
+          const name = st.user?.name || `Roll ${cleanR}`;
+          dirMap.set(cleanR, { id: st.id, name });
+          dirMap.set(strippedR, { id: st.id, name });
+        }
+      });
+    }
+    setStudentDirectory(dirMap);
+
+    // 2. Compile Answer Keys
+    const multiSetKeys: Record<string, Record<string, string>> = {};
+    const defaultKey: Record<string, string> = {};
+    const examSets = Array.isArray(data.examSets) ? data.examSets : [];
+
+    const indexToLetter = (idx: number) => {
+      const letters = ['A', 'B', 'C', 'D', 'E'];
+      return letters[idx] || 'A';
+    };
+
+    const extractAnswersFromQuestions = (qList: any[]) => {
+      const map: Record<string, string> = {};
+      if (!Array.isArray(qList)) return map;
+
+      qList.forEach((q: any, idx: number) => {
+        if (!q || typeof q !== 'object') return;
+        const qKey = `q${idx + 1}`;
+        let correctLetter = '';
+
+        if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
+          const caStr = String(q.correctAnswer).trim().toUpperCase();
+          const firstChar = caStr.charAt(0);
+          if (['A', 'B', 'C', 'D', 'E'].includes(caStr)) {
+            correctLetter = caStr;
+          } else if (['A', 'B', 'C', 'D', 'E'].includes(firstChar)) {
+            correctLetter = firstChar;
+          } else if (['ক', 'খ', 'গ', 'ঘ'].includes(firstChar)) {
+            const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+            correctLetter = bnMap[firstChar] || '';
+          }
+        }
+
+        if (!correctLetter && Array.isArray(q.options)) {
+          const correctIdx = q.options.findIndex((opt: any) => {
+            if (typeof opt === 'object' && opt !== null) {
+              return opt.isCorrect === true || opt.correct === true;
+            }
+            return false;
+          });
+
+          if (correctIdx >= 0) {
+            correctLetter = indexToLetter(correctIdx);
+          }
+        }
+
+        if (!correctLetter && q.correctOption !== undefined && q.correctOption !== null) {
+          if (typeof q.correctOption === 'number') {
+            correctLetter = indexToLetter(q.correctOption - 1);
+          } else if (typeof q.correctOption === 'string') {
+            const cleaned = q.correctOption.trim().toUpperCase();
+            const f = cleaned.charAt(0);
+            if (['A', 'B', 'C', 'D', 'E'].includes(cleaned)) {
+              correctLetter = cleaned;
+            } else if (['A', 'B', 'C', 'D', 'E'].includes(f)) {
+              correctLetter = f;
+            } else if (['ক', 'খ', 'গ', 'ঘ'].includes(f)) {
+              const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+              correctLetter = bnMap[f] || '';
+            }
+          }
+        }
+
+        map[qKey] = correctLetter || 'A';
+      });
+      return map;
+    };
+
+    if (examSets.length > 0) {
+      examSets.forEach((s: any) => {
+        if (!s || typeof s !== 'object') return;
+        const sNameStr = String(s.name || 'A');
+        const rawName = sNameStr.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase() || 'A';
+        const firstLetter = rawName.charAt(0) || 'A';
+        const qs = Array.isArray(s.questionsJson) 
+          ? s.questionsJson 
+          : (Array.isArray(s.questions) ? s.questions : []);
+        
+        const setKey = extractAnswersFromQuestions(qs);
+        multiSetKeys[rawName] = setKey;
+        multiSetKeys[firstLetter] = setKey;
+        multiSetKeys[sNameStr.trim().toUpperCase()] = setKey;
+
+        if (Object.keys(defaultKey).length === 0 || rawName === 'A' || firstLetter === 'A') {
+          Object.assign(defaultKey, setKey);
+        }
+      });
+    }
+
+    if (Object.keys(defaultKey).length === 0 && Array.isArray(data.questions)) {
+      Object.assign(defaultKey, extractAnswersFromQuestions(data.questions));
+    }
+
+    // Auto-select template preset based on question count
+    const totalQuestionCount = Object.keys(defaultKey).length || Number(data.totalMarks) || 100;
+    if (totalQuestionCount <= 50) {
+      setSelectedPresetId('bangladesh_board_hsc');
+    } else {
+      setSelectedPresetId('medical_admission_100q');
+    }
+
+    const negMark = data.mcqNegativeMarking !== undefined ? Number(data.mcqNegativeMarking) : 0.25;
+
+    const dynamicConfig: EvaluationConfig = {
+      examName: data.name || 'Exam',
+      examCode: data.id || 'EXAM',
+      totalMarks: Number(data.totalMarks) || 100,
+      answerKey: defaultKey,
+      multiSetAnswerKeys: multiSetKeys,
+      rollNumberField: 'Roll',
+      serialNumberField: 'Serial',
+      setNameField: 'Set',
+      markingSchemes: {
+        default: {
+          correct: 1.0,
+          incorrect: -Math.abs(negMark),
+          unmarked: 0,
+          bonus: 1.0,
+        },
+      },
+    };
+
+    setEvaluationConfig(dynamicConfig);
+  }, []);
+
+  // Fetch Exam Data & Compile Authentic Answer Key from DB with Instant Cache
   useEffect(() => {
     const activeExamId = examId || resolveExamId();
     if (!activeExamId) {
-      const timer = setTimeout(() => {
-        if (!examId && !resolveExamId()) {
-          setLoadingExam(false);
-          setExamError('পরীক্ষার আইডি সনাক্ত করা যায়নি। অনুগ্রহ করে পরীক্ষার তালিকা থেকে পুনরায় প্রবেশ করুন।');
-        }
-      }, 2500);
-      return () => clearTimeout(timer);
+      setLoadingExam(false);
+      setExamError('পরীক্ষার আইডি সনাক্ত করা যায়নি। অনুগ্রহ করে পরীক্ষার তালিকা থেকে পুনরায় প্রবেশ করুন।');
+      return;
     }
 
-    let isMounted = true;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    // Fast-path: Instant hydration from sessionStorage (0ms perceived load)
+    try {
+      const cached = sessionStorage.getItem(`omr_exam_${activeExamId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.id === activeExamId || parsed.name)) {
+          compileExamData(parsed);
+          setLoadingExam(false);
+        }
+      }
+    } catch {}
+
+    let isCurrent = true;
 
     async function fetchExamDetails() {
       try {
-        setLoadingExam(true);
         setExamError(null);
-        // Using mode=omr to load lightweight, fast 5KB payload skipping question bank egress
         const res = await fetch(`/api/exams/${activeExamId}?mode=omr`, {
-          signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
         });
-        clearTimeout(timeoutId);
 
         if (!res.ok) {
           throw new Error(`পরীক্ষা পাওয়া যায়নি (HTTP ${res.status})`);
         }
         const rawData = await res.json();
         const data = rawData.exam || rawData;
-        if (!isMounted) return;
-        setExam(data);
 
-        // Pre-build Student Directory Map from exam's class roster
-        const dirMap = new Map<string, { id: string; name: string }>();
-        if (Array.isArray(data.students)) {
-          data.students.forEach((st: any) => {
-            if (st && st.roll) {
-              const cleanR = String(st.roll).trim();
-              const strippedR = cleanR.replace(/^0+/, '') || cleanR;
-              const name = st.user?.name || `Roll ${cleanR}`;
-              dirMap.set(cleanR, { id: st.id, name });
-              dirMap.set(strippedR, { id: st.id, name });
-            }
-          });
-        }
-        setStudentDirectory(dirMap);
+        if (!isCurrent) return;
+        compileExamData(data);
 
-        // Compile Answer Key from Exam Questions / Sets
-        const multiSetKeys: Record<string, Record<string, string>> = {};
-        const defaultKey: Record<string, string> = {};
-
-        const examSets = Array.isArray(data.examSets) ? data.examSets : [];
-
-        // Helper to convert option index to letter
-        const indexToLetter = (idx: number) => {
-          const letters = ['A', 'B', 'C', 'D', 'E'];
-          return letters[idx] || 'A';
-        };
-
-        const extractAnswersFromQuestions = (qList: any[]) => {
-          const map: Record<string, string> = {};
-          if (!Array.isArray(qList)) return map;
-
-          qList.forEach((q: any, idx: number) => {
-            if (!q || typeof q !== 'object') return;
-            const qKey = `q${idx + 1}`;
-            let correctLetter = '';
-
-            // 1. Try correctAnswer field (supports 'A', 'BCD' -> 'B', 'ক' -> 'A')
-            if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
-              const caStr = String(q.correctAnswer).trim().toUpperCase();
-              const firstChar = caStr.charAt(0);
-              if (['A', 'B', 'C', 'D', 'E'].includes(caStr)) {
-                correctLetter = caStr;
-              } else if (['A', 'B', 'C', 'D', 'E'].includes(firstChar)) {
-                correctLetter = firstChar;
-              } else if (['ক', 'খ', 'গ', 'ঘ'].includes(firstChar)) {
-                const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
-                correctLetter = bnMap[firstChar] || '';
-              }
-            }
-
-            // 2. Try options array if not yet resolved
-            if (!correctLetter && Array.isArray(q.options)) {
-              const correctIdx = q.options.findIndex((opt: any) => {
-                if (typeof opt === 'object' && opt !== null) {
-                  return opt.isCorrect === true || opt.correct === true;
-                }
-                return false;
-              });
-
-              if (correctIdx >= 0) {
-                correctLetter = indexToLetter(correctIdx);
-              }
-            }
-
-            // 3. Try correctOption field (1-based index, letter, or Bengali)
-            if (!correctLetter && q.correctOption !== undefined && q.correctOption !== null) {
-              if (typeof q.correctOption === 'number') {
-                correctLetter = indexToLetter(q.correctOption - 1);
-              } else if (typeof q.correctOption === 'string') {
-                const cleaned = q.correctOption.trim().toUpperCase();
-                const f = cleaned.charAt(0);
-                if (['A', 'B', 'C', 'D', 'E'].includes(cleaned)) {
-                  correctLetter = cleaned;
-                } else if (['A', 'B', 'C', 'D', 'E'].includes(f)) {
-                  correctLetter = f;
-                } else if (['ক', 'খ', 'গ', 'ঘ'].includes(f)) {
-                  const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
-                  correctLetter = bnMap[f] || '';
-                }
-              }
-            }
-
-            map[qKey] = correctLetter || 'A';
-          });
-          return map;
-        };
-
-        if (examSets.length > 0) {
-          examSets.forEach((s: any) => {
-            if (!s || typeof s !== 'object') return;
-            const sNameStr = String(s.name || 'A');
-            const rawName = sNameStr.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim().toUpperCase() || 'A';
-            const firstLetter = rawName.charAt(0) || 'A';
-            const qs = Array.isArray(s.questionsJson) 
-              ? s.questionsJson 
-              : (Array.isArray(s.questions) ? s.questions : []);
-            
-            const setKey = extractAnswersFromQuestions(qs);
-            multiSetKeys[rawName] = setKey;
-            multiSetKeys[firstLetter] = setKey;
-            multiSetKeys[sNameStr.trim().toUpperCase()] = setKey;
-
-            if (Object.keys(defaultKey).length === 0 || rawName === 'A' || firstLetter === 'A') {
-              Object.assign(defaultKey, setKey);
-            }
-          });
-        }
-
-        // Auto-select template preset based on question count
-        const totalQuestionCount = Object.keys(defaultKey).length || Number(data.totalMarks) || 100;
-        if (totalQuestionCount <= 50) {
-          setSelectedPresetId('bangladesh_board_hsc');
-        } else {
-          setSelectedPresetId('medical_admission_100q');
-        }
-
-        const negMark = data.mcqNegativeMarking !== undefined ? Number(data.mcqNegativeMarking) : 0.25;
-
-        const dynamicConfig: EvaluationConfig = {
-          examName: data.name,
-          examCode: data.id,
-          totalMarks: Number(data.totalMarks) || 100,
-          answerKey: defaultKey,
-          multiSetAnswerKeys: multiSetKeys,
-          rollNumberField: 'Roll',
-          serialNumberField: 'Serial',
-          setNameField: 'Set',
-          markingSchemes: {
-            default: {
-              correct: 1.0,
-              incorrect: -Math.abs(negMark),
-              unmarked: 0,
-              bonus: 1.0,
-            },
-          },
-        };
-
-        setEvaluationConfig(dynamicConfig);
+        try {
+          sessionStorage.setItem(`omr_exam_${activeExamId}`, JSON.stringify(data));
+        } catch {}
       } catch (err: any) {
-        if (!isMounted) return;
+        if (!isCurrent) return;
         console.error('Failed to load exam details:', err);
-        const isAbort = err.name === 'AbortError' || err.message?.includes('aborted');
-        setExamError(
-          isAbort
-            ? 'সার্ভার থেকে তথ্য লোড হতে অতিরিক্ত সময় লাগছে। অনুগ্রহ করে নিচের বাটনে ক্লিক করে পুনরায় চেষ্টা করুন।'
-            : (err.message || 'Error loading exam')
-        );
+        setExamError(err.message || 'Error loading exam');
       } finally {
-        if (isMounted) {
+        if (isCurrent) {
           setLoadingExam(false);
         }
       }
@@ -320,11 +325,9 @@ export default function ExamBatchScanPage() {
     fetchExamDetails();
 
     return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-      controller.abort();
+      isCurrent = false;
     };
-  }, [examId, resolveExamId, fetchAttempt]);
+  }, [examId, resolveExamId, fetchAttempt, compileExamData]);
 
   // Clean up Camera Stream on unmount
   useEffect(() => {
@@ -364,6 +367,7 @@ export default function ExamBatchScanPage() {
                                  file.name.toLowerCase().includes('master') ||
                                  activeTemplate.pageDimensions[0] === 1060;
           
+          const { renderPdfToCanvases } = await import('@/lib/omr/pdfLoader');
           const renderedPages = await renderPdfToCanvases(file, {
             dpi: 150,
             oddPagesOnly: isMasterSpread,
@@ -671,7 +675,7 @@ export default function ExamBatchScanPage() {
   };
 
   // Export Results CSV
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (scoreCards.length === 0) return;
     const csvData = scoreCards.map(c => ({
       'Rank': c.rank,
@@ -689,6 +693,7 @@ export default function ExamBatchScanPage() {
       'Flags': c.flags.join('; '),
     }));
 
+    const Papa = (await import('papaparse')).default;
     const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -711,37 +716,57 @@ export default function ExamBatchScanPage() {
 
   if (loadingExam) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
-        <div className="relative mb-5">
-          <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-indigo-400 animate-pulse" />
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        {/* Top Header Skeleton */}
+        <header className="border-b border-slate-800 bg-slate-900/90 px-4 sm:px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-slate-800 animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="h-5 w-48 sm:w-64 bg-slate-800 rounded animate-pulse" />
+              <div className="h-3 w-32 bg-slate-800/60 rounded animate-pulse" />
+            </div>
           </div>
-        </div>
-        <h2 className="text-lg font-bold text-white mb-2">পরীক্ষার বিবরণ ও উত্তরমালা লোড হচ্ছে...</h2>
-        <p className="text-xs text-slate-400 max-w-sm mb-6">
-          ডাটাবেস থেকে প্রশ্নসেট, সঠিক উত্তর এবং শিক্ষার্থীদের রোল তালিকা যাচাই করা হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন।
-        </p>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-24 bg-slate-800 rounded-lg animate-pulse hidden sm:block" />
+            <div className="h-8 w-24 bg-slate-800 rounded-lg animate-pulse" />
+          </div>
+        </header>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setLoadingExam(true);
-              setExamError(null);
-              setFetchAttempt(prev => prev + 1);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-all shadow-sm cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            দেরি হলে দ্রুত রিফ্রেশ করুন
-          </button>
-          <Link
-            href="/exams"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            পরীক্ষা তালিকায় ফিরুন
-          </Link>
+        {/* Content Skeleton */}
+        <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex gap-2">
+              <div className="h-9 w-32 bg-slate-800 rounded-xl animate-pulse" />
+              <div className="h-9 w-28 bg-slate-800/60 rounded-xl animate-pulse" />
+            </div>
+            <div className="h-8 w-44 bg-slate-800/50 rounded-lg animate-pulse hidden sm:block" />
+          </div>
+
+          <div className="border-2 border-dashed border-slate-800/80 rounded-2xl p-10 flex flex-col items-center justify-center text-center bg-slate-900/40">
+            <div className="relative mb-4">
+              <div className="w-14 h-14 rounded-full border-3 border-indigo-500/20 border-t-indigo-500 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-base font-bold text-white mb-1">পরীক্ষার বিবরণ ও উত্তরমালা প্রস্তুত হচ্ছে...</h2>
+            <p className="text-xs text-slate-400 max-w-sm mb-4">
+              ডাটাবেস থেকে প্রশ্নসেট, সঠিক উত্তর এবং শিক্ষার্থীদের রোল তালিকা দ্রুত সিঙ্ক হচ্ছে।
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setLoadingExam(true);
+                  setExamError(null);
+                  setFetchAttempt(prev => prev + 1);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>রিফ্রেশ</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
