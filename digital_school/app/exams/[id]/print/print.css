@@ -858,10 +858,10 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   }
 
-  /* A3 Master Booklet Spread Styling */
+  /* A3 Master Booklet Spread Styling (Strict ISO A3 Landscape: 420mm x 297mm = 1190.55pt x 841.89pt) */
   .a3-master-container {
-    width: 1435pt !important;
-    max-width: 1435pt !important;
+    width: 1190.55pt !important;
+    max-width: 1190.55pt !important;
     background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -869,20 +869,25 @@
   }
 
   .a3-master-sheet {
-    width: 1435pt !important;
-    height: 976pt !important;
-    max-height: 976pt !important;
+    width: 1190.55pt !important;
+    max-width: 1190.55pt !important;
+    height: 841.89pt !important;
+    max-height: 841.89pt !important;
+    min-height: 841.89pt !important;
     page-break-after: always !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     background: #ffffff !important;
+    position: relative !important;
   }
 }
 
 /* Screen Preview for A3 Master Booklet */
 .a3-master-container {
-  width: 1435pt;
+  width: 1190.55pt;
   max-width: 100%;
   margin: 0 auto;
   background: #ffffff;
@@ -890,9 +895,12 @@
 }
 
 .a3-master-sheet {
-  width: 1435pt;
+  width: 1190.55pt;
   max-width: 100%;
-  min-height: 976pt;
+  min-height: 841.89pt;
+  max-height: 841.89pt;
+  overflow: hidden;
   background: #ffffff;
   box-sizing: border-box;
+  position: relative;
 }
