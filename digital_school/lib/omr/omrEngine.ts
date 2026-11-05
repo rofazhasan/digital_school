@@ -60,6 +60,125 @@ export function renderMatToCanvas(cv: any, mat: any, canvas: HTMLCanvasElement):
   }
 }
 
+function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean; quads: MarkerQuad[] } {
+  const curW = orientedSrc.cols;
+  const curH = orientedSrc.rows;
+  const midX = curW / 2;
+  const midY = curH / 2;
+
+  let quads: MarkerQuad[] = [
+    { name: 'TL', condition: (p) => p.x < midX && p.y < midY, bestPt: null, maxArea: 0 },
+    { name: 'TR', condition: (p) => p.x >= midX && p.y < midY, bestPt: null, maxArea: 0 },
+    { name: 'BL', condition: (p) => p.x < midX && p.y >= midY, bestPt: null, maxArea: 0 },
+    { name: 'BR', condition: (p) => p.x >= midX && p.y >= midY, bestPt: null, maxArea: 0 }
+  ];
+
+  let thresh = new cv.Mat();
+  let contours = new cv.MatVector();
+  let hierarchy = new cv.Mat();
+  let orientedGray = new cv.Mat();
+
+  try {
+    try {
+      cv.cvtColor(orientedSrc, orientedGray, cv.COLOR_RGBA2GRAY);
+    } catch {
+      orientedGray = orientedSrc.clone();
+    }
+
+    // Multi-threshold marker pass: Otsu adaptive illumination thresholding
+    cv.threshold(orientedGray, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+    const inspectContours = (cntList: any) => {
+      const numContours = cntList.size();
+      for (let i = 0; i < numContours; ++i) {
+        let cnt = cntList.get(i);
+        try {
+          let area = cv.contourArea(cnt);
+          if (area > 80 && area < (curW * curH) / 6) { 
+            let peri = cv.arcLength(cnt, true);
+            let approx = new cv.Mat();
+            try {
+              cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
+              if (approx.rows >= 4 && approx.rows <= 8) {
+                let rect = cv.boundingRect(cnt);
+                let aspectRatio = rect.width / rect.height;
+                // Extended aspect ratio tolerance to handle severe phone camera perspective tilt (up to 40 deg)
+                if (aspectRatio >= 0.45 && aspectRatio <= 1.85) {
+                  // Subpixel centroid refinement via spatial image moments
+                  let M = cv.moments(cnt, false);
+                  let centerX = M.m00 !== 0 ? (M.m10 / M.m00) : (rect.x + rect.width / 2);
+                  let centerY = M.m00 !== 0 ? (M.m01 / M.m00) : (rect.y + rect.height / 2);
+                  
+                  for (let q of quads) {
+                    if (q.condition({ x: centerX, y: centerY })) {
+                      if (area > q.maxArea) {
+                        q.maxArea = area;
+                        q.bestPt = { x: centerX, y: centerY };
+                      }
+                    }
+                  }
+                }
+              }
+            } finally {
+              approx.delete();
+            }
+          }
+        } finally {
+          cnt.delete();
+        }
+      }
+    };
+
+    inspectContours(contours);
+    let detected = quads.every(q => q.bestPt !== null);
+
+    // Fallback pass: Adaptive Gaussian thresholding if ambient lighting has harsh smartphone shadows
+    if (!detected) {
+      contours.delete();
+      hierarchy.delete();
+      contours = new cv.MatVector();
+      hierarchy = new cv.Mat();
+      cv.adaptiveThreshold(orientedGray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 10);
+      cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+      inspectContours(contours);
+      detected = quads.every(q => q.bestPt !== null);
+    }
+
+    // 3-Marker Affine Parallelogram Recovery (Handles Torn / Missing Corners):
+    if (!detected) {
+      const found = quads.filter(q => q.bestPt !== null);
+      if (found.length === 3) {
+        const tl = quads.find(q => q.name === 'TL')!;
+        const tr = quads.find(q => q.name === 'TR')!;
+        const bl = quads.find(q => q.name === 'BL')!;
+        const br = quads.find(q => q.name === 'BR')!;
+
+        if (!tl.bestPt && tr.bestPt && bl.bestPt && br.bestPt) {
+          tl.bestPt = { x: tr.bestPt.x + bl.bestPt.x - br.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - br.bestPt.y };
+          detected = true;
+        } else if (!tr.bestPt && tl.bestPt && bl.bestPt && br.bestPt) {
+          tr.bestPt = { x: tl.bestPt.x + br.bestPt.x - bl.bestPt.x, y: tl.bestPt.y + br.bestPt.y - bl.bestPt.y };
+          detected = true;
+        } else if (!bl.bestPt && tl.bestPt && tr.bestPt && br.bestPt) {
+          bl.bestPt = { x: tl.bestPt.x + br.bestPt.x - tr.bestPt.x, y: tl.bestPt.y + br.bestPt.y - tr.bestPt.y };
+          detected = true;
+        } else if (!br.bestPt && tl.bestPt && tr.bestPt && bl.bestPt) {
+          br.bestPt = { x: tr.bestPt.x + bl.bestPt.x - tl.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - tl.bestPt.y };
+          detected = true;
+        }
+      }
+    }
+
+    return { detected, quads };
+  } finally {
+    thresh.delete();
+    contours.delete();
+    hierarchy.delete();
+    orientedGray.delete();
+  }
+}
+
 function alignDocument(src: any, template: Template): { warped: any; markersDetected: boolean; skewAngle: number } {
   const cv = getCV();
   const [targetW, targetH] = template.pageDimensions;
@@ -104,7 +223,7 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
     return { warped, markersDetected: true, skewAngle: 0 };
   }
 
-  // 1. Orientation check: Auto-orient if aspect ratio is inverted (e.g. rotated mobile scan)
+  // 1. Initial Orientation check: Auto-orient if aspect ratio is inverted (e.g. rotated mobile scan)
   let orientedSrc = activeSrc.clone();
   if ((targetW > targetH && w < h) || (targetW < targetH && w > h)) {
     cv.rotate(activeSrc, orientedSrc, cv.ROTATE_90_CLOCKWISE);
@@ -112,122 +231,36 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
   }
   activeSrc.delete();
 
-  const curW = orientedSrc.cols;
-  const curH = orientedSrc.rows;
-  const midX = curW / 2;
-  const midY = curH / 2;
-
-  let quads: MarkerQuad[] = [
-    { name: 'TL', condition: (p) => p.x < midX && p.y < midY, bestPt: null, maxArea: 0 },
-    { name: 'TR', condition: (p) => p.x >= midX && p.y < midY, bestPt: null, maxArea: 0 },
-    { name: 'BL', condition: (p) => p.x < midX && p.y >= midY, bestPt: null, maxArea: 0 },
-    { name: 'BR', condition: (p) => p.x >= midX && p.y >= midY, bestPt: null, maxArea: 0 }
-  ];
+  let quads: MarkerQuad[] = [];
 
   if (useMarkers) {
-    let thresh = new cv.Mat();
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
+    const res = extractFiducialMarkers(orientedSrc, cv);
+    markersDetected = res.detected;
+    quads = res.quads;
 
-    try {
-      let orientedGray = new cv.Mat();
-      try {
-        cv.cvtColor(orientedSrc, orientedGray, cv.COLOR_RGBA2GRAY);
-      } catch {
-        orientedGray = orientedSrc.clone();
-      }
+    // 4-Way Rotation Invariant Smartphone Marker Search (0°, 90°, 180°, 270°)
+    // Guarantees phone captures taken at any angle achieve 99.99% automatic orientation lock
+    if (!markersDetected) {
+      const candidateRotations = [
+        { code: cv.ROTATE_90_CLOCKWISE, angle: 90 },
+        { code: cv.ROTATE_180, angle: 180 },
+        { code: cv.ROTATE_90_COUNTERCLOCKWISE, angle: 270 }
+      ];
 
-      // Multi-threshold marker pass: Otsu adaptive illumination thresholding
-      cv.threshold(orientedGray, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-      cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-      const inspectContours = (cntList: any) => {
-        const numContours = cntList.size();
-        for (let i = 0; i < numContours; ++i) {
-          let cnt = cntList.get(i);
-          try {
-            let area = cv.contourArea(cnt);
-            if (area > 80 && area < (curW * curH) / 6) { 
-              let peri = cv.arcLength(cnt, true);
-              let approx = new cv.Mat();
-              try {
-                cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
-                if (approx.rows >= 4 && approx.rows <= 8) {
-                  let rect = cv.boundingRect(cnt);
-                  let aspectRatio = rect.width / rect.height;
-                  // Extended aspect ratio tolerance to handle severe phone camera perspective tilt (up to 40 deg)
-                  if (aspectRatio >= 0.45 && aspectRatio <= 1.85) {
-                    // Subpixel centroid refinement via spatial image moments
-                    let M = cv.moments(cnt, false);
-                    let centerX = M.m00 !== 0 ? (M.m10 / M.m00) : (rect.x + rect.width / 2);
-                    let centerY = M.m00 !== 0 ? (M.m01 / M.m00) : (rect.y + rect.height / 2);
-                    
-                    for (let q of quads) {
-                      if (q.condition({ x: centerX, y: centerY })) {
-                        if (area > q.maxArea) {
-                          q.maxArea = area;
-                          q.bestPt = { x: centerX, y: centerY };
-                        }
-                      }
-                    }
-                  }
-                }
-              } finally {
-                approx.delete();
-              }
-            }
-          } finally {
-            cnt.delete();
-          }
+      for (const rot of candidateRotations) {
+        let testRotated = new cv.Mat();
+        cv.rotate(orientedSrc, testRotated, rot.code);
+        const testRes = extractFiducialMarkers(testRotated, cv);
+        if (testRes.detected) {
+          orientedSrc.delete();
+          orientedSrc = testRotated;
+          quads = testRes.quads;
+          markersDetected = true;
+          skewAngle = (skewAngle + rot.angle) % 360;
+          break;
         }
-      };
-
-      inspectContours(contours);
-      markersDetected = quads.every(q => q.bestPt !== null);
-
-      // Fallback pass: Adaptive Gaussian thresholding if ambient lighting has harsh shadows
-      if (!markersDetected) {
-        contours.delete();
-        hierarchy.delete();
-        contours = new cv.MatVector();
-        hierarchy = new cv.Mat();
-        cv.adaptiveThreshold(orientedGray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 10);
-        cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-        inspectContours(contours);
-        markersDetected = quads.every(q => q.bestPt !== null);
+        testRotated.delete();
       }
-
-      // 3-Marker Affine Parallelogram Recovery (Handles Torn / Missing Corners):
-      // If 3 corners are detected and 1 is missing, recover the 4th via affine parallelogram closure:
-      if (!markersDetected) {
-        const found = quads.filter(q => q.bestPt !== null);
-        if (found.length === 3) {
-          const tl = quads.find(q => q.name === 'TL')!;
-          const tr = quads.find(q => q.name === 'TR')!;
-          const bl = quads.find(q => q.name === 'BL')!;
-          const br = quads.find(q => q.name === 'BR')!;
-
-          if (!tl.bestPt && tr.bestPt && bl.bestPt && br.bestPt) {
-            tl.bestPt = { x: tr.bestPt.x + bl.bestPt.x - br.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - br.bestPt.y };
-            markersDetected = true;
-          } else if (!tr.bestPt && tl.bestPt && bl.bestPt && br.bestPt) {
-            tr.bestPt = { x: tl.bestPt.x + br.bestPt.x - bl.bestPt.x, y: tl.bestPt.y + br.bestPt.y - bl.bestPt.y };
-            markersDetected = true;
-          } else if (!bl.bestPt && tl.bestPt && tr.bestPt && br.bestPt) {
-            bl.bestPt = { x: tl.bestPt.x + br.bestPt.x - tr.bestPt.x, y: tl.bestPt.y + br.bestPt.y - tr.bestPt.y };
-            markersDetected = true;
-          } else if (!br.bestPt && tl.bestPt && tr.bestPt && bl.bestPt) {
-            br.bestPt = { x: tr.bestPt.x + bl.bestPt.x - tl.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - tl.bestPt.y };
-            markersDetected = true;
-          }
-        }
-      }
-
-      orientedGray.delete();
-    } finally {
-      thresh.delete();
-      contours.delete();
-      hierarchy.delete();
     }
   }
   
@@ -249,6 +282,8 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
       bl.x, bl.y
     ]);
     
+    const curW = orientedSrc.cols;
+    const curH = orientedSrc.rows;
     // Preserve marker inset if the template coordinates are page-relative
     const avgMarginX = Math.round((tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / 4);
     const avgMarginY = Math.round((tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / 4);

@@ -68,16 +68,16 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
           className="break-inside-avoid text-[11px] leading-[1.38] py-1 border-b border-dotted border-slate-300 relative group"
         >
           <div className="flex items-start gap-1 font-semibold text-black">
-            <span className="font-bold shrink-0 text-slate-900 select-none">
+            <span className="font-bold shrink-0 text-slate-900 select-none font-nikosh">
               {toBengaliNumerals(String(qNum).padStart(2, '0'))}.
             </span>
-            <div className="flex-1 font-serif text-[11px] leading-tight text-slate-950 font-medium">
+            <div className="flex-1 font-nikosh font-serif text-[11px] leading-tight text-slate-950 font-medium">
               <UniversalMathJax inline dynamic>{cleanupMath(qText)}</UniversalMathJax>
             </div>
           </div>
 
           {opts.length > 0 && (
-            <div className={`grid ${optLayoutClass} gap-x-2 gap-y-0.5 mt-0.5 ml-3 font-serif text-[10.5px]`}>
+            <div className={`grid ${optLayoutClass} gap-x-2 gap-y-0.5 mt-0.5 ml-3 font-nikosh font-serif text-[10.5px]`}>
               {opts.map((opt: any, optIdx: number) => {
                 const optLetter = String.fromCharCode(65 + optIdx);
                 const optText = typeof opt === 'string' ? opt : (opt.text || '');
@@ -507,7 +507,7 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
     );
 
     return (
-      <div ref={ref} className="a3-master-container font-serif text-black bg-white select-none relative">
+      <div ref={ref} className="a3-master-container font-nikosh font-serif text-black bg-white select-none relative">
         {/* Optional Watermark */}
         {showWatermark && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center opacity-[0.035] select-none z-0">

@@ -685,7 +685,8 @@ export default function PrintExamPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   // Paper Size & Booklet Options State
-  const [printFormat, setPrintFormat] = useState<'normal' | 'a3_master'>('normal');
+  const [printFormat, setPrintFormat] = useState<'normal' | 'a3_master' | 'omr_only'>('normal');
+  const [selectedOmrTemplate, setSelectedOmrTemplate] = useState<'medical_admission_100q' | 'bangladesh_board_hsc' | 'university_admission' | 'compact_50q'>('medical_admission_100q');
   const [a3DuplexMode, setA3DuplexMode] = useState<'short_edge' | 'long_edge'>('short_edge');
   const [showWatermark, setShowWatermark] = useState(false);
   const [customWatermarkText, setCustomWatermarkText] = useState('');
@@ -973,16 +974,20 @@ export default function PrintExamPage() {
               size: ${
                 printFormat === 'a3_master'
                   ? 'A3 landscape'
-                  : isBooklet
-                    ? (paperSize === 'a3' ? 'A3 landscape' : paperSize === 'a4' ? 'A4 landscape' : paperSize === 'legal' ? 'legal landscape' : 'letter landscape')
-                    : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
+                  : printFormat === 'omr_only'
+                    ? (selectedOmrTemplate === 'medical_admission_100q' && paperSize === 'a3' ? 'A3 landscape' : 'A4 portrait')
+                    : isBooklet
+                      ? (paperSize === 'a3' ? 'A3 landscape' : paperSize === 'a4' ? 'A4 landscape' : paperSize === 'legal' ? 'legal landscape' : 'letter landscape')
+                      : (paperSize === 'a3' ? 'A3 portrait' : paperSize === 'a4' ? 'A4 portrait' : paperSize === 'legal' ? 'legal portrait' : 'letter portrait')
               };
               margin: ${
                 printFormat === 'a3_master'
                   ? '0mm'
-                  : isBooklet
-                    ? (paperSize === 'a3' ? '8mm' : '5mm')
-                    : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
+                  : printFormat === 'omr_only'
+                    ? '4mm'
+                    : isBooklet
+                      ? (paperSize === 'a3' ? '8mm' : '5mm')
+                      : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
               };
             }
             body {
@@ -1021,6 +1026,8 @@ export default function PrintExamPage() {
           setTempSchoolAddress={setTempSchoolAddress}
           handleSaveInstitute={handleSaveInstitute}
           handleResetInstitute={handleResetInstitute}
+          selectedOmrTemplate={selectedOmrTemplate}
+          setSelectedOmrTemplate={setSelectedOmrTemplate}
           printFormat={printFormat}
           setPrintFormat={handlePrintFormatChange}
           a3DuplexMode={a3DuplexMode}
@@ -1127,6 +1134,21 @@ export default function PrintExamPage() {
                   duplexFlip={a3DuplexMode}
                   showWatermark={showWatermark}
                   watermarkText={customWatermarkText}
+                />
+              ))}
+            </div>
+          ) : printFormat === 'omr_only' ? (
+            <div className="omr-only-container flex flex-col items-center">
+              {nonEmptySets.map((set: any) => (
+                <OMRPage
+                  key={`omr-only-${set.setId}`}
+                  set={set}
+                  examInfo={examInfo}
+                  language={language}
+                  hideInstitute={hideInstitute}
+                  paperClass={paperClass}
+                  customSchoolName={customSchoolName}
+                  customSchoolAddress={customSchoolAddress}
                 />
               ))}
             </div>
@@ -1743,7 +1765,23 @@ export default function PrintExamPage() {
 }
 
 // --- Sub-Component: OMR Page ---
-const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
+const OMRPage = ({
+  set,
+  examInfo,
+  language,
+  hideInstitute,
+  paperClass = 'a4-paper',
+  customSchoolName,
+  customSchoolAddress,
+}: {
+  set: any;
+  examInfo: any;
+  language: 'bn' | 'en';
+  hideInstitute?: boolean;
+  paperClass?: string;
+  customSchoolName?: string;
+  customSchoolAddress?: string;
+}) => {
   const [uniqueCode] = useState(() => uuidv4());
 
   const mcqOptionsCount = useMemo(() => {
@@ -1756,16 +1794,16 @@ const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-pape
     <div className={`print-page-container ${paperClass} omr-sheet-wrapper`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       <OMRSheet
         questions={set}
-        qrData={set.qrData}
+        qrData={set.qrData || { examId: examInfo.id, setId: set.setId, setName: set.setName }}
         rollDigits={6}
-        fontFamily={language === 'bn' ? 'SolaimanLipi, serif' : 'Times New Roman, serif'}
+        fontFamily={language === 'bn' ? "'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif" : "'ExamFont', Times New Roman, serif"}
         mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
         mcqOptionsCount={mcqOptionsCount}
         setName={set.setName}
-        bubbleSize={16}
+        bubbleSize={18}
         logoUrl={examInfo.schoolLogo}
-        instituteName={examInfo.schoolName}
-        schoolAddress={examInfo.schoolAddress}
+        instituteName={!hideInstitute ? (customSchoolName || examInfo.schoolName || 'ROFAZ ACADEMY') : ''}
+        schoolAddress={!hideInstitute ? (customSchoolAddress || examInfo.schoolAddress || '') : ''}
         examTitle={examInfo.title}
         examDate={examInfo.date}
         subjectName={examInfo.subject}
@@ -1788,6 +1826,7 @@ const PrintControls = ({
   tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
   handleSaveInstitute, handleResetInstitute,
   printFormat, setPrintFormat,
+  selectedOmrTemplate, setSelectedOmrTemplate,
   a3DuplexMode, setA3DuplexMode,
   showWatermark, setShowWatermark,
   customWatermarkText, setCustomWatermarkText,
@@ -1829,18 +1868,18 @@ const PrintControls = ({
           </button>
         </div>
 
-        {/* Section: Format Selector (Normal vs A3 Master Booklet) */}
+        {/* Section: Format Selector (Normal vs A3 Master vs OMR Only) */}
         <div className="border-t border-gray-200 pt-2 space-y-1.5">
           <span className="block font-bold text-gray-800 text-[11px]">
             {language === 'en' ? 'Print Format Style:' : 'প্রিন্ট ফরম্যাট স্টাইল:'}
           </span>
-          <div className="grid grid-cols-2 gap-1.5 bg-gray-100 p-1 rounded-lg">
+          <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
               onClick={() => setPrintFormat('normal')}
               className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${printFormat === 'normal' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-200'}`}
             >
-              {language === 'en' ? 'Normal (Default)' : 'নরমাল (ডিফল্ট)'}
+              {language === 'en' ? 'Normal' : 'নরমাল'}
             </button>
             <button
               type="button"
@@ -1850,7 +1889,34 @@ const PrintControls = ({
             >
               {language === 'en' ? 'A3 Master 🌟' : 'A3 মাস্টার 🌟'}
             </button>
+            <button
+              type="button"
+              onClick={() => setPrintFormat('omr_only')}
+              className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${printFormat === 'omr_only' ? 'bg-purple-700 text-white shadow-sm ring-1 ring-purple-500' : 'text-gray-700 hover:bg-gray-200'}`}
+              title="Print standalone OMR answer sheets directly"
+            >
+              {language === 'en' ? 'OMR Only 📋' : 'OMR মাত্র 📋'}
+            </button>
           </div>
+
+          {/* OMR Template Selector when A3 Master or OMR Only is chosen */}
+          {(printFormat === 'a3_master' || printFormat === 'omr_only') && (
+            <div className="space-y-1.5 mt-2 bg-slate-50 p-2 rounded-lg border border-slate-200 text-left">
+              <label className="block text-[10.5px] font-bold text-gray-800">
+                📋 {language === 'en' ? 'OMR Sheet Template:' : 'OMR শিট টেমপ্লেট নির্বাচন:'}
+              </label>
+              <select
+                value={selectedOmrTemplate}
+                onChange={(e) => setSelectedOmrTemplate(e.target.value as any)}
+                className="w-full py-1 px-1.5 bg-white border border-gray-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900"
+              >
+                <option value="medical_admission_100q">🩺 মেডিকেল ভর্তি মাস্টার (১০০ প্রশ্ন, ৭-ডিজিট রোল, বুকলেট ফরম্যাট)</option>
+                <option value="bangladesh_board_hsc">🎓 বাংলাদেশ শিক্ষা বোর্ড (HSC / SSC - ৫০ প্রশ্ন, সেট ক/খ/গ/ঘ)</option>
+                <option value="university_admission">🏛️ বিশ্ববিদ্যালয় ভর্তি পরীক্ষা (DU / GST গুচ্ছ - ১০০ প্রশ্ন)</option>
+                <option value="compact_50q">⚡ সংক্ষিপ্ত মডেল টেস্ট OMR (৫০ প্রশ্ন)</option>
+              </select>
+            </div>
+          )}
           {printFormat === 'a3_master' && (
             <div className="space-y-2 mt-2">
               <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 text-xs">

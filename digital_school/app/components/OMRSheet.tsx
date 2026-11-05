@@ -56,7 +56,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   qrData,
   rollDigits = 6,
   bubbleSize = 24, // Restored to 24px (Large)
-  fontFamily = 'Noto Serif Bengali, serif',
+  fontFamily = "'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif",
   extraFields = [],
   mcqOptionLabels = MCQ_LABELS,
   mcqOptionsCount = 4,

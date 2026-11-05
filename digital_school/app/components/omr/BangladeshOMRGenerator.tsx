@@ -348,9 +348,9 @@ export function BangladeshOMRGenerator({
 
   const handleSyncToScanner = () => {
     const tmpl = generateOMRCheckerTemplate();
-    onApplyGeneratedTemplate(tmpl);
+    if (onApplyGeneratedTemplate) onApplyGeneratedTemplate(tmpl);
     setStatusMessage('Sync complete! Template calibrated for this exact printed sheet.');
-    onNavigateToScanner();
+    if (onNavigateToScanner) onNavigateToScanner();
   };
 
   const handleExportTemplateJSON = () => {

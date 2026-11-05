@@ -34,6 +34,13 @@ export default function OMRTemplatesPage() {
 
         <div className="flex items-center gap-2">
           <Link
+            href="/exams/print"
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>প্রিন্ট ও OMR হাব</span>
+          </Link>
+          <Link
             href="/exams"
             className="px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-semibold text-slate-300 transition-colors"
           >
@@ -41,6 +48,22 @@ export default function OMRTemplatesPage() {
           </Link>
         </div>
       </header>
+
+      {/* Migration Notice Banner */}
+      <div className="bg-indigo-950/40 border-b border-indigo-900/60 px-4 py-2.5 text-xs text-indigo-200 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+          <span>
+            <strong>নতুন ফিচার:</strong> OMR টেমপ্লেট ও প্রিন্টিং এখন সরাসরি <strong>/exams/print</strong> এবং প্রতিটি পরীক্ষার <strong>/exams/[id]/print</strong> এ যুক্ত হয়েছে।
+          </span>
+        </div>
+        <Link
+          href="/exams/print"
+          className="text-xs font-bold text-indigo-300 hover:text-white underline shrink-0"
+        >
+          প্রিন্ট হাবে যান &rarr;
+        </Link>
+      </div>
 
       {/* Main OMR Generator Workspace */}
       <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">

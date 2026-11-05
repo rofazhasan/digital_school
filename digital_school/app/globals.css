@@ -3,6 +3,27 @@
 @import "@fontsource/noto-serif-bengali/index.css";
 @import "../styles/diagrams.css";
 
+/* Authentic NikoshBAN Bengali Typography */
+@font-face {
+  font-family: 'NikoshBAN';
+  src: url('/fonts/NikoshBAN.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NikoshBAN';
+  src: url('/fonts/NikoshBAN.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-nikosh {
+  font-family: 'NikoshBAN', 'Noto Serif Bengali', serif !important;
+}
+
 @source "..";
 @source "../components";
 @source "../lib";

@@ -46,6 +46,27 @@
   unicode-range: U+0964-0965, U+0980-09FE, U+200C-200D, U+20B9, U+25CC, U+A8F1;
 }
 
+/* Authentic NikoshBAN Bengali Typography for OMR and Questions */
+@font-face {
+  font-family: 'NikoshBAN';
+  src: url('/fonts/NikoshBAN.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'NikoshBAN';
+  src: url('/fonts/NikoshBAN.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-nikosh {
+  font-family: 'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif !important;
+}
+
 /* BanglaOMR - MCQ option labels bubble font */
 @font-face {
   font-family: 'BanglaOMR';
