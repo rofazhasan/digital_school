@@ -409,7 +409,8 @@ export async function processOMR(
   template: Template, 
   bubbles: BubblePoint[], 
   overlayCanvas?: HTMLCanvasElement,
-  filename: string = 'scan.jpg'
+  filename: string = 'scan.jpg',
+  options?: { generateCanvases?: boolean }
 ): Promise<ScanProcessingResult> {
   if (!imageCanvas || imageCanvas.width === 0 || imageCanvas.height === 0) {
     throw new Error('Invalid image canvas: canvas has zero dimensions');
@@ -724,11 +725,11 @@ export async function processOMR(
 
     const status: ScanProcessingResult['status'] = flags.length > 0 ? 'FLAGGED' : 'SUCCESS';
 
-    // 7. Generate high-resolution warped and studio-beautified document canvases
+    // 7. Generate high-resolution warped and studio-beautified document canvases (opt-in to preserve RAM and prevent cache bloat)
     let warpedImageCanvas: HTMLCanvasElement | undefined;
     let enhancedImageCanvas: HTMLCanvasElement | undefined;
 
-    if (typeof document !== 'undefined') {
+    if (options?.generateCanvases && typeof document !== 'undefined') {
       try {
         warpedImageCanvas = document.createElement('canvas');
         renderMatToCanvas(cv, warped, warpedImageCanvas);

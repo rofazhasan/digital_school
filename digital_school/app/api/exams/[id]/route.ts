@@ -96,6 +96,62 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
 
+    // Fast-path for OMR scanning & grading: skips expensive question bank queries and returns ultra-lightweight payload
+    const isOmr = request.nextUrl.searchParams.get('mode') === 'omr' || 
+                  request.nextUrl.searchParams.get('omr') === 'true' || 
+                  request.nextUrl.searchParams.get('omr') === '1';
+
+    if (isOmr) {
+      const classStudents = exam.classId ? await prisma.studentProfile.findMany({
+        where: { classId: exam.classId },
+        select: {
+          id: true,
+          roll: true,
+          registrationNo: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }) : [];
+
+      // Optimize examSets to strip heavy descriptions, questionsText, SVG formulas, while preserving exact answers
+      const slimSets = (exam.examSets || []).map((s: any) => {
+        const rawQs = Array.isArray(s.questionsJson) ? s.questionsJson : [];
+        const slimQs = rawQs.map((q: any, idx: number) => ({
+          id: q.id || `q_${idx + 1}`,
+          correctAnswer: q.correctAnswer,
+          correctOption: q.correctOption,
+          negativeMarks: q.negativeMarks ?? exam.mcqNegativeMarking ?? 0.25,
+          options: Array.isArray(q.options) ? q.options.map((opt: any) => ({
+            isCorrect: Boolean(opt?.isCorrect || opt?.correct),
+          })) : [],
+        }));
+        return {
+          id: s.id,
+          name: s.name,
+          questionsJson: slimQs,
+        };
+      });
+
+      return NextResponse.json({
+        exam: {
+          id: exam.id,
+          name: exam.name,
+          totalMarks: exam.totalMarks,
+          mcqNegativeMarking: exam.mcqNegativeMarking,
+          classId: exam.classId,
+          students: classStudents,
+          examSets: slimSets,
+        },
+        questions: {
+          data: [],
+          meta: { total: 0, page: 1, limit: 0, totalPages: 0 }
+        }
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        }
+      });
+    }
+
     // 2. Validate and parse query parameters for filtering and pagination
     const queryParams = Object.fromEntries(request.nextUrl.searchParams.entries());
     const validation = getQuestionsQuerySchema.safeParse(queryParams);

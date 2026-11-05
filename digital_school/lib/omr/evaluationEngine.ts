@@ -12,6 +12,16 @@ const DEFAULT_MARKING_SCHEME: MarkingScheme = {
   bonus: 1,
 };
 
+const BENGALI_TO_ENG_OPTION: Record<string, string> = {
+  'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D', 'ঙ': 'E',
+};
+
+function normalizeLetter(val: string): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  return BENGALI_TO_ENG_OPTION[trimmed] || trimmed.toUpperCase();
+}
+
 export class EvaluationEngine {
   private config: EvaluationConfig;
 
@@ -108,7 +118,7 @@ export class EvaluationEngine {
         studentFlags.push(`Multi-marked question ${qKey}: [${rawMarked.join(',')}]`);
       } else {
         if (typeof correctAns === 'string') {
-          if (studentAnswer.toUpperCase() === correctAns.toUpperCase()) {
+          if (normalizeLetter(studentAnswer) === normalizeLetter(correctAns)) {
             verdict = 'correct';
             scoreAwarded = scheme.correct;
             correctCount++;
@@ -121,7 +131,7 @@ export class EvaluationEngine {
         } else if (Array.isArray(correctAns)) {
           if (correctAns.length > 0 && Array.isArray(correctAns[0])) {
             const weightedTuples = correctAns as [string, number][];
-            const matchedTuple = weightedTuples.find(([ans]) => ans.toUpperCase() === studentAnswer.toUpperCase());
+            const matchedTuple = weightedTuples.find(([ans]) => normalizeLetter(ans) === normalizeLetter(studentAnswer));
             if (matchedTuple) {
               verdict = 'correct';
               scoreAwarded = matchedTuple[1];
@@ -133,8 +143,8 @@ export class EvaluationEngine {
               incorrectCount++;
             }
           } else {
-            const allowedAnswers = (correctAns as string[]).map(a => a.toUpperCase());
-            if (allowedAnswers.includes(studentAnswer.toUpperCase())) {
+            const allowedAnswers = (correctAns as string[]).map(a => normalizeLetter(a));
+            if (allowedAnswers.includes(normalizeLetter(studentAnswer))) {
               verdict = 'correct';
               scoreAwarded = scheme.correct;
               correctCount++;

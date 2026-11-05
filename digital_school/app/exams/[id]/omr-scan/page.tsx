@@ -38,7 +38,7 @@ import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
 import { processOMR } from '@/lib/omr/omrEngine';
 import { renderPdfToCanvases } from '@/lib/omr/pdfLoader';
-import { loadOpenCV } from '@/lib/omr/opencvLoader';
+import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
 import Papa from 'papaparse';
 
@@ -90,6 +90,7 @@ export default function ExamBatchScanPage() {
   const [exam, setExam] = useState<any>(null);
   const [loadingExam, setLoadingExam] = useState<boolean>(true);
   const [examError, setExamError] = useState<string | null>(null);
+  const [fetchAttempt, setFetchAttempt] = useState<number>(0);
   const [studentDirectory, setStudentDirectory] = useState<Map<string, { id: string; name: string }>>(new Map());
 
   // OMR Config state
@@ -118,12 +119,8 @@ export default function ExamBatchScanPage() {
   const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
 
-  // Initialize OpenCV & Template
+  // Initialize Template configuration without heavy OpenCV download on page mount
   useEffect(() => {
-    loadOpenCV().catch(err => {
-      console.warn('OpenCV lazy load deferred (will retry on scan):', err);
-    });
-
     const preset = PRESET_TEMPLATES.find(p => p.id === selectedPresetId) || PRESET_TEMPLATES[0];
     setActiveTemplate(preset.template);
     const parsed = parseTemplate(preset.template);
@@ -145,14 +142,14 @@ export default function ExamBatchScanPage() {
 
     let isMounted = true;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     async function fetchExamDetails() {
       try {
         setLoadingExam(true);
         setExamError(null);
-        // Using limit=1 to avoid loading unnecessary heavy question lists from Question bank table
-        const res = await fetch(`/api/exams/${activeExamId}?limit=1`, {
+        // Using mode=omr to load lightweight, fast 5KB payload skipping question bank egress
+        const res = await fetch(`/api/exams/${activeExamId}?mode=omr`, {
           signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
         });
@@ -266,7 +263,9 @@ export default function ExamBatchScanPage() {
             const setKey = extractAnswersFromQuestions(qs);
             multiSetKeys[rawName] = setKey;
             multiSetKeys[firstLetter] = setKey;
-            if (rawName === 'A' || firstLetter === 'A' || !defaultKey['q1']) {
+            multiSetKeys[sNameStr.trim().toUpperCase()] = setKey;
+
+            if (Object.keys(defaultKey).length === 0 || rawName === 'A' || firstLetter === 'A') {
               Object.assign(defaultKey, setKey);
             }
           });
@@ -308,7 +307,7 @@ export default function ExamBatchScanPage() {
         const isAbort = err.name === 'AbortError' || err.message?.includes('aborted');
         setExamError(
           isAbort
-            ? 'পরীক্ষার তথ্য লোড হতে অতিরিক্ত সময় লাগছে। অনুগ্রহ করে পুনরায় রিফ্রেশ করুন।'
+            ? 'সার্ভার থেকে তথ্য লোড হতে অতিরিক্ত সময় লাগছে। অনুগ্রহ করে নিচের বাটনে ক্লিক করে পুনরায় চেষ্টা করুন।'
             : (err.message || 'Error loading exam')
         );
       } finally {
@@ -322,9 +321,10 @@ export default function ExamBatchScanPage() {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [examId, resolveExamId]);
+  }, [examId, resolveExamId, fetchAttempt]);
 
   // Clean up Camera Stream on unmount
   useEffect(() => {
@@ -342,6 +342,18 @@ export default function ExamBatchScanPage() {
 
     setIsProcessing(true);
     setStatusMessage('ডকুমেন্ট প্রসেসিং এবং পেজ লোডিং শুরু হচ্ছে...');
+
+    // On-demand load OpenCV if not already initialized
+    if (!isOpenCVLoaded()) {
+      setStatusMessage('OMR Vision ইঞ্জিন (OpenCV) লোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...');
+      try {
+        await loadOpenCV();
+      } catch (cvErr: any) {
+        setIsProcessing(false);
+        setStatusMessage('OpenCV ইঞ্জিন লোড হতে ব্যর্থ হয়েছে: ' + cvErr.message);
+        return;
+      }
+    }
 
     const itemsToProcess: { canvas: HTMLCanvasElement; name: string }[] = [];
 
@@ -404,10 +416,13 @@ export default function ExamBatchScanPage() {
           activeTemplate,
           parsedBubbles,
           undefined,
-          item.name
+          item.name,
+          { generateCanvases: false } // Crucial: avoid 24MB canvas in memory
         );
 
-        newScanResults[scanRes.sheetId] = scanRes;
+        // Store lightweight scan result without DOM canvases
+        const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
+        newScanResults[scanRes.sheetId] = leanScanRes as any;
 
         const card = evalEngine.evaluateCandidate(
           scanRes.sheetId,
@@ -468,6 +483,9 @@ export default function ExamBatchScanPage() {
   const startCamera = async () => {
     try {
       setIsCameraActive(true);
+      if (!isOpenCVLoaded()) {
+        loadOpenCV().catch(e => console.warn('Camera OpenCV preload error:', e));
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -510,13 +528,23 @@ export default function ExamBatchScanPage() {
     setStatusMessage('ক্যামেরা ফ্রেম স্ক্যান ও মূল্যায়ন করা হচ্ছে...');
 
     try {
+      if (!isOpenCVLoaded()) {
+        setStatusMessage('OMR Vision ইঞ্জিন (OpenCV) প্রস্তুত হচ্ছে...');
+        await loadOpenCV();
+      }
+
       const scanRes = await processOMR(
         canvas,
         activeTemplate,
         parsedBubbles,
         undefined,
-        `Camera_Capture_${Date.now()}`
+        `Camera_Capture_${Date.now()}`,
+        { generateCanvases: false } // Prevent RAM explosion
       );
+
+      // Clean canvas memory
+      canvas.width = 0;
+      canvas.height = 0;
 
       const evalEngine = new EvaluationEngine(evaluationConfig);
       const card = evalEngine.evaluateCandidate(
@@ -537,7 +565,8 @@ export default function ExamBatchScanPage() {
       }
 
       const updated = EvaluationEngine.rankCohort([...scoreCards, card]);
-      setScanResults(prev => ({ ...prev, [scanRes.sheetId]: scanRes }));
+      const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
+      setScanResults(prev => ({ ...prev, [scanRes.sheetId]: leanScanRes as any }));
       setScoreCards(updated);
       setSelectedScoreCard(card);
       setStatusMessage(`সফলভাবে রোল: ${card.rollNumber} স্ক্যান ও গ্রেড হয়েছে (নম্বর: ${card.totalScore})!`);
@@ -696,11 +725,15 @@ export default function ExamBatchScanPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-all shadow-sm"
+            onClick={() => {
+              setLoadingExam(true);
+              setExamError(null);
+              setFetchAttempt(prev => prev + 1);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-semibold border border-slate-700 transition-all shadow-sm cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            দেরি হলে রিফ্রেশ করুন
+            দেরি হলে দ্রুত রিফ্রেশ করুন
           </button>
           <Link
             href="/exams"
@@ -726,8 +759,12 @@ export default function ExamBatchScanPage() {
         </p>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-indigo-600/30"
+            onClick={() => {
+              setLoadingExam(true);
+              setExamError(null);
+              setFetchAttempt(prev => prev + 1);
+            }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-indigo-600/30 cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
             পুনরায় চেষ্টা করুন
