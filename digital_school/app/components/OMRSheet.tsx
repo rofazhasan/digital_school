@@ -358,7 +358,21 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
                 <p className="text-[8px] font-mono">{uniqueCode?.slice(0, 8)}</p>
               </div>
               <div className="border border-black p-0.5 bg-white">
-                <QRCode value={JSON.stringify(qrData)} size={42} />
+                <QRCode
+                  value={
+                    typeof qrData === 'string'
+                      ? qrData
+                      : JSON.stringify(qrData || {
+                          v: 1,
+                          examId: uniqueCode || '',
+                          setName: setName || 'A',
+                          template: 'standard_100q',
+                          title: examTitle
+                        })
+                  }
+                  size={48}
+                  level="M"
+                />
               </div>
             </div>
           </div>

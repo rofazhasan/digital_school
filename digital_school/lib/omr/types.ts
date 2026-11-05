@@ -66,6 +66,21 @@ export interface StateMachineAuditReport {
   }[];
 }
 
+export interface QRCodeScanResult {
+  found: boolean;
+  rawText: string | null;
+  detectedOrientation?: 0 | 90 | 180 | 270;
+  metadata?: {
+    examId?: string;
+    setId?: string;
+    setName?: string;
+    template?: string;
+    title?: string;
+    v?: number;
+    [key: string]: any;
+  };
+}
+
 export interface ScanProcessingResult {
   sheetId: string;
   filename: string;
@@ -81,6 +96,7 @@ export interface ScanProcessingResult {
   warpedImageCanvas?: HTMLCanvasElement;
   enhancedImageCanvas?: HTMLCanvasElement;
   stateMachineAudit?: StateMachineAuditReport;
+  qrResult?: QRCodeScanResult;
 }
 
 export interface MarkingScheme {

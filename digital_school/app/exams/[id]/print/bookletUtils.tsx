@@ -243,7 +243,14 @@ export const OMRPage = ({
     >
       <OMRSheet
         questions={set}
-        qrData={set.qrData}
+        qrData={set.qrData || {
+          v: 1,
+          examId: examInfo.id || examInfo.examId || '',
+          setId: set.setId || set.setName || 'A',
+          setName: set.setName || 'A',
+          template: 'standard_100q',
+          title: examInfo.title || ''
+        }}
         rollDigits={6}
         fontFamily={language === 'bn' ? 'SolaimanLipi, serif' : 'Times New Roman, serif'}
         mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}

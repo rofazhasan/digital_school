@@ -1,12 +1,114 @@
+import jsQR from 'jsqr';
 import type { 
   BubblePoint, 
   Template, 
   ScanProcessingResult, 
   BubbleDetectionResult,
-  StateMachineAuditReport 
+  StateMachineAuditReport,
+  QRCodeScanResult
 } from './types';
 import { resolveConcatenatedFields } from './templateParser';
 import { createOmrScanStateMachine, getOmrStateName } from './omrScanStateMachine';
+
+export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResult {
+  if (!canvas || canvas.width === 0 || canvas.height === 0) {
+    return { found: false, rawText: null };
+  }
+
+  const parsePayload = (data: string): { examId?: string; setId?: string; setName?: string; template?: string; title?: string; v?: number; [k: string]: any } => {
+    let parsed: any = {};
+    try {
+      if (data.startsWith('{')) {
+        parsed = JSON.parse(data);
+      } else if (data.startsWith('ROFAZ_OMR:')) {
+        const parts = data.replace('ROFAZ_OMR:', '').split('|');
+        parsed = {
+          examId: parts[0],
+          setId: parts[1],
+          setName: parts[2] || parts[1],
+          template: parts[3],
+          v: 1
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+    return parsed;
+  };
+
+  const tryScan = (c: HTMLCanvasElement, orientation: 0 | 90 | 180 | 270 = 0): QRCodeScanResult | null => {
+    try {
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      const imgData = ctx.getImageData(0, 0, c.width, c.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'attemptBoth',
+      });
+      if (code && code.data && code.data.trim()) {
+        const metadata = parsePayload(code.data.trim());
+        return {
+          found: true,
+          rawText: code.data.trim(),
+          detectedOrientation: orientation,
+          metadata
+        };
+      }
+    } catch (err) {
+      // ignore
+    }
+    return null;
+  };
+
+  // Pass 1: Direct full canvas scan
+  let res = tryScan(canvas, 0);
+  if (res && res.found) return res;
+
+  // Pass 2: Header crop (top 40% where OMR QRs reside)
+  try {
+    if (typeof document !== 'undefined') {
+      const topW = canvas.width;
+      const topH = Math.round(canvas.height * 0.4);
+      if (topH > 40) {
+        const topCanvas = document.createElement('canvas');
+        topCanvas.width = topW;
+        topCanvas.height = topH;
+        const topCtx = topCanvas.getContext('2d');
+        if (topCtx) {
+          topCtx.drawImage(canvas, 0, 0, topW, topH, 0, 0, topW, topH);
+          res = tryScan(topCanvas, 0);
+          if (res && res.found) return res;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // Pass 3: Multi-angle rotation search (90, 180, 270 deg) for phone camera rotation recovery
+  try {
+    if (typeof document !== 'undefined') {
+      const orientations: Array<90 | 180 | 270> = [90, 180, 270];
+      for (const deg of orientations) {
+        const rotCanvas = document.createElement('canvas');
+        if (deg === 90 || deg === 270) {
+          rotCanvas.width = canvas.height;
+          rotCanvas.height = canvas.width;
+        } else {
+          rotCanvas.width = canvas.width;
+          rotCanvas.height = canvas.height;
+        }
+        const rotCtx = rotCanvas.getContext('2d');
+        if (rotCtx) {
+          rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+          rotCtx.rotate((deg * Math.PI) / 180);
+          rotCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+          res = tryScan(rotCanvas, deg);
+          if (res && res.found) return res;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return { found: false, rawText: null };
+}
 
 function getCV() {
   if (typeof window !== 'undefined' && (window as any).cv) return (window as any).cv;
@@ -497,7 +599,21 @@ export async function processOMR(
   const sm = createOmrScanStateMachine(sheetId, filename, [imageCanvas.width, imageCanvas.height]);
   sm.dispatch('INGEST_IMAGE');
 
+  // Multi-pass QR detection for zero-config exam and set resolution
+  const qrResult = scanQRCodeFromCanvas(imageCanvas);
+
   try {
+    // If QR code revealed a specific orientation (e.g. horizontal or upside down), pre-rotate src
+    if (qrResult.found && qrResult.detectedOrientation) {
+      if (qrResult.detectedOrientation === 90) {
+        cv.rotate(src, src, cv.ROTATE_90_CLOCKWISE);
+      } else if (qrResult.detectedOrientation === 180) {
+        cv.rotate(src, src, cv.ROTATE_180);
+      } else if (qrResult.detectedOrientation === 270) {
+        cv.rotate(src, src, cv.ROTATE_90_COUNTERCLOCKWISE);
+      }
+    }
+
     // 1. Document Alignment & Perspective Warp
     const alignResult = alignDocument(src, template);
     warped = alignResult.warped;
@@ -865,7 +981,8 @@ export async function processOMR(
       flags,
       warpedImageCanvas,
       enhancedImageCanvas,
-      stateMachineAudit
+      stateMachineAudit,
+      qrResult
     };
   } finally {
     src.delete();

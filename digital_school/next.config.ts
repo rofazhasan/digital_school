@@ -6,6 +6,9 @@ const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  buildExcludes: [/opencv\.js$/, /.*\.map$/, /workers\/.*\.js$/],
+  publicExcludes: ['!workers/**/*', '!opencv.js'],
 });
 
 /** @type {import('next').NextConfig} */

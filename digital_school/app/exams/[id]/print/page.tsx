@@ -1116,6 +1116,8 @@ export default function PrintExamPage() {
                 <A3MasterExamPaper
                   key={`a3-master-${set.setId}`}
                   examInfo={{
+                    id: examId,
+                    examId: examId,
                     schoolName: !hideInstitute ? (customSchoolName || examInfo.schoolName || '') : '',
                     schoolAddress: !hideInstitute ? (customSchoolAddress || examInfo.schoolAddress || '') : '',
                     title: examInfo.title,
@@ -1123,10 +1125,19 @@ export default function PrintExamPage() {
                     class: examInfo.class,
                     date: showDate ? examInfo.date : undefined,
                     set: set.setName,
+                    setId: set.setId,
                     duration: examInfo.duration,
                     totalMarks: examInfo.totalMarks,
                     mcqNegativeMarking: examInfo.mcqNegativeMarking,
                     objectiveTime: examInfo.objectiveTime,
+                    qrData: {
+                      v: 1,
+                      examId: examId,
+                      setId: set.setId,
+                      setName: set.setName,
+                      template: 'a3_master',
+                      title: examInfo.title
+                    }
                   }}
                   questions={set.orderedObjective || []}
                   fontSize={objectiveFontSize}
@@ -1794,7 +1805,14 @@ const OMRPage = ({
     <div className={`print-page-container ${paperClass} omr-sheet-wrapper`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       <OMRSheet
         questions={set}
-        qrData={set.qrData || { examId: examInfo.id, setId: set.setId, setName: set.setName }}
+        qrData={set.qrData || {
+          v: 1,
+          examId: examInfo.id || '',
+          setId: set.setId || set.setName || 'A',
+          setName: set.setName || 'A',
+          template: 'standard_100q',
+          title: examInfo.title || ''
+        }}
         rollDigits={6}
         fontFamily={language === 'bn' ? "'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif" : "'ExamFont', Times New Roman, serif"}
         mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}

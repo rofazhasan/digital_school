@@ -36,7 +36,7 @@ import type {
 import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
-import { processOMR } from '@/lib/omr/omrEngine';
+import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
 
@@ -293,11 +293,17 @@ export default function ExamBatchScanPage() {
     let isCurrent = true;
 
     async function fetchExamDetails() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       try {
         setExamError(null);
         const res = await fetch(`/api/exams/${activeExamId}?mode=omr`, {
+          signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
         });
+
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
           throw new Error(`পরীক্ষা পাওয়া যায়নি (HTTP ${res.status})`);
@@ -312,9 +318,10 @@ export default function ExamBatchScanPage() {
           sessionStorage.setItem(`omr_exam_${activeExamId}`, JSON.stringify(data));
         } catch {}
       } catch (err: any) {
+        clearTimeout(timeoutId);
         if (!isCurrent) return;
         console.error('Failed to load exam details:', err);
-        setExamError(err.message || 'Error loading exam');
+        setExamError(err.name === 'AbortError' ? 'সার্ভার সংযোগ সময়োত্তীর্ণ হয়েছে (Timeout)। পুনরায় চেষ্টা করুন।' : (err.message || 'Error loading exam'));
       } finally {
         if (isCurrent) {
           setLoadingExam(false);
@@ -415,6 +422,9 @@ export default function ExamBatchScanPage() {
       await new Promise(r => setTimeout(r, 16));
 
       try {
+        const qr = scanQRCodeFromCanvas(item.canvas);
+        const qrSet = qr?.metadata?.setName || qr?.metadata?.setId || (qr as any)?.setName;
+
         const scanRes = await processOMR(
           item.canvas,
           activeTemplate,
@@ -428,10 +438,15 @@ export default function ExamBatchScanPage() {
         const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
         newScanResults[scanRes.sheetId] = leanScanRes as any;
 
+        const effectiveResponses = { ...scanRes.responses };
+        if (qrSet) {
+          effectiveResponses['Set'] = [qrSet];
+        }
+
         const card = evalEngine.evaluateCandidate(
           scanRes.sheetId,
           item.name,
-          scanRes.responses,
+          effectiveResponses,
           scanRes.concatenatedResponses,
           scanRes.flags
         );

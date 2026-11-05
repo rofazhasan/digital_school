@@ -1,12 +1,15 @@
 "use client";
 
 import React, { forwardRef, useMemo } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 import { toBengaliNumerals, formatBengaliDuration } from "@/utils/numeralConverter";
 
 export interface A3MasterExamPaperProps {
   examInfo: {
+    id?: string;
+    examId?: string;
     schoolName: string;
     schoolAddress?: string;
     title: string;
@@ -14,10 +17,12 @@ export interface A3MasterExamPaperProps {
     class?: string;
     date?: string;
     set?: string;
+    setId?: string;
     duration?: string;
     totalMarks?: string | number;
     mcqNegativeMarking?: number;
     objectiveTime?: number;
+    qrData?: any;
   };
   questions: any[];
   fontSize?: number;
@@ -142,6 +147,16 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
     const renderOmrSection = () => {
       const isCompact50OrLess = totalCount <= 50;
 
+      const qrPayload = examInfo.qrData || {
+        v: 1,
+        examId: examInfo.id || examInfo.examId || '',
+        setId: examInfo.setId || cleanSet,
+        setName: cleanSet,
+        template: 'a3_master',
+        title: cleanBengaliText(examInfo.title || '')
+      };
+      const qrString = typeof qrPayload === 'string' ? qrPayload : JSON.stringify(qrPayload);
+
       return (
         <div className="w-[425pt] h-full p-2.5 pr-2 flex flex-col justify-between shrink-0 bg-white relative">
           {/* Corner Optical Fiducial Marks for Scanner Alignment */}
@@ -152,24 +167,28 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
 
           {/* Top Section */}
           <div className="space-y-1.5">
-            {/* OMR Header Banner */}
-            <div className="border-2 border-black p-1.5 text-center bg-slate-50 relative">
+            {/* OMR Header Banner with Embedded Auto-Scan QR Code */}
+            <div className="border-2 border-black p-1.5 text-center bg-slate-50 relative pr-14">
+              {/* Secured OMR QR Code for Instant Scanner Ingestion */}
+              <div className="absolute right-1 top-1 bg-white p-0.5 border border-black/40 rounded shadow-xs select-none">
+                <QRCodeSVG value={qrString} size={42} level="M" />
+              </div>
               {!hideInstitute && (
-                <h1 className="font-bold text-[14px] tracking-wider uppercase text-black leading-none font-nikosh">
+                <h1 className="font-bold text-[13.5px] tracking-wider uppercase text-black leading-none font-nikosh">
                   {cleanBengaliText(examInfo.schoolName || 'ROFAZ ACADEMY')}
                 </h1>
               )}
-              <div className="text-[9.5px] font-semibold text-slate-700 mt-0.5 font-nikosh">
+              <div className="text-[9px] font-semibold text-slate-700 mt-0.5 font-nikosh">
                 {cleanBengaliText(examInfo.schoolAddress || 'Medical & Dental Admission Coaching')}
               </div>
-              <div className="flex justify-between items-center text-[10px] font-bold mt-1 px-1 border-t border-slate-300 pt-1 font-nikosh">
+              <div className="flex justify-between items-center text-[9.5px] font-bold mt-1 px-1 border-t border-slate-300 pt-1 font-nikosh">
                 <span>পূর্ণমান: {toBengaliNumerals(totalMarks)}</span>
                 <span>সময়: {duration}</span>
-                <span className="bg-black text-white px-2 py-0.5 rounded text-[9.5px] font-mono tracking-wider">
+                <span className="bg-black text-white px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider">
                   সেট: {cleanSet}
                 </span>
               </div>
-              <div className="text-[10.5px] font-bold mt-0.5 text-slate-900 border-t border-slate-200 pt-0.5 truncate font-nikosh">
+              <div className="text-[10px] font-bold mt-0.5 text-slate-900 border-t border-slate-200 pt-0.5 truncate font-nikosh">
                 {cleanBengaliText(examInfo.title)}
               </div>
             </div>
