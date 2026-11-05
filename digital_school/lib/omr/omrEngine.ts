@@ -264,6 +264,9 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
     }
   }
   
+  const curW = orientedSrc.cols;
+  const curH = orientedSrc.rows;
+  
   if (markersDetected) {
     const tl = quads.find(q => q.name === 'TL')!.bestPt!;
     const tr = quads.find(q => q.name === 'TR')!.bestPt!;
@@ -282,8 +285,6 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
       bl.x, bl.y
     ]);
     
-    const curW = orientedSrc.cols;
-    const curH = orientedSrc.rows;
     // Preserve marker inset if the template coordinates are page-relative
     const avgMarginX = Math.round((tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / 4);
     const avgMarginY = Math.round((tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / 4);
@@ -432,6 +433,42 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
       pageContours.delete();
       pageHierarchy.delete();
     }
+  }
+
+  // Final Upright Verification:
+  // Ensure top 15% is the header banner and candidate info (significantly darker than the bottom footer).
+  // If inverted, automatically rotate 180 degrees.
+  try {
+    let warpedGray = new cv.Mat();
+    try {
+      cv.cvtColor(warped, warpedGray, cv.COLOR_RGBA2GRAY);
+    } catch {
+      warpedGray = warped.clone();
+    }
+    const bandH = Math.round(targetH * 0.15);
+    let topRoi = warpedGray.roi(new cv.Rect(0, 0, targetW, bandH));
+    let botRoi = warpedGray.roi(new cv.Rect(0, targetH - bandH, targetW, bandH));
+    let topThresh = new cv.Mat();
+    let botThresh = new cv.Mat();
+    cv.threshold(topRoi, topThresh, 128, 255, cv.THRESH_BINARY_INV);
+    cv.threshold(botRoi, botThresh, 128, 255, cv.THRESH_BINARY_INV);
+    const topDark = cv.countNonZero(topThresh);
+    const botDark = cv.countNonZero(botThresh);
+    topRoi.delete();
+    botRoi.delete();
+    topThresh.delete();
+    botThresh.delete();
+    warpedGray.delete();
+
+    if (botDark > topDark * 1.35) {
+      let uprightWarped = new cv.Mat();
+      cv.rotate(warped, uprightWarped, cv.ROTATE_180);
+      warped.delete();
+      warped = uprightWarped;
+      skewAngle = (skewAngle + 180) % 360;
+    }
+  } catch {
+    // Preserve warped image if check is skipped
   }
 
   orientedSrc.delete();
