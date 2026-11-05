@@ -37,6 +37,7 @@ import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
 import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
+import { ScannerAudioHaptics } from '@/lib/omr/streamAutoScanner';
 
 export default function StudentOMRScannerPage() {
   const router = useRouter();
@@ -289,6 +290,7 @@ export default function StudentOMRScannerPage() {
 
       (card as any).examId = qrExamId;
 
+      ScannerAudioHaptics.playSuccessChirp();
       setScanResult(scanRes);
       setScoreCard(card);
       setDetectedExamMeta(examBundle?.exam || null);

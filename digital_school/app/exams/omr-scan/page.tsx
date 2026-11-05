@@ -24,7 +24,12 @@ import {
   Clock,
   QrCode,
   Check,
-  ChevronDown
+  ChevronDown,
+  Flashlight,
+  Volume2,
+  Play,
+  Pause,
+  Video
 } from 'lucide-react';
 
 import type {
@@ -41,6 +46,12 @@ import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
 import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
+import { 
+  StreamMotionAnalyzer, 
+  ScannerAudioHaptics, 
+  TorchController, 
+  DuplicateSuppressor 
+} from '@/lib/omr/streamAutoScanner';
 
 interface ExamMetadata {
   id: string;
@@ -95,6 +106,21 @@ export default function UniversalOMRScannerPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
+
+  // Hands-Free Continuous Auto-Scan Stream State
+  const [isAutoScanMode, setIsAutoScanMode] = useState<boolean>(true);
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
+  const [cameraMotionState, setCameraMotionState] = useState<'HAND_MOVING' | 'SETTLING' | 'STATIONARY'>('HAND_MOVING');
+  const [sharpnessScore, setSharpnessScore] = useState<number>(0);
+  const [flashGlow, setFlashGlow] = useState<boolean>(false);
+  const [recentCapturePill, setRecentCapturePill] = useState<{ roll: string; score: number; set: string } | null>(null);
+
+  const motionAnalyzerRef = useRef<StreamMotionAnalyzer>(new StreamMotionAnalyzer(160, 120));
+  const duplicateSuppressorRef = useRef<DuplicateSuppressor>(new DuplicateSuppressor());
+  const lowResCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isCapturingFrameRef = useRef<boolean>(false);
+  const autoScanLoopRef = useRef<number | null>(null);
 
   // Initialize Template
   useEffect(() => {
@@ -433,13 +459,15 @@ export default function UniversalOMRScannerPage() {
         }
       });
       activeStreamRef.current = stream;
+      const torchSupported = await TorchController.isSupported(stream);
+      setIsTorchSupported(torchSupported);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       }
       setIsCameraActive(true);
       setActiveTab('camera');
-      setCameraFeedback('ক্যামেরা প্রস্তুত। ওএমআর শিটের উপর কিউআর কোড এবং পেপার সোজা রাখুন।');
+      setCameraFeedback('ক্যামেরা প্রস্তুত। ওএমআর শিট ফ্রেমের নিচে রাখুন — স্বয়ংক্রিয়ভাবে স্ক্যান হবে!');
     } catch (err: any) {
       console.error('Camera access error:', err);
       alert('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
@@ -453,22 +481,37 @@ export default function UniversalOMRScannerPage() {
       activeStreamRef.current = null;
     }
     setIsCameraActive(false);
+    setIsTorchOn(false);
+    if (autoScanLoopRef.current) {
+      cancelAnimationFrame(autoScanLoopRef.current);
+      autoScanLoopRef.current = null;
+    }
   };
 
-  // Capture Single Frame from Camera
-  const captureFrameAndProcess = async () => {
-    if (!videoRef.current) return;
+  // Toggle Flashlight / Torch
+  const toggleTorch = async () => {
+    if (!activeStreamRef.current) return;
+    const nextState = !isTorchOn;
+    const ok = await TorchController.setTorch(activeStreamRef.current, nextState);
+    if (ok) setIsTorchOn(nextState);
+  };
+
+  // Hands-Free Auto-Capture Trigger Function
+  const triggerAutoCapture = async () => {
+    if (isCapturingFrameRef.current || !videoRef.current) return;
     const v = videoRef.current;
     if (v.videoWidth === 0 || v.videoHeight === 0) return;
 
+    isCapturingFrameRef.current = true;
     const c = document.createElement('canvas');
     c.width = v.videoWidth;
     c.height = v.videoHeight;
     const ctx = c.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      isCapturingFrameRef.current = false;
+      return;
+    }
     ctx.drawImage(v, 0, 0);
-
-    setCameraFeedback('স্ক্যান বিশ্লেষণ চলছে...');
 
     try {
       const qr = scanQRCodeFromCanvas(c);
@@ -500,6 +543,22 @@ export default function UniversalOMRScannerPage() {
         { generateCanvases: false }
       );
 
+      const rollStr = scanRes.concatenatedResponses?.['Roll'] || scanRes.responses['Roll']?.[0] || '';
+      const sheetFingerprint = `${targetExamId}_${qrSet || 'A'}_${rollStr || scanRes.sheetId}`;
+
+      // Prevent duplicate scan of the same sheet resting on the desk
+      if (!duplicateSuppressorRef.current.canCapture(sheetFingerprint)) {
+        isCapturingFrameRef.current = false;
+        return;
+      }
+
+      duplicateSuppressorRef.current.recordCapture(sheetFingerprint);
+
+      // Multi-Sensory Feedback: Audio Chime + Tactile Haptics + Emerald Border Flash
+      ScannerAudioHaptics.playSuccessChirp();
+      setFlashGlow(true);
+      setTimeout(() => setFlashGlow(false), 300);
+
       const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
       setScanResults(prev => ({ ...prev, [scanRes.sheetId]: leanScanRes as any }));
 
@@ -509,13 +568,12 @@ export default function UniversalOMRScannerPage() {
 
       const card = evalEngine.evaluateCandidate(
         scanRes.sheetId,
-        `Camera_${toBengaliNumerals(new Date().toLocaleTimeString())}`,
+        `Sheet_${toBengaliNumerals(new Date().toLocaleTimeString())}`,
         responsesWithSet,
         scanRes.concatenatedResponses,
         scanRes.flags
       );
 
-      const rollStr = card.rollNumber || '';
       const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
       const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
       if (matched) {
@@ -526,12 +584,89 @@ export default function UniversalOMRScannerPage() {
 
       setScoreCards(prev => EvaluationEngine.rankCohort([...prev, card]));
       setSelectedScoreCard(card);
-      setCameraFeedback(`সফলভাবে স্ক্যান হয়েছে! রোল: ${card.rollNumber || 'N/A'}, প্রাপ্ত নম্বর: ${card.totalScore}`);
+
+      setRecentCapturePill({
+        roll: card.rollNumber || 'N/A',
+        score: card.totalScore,
+        set: card.examSet || detectedSet || 'A'
+      });
+      setCameraFeedback(`✅ শিট #${toBengaliNumerals(scoreCards.length + 1)} স্ক্যান হয়েছে! রোল: ${card.rollNumber || 'N/A'} • সেট: ${card.examSet || 'A'} • নম্বর: ${card.totalScore}`);
     } catch (err: any) {
-      console.error('Camera capture processing error:', err);
-      setCameraFeedback('স্ক্যান সনাক্ত করা যায়নি। অনুগ্রহ করে আলো বাড়িয়ে সোজাভাবে ধরুন।');
+      console.error('Camera auto-capture error:', err);
+    } finally {
+      c.width = 0;
+      c.height = 0;
+      // Allow 450ms cooldown before next frame capture to give user time to slide sheet
+      setTimeout(() => {
+        isCapturingFrameRef.current = false;
+      }, 450);
     }
   };
+
+  // Manual Trigger Fallback
+  const captureFrameAndProcess = async () => {
+    await triggerAutoCapture();
+  };
+
+  // Continuous Auto-Scan Analysis Loop (20-25 FPS lightweight motion & focus tracking)
+  useEffect(() => {
+    if (!isCameraActive || activeTab !== 'camera') {
+      if (autoScanLoopRef.current) {
+        cancelAnimationFrame(autoScanLoopRef.current);
+        autoScanLoopRef.current = null;
+      }
+      return;
+    }
+
+    if (!lowResCanvasRef.current) {
+      const c = document.createElement('canvas');
+      c.width = 160;
+      c.height = 120;
+      lowResCanvasRef.current = c;
+    }
+
+    const lowCanvas = lowResCanvasRef.current;
+    const lowCtx = lowCanvas.getContext('2d', { willReadFrequently: true });
+    let lastAnalysisTime = 0;
+
+    const frameTick = (time: number) => {
+      if (!isCameraActive || !videoRef.current) return;
+      const v = videoRef.current;
+
+      // Analyze at ~20 FPS (every 45ms)
+      if (time - lastAnalysisTime >= 45 && v.videoWidth > 0 && v.videoHeight > 0 && lowCtx) {
+        lastAnalysisTime = time;
+        lowCtx.drawImage(v, 0, 0, 160, 120);
+        const analysis = motionAnalyzerRef.current.analyzeFrame(lowCanvas);
+
+        setCameraMotionState(analysis.motionState);
+        setSharpnessScore(analysis.sharpnessScore);
+
+        if (analysis.motionDelta > 16.0) {
+          duplicateSuppressorRef.current.onMotionSpikeDetected();
+        }
+
+        if (
+          isAutoScanMode &&
+          analysis.isAutoCaptureReady &&
+          !isCapturingFrameRef.current
+        ) {
+          triggerAutoCapture();
+        }
+      }
+
+      autoScanLoopRef.current = requestAnimationFrame(frameTick);
+    };
+
+    autoScanLoopRef.current = requestAnimationFrame(frameTick);
+
+    return () => {
+      if (autoScanLoopRef.current) {
+        cancelAnimationFrame(autoScanLoopRef.current);
+        autoScanLoopRef.current = null;
+      }
+    };
+  }, [isCameraActive, activeTab, isAutoScanMode, selectedExamId, activeTemplate, parsedBubbles]);
 
   // Sync / Batch Submit to PostgreSQL DB
   const syncCohortToDatabase = async () => {
@@ -856,47 +991,188 @@ export default function UniversalOMRScannerPage() {
           </div>
         )}
 
-        {/* Tab 2: Live Camera Scanner */}
+        {/* Tab 2: Live Camera Scanner - Hands-Free Bulk Stream Engine */}
         {activeTab === 'camera' && (
           <div className="space-y-4">
-            <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 flex flex-col items-center justify-center min-h-[420px]">
+            <div className={`relative rounded-2xl overflow-hidden bg-black border transition-all duration-300 flex flex-col items-center justify-center min-h-[480px] ${
+              flashGlow 
+                ? 'ring-8 ring-emerald-400 shadow-[0_0_60px_rgba(52,211,153,0.85)] border-emerald-400 scale-[1.005]' 
+                : 'border-slate-800'
+            }`}>
               <video
                 ref={videoRef}
                 playsInline
                 muted
-                className="w-full max-h-[540px] object-contain"
+                className="w-full max-h-[560px] object-contain"
               />
 
-              {/* Scanning Crosshair Overlay */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-72 h-96 border-2 border-indigo-400/60 rounded-xl relative">
-                  <div className="absolute top-2 left-2 text-[10px] text-indigo-300 font-mono bg-slate-950/80 px-2 py-0.5 rounded">
-                    ALIGN OMR SHEET
-                  </div>
-                  <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-500/40 animate-pulse" />
-                </div>
-              </div>
-
-              {/* Camera Controls Bar */}
-              <div className="absolute bottom-4 inset-x-4 flex items-center justify-between bg-slate-950/80 backdrop-blur border border-slate-800/80 p-3 rounded-xl">
-                <div className="text-xs text-slate-300 truncate max-w-[60%]">
-                  {cameraFeedback || 'ক্যামেরা চালু আছে'}
-                </div>
+              {/* Top HUD: Real-time Radar & Hardware Controls */}
+              <div className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-auto">
                 <div className="flex items-center gap-2">
+                  {/* Auto-Scan Stream Toggle */}
                   <button
-                    onClick={captureFrameAndProcess}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                    onClick={() => setIsAutoScanMode(!isAutoScanMode)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur shadow-lg transition cursor-pointer ${
+                      isAutoScanMode 
+                        ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shadow-emerald-500/20' 
+                        : 'bg-slate-900/80 border border-slate-700 text-slate-400'
+                    }`}
                   >
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>স্ক্যান করুন</span>
+                    <Zap className={`w-3.5 h-3.5 ${isAutoScanMode ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+                    <span>{isAutoScanMode ? 'অটো-স্ট্রিম: চালু' : 'ম্যানুয়াল মোড'}</span>
                   </button>
+
+                  {/* Motion State Radar */}
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono backdrop-blur border ${
+                    cameraMotionState === 'STATIONARY' 
+                      ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300' 
+                      : cameraMotionState === 'SETTLING'
+                      ? 'bg-sky-500/20 border-sky-400/40 text-sky-300'
+                      : 'bg-amber-500/20 border-amber-400/40 text-amber-300'
+                  }`}>
+                    <span className="w-2 h-2 rounded-full animate-ping" style={{
+                      backgroundColor: cameraMotionState === 'STATIONARY' ? '#34d399' : (cameraMotionState === 'SETTLING' ? '#38bdf8' : '#fbbf24')
+                    }} />
+                    <span>
+                      {cameraMotionState === 'STATIONARY' ? '🎯 স্থির (লকড)' : (cameraMotionState === 'SETTLING' ? '⏳ স্থির হচ্ছে...' : '🖐️ হাত নড়ছে')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Sharpness Meter */}
+                  <div className="hidden sm:flex items-center gap-2 bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                    <span className="text-[11px] text-slate-400">শার্পনেস:</span>
+                    <div className="w-16 h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-150 ${sharpnessScore > 65 ? 'bg-emerald-400' : (sharpnessScore > 35 ? 'bg-amber-400' : 'bg-rose-400')}`}
+                        style={{ width: `${Math.min(100, sharpnessScore)}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-[11px] text-white">{sharpnessScore}%</span>
+                  </div>
+
+                  {/* Flashlight / Torch Toggle */}
+                  {isTorchSupported && (
+                    <button
+                      onClick={toggleTorch}
+                      className={`p-2 rounded-xl backdrop-blur border transition cursor-pointer ${
+                        isTorchOn 
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-lg shadow-amber-500/20' 
+                          : 'bg-slate-900/80 border-slate-700 text-slate-300 hover:text-white'
+                      }`}
+                      title="ফ্ল্যাশলাইট চালু/বন্ধ করুন"
+                    >
+                      <Flashlight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Stop Camera Button */}
                   <button
                     onClick={stopCamera}
-                    className="px-3 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition"
+                    className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold backdrop-blur transition cursor-pointer"
                   >
                     বন্ধ
                   </button>
                 </div>
+              </div>
+
+              {/* Scanning Crosshair Overlay with Corner Targeting Brackets */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4">
+                <div className={`w-full max-w-xs sm:max-w-sm h-72 sm:h-96 border-2 rounded-2xl relative transition-all duration-200 ${
+                  cameraMotionState === 'STATIONARY' 
+                    ? 'border-emerald-400/80 shadow-[0_0_30px_rgba(52,211,153,0.3)]' 
+                    : (cameraMotionState === 'SETTLING' ? 'border-sky-400/60' : 'border-indigo-400/40')
+                }`}>
+                  {/* Corner Targeting Marks */}
+                  <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl" />
+                  <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr" />
+                  <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl" />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br" />
+
+                  <div className="absolute top-2 left-2 text-[10px] text-emerald-300 font-mono bg-slate-950/85 px-2.5 py-1 rounded-md border border-emerald-500/30 flex items-center gap-1.5">
+                    <QrCode className="w-3 h-3 text-emerald-400" />
+                    <span>OMR ALIGNMENT FRAME</span>
+                  </div>
+
+                  <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent animate-pulse" />
+                </div>
+              </div>
+
+              {/* Floating Instant Score Pill Toast */}
+              {recentCapturePill && (
+                <div className="absolute top-16 inset-x-4 flex justify-center pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300">
+                  <div className="bg-emerald-950/90 border border-emerald-400/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-300 font-bold text-xs">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-2">
+                        <span>রোল: {recentCapturePill.roll}</span>
+                        <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[10px]">
+                          সেট {recentCapturePill.set}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-emerald-300 font-medium">
+                        প্রাপ্ত নম্বর: {toBengaliNumerals(recentCapturePill.score)} • ব্যাচে যুক্ত হয়েছে
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Mobile Command Deck */}
+              <div className="absolute bottom-3 inset-x-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/90 p-3 rounded-2xl shadow-2xl space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="text-slate-300 truncate max-w-[55%] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{cameraFeedback || 'ক্যামেরা চালু আছে'}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-mono font-bold">
+                      মোট: {toBengaliNumerals(scoreCards.length)} টি
+                    </span>
+                    <button
+                      onClick={captureFrameAndProcess}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>ম্যানুয়াল স্ক্যান</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scanned Roster Strip (Horizontal Scroller) */}
+                {scoreCards.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                    <div className="text-[11px] text-slate-400 shrink-0 font-medium">
+                      সর্বশেষ:
+                    </div>
+                    {scoreCards.slice(-6).reverse().map((c, i) => (
+                      <div 
+                        key={c.sheetId || i}
+                        className="shrink-0 flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/70 px-2.5 py-1 rounded-lg text-xs"
+                      >
+                        <span className="font-mono font-bold text-white text-[11px]">
+                          {c.rollNumber || 'N/A'}
+                        </span>
+                        <span className="text-emerald-400 font-bold text-[11px]">
+                          ({toBengaliNumerals(c.totalScore)})
+                        </span>
+                      </div>
+                    ))}
+
+                    <button
+                      onClick={syncCohortToDatabase}
+                      disabled={isSyncing}
+                      className="ml-auto shrink-0 inline-flex items-center gap-1 px-3 py-1 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition shadow cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'ডাটাবেসে সেভ'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
