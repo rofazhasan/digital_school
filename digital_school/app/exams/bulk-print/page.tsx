@@ -27,7 +27,7 @@ import {
   toBengaliNumerals,
   OMRPage,
   BookletGuideModal
-} from '../[id]/print/page';
+} from '../[id]/print/bookletUtils';
 import '../[id]/print/print.css';
 
 // --- Types ---
@@ -658,7 +658,7 @@ function BulkPrintContent() {
           examPages += N;
           examSheets += sheets.length;
 
-          sheets.forEach((sh, shIdx) => {
+          sheets.forEach((sh: any, shIdx: number) => {
             sheetNavigationItems.push({
               sheetIndex: currentSheetCounter++,
               examTitle: effectiveInfo?.title || 'Exam',
@@ -1350,10 +1350,10 @@ function BulkPrintContent() {
                               {item.class && (
                                 <span className="bg-slate-800 px-1 rounded text-slate-300">{item.class}</span>
                               )}
-                              {item.totalMarks > 0 && (
+                              {Boolean(item.totalMarks && item.totalMarks > 0) && (
                                 <span>{item.totalMarks} Marks</span>
                               )}
-                              {item.duration > 0 && (
+                              {Boolean(item.duration && item.duration > 0) && (
                                 <span>{item.duration} Mins</span>
                               )}
                               {breakdown && (
@@ -1946,7 +1946,7 @@ function BulkPrintContent() {
 
                                 return (
                                   <React.Fragment key={`std-paginated-${examData.id}-${set.setId}`}>
-                                    {pages.map((p, pIdx) => {
+                                    {pages.map((p: any, pIdx: number) => {
                                       const pageNum = pIdx + 1;
                                       const isPage1 = pageNum === 1;
                                       const isFinalPage = pageNum === totalPages;
@@ -2191,7 +2191,7 @@ function BulkPrintContent() {
 
                               return (
                                 <React.Fragment key={`booklet-${examData.id}-${set.setId}`}>
-                                  {sheets.map(sheet => (
+                                  {sheets.map((sheet: any) => (
                                     <React.Fragment key={`sheet-${examData.id}-${sheet.sheetNumber}`}>
                                       {/* FRONT SPREAD */}
                                       <div id={`sheet-${examData.id}-${sheet.sheetNumber}`} className={`print-page-container booklet-sheet ${paperClass}`} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>

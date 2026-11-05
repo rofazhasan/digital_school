@@ -7,6 +7,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { v4 as uuidv4 } from 'uuid';
 import { mathJaxConfig as globalMathJaxConfig } from '@/app/components/MathJaxConfig';
 import Head from 'next/head';
+import { Sparkles } from 'lucide-react';
 
 // --- Component Imports ---
 import QuestionPaper from '../../../components/QuestionPaper';
@@ -24,14 +25,14 @@ const LANGS = {
 };
 
 // Helper to convert Arabic digits (0-9) to Bengali digits (০-৯)
-export const toBengaliNumerals = (input: string | number | undefined | null): string => {
+const toBengaliNumerals = (input: string | number | undefined | null): string => {
   if (input === undefined || input === null) return '';
   const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
   return String(input).replace(/[0-9]/g, (w) => bengaliDigits[+w]);
 };
 
 // Calculate clean visual character length, normalizing LaTeX / KaTeX math expressions
-export const getCleanVisualLength = (text: any): number => {
+const getCleanVisualLength = (text: any): number => {
   if (!text || typeof text !== 'string') return 0;
   let clean = text
     .replace(/\$\$[\s\S]*?\$\$/g, (m) => m.slice(2, -2).replace(/\\[a-zA-Z]+/g, 'X').slice(0, 15))
@@ -68,7 +69,7 @@ export const getCleanVisualLength = (text: any): number => {
 };
 
 // --- Booklet Imposition Sheet Representation ---
-export interface BookletSheet {
+interface BookletSheet {
   sheetNumber: number;
   front: {
     leftPageNum: number;
@@ -87,7 +88,7 @@ export interface BookletSheet {
  * left += 2, right -= 2
  * Perfect for 4-page, 8-page, 12-page, 16-page, 20-page, etc.
  */
-export function computeBookletSheets(totalLogicalPages: number): { sheets: BookletSheet[]; N: number } {
+function computeBookletSheets(totalLogicalPages: number): { sheets: BookletSheet[]; N: number } {
   const N = Math.max(4, Math.ceil(totalLogicalPages / 4) * 4);
   const numSheets = N / 4;
   const sheets: BookletSheet[] = [];
@@ -118,7 +119,7 @@ export function computeBookletSheets(totalLogicalPages: number): { sheets: Bookl
  * font scaling, paper size (A3, A4, Legal), and optional user target choice.
  * For booklet mode, guarantees a multiple of 4 pages (4, 8, 12, 16...).
  */
-export function getOptimalPageCount(
+function getOptimalPageCount(
   set: any,
   examInfo: any,
   layoutMode: string,
@@ -192,7 +193,7 @@ export function getOptimalPageCount(
 }
 
 // --- Helper: Split an Exam Set into Logical Pages for Booklet Printing (4-page, 8-page, N-page) ---
-export function splitExamSetForBooklet(
+function splitExamSetForBooklet(
   set: any,
   examInfo?: any,
   targetPages: number = 4,
@@ -685,6 +686,9 @@ export default function PrintExamPage() {
 
   // Paper Size & Booklet Options State
   const [printFormat, setPrintFormat] = useState<'normal' | 'a3_master'>('normal');
+  const [a3DuplexMode, setA3DuplexMode] = useState<'short_edge' | 'long_edge'>('short_edge');
+  const [showWatermark, setShowWatermark] = useState(false);
+  const [customWatermarkText, setCustomWatermarkText] = useState('');
   const [paperSize, setPaperSize] = useState<'legal' | 'a4' | 'a3' | 'letter'>('a4');
   const [layoutMode, setLayoutMode] = useState<'standard' | 'booklet_4page' | 'booklet_6page' | 'booklet_2up'>('standard');
   const [bookletPagesChoice, setBookletPagesChoice] = useState<'auto' | 4 | 8 | 12 | 16>('auto');
@@ -709,6 +713,14 @@ export default function PrintExamPage() {
         setPrintFormat(savedFormat as any);
         if (savedFormat === 'a3_master') setPaperSize('a3');
       }
+      const savedA3Duplex = localStorage.getItem('print_a3_duplex_mode');
+      if (savedA3Duplex === 'short_edge' || savedA3Duplex === 'long_edge') {
+        setA3DuplexMode(savedA3Duplex as any);
+      }
+      const savedWatermark = localStorage.getItem('print_show_watermark');
+      if (savedWatermark !== null) setShowWatermark(savedWatermark === 'true');
+      const savedWatermarkText = localStorage.getItem('print_custom_watermark_text');
+      if (savedWatermarkText) setCustomWatermarkText(savedWatermarkText);
       const savedPaper = localStorage.getItem('print_paper_size');
       if (savedPaper) setPaperSize(savedPaper as any);
       const savedLayout = localStorage.getItem('print_layout_mode');
@@ -1011,6 +1023,12 @@ export default function PrintExamPage() {
           handleResetInstitute={handleResetInstitute}
           printFormat={printFormat}
           setPrintFormat={handlePrintFormatChange}
+          a3DuplexMode={a3DuplexMode}
+          setA3DuplexMode={setA3DuplexMode}
+          showWatermark={showWatermark}
+          setShowWatermark={setShowWatermark}
+          customWatermarkText={customWatermarkText}
+          setCustomWatermarkText={setCustomWatermarkText}
           paperSize={paperSize}
           setPaperSize={handlePaperSizeChange}
           layoutMode={layoutMode}
@@ -1106,6 +1124,9 @@ export default function PrintExamPage() {
                   questions={set.orderedObjective || []}
                   fontSize={objectiveFontSize}
                   hideInstitute={hideInstitute}
+                  duplexFlip={a3DuplexMode}
+                  showWatermark={showWatermark}
+                  watermarkText={customWatermarkText}
                 />
               ))}
             </div>
@@ -1266,7 +1287,7 @@ export default function PrintExamPage() {
               Back:  left + 1 | right - 1
               left += 2, right -= 2
              ============================================================== */}
-          {(layoutMode === 'booklet' || layoutMode === 'booklet_4page' || layoutMode === 'booklet_6page') && (
+          {((layoutMode as string) === 'booklet' || layoutMode === 'booklet_4page' || layoutMode === 'booklet_6page') && (
             <>
               {nonEmptySets.map((set: any) => {
                 const targetPages = getOptimalPageCount(
@@ -1722,7 +1743,7 @@ export default function PrintExamPage() {
 }
 
 // --- Sub-Component: OMR Page ---
-export const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
+const OMRPage = ({ set, examInfo, language, hideInstitute, paperClass = 'a4-paper' }: { set: any, examInfo: any, language: 'bn' | 'en', hideInstitute?: boolean, paperClass?: string }) => {
   const [uniqueCode] = useState(() => uuidv4());
 
   const mcqOptionsCount = useMemo(() => {
@@ -1767,6 +1788,9 @@ const PrintControls = ({
   tempSchoolName, setTempSchoolName, tempSchoolAddress, setTempSchoolAddress,
   handleSaveInstitute, handleResetInstitute,
   printFormat, setPrintFormat,
+  a3DuplexMode, setA3DuplexMode,
+  showWatermark, setShowWatermark,
+  customWatermarkText, setCustomWatermarkText,
   paperSize, setPaperSize, layoutMode, setLayoutMode,
   bookletPagesChoice, setBookletPagesChoice,
   showFoldGuide, toggleFoldGuide, openBookletGuide,
@@ -1828,9 +1852,88 @@ const PrintControls = ({
             </button>
           </div>
           {printFormat === 'a3_master' && (
-            <p className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 border border-emerald-200 p-1.5 rounded-lg leading-tight">
-              🩺 মেডিকেল ও বিশ্ববিদ্যালয় ভর্তি পরীক্ষার A3 ল্যান্ডস্কেপ ফরম্যাট সক্রিয়। বাঁয়ে ডিট্যাচেবল OMR এবং পিঠে ১২টি আচরণবিধি বক্স সহ সাজানো।
-            </p>
+            <div className="space-y-2 mt-2">
+              <div className="p-2 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-900 mb-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>A3 মাস্টার ডুপ্লেক্স প্রিন্টিং গাইড:</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-emerald-900">
+                  উভয় পৃষ্ঠায় প্রিন্ট হলে কাটার পর <strong>সামনে প্রশ্ন ১-৫০ ও পিঠে প্রশ্ন ৫১-১০০</strong> থাকবে, এবং <strong>OMR-এর পিঠে ১২টি আচরণবিধি</strong> থাকবে। কোনো প্রশ্ন বাদ যাবে না!
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                  {language === 'en' ? 'Duplex Alignment:' : 'ডুপ্লেক্স বাইন্ডিং ওরিয়েন্টেশন:'}
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 bg-gray-100 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setA3DuplexMode('short_edge');
+                      localStorage.setItem('print_a3_duplex_mode', 'short_edge');
+                    }}
+                    className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${
+                      a3DuplexMode === 'short_edge'
+                        ? 'bg-emerald-700 text-white shadow-sm ring-1 ring-emerald-500'
+                        : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title="Recommended for standard A3 landscape printers (Flip on short edge)"
+                  >
+                    {language === 'en' ? 'Short-Edge (Booklet 🌟)' : 'শর্ট-এজ ফ্লিপ (বুকলেট 🌟)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setA3DuplexMode('long_edge');
+                      localStorage.setItem('print_a3_duplex_mode', 'long_edge');
+                    }}
+                    className={`py-1.5 px-1 rounded font-bold text-[10px] transition text-center leading-tight ${
+                      a3DuplexMode === 'long_edge'
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title="For vertical flip printers (Flip on long edge)"
+                  >
+                    {language === 'en' ? 'Long-Edge Flip' : 'লং-এজ ফ্লিপ'}
+                  </button>
+                </div>
+                <span className="text-[9.5px] text-gray-500 mt-0.5 block leading-tight">
+                  {a3DuplexMode === 'short_edge'
+                    ? '✓ প্রিন্ট ডায়ালগে Two-Sided: "Flip on short edge" সিলেক্ট করুন।'
+                    : 'লং-এজ প্রিন্টারে উল্লম্বভাবে পৃষ্ঠা উল্টানোর জন্য উপযুক্ত।'}
+                </span>
+              </div>
+
+              {/* Watermark Toggle */}
+              <div className="pt-1 border-t border-gray-200">
+                <label className="flex items-center gap-1.5 cursor-pointer text-gray-700 text-[11px] font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={showWatermark}
+                    onChange={(e) => {
+                      setShowWatermark(e.target.checked);
+                      localStorage.setItem('print_show_watermark', String(e.target.checked));
+                    }}
+                    className="rounded text-emerald-600 focus:ring-0"
+                  />
+                  <span>সিকিউরিটি জলছাপ (Watermark) সক্রিয় করুন</span>
+                </label>
+                {showWatermark && (
+                  <input
+                    type="text"
+                    value={customWatermarkText}
+                    onChange={(e) => {
+                      setCustomWatermarkText(e.target.value);
+                      localStorage.setItem('print_custom_watermark_text', e.target.value);
+                    }}
+                    placeholder="e.g. ROFAZ ACADEMY / CONFIDENTIAL"
+                    className="w-full mt-1 px-2 py-1 text-[10px] border border-gray-300 rounded bg-white text-gray-900"
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -2232,7 +2335,7 @@ const PrintControls = ({
 };
 
 // --- Sub-Component: Comprehensive Booklet & Paper Size Advisory Modal ---
-export const BookletGuideModal = ({
+const BookletGuideModal = ({
   language, paperSize, setPaperSize, layoutMode, setLayoutMode, activeTab, setActiveTab, onClose
 }: any) => {
   const isEn = language === 'en';
