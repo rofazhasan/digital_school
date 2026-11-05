@@ -736,7 +736,7 @@ export async function processOMR(
         const texture = extractPatchTexture(grayData, curW, curH, innerX, innerY, innerW, innerH, 168);
 
         // (D) Phase 2 Micro-Neural Network Inference on 16x16 Resampled Patch
-        const patch16 = extractNormalized16x16Patch(grayData, curW, curH, innerX, innerY, innerW, innerH);
+        const patch16 = extractNormalized16x16Patch(grayData, curW, curH, refined.cx, refined.cy, bw, bh);
         const neuralPred = predictBubbleNeural(patch16);
 
         bubbleValues.push({

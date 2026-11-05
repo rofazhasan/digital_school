@@ -287,14 +287,21 @@ export function extractPatchTexture(
   let darkCount = 0;
   let total = 0;
 
+  const midX = rx + maxW / 2;
+  const midY = ry + maxH / 2;
+  const radius = Math.min(maxW, maxH) / 2;
+
   for (let y = ry; y < ry + maxH; y++) {
     const rowOffset = y * imageWidth;
     for (let x = rx; x < rx + maxW; x++) {
-      const val = grayData[rowOffset + x];
-      sum += val;
-      sumSq += val * val;
-      if (val < thresholdCutoff) darkCount++;
-      total++;
+      // Circular disc mask (ignores outer square corner artifacts)
+      if (Math.hypot(x - midX, y - midY) <= radius) {
+        const val = grayData[rowOffset + x];
+        sum += val;
+        sumSq += val * val;
+        if (val < thresholdCutoff) darkCount++;
+        total++;
+      }
     }
   }
 
