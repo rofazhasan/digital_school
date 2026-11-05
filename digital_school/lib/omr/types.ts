@@ -49,6 +49,10 @@ export interface BubbleDetectionResult extends BubblePoint {
   isMarked: boolean;
   rect: { x: number; y: number; width: number; height: number };
   fillRatio?: number;
+  patchStdDev?: number;
+  posteriorFilled?: number;
+  posteriorErased?: number;
+  isErasureAnomaly?: boolean;
 }
 
 export interface StateMachineAuditReport {
