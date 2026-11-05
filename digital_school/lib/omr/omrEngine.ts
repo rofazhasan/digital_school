@@ -15,6 +15,10 @@ import {
   computeGMMPosterior, 
   extractPatchTexture 
 } from './mathematicalModels';
+import { 
+  extractNormalized16x16Patch, 
+  predictBubbleNeural 
+} from './neuralBubbleClassifier';
 
 export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResult {
   if (!canvas || canvas.width === 0 || canvas.height === 0) {
@@ -731,6 +735,10 @@ export async function processOMR(
         // (C) Extract spatial texture metrics (mean, stdDev, fillRatio, homogeneity)
         const texture = extractPatchTexture(grayData, curW, curH, innerX, innerY, innerW, innerH, 168);
 
+        // (D) Phase 2 Micro-Neural Network Inference on 16x16 Resampled Patch
+        const patch16 = extractNormalized16x16Patch(grayData, curW, curH, innerX, innerY, innerW, innerH);
+        const neuralPred = predictBubbleNeural(patch16);
+
         bubbleValues.push({
           ...b,
           meanVal: texture.mean,
@@ -739,6 +747,7 @@ export async function processOMR(
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           fillRatio: texture.fillRatio,
           patchStdDev: texture.stdDev,
+          neuralPrediction: neuralPred,
         });
       }
     }
@@ -829,12 +838,14 @@ export async function processOMR(
 
       if (isIdColumn) {
         // -------------------------------------------------------------
-        // (A) COLUMN-CONSTRAINED SOFTMAX MAXIMUM A POSTERIORI (MAP) + GMM
+        // (A) COLUMN-CONSTRAINED SOFTMAX MAXIMUM A POSTERIORI (MAP) + GMM + NEURAL
         // -------------------------------------------------------------
-        // A bubble is marked if either:
-        // 1. High Bayesian posterior probability of being filled (P(Filled | x) >= 0.60) with contrast gap >= 18
-        // 2. Strong contrast drop (gapToMedian >= 30 or (mean < 165 and gapToMedian >= 20))
+        // A bubble is marked if verified by:
+        // 1. High Neural confidence (neuralPrediction.pFilled >= 0.52 and not ERASED)
+        // 2. High Bayesian posterior probability of being filled (P(Filled | x) >= 0.60) with contrast gap >= 18
+        // 3. Strong contrast drop (gapToMedian >= 30 or (mean < 165 and gapToMedian >= 20))
         const isDigitMarked = 
+          (minB.neuralPrediction && minB.neuralPrediction.pFilled >= 0.52 && gapToMedian >= 16 && minB.neuralPrediction.predictedClass !== 'ERASED') ||
           (minB.posteriorFilled !== undefined && minB.posteriorFilled >= 0.60 && gapToMedian >= 18) ||
           (gapToMedian >= 30) ||
           (minB.meanVal < 165 && gapToMedian >= 20) ||
@@ -842,13 +853,14 @@ export async function processOMR(
 
         if (isDigitMarked) {
           minB.isMarked = true;
-          const confidenceScore = Math.min(0.999, Math.max(0.75, (gapToMedian / 40) * 0.6 + (minB.fillRatio || 0.4) * 0.4));
+          const confidenceScore = Math.min(0.999, Math.max(0.75, (gapToMedian / 40) * 0.5 + (minB.fillRatio || 0.4) * 0.25 + ((minB.neuralPrediction?.pFilled || 0.5) * 0.25)));
           minB.confidence = parseFloat(confidenceScore.toFixed(3));
           responses[lbl] = [minB.value];
 
-          // Collision vs. Erasure discrimination using GMM Posteriors and Patch Texture:
+          // Collision vs. Erasure discrimination using Neural Network, GMM Posteriors, and Patch Texture:
           const secondGapToMedian = medianVal - secondB.meanVal;
           const secondIsErased = 
+            (secondB.neuralPrediction && (secondB.neuralPrediction.predictedClass === 'ERASED' || secondB.neuralPrediction.pErased > 0.48)) ||
             (secondB.posteriorErased !== undefined && secondB.posteriorErased > 0.45) ||
             (secondB.patchStdDev !== undefined && secondB.patchStdDev > 22 && secondB.meanVal > minB.meanVal + 15);
 
@@ -868,13 +880,14 @@ export async function processOMR(
       }
 
       // -------------------------------------------------------------
-      // (B) SCALE-INVARIANT ROBUST ORDER STATISTICS (Z-SCORE + MAD + GMM)
+      // (B) SCALE-INVARIANT ROBUST ORDER STATISTICS (Z-SCORE + MAD + GMM + NEURAL)
       // -------------------------------------------------------------
       const absDevs = group.map(b => Math.abs(b.meanVal - medianVal)).sort((a, b) => a - b);
       const mad = absDevs[Math.floor(absDevs.length / 2)];
       const zContrast = gapToMedian / (1.4826 * mad + 1.0);
 
       const isOptionMarked = 
+        (minB.neuralPrediction && minB.neuralPrediction.pFilled >= 0.52 && gapToMedian >= 16 && minB.neuralPrediction.predictedClass !== 'ERASED') ||
         (minB.posteriorFilled !== undefined && minB.posteriorFilled >= 0.60 && gapToMedian >= 18) ||
         (gapToMedian >= 35) ||
         (minB.meanVal < 165 && gapToMedian >= 22) ||
@@ -883,16 +896,17 @@ export async function processOMR(
 
       if (isOptionMarked) {
         minB.isMarked = true;
-        const confidenceScore = Math.min(0.999, Math.max(0.70, (gapToMedian / 45) * 0.65 + (minB.fillRatio || 0.4) * 0.35));
+        const confidenceScore = Math.min(0.999, Math.max(0.70, (gapToMedian / 45) * 0.50 + (minB.fillRatio || 0.4) * 0.25 + ((minB.neuralPrediction?.pFilled || 0.5) * 0.25)));
         minB.confidence = parseFloat(confidenceScore.toFixed(3));
         responses[lbl] = [minB.value];
 
-        // Multi-mark discrimination for MCQs with erasure filtering
+        // Multi-mark discrimination for MCQs with neural erasure filtering
         for (let i = 1; i < group.length; i++) {
           const sibling = group[i];
           const diffToMin = sibling.meanVal - minB.meanVal;
           const siblingGapToMedian = medianVal - sibling.meanVal;
           const siblingIsErased = 
+            (sibling.neuralPrediction && (sibling.neuralPrediction.predictedClass === 'ERASED' || sibling.neuralPrediction.pErased > 0.48)) ||
             (sibling.posteriorErased !== undefined && sibling.posteriorErased > 0.45) ||
             (sibling.patchStdDev !== undefined && sibling.patchStdDev > 22 && sibling.meanVal > minB.meanVal + 15);
 

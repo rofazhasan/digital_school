@@ -43,6 +43,14 @@ export interface BubblePoint {
   section?: string;
 }
 
+export interface NeuralClassification {
+  pEmpty: number;
+  pErased: number;
+  pFilled: number;
+  predictedClass: 'EMPTY' | 'ERASED' | 'FILLED';
+  embeddingEnergy: number;
+}
+
 export interface BubbleDetectionResult extends BubblePoint {
   meanVal: number;
   confidence: number;
@@ -53,6 +61,7 @@ export interface BubbleDetectionResult extends BubblePoint {
   posteriorFilled?: number;
   posteriorErased?: number;
   isErasureAnomaly?: boolean;
+  neuralPrediction?: NeuralClassification;
 }
 
 export interface StateMachineAuditReport {

@@ -316,3 +316,4 @@ export function extractPatchTexture(
     homogeneity
   };
 }
+
