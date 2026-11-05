@@ -107,6 +107,37 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
     }
   } catch (e) {}
 
+  // Pass 4: Top-right quadrant with high-contrast Otsu normalization (where OMR QR codes reside)
+  try {
+    if (typeof document !== 'undefined') {
+      const qW = Math.round(canvas.width * 0.45);
+      const qH = Math.round(canvas.height * 0.35);
+      const qCanvas = document.createElement('canvas');
+      qCanvas.width = qW;
+      qCanvas.height = qH;
+      const qCtx = qCanvas.getContext('2d');
+      if (qCtx) {
+        qCtx.drawImage(canvas, canvas.width - qW, 0, qW, qH, 0, 0, qW, qH);
+        res = tryScan(qCanvas, 0);
+        if (res && res.found) return res;
+
+        // Apply high-contrast binarization
+        const imgData = qCtx.getImageData(0, 0, qW, qH);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          const val = lum < 128 ? 0 : 255;
+          data[i] = val;
+          data[i + 1] = val;
+          data[i + 2] = val;
+        }
+        qCtx.putImageData(imgData, 0, 0);
+        res = tryScan(qCanvas, 0);
+        if (res && res.found) return res;
+      }
+    }
+  } catch (e) {}
+
   return { found: false, rawText: null };
 }
 

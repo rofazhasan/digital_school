@@ -53,7 +53,9 @@ import {
   Layers,
   ChevronRight,
   Filter,
-  Monitor
+  Monitor,
+  QrCode,
+  ScanLine
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
@@ -630,6 +632,7 @@ export default function StudentDashboardPage() {
                 {[
                   { id: 'dashboard', label: 'Overview', icon: Home, action: () => setActiveTab('dashboard') },
                   { id: 'student-corner', label: 'Student Corner', icon: Compass, href: '/student/student-corner', isFeatured: true, badgeText: 'OS' },
+                  { id: 'omr-scan', label: 'OMR Scanner', icon: QrCode, href: '/student/omr-scan', isFeatured: true, badgeText: 'SCAN' },
                   { id: 'exams', label: 'My Exams', icon: FileText, action: () => setActiveTab('exams') },
                   { id: 'analytics', label: 'Analytics', icon: TrendingUp, action: () => setActiveTab('analytics') },
                   { id: 'focus', label: 'Focus Mode', icon: Target, action: () => setIsFocusModeOpen(true) },
@@ -676,6 +679,16 @@ export default function StudentDashboardPage() {
 
             {/* Right Action Icons */}
             <div className="flex items-center gap-2.5 sm:gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/student/omr-scan')}
+                className="flex items-center gap-2 rounded-full border-indigo-500/40 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors shadow-xs"
+              >
+                <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                <span>OMR স্ক্যান</span>
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"

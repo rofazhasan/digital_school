@@ -11,8 +11,10 @@ import {
   Bookmark,
   LayoutGrid,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  QrCode
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Template } from '@/lib/omr/types';
 import { toBengaliNumerals as toBanglaNumber } from '@/utils/numeralConverter';
 import './omr.css';
@@ -20,6 +22,9 @@ import './omr.css';
 interface BangladeshOMRGeneratorProps {
   onApplyGeneratedTemplate?: (template: Template) => void;
   onNavigateToScanner?: () => void;
+  examId?: string;
+  setId?: string;
+  setName?: string;
 }
 
 export type PresetType = 
@@ -36,7 +41,10 @@ export type SheetLayoutMode = 'split' | 'stacked';
 
 export function BangladeshOMRGenerator({ 
   onApplyGeneratedTemplate, 
-  onNavigateToScanner 
+  onNavigateToScanner,
+  examId,
+  setId,
+  setName
 }: BangladeshOMRGeneratorProps) {
   // Preset selection
   const [selectedPreset, setSelectedPreset] = useState<PresetType>('hsc_ssc_50');
@@ -791,6 +799,38 @@ export function BangladeshOMRGenerator({
 
             {/* Sheet Header Area */}
             <div className="sheet-header">
+              {/* Universal OMR QR Code Badge */}
+              <div 
+                className="omr-qr-code-box"
+                style={{ 
+                  position: 'absolute', 
+                  right: 4, 
+                  top: 0, 
+                  textAlign: 'center',
+                  background: '#ffffff',
+                  padding: '2px',
+                  border: '1px solid #111',
+                  borderRadius: '4px'
+                }}
+              >
+                <QRCodeSVG
+                  value={JSON.stringify({
+                    examId: examId || 'BOARD_EXAM',
+                    setId: setId || `SET_${setName || 'A'}`,
+                    setName: setName || 'A',
+                    template: selectedPreset || `board_${numQuestions}q`,
+                    title: examTitleBangla || 'Board Exam',
+                    v: 1
+                  })}
+                  size={52}
+                  level="M"
+                  includeMargin={false}
+                />
+                <div style={{ fontSize: '7.5px', fontFamily: 'monospace', color: '#111', fontWeight: 'bold', marginTop: '1px' }}>
+                  {`SET-${setName || 'A'}`}
+                </div>
+              </div>
+
               <div className="header-year-row">
                 <span className="exam-dotted-line">....................................................................................</span>
                 <span className="year-label">পরীক্ষা</span>

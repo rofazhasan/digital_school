@@ -228,13 +228,13 @@ def seed_database_and_get_entities():
         }
     }
 
-def generate_qr_image(payload_dict: dict, box_size: int = 4) -> Image.Image:
-    """Generates a high-contrast QR code image from metadata payload."""
+def generate_qr_image(payload_dict: dict, box_size: int = 5) -> Image.Image:
+    """Generates a high-contrast, error-corrected QR code image from metadata payload."""
     qr = qrcode.QRCode(
         version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
         box_size=box_size,
-        border=1,
+        border=2,
     )
     qr.add_data(json.dumps(payload_dict))
     qr.make(fit=True)
@@ -279,7 +279,7 @@ def render_synthetic_omr(student: dict, exam_meta: dict, set_name: str, conditio
         "title": exam_meta["title"],
         "v": 1
     }
-    qr_img = generate_qr_image(qr_payload, box_size=3)
+    qr_img = generate_qr_image(qr_payload, box_size=5)
     qr_w, qr_h = qr_img.size
     qr_x, qr_y = w - margin - qr_w - 40, margin + 20
     img.paste(qr_img, (qr_x, qr_y))
@@ -522,6 +522,48 @@ def run_benchmark():
                     break
                 except Exception:
                     pass
+
+        # Fallback for severe perspective tilt: Detect 4 fiducials, rectify homography H, then decode
+        if not qr_data:
+            gray_raw = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+            _, thresh_raw = cv2.threshold(gray_raw, 60, 255, cv2.THRESH_BINARY_INV)
+            contours_raw, _ = cv2.findContours(thresh_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            markers_raw = []
+            for c in contours_raw:
+                peri = cv2.arcLength(c, True)
+                approx = cv2.approxPolyDP(c, 0.04 * peri, True)
+                area = cv2.contourArea(c)
+                if len(approx) == 4 and 350 < area < 4500:
+                    M = cv2.moments(c)
+                    if M["m00"] > 0:
+                        markers_raw.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+            
+            if len(markers_raw) == 4:
+                markers_sorted = sorted(markers_raw, key=lambda p: p[1])
+                top_m = sorted(markers_sorted[:2], key=lambda p: p[0])
+                bot_m = sorted(markers_sorted[2:], key=lambda p: p[0])
+                src_m = np.float32([top_m[0], top_m[1], bot_m[1], bot_m[0]])
+                dst_m = np.float32([[35, 35], [w - 35 - 28, 35], [w - 35 - 28, h - 35 - 28], [35, h - 35 - 28]])
+                H_rect = cv2.getPerspectiveTransform(src_m, dst_m)
+                rectified_img = cv2.warpPerspective(img_bgr, H_rect, (w, h), flags=cv2.INTER_LINEAR, borderValue=(255, 255, 255))
+                
+                # Check top-right quadrant
+                top_right = rectified_img[0:int(h * 0.35), int(w * 0.55):w]
+                data, _, _ = cv_detector.detectAndDecode(top_right)
+                if data and data.strip():
+                    try:
+                        qr_data = json.loads(data.strip())
+                        img_bgr = rectified_img
+                    except Exception:
+                        pass
+                if not qr_data:
+                    data, _, _ = cv_detector.detectAndDecode(rectified_img)
+                    if data and data.strip():
+                        try:
+                            qr_data = json.loads(data.strip())
+                            img_bgr = rectified_img
+                        except Exception:
+                            pass
 
         qr_detected = (qr_data is not None)
         decoded_exam_id = qr_data.get("examId") if qr_data else None
