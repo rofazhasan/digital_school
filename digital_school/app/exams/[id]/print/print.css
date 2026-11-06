@@ -874,14 +874,23 @@
     height: 841.89pt !important;
     max-height: 841.89pt !important;
     min-height: 841.89pt !important;
-    page-break-after: always !important;
-    break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     background: #ffffff !important;
     position: relative !important;
+    border-bottom: none !important;
+  }
+
+  .a3-master-sheet:not(:last-child) {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .a3-master-sheet:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 }
 

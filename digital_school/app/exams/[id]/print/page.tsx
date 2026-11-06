@@ -1105,7 +1105,7 @@ export default function PrintExamPage() {
         </div>
 
         {/* Main Printable Content Container */}
-        <div ref={printRef} className="relative z-10 my-4">
+        <div ref={printRef} className="relative z-10 my-4 print:my-0 print:p-0 print:m-0">
           
           {/* ==============================================================
               CASE 0: A3 MASTER FORMAT (World-Class B&W Medical & Admission Master Spread)

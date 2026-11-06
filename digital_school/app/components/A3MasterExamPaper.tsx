@@ -32,6 +32,37 @@ export interface A3MasterExamPaperProps {
   showWatermark?: boolean;
 }
 
+// Helper to calculate balanced OMR columns for exact question count
+function computeOmrColumns(total: number) {
+  const safeTotal = Math.max(1, total);
+  let numCols = 5;
+  if (safeTotal <= 20) numCols = 2;
+  else if (safeTotal <= 35) numCols = 3;
+  else if (safeTotal <= 50) numCols = safeTotal === 50 ? 5 : 4;
+  else numCols = 5;
+
+  const baseRows = Math.floor(safeTotal / numCols);
+  const remainder = safeTotal % numCols;
+
+  const cols: { start: number; end: number; count: number }[] = [];
+  let currentStart = 1;
+
+  for (let c = 0; c < numCols; c++) {
+    const colCount = baseRows + (c < remainder ? 1 : 0);
+    if (colCount > 0) {
+      cols.push({
+        start: currentStart,
+        end: currentStart + colCount - 1,
+        count: colCount,
+      });
+      currentStart += colCount;
+    }
+  }
+
+  const maxRows = Math.max(...cols.map(c => c.count), 1);
+  return { numCols: cols.length, columns: cols, maxRows };
+}
+
 // Helper to normalize Bengali text and remove duplicate vowel diacritics / broken conjuncts
 const cleanBengaliText = (text: string): string => {
   if (!text) return "";
@@ -61,6 +92,9 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
       ? formatBengaliDuration(examInfo.objectiveTime)
       : (examInfo.duration || '৬০ মিনিট');
     const negMarking = examInfo.mcqNegativeMarking !== undefined ? examInfo.mcqNegativeMarking : 0.25;
+
+    // Dynamic OMR Column & Row Matrix Calculator
+    const omrLayout = useMemo(() => computeOmrColumns(totalCount), [totalCount]);
 
     // Strict Dynamic Half-Split: Exactly half on front, remaining half on back
     const halfCount = Math.ceil(totalCount / 2);
@@ -145,8 +179,6 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
 
     // --- REUSABLE COMPONENT: Detachable OMR Sheet (Front Left - 425pt) ---
     const renderOmrSection = () => {
-      const isCompact50OrLess = totalCount <= 50;
-
       const qrPayload = examInfo.qrData || {
         v: 1,
         examId: examInfo.id || examInfo.examId || '',
@@ -157,6 +189,23 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
       };
       const qrString = typeof qrPayload === 'string' ? qrPayload : JSON.stringify(qrPayload);
 
+      const { numCols, columns, maxRows } = omrLayout;
+      const gridColsClass = numCols === 2 ? 'grid-cols-2' : numCols === 3 ? 'grid-cols-3' : numCols === 4 ? 'grid-cols-4' : 'grid-cols-5';
+
+      // Dynamic bubble sizing & spacing according to question density
+      const isLarge = maxRows <= 10;
+      const isMedium = maxRows > 10 && maxRows <= 15;
+
+      const bubbleSizeClass = isLarge 
+        ? 'w-[19px] h-[19px] text-[10px]' 
+        : isMedium 
+          ? 'w-[15.5px] h-[15.5px] text-[8px]' 
+          : 'w-[13px] h-[13px] text-[7px]';
+
+      const rowPaddingClass = isLarge ? 'py-[3px]' : isMedium ? 'py-[1.5px]' : 'py-[0.5px]';
+      const qNumTextClass = isLarge ? 'text-[9.5px] w-5' : isMedium ? 'text-[8.5px] w-4' : 'text-[7.5px] w-3.5';
+      const bubbleGapClass = isLarge ? 'gap-[3px]' : isMedium ? 'gap-[2px]' : 'gap-[1.5px]';
+
       return (
         <div className="w-[425pt] h-full p-2.5 pr-2 flex flex-col justify-between shrink-0 bg-white relative">
           {/* Corner Optical Fiducial Marks for Scanner Alignment */}
@@ -165,161 +214,172 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
           <div className="absolute bottom-1 left-1 w-2.5 h-2.5 bg-black" />
           <div className="absolute bottom-1 right-1 w-2.5 h-2.5 bg-black" />
 
-          {/* Top Section */}
-          <div className="space-y-1.5">
-            {/* OMR Header Banner with Embedded Auto-Scan QR Code */}
-            <div className="border-2 border-black p-1.5 text-center bg-slate-50 relative pr-14">
-              {/* Secured OMR QR Code for Instant Scanner Ingestion */}
-              <div className="absolute right-1 top-1 bg-white p-0.5 border border-black/40 rounded shadow-xs select-none">
-                <QRCodeSVG value={qrString} size={42} level="M" />
-              </div>
-              {!hideInstitute && (
-                <h1 className="font-bold text-[13.5px] tracking-wider uppercase text-black leading-none font-nikosh">
-                  {cleanBengaliText(examInfo.schoolName || 'ROFAZ ACADEMY')}
-                </h1>
-              )}
-              <div className="text-[9px] font-semibold text-slate-700 mt-0.5 font-nikosh">
-                {cleanBengaliText(examInfo.schoolAddress || 'Medical & Dental Admission Coaching')}
-              </div>
-              <div className="flex justify-between items-center text-[9.5px] font-bold mt-1 px-1 border-t border-slate-300 pt-1 font-nikosh">
-                <span>পূর্ণমান: {toBengaliNumerals(totalMarks)}</span>
-                <span>সময়: {duration}</span>
-                <span className="bg-black text-white px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider">
-                  সেট: {cleanSet}
-                </span>
-              </div>
-              <div className="text-[10px] font-bold mt-0.5 text-slate-900 border-t border-slate-200 pt-0.5 truncate font-nikosh">
-                {cleanBengaliText(examInfo.title)}
-              </div>
-            </div>
-
-            {/* Student Metadata Box & Grids */}
-            <div className="flex gap-1.5">
-              {/* Roll Number Bubble Grid (7 Digits) */}
-              <div className="border border-black p-1 text-center shrink-0 bg-white">
-                <div className="font-bold text-[8px] tracking-wider uppercase mb-0.5 bg-black text-white px-1 py-0.5">
-                  ROLL NUMBER
+          {/* Full-Height Card Boundary mirroring back side Instructions Card */}
+          <div className="border-2 border-black p-2.5 h-full flex flex-col justify-between bg-white font-nikosh">
+            {/* Top Section */}
+            <div className="space-y-1">
+              {/* OMR Header Banner with Embedded Auto-Scan QR Code */}
+              <div className="border-2 border-black p-1 text-center bg-slate-50 relative pr-14">
+                {/* Secured OMR QR Code for Instant Scanner Ingestion */}
+                <div className="absolute right-1 top-1 bg-white p-0.5 border border-black/40 rounded shadow-xs select-none">
+                  <QRCodeSVG value={qrString} size={42} level="M" />
                 </div>
-                <div className="flex gap-0.5 justify-center mb-0.5">
-                  {Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i} className="w-3.5 h-3.5 border border-black text-[8px] font-bold flex items-center justify-center bg-slate-50"></div>
-                  ))}
+                {!hideInstitute && (
+                  <h1 className="font-bold text-[13px] tracking-wider uppercase text-black leading-none font-nikosh">
+                    {cleanBengaliText(examInfo.schoolName || 'ROFAZ ACADEMY')}
+                  </h1>
+                )}
+                <div className="text-[8.5px] font-semibold text-slate-700 mt-0.5 font-nikosh">
+                  {cleanBengaliText(examInfo.schoolAddress || 'Medical & Dental Admission Coaching')}
                 </div>
-                <div className="flex gap-0.5 justify-center">
-                  {Array.from({ length: 7 }).map((_, col) => (
-                    <div key={col} className="flex flex-col gap-[1.5px]">
-                      {Array.from({ length: 10 }).map((_, digit) => (
-                        <div
-                          key={digit}
-                          className="w-3.5 h-3 rounded-full border border-slate-900 text-[7px] font-bold flex items-center justify-center select-none"
-                        >
-                          {digit}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+                <div className="flex justify-between items-center text-[9px] font-bold mt-1 px-1 border-t border-slate-300 pt-0.5 font-nikosh">
+                  <span>পূর্ণমান: {toBengaliNumerals(totalMarks)}</span>
+                  <span>সময়: {duration}</span>
+                  <span className="bg-black text-white px-1.5 py-0.5 rounded text-[8.5px] font-mono tracking-wider">
+                    সেট: {cleanSet}
+                  </span>
+                </div>
+                <div className="text-[9.5px] font-bold mt-0.5 text-slate-900 border-t border-slate-200 pt-0.5 truncate font-nikosh">
+                  {cleanBengaliText(examInfo.title)}
                 </div>
               </div>
 
-              {/* Serial Number Bubble Grid (6 Digits) */}
-              <div className="border border-black p-1 text-center shrink-0 bg-white">
-                <div className="font-bold text-[8px] tracking-wider uppercase mb-0.5 bg-black text-white px-1 py-0.5">
-                  SERIAL NO
-                </div>
-                <div className="flex gap-0.5 justify-center mb-0.5">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="w-3.5 h-3.5 border border-black text-[8px] font-bold flex items-center justify-center bg-slate-50"></div>
-                  ))}
-                </div>
-                <div className="flex gap-0.5 justify-center">
-                  {Array.from({ length: 6 }).map((_, col) => (
-                    <div key={col} className="flex flex-col gap-[1.5px]">
-                      {Array.from({ length: 10 }).map((_, digit) => (
-                        <div
-                          key={digit}
-                          className="w-3.5 h-3 rounded-full border border-slate-900 text-[7px] font-bold flex items-center justify-center select-none"
-                        >
-                          {digit}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Candidate Info Input Fields + Set Code Bubble */}
-              <div className="border border-black p-1 flex-1 flex flex-col justify-between text-[8.5px] bg-slate-50/50 font-nikosh">
-                <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
-                  <span className="font-bold w-10 text-slate-800">নাম:</span>
-                  <span className="flex-1 border-b border-dotted border-black"></span>
-                </div>
-                <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
-                  <span className="font-bold w-10 text-slate-800">ব্যাচ:</span>
-                  <span className="flex-1 border-b border-dotted border-black"></span>
-                </div>
-                <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
-                  <span className="font-bold w-10 text-slate-800">শাখা:</span>
-                  <span className="flex-1 border-b border-dotted border-black"></span>
-                </div>
-                <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
-                  <span className="font-bold w-10 text-slate-800">তারিখ:</span>
-                  <span className="flex-1 border-b border-dotted border-black text-slate-800 font-bold">{examInfo.date || ''}</span>
-                </div>
-                {/* Set Code Bubbling for Candidates */}
-                <div className="flex items-center justify-between border-t border-slate-300 pt-0.5">
-                  <span className="font-bold text-[8px] text-slate-900">সেট কোড:</span>
-                  <div className="flex gap-1">
-                    {['A', 'B', 'C', 'D'].map((s) => (
-                      <div
-                        key={s}
-                        className={`w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center font-bold text-[7.5px] select-none ${
-                          cleanSet === s ? 'bg-black text-white' : 'bg-white text-black'
-                        }`}
-                      >
-                        {s}
+              {/* Student Metadata Box & Grids */}
+              <div className="flex gap-1.5">
+                {/* Roll Number Bubble Grid (7 Digits) */}
+                <div className="border border-black p-1 text-center shrink-0 bg-white">
+                  <div className="font-bold text-[8px] tracking-wider uppercase mb-0.5 bg-black text-white px-1 py-0.5">
+                    ROLL NUMBER
+                  </div>
+                  <div className="flex gap-0.5 justify-center mb-0.5">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className="w-3.5 h-3.5 border border-black text-[8px] font-bold flex items-center justify-center bg-slate-50"></div>
+                    ))}
+                  </div>
+                  <div className="flex gap-0.5 justify-center">
+                    {Array.from({ length: 7 }).map((_, col) => (
+                      <div key={col} className="flex flex-col gap-[1.5px]">
+                        {Array.from({ length: 10 }).map((_, digit) => (
+                          <div
+                            key={digit}
+                            className="w-3.5 h-3 rounded-full border border-slate-900 text-[7px] font-bold flex items-center justify-center select-none"
+                          >
+                            {digit}
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {/* Serial Number Bubble Grid (6 Digits) */}
+                <div className="border border-black p-1 text-center shrink-0 bg-white">
+                  <div className="font-bold text-[8px] tracking-wider uppercase mb-0.5 bg-black text-white px-1 py-0.5">
+                    SERIAL NO
+                  </div>
+                  <div className="flex gap-0.5 justify-center mb-0.5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="w-3.5 h-3.5 border border-black text-[8px] font-bold flex items-center justify-center bg-slate-50"></div>
+                    ))}
+                  </div>
+                  <div className="flex gap-0.5 justify-center">
+                    {Array.from({ length: 6 }).map((_, col) => (
+                      <div key={col} className="flex flex-col gap-[1.5px]">
+                        {Array.from({ length: 10 }).map((_, digit) => (
+                          <div
+                            key={digit}
+                            className="w-3.5 h-3 rounded-full border border-slate-900 text-[7px] font-bold flex items-center justify-center select-none"
+                          >
+                            {digit}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Candidate Info Input Fields + Set Code Bubble */}
+                <div className="border border-black p-1 flex-1 flex flex-col justify-between text-[8.5px] bg-slate-50/50 font-nikosh">
+                  <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
+                    <span className="font-bold w-10 text-slate-800">নাম:</span>
+                    <span className="flex-1 border-b border-dotted border-black"></span>
+                  </div>
+                  <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
+                    <span className="font-bold w-10 text-slate-800">ব্যাচ:</span>
+                    <span className="flex-1 border-b border-dotted border-black"></span>
+                  </div>
+                  <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
+                    <span className="font-bold w-10 text-slate-800">শাখা:</span>
+                    <span className="flex-1 border-b border-dotted border-black"></span>
+                  </div>
+                  <div className="flex items-center gap-1 border-b border-slate-300 pb-0.5">
+                    <span className="font-bold w-10 text-slate-800">তারিখ:</span>
+                    <span className="flex-1 border-b border-dotted border-black text-slate-800 font-bold">{examInfo.date || ''}</span>
+                  </div>
+                  {/* Set Code Bubbling for Candidates */}
+                  <div className="flex items-center justify-between border-t border-slate-300 pt-0.5">
+                    <span className="font-bold text-[8px] text-slate-900">সেট কোড:</span>
+                    <div className="flex gap-1">
+                      {['A', 'B', 'C', 'D'].map((s) => (
+                        <div
+                          key={s}
+                          className={`w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center font-bold text-[7.5px] select-none ${
+                            cleanSet === s ? 'bg-black text-white' : 'bg-white text-black'
+                          }`}
+                        >
+                          {s}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quranic Verse / Inspirational Motto Banner */}
+              <div className="bg-black text-white text-center py-0.5 font-bold text-[8px] tracking-wider uppercase">
+                BE COLOURED BY THE COLOUR OF ALLAH (AL QURAN)
               </div>
             </div>
 
-            {/* Quranic Verse / Inspirational Motto Banner */}
-            <div className="bg-black text-white text-center py-0.5 font-bold text-[8.5px] tracking-wider uppercase">
-              BE COLOURED BY THE COLOUR OF ALLAH (AL QURAN)
-            </div>
-          </div>
+            {/* Dynamic Adaptive Full-Height OMR Bubble Matrix */}
+            <div className="flex-1 flex flex-col justify-between border border-black p-1.5 my-1 bg-white">
+              {/* Matrix Header Banner */}
+              <div className="bg-slate-200 text-black font-bold text-[9px] px-1.5 py-0.5 flex justify-between items-center mb-1">
+                <span>OMR ANSWER SHEET : QUESTIONS ০১ – {toBengaliNumerals(String(totalCount).padStart(2, '0'))}</span>
+                <span className="tracking-wider">(A) (B) (C) (D)</span>
+              </div>
 
-          {/* OMR Bubble Matrices: Dynamically fills section based on question count */}
-          <div className="flex-1 flex flex-col justify-center space-y-1.5 my-1">
-            {isCompact50OrLess ? (
-              /* Single Spacious 50-Question Matrix that Elegantly Fills the Sheet */
-              <div className="border border-black p-1.5 bg-white shadow-none">
-                <div className="bg-slate-200 text-black font-bold text-[9px] px-1.5 py-0.5 flex justify-between mb-1.5">
-                  <span>OMR ANSWER SHEET : QUESTIONS 01 – {String(Math.min(50, totalCount || 50)).padStart(2, '0')}</span>
-                  <span>(A) (B) (C) (D)</span>
-                </div>
-                <div className="grid grid-cols-5 gap-1.5 text-[8.5px]">
-                  {[0, 10, 20, 30, 40].map((start) => (
-                    <div key={start} className="space-y-[3.5px]">
-                      {Array.from({ length: 10 }).map((_, r) => {
-                        const qNum = start + r + 1;
-                        const isAvailable = qNum <= (totalCount || 50);
+              {/* Columns Grid spanning full vertical height */}
+              <div className={`grid ${gridColsClass} gap-1 flex-1 items-stretch`}>
+                {columns.map((col, colIdx) => (
+                  <div key={colIdx} className="flex flex-col justify-between border border-slate-300 rounded-xs p-1 bg-white h-full">
+                    {/* Column Header */}
+                    <div className="flex justify-between items-center border-b border-black pb-0.5 mb-0.5 text-[8px] font-bold text-slate-800">
+                      <span>প্রশ্ন</span>
+                      <div className={`flex ${bubbleGapClass} pr-0.5 text-[7px]`}>
+                        <span>A</span><span>B</span><span>C</span><span>D</span>
+                      </div>
+                    </div>
+
+                    {/* Question Rows in this Column */}
+                    <div className="flex-1 flex flex-col justify-between">
+                      {Array.from({ length: col.count }).map((_, r) => {
+                        const qNum = col.start + r;
                         return (
                           <div
                             key={qNum}
-                            className={`flex items-center justify-between px-1 py-[1.5px] rounded ${
-                              r % 2 === 1 ? 'bg-slate-100/70' : ''
-                            } ${!isAvailable ? 'opacity-30' : ''}`}
+                            className={`flex items-center justify-between px-0.5 ${rowPaddingClass} rounded ${
+                              r % 2 === 1 ? 'bg-slate-100/70' : 'bg-white'
+                            }`}
                           >
-                            <span className="font-bold w-4 text-[8px] text-slate-800">
-                              {String(qNum).padStart(2, '0')}
+                            <span className={`font-bold font-nikosh text-slate-900 select-none ${qNumTextClass}`}>
+                              {toBengaliNumerals(String(qNum).padStart(2, '0'))}
                             </span>
-                            <div className="flex gap-[2px]">
+                            <div className={`flex ${bubbleGapClass}`}>
                               {['A', 'B', 'C', 'D'].map((opt) => (
                                 <div
                                   key={opt}
-                                  className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center font-bold text-[7.5px] bg-white select-none"
+                                  className={`${bubbleSizeClass} rounded-full border border-black flex items-center justify-center font-bold bg-white select-none shadow-[0_0_0_0.2px_rgba(0,0,0,0.8)]`}
                                 >
                                   {opt}
                                 </div>
@@ -329,105 +389,24 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
                         );
                       })}
                     </div>
-                  ))}
-                </div>
-                {/* Visual Scanner Notice */}
-                <div className="mt-1.5 pt-1 border-t border-slate-300 text-[8px] text-slate-700 flex justify-between font-nikosh">
-                  <span>• শুধুমাত্র কালো বলপয়েন্ট কলম দিয়ে সম্পূর্ণ বৃত্ত ভরাট করুন</span>
-                  <span>• বৃত্তের বাইরে কোনো দাগ দেওয়া যাবে না</span>
-                </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              /* Dual Matrices for 1-50 and 51-100 */
-              <>
-                {/* 1-50 */}
-                <div className="border border-black p-1 bg-white">
-                  <div className="bg-slate-200 text-black font-bold text-[8.5px] px-1 py-0.5 flex justify-between mb-0.5">
-                    <span>OMR ANSWER SHEET : QUESTIONS 01 – 50</span>
-                    <span>(A) (B) (C) (D)</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1 text-[8px]">
-                    {[0, 10, 20, 30, 40].map((start) => (
-                      <div key={start} className="space-y-[2px]">
-                        {Array.from({ length: 10 }).map((_, r) => {
-                          const qNum = start + r + 1;
-                          return (
-                            <div
-                              key={qNum}
-                              className={`flex items-center justify-between px-0.5 py-[1px] rounded ${
-                                r % 2 === 1 ? 'bg-slate-100/60' : ''
-                              }`}
-                            >
-                              <span className="font-bold w-3.5 text-[7.5px] text-slate-800">
-                                {String(qNum).padStart(2, '0')}
-                              </span>
-                              <div className="flex gap-[2px]">
-                                {['A', 'B', 'C', 'D'].map((opt) => (
-                                  <div
-                                    key={opt}
-                                    className="w-3 h-3 rounded-full border border-black flex items-center justify-center font-bold text-[6.5px] bg-white select-none"
-                                  >
-                                    {opt}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* 51-100 */}
-                <div className="border border-black p-1 bg-white">
-                  <div className="bg-slate-200 text-black font-bold text-[8.5px] px-1 py-0.5 flex justify-between mb-0.5">
-                    <span>OMR ANSWER SHEET : QUESTIONS 51 – 100</span>
-                    <span>(A) (B) (C) (D)</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1 text-[8px]">
-                    {[50, 60, 70, 80, 90].map((start) => (
-                      <div key={start} className="space-y-[2px]">
-                        {Array.from({ length: 10 }).map((_, r) => {
-                          const qNum = start + r + 1;
-                          const isAvailable = qNum <= totalCount;
-                          return (
-                            <div
-                              key={qNum}
-                              className={`flex items-center justify-between px-0.5 py-[1px] rounded ${
-                                r % 2 === 1 ? 'bg-slate-100/60' : ''
-                              } ${!isAvailable ? 'opacity-30' : ''}`}
-                            >
-                              <span className="font-bold w-3.5 text-[7.5px] text-slate-800">
-                                {qNum}
-                              </span>
-                              <div className="flex gap-[2px]">
-                                {['A', 'B', 'C', 'D'].map((opt) => (
-                                  <div
-                                    key={opt}
-                                    className="w-3 h-3 rounded-full border border-black flex items-center justify-center font-bold text-[6.5px] bg-white select-none"
-                                  >
-                                    {opt}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+              {/* Footer Guidance */}
+              <div className="mt-1 pt-0.5 border-t border-slate-300 text-[7.5px] text-slate-700 flex justify-between font-nikosh font-medium">
+                <span>• শুধুমাত্র কালো বলপয়েন্ট কলম দিয়ে সম্পূর্ণ বৃত্ত ভরাট করুন</span>
+                <span>• বৃত্তের বাইরে কোনো দাগ দেওয়া সম্পূর্ণ নিষিদ্ধ</span>
+              </div>
+            </div>
 
-          {/* Official Examiner Score Strip */}
-          <div className="border-2 border-black p-1 flex justify-between items-center text-[9px] font-bold bg-slate-50 font-nikosh">
-            <span>সঠিক: ______</span>
-            <span>ভুল: ______</span>
-            <span>কর্তন ({toBengaliNumerals(negMarking)}): ______</span>
-            <span>প্রাপ্ত নম্বর: ______ / {toBengaliNumerals(totalMarks)}</span>
+            {/* Official Examiner Score Strip */}
+            <div className="border-2 border-black p-1 flex justify-between items-center text-[9px] font-bold bg-slate-50 font-nikosh">
+              <span>সঠিক: ______</span>
+              <span>ভুল: ______</span>
+              <span>কর্তন ({toBengaliNumerals(negMarking)}): ______</span>
+              <span>প্রাপ্ত নম্বর: ______ / {toBengaliNumerals(totalMarks)}</span>
+            </div>
           </div>
         </div>
       );
@@ -666,7 +645,7 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
             SHEET 1 (FRONT SPREAD / PAGE 1): STRICT ISO A3 LANDSCAPE
             Layout: [ LEFT: Detachable OMR (425pt) ] | [ Cut Bar (18pt) ] | [ RIGHT: Questions Part 1 ]
             ========================================================================= */}
-        <div className="a3-master-sheet flex flex-row w-full border-b-2 border-black page-break-after-always relative bg-white">
+        <div className="a3-master-sheet flex flex-row w-full border-b-2 border-black relative bg-white">
           {renderOmrSection()}
           {renderPerforationSeparator('right')}
           {renderQuestionsPart1()}
@@ -682,8 +661,9 @@ export const A3MasterExamPaper = forwardRef<HTMLDivElement, A3MasterExamPaperPro
               1. The question paper retains half questions on front (1 to half) and half on back (half+1 to end).
               2. When the OMR is detached along the perforation, the detached sheet has OMR on the front
                  and Instructions & Conduct Code on the back. Zero questions are severed!
+              3. Strictly NO trailing page-break so document prints as EXACTLY 2 physical pages!
             ========================================================================= */}
-        <div className="a3-master-sheet flex flex-row w-full page-break-after-always relative bg-white">
+        <div className="a3-master-sheet flex flex-row w-full relative bg-white">
           {duplexFlip === 'short_edge' ? (
             <>
               {/* Short-Edge Flip (Standard / Recommended): Questions Part 2 on Left, Instructions on Right */}
