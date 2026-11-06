@@ -209,11 +209,16 @@ function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean;
   const midX = curW / 2;
   const midY = curH / 2;
 
+  // Strict corner envelope (outer 20% of each quadrant) to reject central MCQs and labels
+  const envX = curW * 0.20;
+  const envY = curH * 0.20;
+  const minMarkerArea = Math.max(160, (curW * curH) / 6000);
+
   let quads: MarkerQuad[] = [
-    { name: 'TL', condition: (p) => p.x < midX && p.y < midY, bestPt: null, maxArea: 0 },
-    { name: 'TR', condition: (p) => p.x >= midX && p.y < midY, bestPt: null, maxArea: 0 },
-    { name: 'BL', condition: (p) => p.x < midX && p.y >= midY, bestPt: null, maxArea: 0 },
-    { name: 'BR', condition: (p) => p.x >= midX && p.y >= midY, bestPt: null, maxArea: 0 }
+    { name: 'TL', condition: (p) => p.x < envX && p.y < envY, bestPt: null, maxArea: 0 },
+    { name: 'TR', condition: (p) => p.x >= (curW - envX) && p.y < envY, bestPt: null, maxArea: 0 },
+    { name: 'BL', condition: (p) => p.x < envX && p.y >= (curH - envY), bestPt: null, maxArea: 0 },
+    { name: 'BR', condition: (p) => p.x >= (curW - envX) && p.y >= (curH - envY), bestPt: null, maxArea: 0 }
   ];
 
   let thresh = new cv.Mat();
@@ -238,16 +243,17 @@ function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean;
         let cnt = cntList.get(i);
         try {
           let area = cv.contourArea(cnt);
-          if (area > 80 && area < (curW * curH) / 6) { 
+          if (area >= minMarkerArea && area < (curW * curH) / 6) { 
             let peri = cv.arcLength(cnt, true);
             let approx = new cv.Mat();
             try {
               cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
-              if (approx.rows >= 4 && approx.rows <= 8) {
+              if (approx.rows >= 4 && approx.rows <= 6) {
                 let rect = cv.boundingRect(cnt);
                 let aspectRatio = rect.width / rect.height;
+                let solidity = area / (rect.width * rect.height);
                 // Extended aspect ratio tolerance to handle severe phone camera perspective tilt (up to 40 deg)
-                if (aspectRatio >= 0.45 && aspectRatio <= 1.85) {
+                if (aspectRatio >= 0.45 && aspectRatio <= 1.85 && solidity >= 0.70) {
                   // Subpixel centroid refinement via spatial image moments
                   let M = cv.moments(cnt, false);
                   let centerX = M.m00 !== 0 ? (M.m10 / M.m00) : (rect.x + rect.width / 2);
