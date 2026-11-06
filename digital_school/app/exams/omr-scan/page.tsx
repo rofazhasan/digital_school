@@ -130,6 +130,16 @@ export default function UniversalOMRScannerPage() {
     setParsedBubbles(parsed.bubbles);
   }, [selectedPresetId]);
 
+  // Preload OpenCV in background idle time so scans start instantly with zero latency
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isOpenCVLoaded()) {
+      const timer = setTimeout(() => {
+        loadOpenCV().catch(err => console.debug('OpenCV background prefetch deferred:', err));
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Fetch list of available exams on mount
   useEffect(() => {
     async function loadExams() {

@@ -125,6 +125,16 @@ export default function ExamBatchScanPage() {
     setParsedBubbles(parsed.bubbles);
   }, [selectedPresetId]);
 
+  // Preload OpenCV in background idle time so scans start instantly with zero latency
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isOpenCVLoaded()) {
+      const timer = setTimeout(() => {
+        loadOpenCV().catch(err => console.debug('OpenCV background prefetch deferred:', err));
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Memoized function to configure student directory and answer key
   const compileExamData = useCallback((data: any) => {
     if (!data) return;

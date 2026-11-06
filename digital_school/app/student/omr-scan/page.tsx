@@ -98,6 +98,16 @@ export default function StudentOMRScannerPage() {
     setParsedBubbles(parsed.bubbles);
   }, [selectedPresetId]);
 
+  // Preload OpenCV in background idle time so scans start instantly with zero latency
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isOpenCVLoaded()) {
+      const timer = setTimeout(() => {
+        loadOpenCV().catch(err => console.debug('OpenCV background prefetch deferred:', err));
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Clean up Camera on unmount
   useEffect(() => {
     return () => {
