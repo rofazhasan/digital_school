@@ -25,6 +25,9 @@ async function getPdfJs(): Promise<any> {
   return new Promise((resolve, reject) => {
     const existingScript = document.getElementById('pdfjs-script');
     if (existingScript) {
+      if ((window as any).pdfjsLib) {
+        return resolve((window as any).pdfjsLib);
+      }
       existingScript.addEventListener('load', () => {
         resolve((window as any).pdfjsLib);
       });

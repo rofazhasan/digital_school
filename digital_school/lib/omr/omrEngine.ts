@@ -152,9 +152,10 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
 }
 
 function getCV() {
-  if (typeof window !== 'undefined' && (window as any).cv) return (window as any).cv;
-  if (typeof global !== 'undefined' && (global as any).cv) return (global as any).cv;
-  if (typeof globalThis !== 'undefined' && (globalThis as any).cv) return (globalThis as any).cv;
+  const cv = (typeof window !== 'undefined' ? (window as any).cv : null) ||
+             (typeof global !== 'undefined' ? (global as any).cv : null) ||
+             (typeof globalThis !== 'undefined' ? (globalThis as any).cv : null);
+  if (cv && typeof cv.Mat === 'function') return cv;
   throw new Error("OpenCV.js is not loaded yet. Please wait a moment or refresh.");
 }
 

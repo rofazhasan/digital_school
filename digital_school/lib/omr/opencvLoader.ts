@@ -8,11 +8,15 @@
  * 
  * Crucial Fix for Emscripten Modular Builds:
  * In @techstark/opencv-js and modern Emscripten builds, window.cv is initially assigned
- * a Promise returned by the factory function `cv(Module)`.
- * Direct access to window.cv.Mat without unwrapping leaves cv.Mat undefined,
- * causing endless polling and main-thread browser freezes.
- * This loader properly awaits and unwraps the Promise, assigning the resolved
- * OpenCV instance back to window.cv.
+ * a Promise-like object with a custom `.then(callback)` method that returns Module itself.
+ * When JavaScript Promises resolve with an object containing a `.then` function (a Thenable),
+ * the Promise unwrapping algorithm repeatedly calls `.then` synchronously, entering an
+ * infinite microtask loop that locks up the browser main thread and causes "Pages Unresponsive".
+ * 
+ * Solution:
+ * Once `cv.Mat` is verified (meaning OpenCV is fully initialized), we immediately delete `cv.then`.
+ * This prevents the infinite thenable recursion, allows seamless `await` and `Promise.resolve`,
+ * and lets `isOpenCVLoaded()` reliably check `typeof cv.Mat === 'function'`.
  */
 
 let cvLoadPromise: Promise<any> | null = null;
@@ -20,8 +24,8 @@ let cvLoadPromise: Promise<any> | null = null;
 export function isOpenCVLoaded(): boolean {
   if (typeof window === 'undefined') return false;
   const cv = (window as any).cv;
-  // Validated when cv exists, is NOT a pending Promise, and has Mat constructor function
-  return Boolean(cv && typeof cv.then !== 'function' && typeof cv.Mat === 'function');
+  // Validated when cv exists and has Mat constructor function
+  return Boolean(cv && typeof cv.Mat === 'function');
 }
 
 export function loadOpenCV(): Promise<any> {
@@ -29,8 +33,11 @@ export function loadOpenCV(): Promise<any> {
     return Promise.reject(new Error('OpenCV is only supported in browser runtime'));
   }
 
-  // 1. If already loaded and initialized, return immediately
+  // 1. If already loaded and initialized, sanitize and return immediately
   if (isOpenCVLoaded()) {
+    try {
+      delete (window as any).cv.then;
+    } catch {}
     return Promise.resolve((window as any).cv);
   }
 
@@ -39,26 +46,16 @@ export function loadOpenCV(): Promise<any> {
     return cvLoadPromise;
   }
 
-  // 3. If window.cv is already in DOM as a Promise, await and unwrap
+  // 3. If window.cv is already in DOM, check or wait for onRuntimeInitialized
   const existingCv = (window as any).cv;
-  if (existingCv && typeof existingCv.then === 'function') {
-    cvLoadPromise = Promise.resolve(existingCv)
-      .then(async (resolved: any) => {
-        let instance = resolved;
-        while (instance && typeof instance.then === 'function') {
-          instance = await instance;
-        }
-        if (instance && typeof instance.Mat === 'function') {
-          (window as any).cv = instance;
-          return instance;
-        }
-        throw new Error('OpenCV resolved instance missing Mat constructor');
-      })
-      .catch((err: any) => {
-        cvLoadPromise = null;
-        throw err;
-      });
-    return cvLoadPromise;
+  if (existingCv) {
+    if (typeof existingCv.Mat === 'function') {
+      try {
+        delete existingCv.then;
+      } catch {}
+      (window as any).cv = existingCv;
+      return Promise.resolve(existingCv);
+    }
   }
 
   const CANDIDATE_SOURCES = [
@@ -73,6 +70,9 @@ export function loadOpenCV(): Promise<any> {
     for (const src of CANDIDATE_SOURCES) {
       try {
         const cvInstance = await loadScriptCandidate(src);
+        try {
+          delete cvInstance.then;
+        } catch {}
         (window as any).cv = cvInstance;
         return cvInstance;
       } catch (err: any) {
@@ -96,12 +96,6 @@ function loadScriptCandidate(src: string): Promise<any> {
       existing.remove();
     }
 
-    const script = document.createElement('script');
-    script.id = 'opencv-js-script';
-    script.src = src;
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-
     let isDone = false;
     let pollInterval: any = null;
 
@@ -113,20 +107,15 @@ function loadScriptCandidate(src: string): Promise<any> {
       }
     };
 
-    const tryResolveInstance = async (candidate: any): Promise<boolean> => {
+    const tryResolveInstance = (candidate: any): boolean => {
       if (isDone || !candidate) return false;
-      try {
-        let instance = candidate;
-        if (typeof instance.then === 'function') {
-          instance = await instance;
-        }
-        if (instance && typeof instance.Mat === 'function') {
-          cleanup();
-          resolve(instance);
-          return true;
-        }
-      } catch (e) {
-        // Not ready yet
+      if (typeof candidate.Mat === 'function') {
+        try {
+          delete candidate.then;
+        } catch {}
+        cleanup();
+        resolve(candidate);
+        return true;
       }
       return false;
     };
@@ -136,11 +125,12 @@ function loadScriptCandidate(src: string): Promise<any> {
     const prevInit = prevModule.onRuntimeInitialized;
     (window as any).Module = {
       ...prevModule,
-      onRuntimeInitialized: async () => {
+      onRuntimeInitialized: () => {
         if (typeof prevInit === 'function') {
           try { prevInit(); } catch {}
         }
-        await tryResolveInstance((window as any).cv);
+        const live = (window as any).cv || (window as any).Module;
+        tryResolveInstance(live);
       }
     };
 
@@ -148,27 +138,33 @@ function loadScriptCandidate(src: string): Promise<any> {
       if (!isDone) {
         cleanup();
         script.remove();
-        reject(new Error(`Timed out loading OpenCV.js from ${src} after 12s`));
+        reject(new Error(`Timed out loading OpenCV.js from ${src} after 15s`));
       }
-    }, 12000);
+    }, 15000);
 
-    script.onload = async () => {
-      // Yield to event loop to allow asm/wasm initialization
-      await new Promise(r => setTimeout(r, 10));
+    const script = document.createElement('script');
+    script.id = 'opencv-js-script';
+    script.src = src;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
 
-      if (await tryResolveInstance((window as any).cv)) {
+    script.onload = () => {
+      // Check if already ready
+      const initialCandidate = (window as any).cv || (window as any).Module;
+      if (tryResolveInstance(initialCandidate)) {
         clearTimeout(timeoutId);
         return;
       }
 
       let elapsed = 0;
-      pollInterval = setInterval(async () => {
+      pollInterval = setInterval(() => {
         elapsed += 50;
-        if (await tryResolveInstance((window as any).cv)) {
+        const liveCandidate = (window as any).cv || (window as any).Module;
+        if (tryResolveInstance(liveCandidate)) {
           clearTimeout(timeoutId);
           return;
         }
-        if (elapsed >= 8000) {
+        if (elapsed >= 10000) {
           cleanup();
           clearTimeout(timeoutId);
           script.remove();
@@ -177,7 +173,7 @@ function loadScriptCandidate(src: string): Promise<any> {
       }, 50);
     };
 
-    script.onerror = (err) => {
+    script.onerror = () => {
       cleanup();
       clearTimeout(timeoutId);
       script.remove();
