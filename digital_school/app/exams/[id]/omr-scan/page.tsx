@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import '@/app/components/omr/omr.css';
 import {
   Upload,
   Camera,
@@ -22,7 +23,17 @@ import {
   BarChart3,
   ShieldCheck,
   FileText,
-  Clock
+  Clock,
+  Volume2,
+  VolumeX,
+  Flashlight,
+  FlashlightOff,
+  Play,
+  Pause,
+  TrendingUp,
+  Award,
+  HelpCircle,
+  Activity
 } from 'lucide-react';
 
 import type {
@@ -38,7 +49,22 @@ import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
 import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
+import {
+  StreamMotionAnalyzer,
+  ScannerAudioHaptics,
+  TorchController,
+  DuplicateSuppressor,
+  FrameAnalysisResult
+} from '@/lib/omr/streamAutoScanner';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
+
+// Modern Web Guidance: Main Thread Task Slicing via scheduler.yield
+async function yieldToMain() {
+  if (typeof window !== 'undefined' && 'scheduler' in window && 'yield' in (window as any).scheduler) {
+    return await (window as any).scheduler.yield();
+  }
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
 
 export default function ExamBatchScanPage() {
   const nextParams = useParams();
@@ -111,11 +137,23 @@ export default function ExamBatchScanPage() {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
-  // Live Camera state
+  // Live Camera & Enterprise Auto-Scanner state
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [isAutoScanning, setIsAutoScanning] = useState<boolean>(false);
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
+  const [isAudioFeedback, setIsAudioFeedback] = useState<boolean>(true);
+  const [motionData, setMotionData] = useState<FrameAnalysisResult | null>(null);
+  const [recentFilmstrip, setRecentFilmstrip] = useState<StudentScoreCard[]>([]);
+  const [scanFeedbackBanner, setScanFeedbackBanner] = useState<{ type: 'success' | 'duplicate' | 'error'; message: string } | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
+  const motionAnalyzerRef = useRef<StreamMotionAnalyzer>(new StreamMotionAnalyzer(160, 120));
+  const suppressorRef = useRef<DuplicateSuppressor>(new DuplicateSuppressor());
+  const isProcessingRef = useRef<boolean>(false);
+  const autoScanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize Template configuration without heavy OpenCV download on page mount
   useEffect(() => {
@@ -429,7 +467,7 @@ export default function ExamBatchScanPage() {
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
       setProgress({ current: i + 1, total: itemsToProcess.length });
-      await new Promise(r => setTimeout(r, 16));
+      await yieldToMain();
 
       try {
         const qr = scanQRCodeFromCanvas(item.canvas);
@@ -528,6 +566,10 @@ export default function ExamBatchScanPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+
+      // Check hardware torch support
+      const supported = await TorchController.isSupported(stream);
+      setIsTorchSupported(supported);
     } catch (err: any) {
       console.error('Camera access error:', err);
       alert('ক্যামেরা চালু করা সম্ভব হয়নি: ' + err.message);
@@ -536,25 +578,40 @@ export default function ExamBatchScanPage() {
   };
 
   const stopCamera = () => {
+    if (autoScanIntervalRef.current) {
+      clearInterval(autoScanIntervalRef.current);
+      autoScanIntervalRef.current = null;
+    }
     if (activeStreamRef.current) {
       activeStreamRef.current.getTracks().forEach(t => t.stop());
       activeStreamRef.current = null;
     }
     setIsCameraActive(false);
+    setIsAutoScanning(false);
+    setIsTorchOn(false);
+    setMotionData(null);
   };
 
-  // Capture Live Snapshot and Grade
+  const toggleTorch = async () => {
+    if (!activeStreamRef.current) return;
+    const nextState = !isTorchOn;
+    const ok = await TorchController.setTorch(activeStreamRef.current, nextState);
+    if (ok) setIsTorchOn(nextState);
+  };
+
+  // Capture Live Snapshot and Grade (with duplicate suppression & audio-haptics)
   const captureAndGrade = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    setIsProcessing(true);
+    setStatusMessage('ক্যামেরা ফ্রেম স্ক্যান ও মূল্যায়ন করা হচ্ছে...');
+
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext('2d');
     ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    setIsProcessing(true);
-    setStatusMessage('ক্যামেরা ফ্রেম স্ক্যান ও মূল্যায়ন করা হচ্ছে...');
 
     try {
       if (!isOpenCVLoaded()) {
@@ -567,11 +624,11 @@ export default function ExamBatchScanPage() {
         activeTemplate,
         parsedBubbles,
         undefined,
-        `Camera_Capture_${Date.now()}`,
+        `Camera_${Date.now()}`,
         { generateCanvases: false } // Prevent RAM explosion
       );
 
-      // Clean canvas memory
+      // Clean canvas memory immediately
       canvas.width = 0;
       canvas.height = 0;
 
@@ -593,19 +650,166 @@ export default function ExamBatchScanPage() {
         card.studentName = matched.name;
       }
 
+      // Enterprise Duplicate Sheet Interception
+      const fingerprint = `sheet_${card.rollNumber || ''}_${card.examSet}_${card.totalScore}`;
+      if (!suppressorRef.current.canCapture(fingerprint)) {
+        if (isAudioFeedback) ScannerAudioHaptics.playDuplicateSound();
+        setScanFeedbackBanner({
+          type: 'duplicate',
+          message: `⚠️ রোল ${card.rollNumber || 'অজ্ঞাত'} এর ওএমআর ইতিমধ্যে স্ক্যান করা হয়েছে!`
+        });
+        setTimeout(() => setScanFeedbackBanner(null), 3500);
+        return;
+      }
+      suppressorRef.current.recordCapture(fingerprint);
+
+      // Supermarket/POS Ascending Success Chime & Haptic Buzz
+      if (isAudioFeedback) ScannerAudioHaptics.playSuccessChirp();
+
       const updated = EvaluationEngine.rankCohort([...scoreCards, card]);
       const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
       setScanResults(prev => ({ ...prev, [scanRes.sheetId]: leanScanRes as any }));
       setScoreCards(updated);
-      setSelectedScoreCard(card);
+      setRecentFilmstrip(prev => [card, ...prev.slice(0, 4)]);
+      setScanFeedbackBanner({
+        type: 'success',
+        message: `✅ সফলভাবে রোল ${card.rollNumber} স্ক্যান হয়েছে! স্কোর: ${toBengaliNumerals(card.totalScore)}`
+      });
+      setTimeout(() => setScanFeedbackBanner(null), 3000);
       setStatusMessage(`সফলভাবে রোল: ${card.rollNumber} স্ক্যান ও গ্রেড হয়েছে (নম্বর: ${card.totalScore})!`);
     } catch (err: any) {
       console.error('Camera scan error:', err);
+      if (isAudioFeedback) ScannerAudioHaptics.playBlurWarning();
+      setScanFeedbackBanner({
+        type: 'error',
+        message: '❌ ওএমআর শনাক্ত করা যায়নি। শিটটি সোজা ও ফ্রেমের ভেতরে রাখুন।'
+      });
+      setTimeout(() => setScanFeedbackBanner(null), 3000);
       setStatusMessage('স্ক্যান ব্যর্থ হয়েছে: ' + err.message);
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
+
+  // Continuous Hands-Free Auto-Scanning Loop
+  useEffect(() => {
+    if (!isCameraActive || !isAutoScanning) {
+      if (autoScanIntervalRef.current) {
+        clearInterval(autoScanIntervalRef.current);
+        autoScanIntervalRef.current = null;
+      }
+      setMotionData(null);
+      return;
+    }
+
+    const motionCanvas = document.createElement('canvas');
+    motionCanvas.width = 160;
+    motionCanvas.height = 120;
+
+    autoScanIntervalRef.current = setInterval(async () => {
+      if (!videoRef.current || isProcessingRef.current) return;
+      const video = videoRef.current;
+      if (video.readyState < 2) return;
+
+      const motionCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+      motionCtx?.drawImage(video, 0, 0, 160, 120);
+      const analysis = motionAnalyzerRef.current.analyzeFrame(motionCanvas);
+      setMotionData(analysis);
+
+      // Re-arm when teacher slides old sheet away
+      if (analysis.motionDelta > 13) {
+        suppressorRef.current.onMotionSpikeDetected();
+      }
+
+      // Auto-trigger when paper settles stationary & sharp
+      if (analysis.isAutoCaptureReady && !isProcessingRef.current) {
+        await captureAndGrade();
+      }
+    }, 150);
+
+    return () => {
+      if (autoScanIntervalRef.current) {
+        clearInterval(autoScanIntervalRef.current);
+        autoScanIntervalRef.current = null;
+      }
+      motionCanvas.width = 0;
+      motionCanvas.height = 0;
+    };
+  }, [isCameraActive, isAutoScanning, isAudioFeedback, activeTemplate, parsedBubbles, evaluationConfig, studentDirectory, scoreCards]);
+
+  // Enterprise Cohort Analytics & Question Item Analysis
+  const analyticsData = useMemo(() => {
+    if (scoreCards.length === 0) return null;
+    const scores = scoreCards.map(c => c.totalScore);
+    const sum = scores.reduce((a, b) => a + b, 0);
+    const avg = parseFloat((sum / scores.length).toFixed(2));
+    const max = Math.max(...scores);
+    const min = Math.min(...scores);
+    const totalMarks = Number(exam?.totalMarks) || 100;
+    const passMarks = totalMarks * 0.40;
+    const passCount = scores.filter(s => s >= passMarks).length;
+    const passRate = parseFloat(((passCount / scores.length) * 100).toFixed(1));
+
+    // 5-Tier Score Distribution
+    const step = totalMarks / 5;
+    const bins = [
+      { label: `০ - ${Math.round(step)}`, count: 0, color: 'bg-rose-500' },
+      { label: `${Math.round(step) + 1} - ${Math.round(step * 2)}`, count: 0, color: 'bg-amber-500' },
+      { label: `${Math.round(step * 2) + 1} - ${Math.round(step * 3)}`, count: 0, color: 'bg-yellow-500' },
+      { label: `${Math.round(step * 3) + 1} - ${Math.round(step * 4)}`, count: 0, color: 'bg-blue-500' },
+      { label: `${Math.round(step * 4) + 1} - ${totalMarks}`, count: 0, color: 'bg-emerald-500' },
+    ];
+
+    scores.forEach(s => {
+      const ratio = Math.max(0, Math.min(0.99, s / totalMarks));
+      const idx = Math.min(4, Math.floor(ratio * 5));
+      bins[idx].count++;
+    });
+
+    // Item Difficulty (P-Value) Analysis
+    const questionStats: Record<string, { correct: number; incorrect: number; total: number; commonWrong: Record<string, number> }> = {};
+    scoreCards.forEach(c => {
+      Object.entries(c.questionVerdicts || {}).forEach(([qKey, verdict]) => {
+        if (!questionStats[qKey]) {
+          questionStats[qKey] = { correct: 0, incorrect: 0, total: 0, commonWrong: {} };
+        }
+        questionStats[qKey].total++;
+        if (verdict.verdict === 'correct') {
+          questionStats[qKey].correct++;
+        } else if (verdict.verdict === 'incorrect') {
+          questionStats[qKey].incorrect++;
+          const ans = verdict.studentAnswer || 'Blank';
+          questionStats[qKey].commonWrong[ans] = (questionStats[qKey].commonWrong[ans] || 0) + 1;
+        }
+      });
+    });
+
+    const itemDifficultyList = Object.entries(questionStats).map(([qKey, data]) => {
+      const pValue = data.total > 0 ? parseFloat((data.correct / data.total).toFixed(2)) : 0;
+      let topWrong = '';
+      let topWrongCount = 0;
+      for (const [ans, cnt] of Object.entries(data.commonWrong)) {
+        if (cnt > topWrongCount) {
+          topWrongCount = cnt;
+          topWrong = ans;
+        }
+      }
+
+      return {
+        qKey: qKey.toUpperCase(),
+        correctCount: data.correct,
+        incorrectCount: data.incorrect,
+        total: data.total,
+        pValue,
+        topWrong,
+        isHard: pValue < 0.40,
+        isEasy: pValue > 0.85
+      };
+    }).sort((a, b) => a.pValue - b.pValue); // Hardest questions first
+
+    return { avg, max, min, passRate, bins, itemDifficultyList };
+  }, [scoreCards, exam]);
 
   // Sync Cohort Results to Database
   const handleSyncToDatabase = async () => {
@@ -919,6 +1123,16 @@ export default function ExamBatchScanPage() {
             >
               <CheckCircle2 className="w-4 h-4" /> গ্রেডেড ফলাফল ({toBengaliNumerals(scoreCards.length)})
             </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'analytics'
+                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 ring-1 ring-amber-400'
+                  : 'bg-slate-800/80 text-slate-400 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" /> পরিসংখ্যান ও অ্যানালিটিক্স
+            </button>
           </div>
 
           {/* Sync to DB Button */}
@@ -1011,23 +1225,24 @@ export default function ExamBatchScanPage() {
                 </label>
               </div>
 
-              {/* Progress and Real-time Status */}
+              {/* Modern Web Guidance: Native Progress with Compositor Accelerated Animation */}
               {isProcessing && (
-                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-slate-300">
-                    <span>{statusMessage}</span>
-                    <span>
-                      {toBengaliNumerals(progress.current)} / {toBengaliNumerals(progress.total)}
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-2.5">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-300">
+                    <span role="status" aria-live="polite" className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                      {statusMessage}
+                    </span>
+                    <span className="font-mono bg-slate-800 px-2 py-0.5 rounded text-[11px] text-indigo-300 border border-slate-700">
+                      {toBengaliNumerals(progress.current)} / {toBengaliNumerals(progress.total)} ({progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}%)
                     </span>
                   </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-indigo-500 h-full transition-all duration-300"
-                      style={{
-                        width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
-                      }}
-                    ></div>
-                  </div>
+                  <progress
+                    className="omr-progress-bar"
+                    value={progress.total > 0 ? progress.current : undefined}
+                    max={progress.total > 0 ? progress.total : undefined}
+                    aria-label="OMR ব্যাচ প্রসেসিং অগ্রগতি"
+                  />
                 </div>
               )}
             </div>
@@ -1078,10 +1293,73 @@ export default function ExamBatchScanPage() {
           </div>
         )}
 
-        {/* TAB 2: LIVE CAMERA SCANNER */}
+        {/* TAB 2: ENTERPRISE LIVE CAMERA SCANNER & HANDS-FREE AUTO-HUD */}
         {activeTab === 'camera' && (
-          <div className="space-y-4 max-w-2xl mx-auto">
-            <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video flex items-center justify-center">
+          <div className="space-y-4 max-w-3xl mx-auto">
+            {/* Camera Control Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAutoScanning(prev => !prev)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    isAutoScanning
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400'
+                      : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                  }`}
+                >
+                  {isAutoScanning ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 text-white animate-pulse" />
+                      <span>অটো-স্ক্যানার: সক্রিয় (হ্যান্ডস-ফ্রি)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>অটো-স্ক্যানার চালু করুন</span>
+                    </>
+                  )}
+                </button>
+
+                {isTorchSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isTorchOn
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/30'
+                        : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                    }`}
+                  >
+                    {isTorchOn ? <Flashlight className="w-3.5 h-3.5" /> : <FlashlightOff className="w-3.5 h-3.5" />}
+                    <span>টর্চ {isTorchOn ? 'চালু' : 'বন্ধ'}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAudioFeedback(prev => !prev)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition"
+                  title="সাউন্ড ও হ্যাপটিক ভাইব্রেশন"
+                >
+                  {isAudioFeedback ? <Volume2 className="w-3.5 h-3.5 text-indigo-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+                  <span>{isAudioFeedback ? 'সাউন্ড অন' : 'মিউট'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/60 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  ক্যামেরা বন্ধ
+                </button>
+              </div>
+            </div>
+
+            {/* Video Viewfinder & Target Reticle HUD */}
+            <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 aspect-video flex items-center justify-center shadow-2xl">
               <video
                 ref={videoRef}
                 playsInline
@@ -1090,37 +1368,161 @@ export default function ExamBatchScanPage() {
               />
               <canvas ref={cameraCanvasRef} className="hidden" />
 
-              {/* Target Alignment Overlay */}
-              <div className="absolute inset-8 border-2 border-dashed border-indigo-400/60 rounded-xl pointer-events-none flex items-center justify-center">
-                <span className="bg-slate-950/80 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/40">
-                  OMR শিটটি ফ্রেমের ভেতরে রাখুন
-                </span>
+              {/* Dynamic 4-Corner Reticle Brackets */}
+              <div className="absolute inset-6 sm:inset-10 pointer-events-none">
+                {/* Top-Left Bracket */}
+                <div
+                  className={`absolute top-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-t-3 border-l-3 rounded-tl-xl transition-all duration-200 ${
+                    motionData?.isAutoCaptureReady
+                      ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-105'
+                      : motionData?.motionState === 'SETTLING'
+                      ? 'border-amber-400'
+                      : 'border-indigo-400/80'
+                  }`}
+                />
+                {/* Top-Right Bracket */}
+                <div
+                  className={`absolute top-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-t-3 border-r-3 rounded-tr-xl transition-all duration-200 ${
+                    motionData?.isAutoCaptureReady
+                      ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-105'
+                      : motionData?.motionState === 'SETTLING'
+                      ? 'border-amber-400'
+                      : 'border-indigo-400/80'
+                  }`}
+                />
+                {/* Bottom-Left Bracket */}
+                <div
+                  className={`absolute bottom-0 left-0 w-8 h-8 sm:w-12 sm:h-12 border-b-3 border-l-3 rounded-bl-xl transition-all duration-200 ${
+                    motionData?.isAutoCaptureReady
+                      ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-105'
+                      : motionData?.motionState === 'SETTLING'
+                      ? 'border-amber-400'
+                      : 'border-indigo-400/80'
+                  }`}
+                />
+                {/* Bottom-Right Bracket */}
+                <div
+                  className={`absolute bottom-0 right-0 w-8 h-8 sm:w-12 sm:h-12 border-b-3 border-r-3 rounded-br-xl transition-all duration-200 ${
+                    motionData?.isAutoCaptureReady
+                      ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] scale-105'
+                      : motionData?.motionState === 'SETTLING'
+                      ? 'border-amber-400'
+                      : 'border-indigo-400/80'
+                  }`}
+                />
+
+                {/* Center Motion Status Beacon */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                  <div className="bg-slate-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-bold border border-slate-700/80 flex items-center gap-2 shadow-xl">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        motionData?.isAutoCaptureReady
+                          ? 'bg-emerald-400 animate-ping'
+                          : motionData?.motionState === 'SETTLING'
+                          ? 'bg-amber-400 animate-pulse'
+                          : 'bg-indigo-400'
+                      }`}
+                    />
+                    <span className="text-white">
+                      {motionData
+                        ? motionData.isAutoCaptureReady
+                          ? '🟢 ওএমআর স্থির ও ফোকাসড — স্বয়ংক্রিয় ক্যাপচার হচ্ছে...'
+                          : motionData.motionState === 'SETTLING'
+                          ? '🟡 ক্যামেরা স্থির হচ্ছে, অপেক্ষা করুন...'
+                          : '🔴 ওএমআর শিটটি ফ্রেমের ভেতরে স্থির রাখুন'
+                        : 'OMR শিটটি ফ্রেমের ভেতরে রাখুন'}
+                    </span>
+                  </div>
+
+                  {/* Sharpness & Motion HUD Bar */}
+                  {motionData && (
+                    <div className="flex items-center gap-3 bg-slate-950/80 backdrop-blur-sm px-3 py-1 rounded-lg text-[10px] text-slate-300 border border-slate-800 font-mono">
+                      <span>শার্পনেস: {motionData.sharpnessScore}%</span>
+                      <span>•</span>
+                      <span>মোশন ডেল্টা: {motionData.motionDelta}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Toast Feedback Banner Overlay */}
+              {scanFeedbackBanner && (
+                <div
+                  className={`absolute top-4 inset-x-4 sm:inset-x-12 p-3 rounded-xl border text-xs font-bold text-center backdrop-blur-md shadow-2xl transition-all z-20 animate-in fade-in slide-in-from-top-3 ${
+                    scanFeedbackBanner.type === 'success'
+                      ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200'
+                      : scanFeedbackBanner.type === 'duplicate'
+                      ? 'bg-amber-950/90 border-amber-500 text-amber-200'
+                      : 'bg-rose-950/90 border-rose-500 text-rose-200'
+                  }`}
+                >
+                  {scanFeedbackBanner.message}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-center gap-3">
+            {/* Manual Trigger & Diagnostics */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              <div className="text-xs text-slate-400 font-medium">
+                {isAutoScanning ? (
+                  <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                    <Activity className="w-3.5 h-3.5 animate-pulse" />
+                    হ্যান্ডস-ফ্রি মোড সক্রিয়: ক্যামেরা স্থির হলেই স্বয়ংক্রিয় স্ক্যান হবে
+                  </span>
+                ) : (
+                  <span>ম্যানুয়াল মোড: নিচে বাটন চাপুন অথবা হ্যান্ডস-ফ্রি চালু করুন</span>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={captureAndGrade}
                 disabled={isProcessing}
-                className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/30 flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
               >
                 <Camera className="w-4 h-4" />
                 {isProcessing ? 'স্ক্যান হচ্ছে...' : 'ছবি তুলুন ও গ্রেড করুন'}
               </button>
-              <button
-                type="button"
-                onClick={stopCamera}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
-              >
-                ক্যামেরা বন্ধ করুন
-              </button>
             </div>
 
-            {statusMessage && (
-              <p className="text-center text-xs font-semibold text-indigo-300">
-                {statusMessage}
-              </p>
+            {/* Live Filmstrip of Recent Captures */}
+            {recentFilmstrip.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-400 px-1">
+                  <span>সর্বশেষ স্ক্যানকৃত ওএমআর ({toBengaliNumerals(recentFilmstrip.length)} টি)</span>
+                  <button
+                    onClick={() => setActiveTab('results')}
+                    className="text-indigo-400 hover:underline cursor-pointer"
+                  >
+                    সকল ফলাফল দেখুন ➔
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {recentFilmstrip.map((c, i) => (
+                    <div
+                      key={c.sheetId || i}
+                      onClick={() => setSelectedScoreCard(c)}
+                      className="bg-slate-900/90 border border-slate-800 hover:border-indigo-500 p-2.5 rounded-xl cursor-pointer transition-all hover:scale-102 space-y-1"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-white">রোল: {c.rollNumber}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-slate-800 text-[10px] font-bold text-slate-300">
+                          {c.examSet}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-emerald-400">
+                          {toBengaliNumerals(c.totalScore)} / {toBengaliNumerals(c.maxScore)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {toBengaliNumerals(c.percentage)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1239,6 +1641,183 @@ export default function ExamBatchScanPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: ENTERPRISE COHORT ANALYTICS & ITEM ANALYSIS */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {!analyticsData ? (
+              <div className="p-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                পরিসংখ্যান ও অ্যানালিটিক্স দেখার জন্য প্রথমে ফাইল আপলোড বা ক্যামেরা দিয়ে ওএমআর খাতা স্ক্যান করুন।
+              </div>
+            ) : (
+              <>
+                {/* 4 Executive KPI Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card 1: Total Candidates */}
+                  <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl relative overflow-hidden backdrop-blur-md">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-bold mb-1">
+                      <span>মোট পরীক্ষার্থী</span>
+                      <Award className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div className="text-2xl font-black text-white font-mono">
+                      {toBengaliNumerals(scoreCards.length)} <span className="text-xs text-slate-400 font-normal">জন</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      ১০০% ওএমআর মূল্যায়ন সম্পন্ন
+                    </div>
+                  </div>
+
+                  {/* Card 2: Average Score */}
+                  <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl relative overflow-hidden backdrop-blur-md">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-bold mb-1">
+                      <span>গড় নম্বর</span>
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-400 font-mono">
+                      {toBengaliNumerals(analyticsData.avg)} <span className="text-xs text-slate-400 font-normal">/ {toBengaliNumerals(exam.totalMarks)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      মেধা বেঞ্চমার্ক: {toBengaliNumerals(((analyticsData.avg / (Number(exam.totalMarks) || 100)) * 100).toFixed(1))}%
+                    </div>
+                  </div>
+
+                  {/* Card 3: Top Score */}
+                  <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl relative overflow-hidden backdrop-blur-md">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-bold mb-1">
+                      <span>সর্বোচ্চ ও সর্বনিম্ন</span>
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="text-2xl font-black text-amber-400 font-mono">
+                      {toBengaliNumerals(analyticsData.max)} <span className="text-xs text-slate-400 font-normal">/ {toBengaliNumerals(analyticsData.min)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      স্কোর ডিফারেনশিয়াল: {toBengaliNumerals((analyticsData.max - analyticsData.min).toFixed(1))}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Pass Rate */}
+                  <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl relative overflow-hidden backdrop-blur-md">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-bold mb-1">
+                      <span>পাস হার (৪০%)</span>
+                      <CheckCircle2 className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div className="text-2xl font-black text-purple-400 font-mono">
+                      {toBengaliNumerals(analyticsData.passRate)}%
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      কৃতকার্য পরীক্ষার্থী অনুপাত
+                    </div>
+                  </div>
+                </div>
+
+                {/* Score Distribution Chart & Item Difficulty Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Score Distribution Histogram */}
+                  <div className="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-indigo-400" /> স্কোর বণ্টন বিশ্লেষণ (Histogram)
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      {analyticsData.bins.map((b, idx) => {
+                        const pct = scoreCards.length > 0 ? (b.count / scoreCards.length) * 100 : 0;
+                        return (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-300 font-medium">নম্বর {toBengaliNumerals(b.label)}</span>
+                              <span className="font-mono text-slate-400">
+                                {toBengaliNumerals(b.count)} জন ({toBengaliNumerals(Math.round(pct))}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                              <div
+                                className={`${b.color} h-full rounded-full transition-all duration-500`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Question Item Difficulty Diagnostics (Hardest Questions) */}
+                  <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 p-5 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 text-rose-400" /> প্রশ্নভিত্তিক কাঠিন্য সূচক (Item Difficulty P-Value)
+                      </h3>
+                      <span className="text-[11px] text-slate-400">
+                        কঠিনতম প্রশ্নগুলো শীর্ষে সাজানো
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs text-slate-300">
+                        <thead className="bg-slate-950/80 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="py-2 px-3 font-bold">প্রশ্ন নং</th>
+                            <th className="py-2 px-3 font-bold text-center">সঠিক উত্তর</th>
+                            <th className="py-2 px-3 font-bold text-center">ভুল উত্তর</th>
+                            <th className="py-2 px-3 font-bold text-center">কাঠিন্য সূচক (P-Value)</th>
+                            <th className="py-2 px-3 font-bold">শিক্ষার্থীর প্রধান ভুল অপশন</th>
+                            <th className="py-2 px-3 font-bold text-center">পর্যালোচনা স্ট্যাটাস</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono">
+                          {analyticsData.itemDifficultyList.slice(0, 10).map(q => (
+                            <tr key={q.qKey} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="py-2 px-3 font-bold text-white">
+                                {q.qKey}
+                              </td>
+                              <td className="py-2 px-3 text-center text-emerald-400 font-bold">
+                                {toBengaliNumerals(q.correctCount)}
+                              </td>
+                              <td className="py-2 px-3 text-center text-rose-400 font-bold">
+                                {toBengaliNumerals(q.incorrectCount)}
+                              </td>
+                              <td className="py-2 px-3 text-center font-bold">
+                                <span className={`px-2 py-0.5 rounded text-[11px] ${
+                                  q.isHard
+                                    ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                                    : q.isEasy
+                                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                                    : 'bg-slate-800 text-slate-200'
+                                }`}>
+                                  {toBengaliNumerals(q.pValue)}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-amber-300 font-semibold">
+                                {q.topWrong ? `অপশন ${q.topWrong}` : '—'}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                {q.isHard ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400">
+                                    <AlertTriangle className="w-3 h-3 text-rose-400" /> ক্লাসে রিভিশন জরুরি
+                                  </span>
+                                ) : q.isEasy ? (
+                                  <span className="text-[10px] text-emerald-400 font-semibold">
+                                    সহজ প্রশ্ন
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400">
+                                    স্বাভাবিক
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}

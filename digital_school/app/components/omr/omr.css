@@ -1130,3 +1130,80 @@
   }
 }
 
+/* ==========================================================================
+   ENTERPRISE OMR PROGRESS & CAMERA HUD STYLES
+   ========================================================================== */
+.omr-progress-bar {
+  appearance: none;
+  border: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: rgba(30, 41, 59, 0.8);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  container-type: inline-size;
+}
+
+.omr-progress-bar::-webkit-progress-bar {
+  background: transparent;
+}
+
+.omr-progress-bar::-webkit-progress-value {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #10b981);
+  border-radius: 9999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.omr-progress-bar::-moz-progress-bar {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #10b981);
+  border-radius: 9999px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.omr-progress-bar:indeterminate {
+  --progress-bar-indeterminate-size: 35%;
+  --progress-bar-indeterminate-duration: 1.4s;
+  background: rgba(30, 41, 59, 0.9);
+}
+
+@keyframes omr-progress-indeterminate {
+  from, to {
+    inline-size: var(--progress-bar-indeterminate-size, 35%);
+    margin-right: auto;
+  }
+  from { translate: -100%; }
+  to { translate: 100cqi; }
+}
+
+.omr-progress-bar:indeterminate::-webkit-progress-value {
+  animation: omr-progress-indeterminate var(--progress-bar-indeterminate-duration, 1.4s) infinite linear;
+}
+
+.omr-progress-bar:indeterminate::-moz-progress-bar {
+  animation: omr-progress-indeterminate var(--progress-bar-indeterminate-duration, 1.4s) infinite linear;
+}
+
+.omr-camera-reticle {
+  position: absolute;
+  pointer-events: none;
+  border-color: rgba(99, 102, 241, 0.85);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.omr-camera-reticle.ready {
+  border-color: #10b981;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.45);
+}
+
+.omr-camera-reticle.moving {
+  border-color: #f43f5e;
+  box-shadow: 0 0 15px rgba(244, 63, 94, 0.35);
+}
+
+.omr-camera-reticle.settling {
+  border-color: #f59e0b;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.35);
+}
+
+
