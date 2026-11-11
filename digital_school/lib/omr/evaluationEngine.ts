@@ -48,6 +48,14 @@ export class EvaluationEngine {
     const serialNo = concatenatedResponses[serialField] || responses[serialField]?.join('') || '';
     const examSet = concatenatedResponses[setField] || responses[setField]?.join('') || 'A';
 
+    // CQ Cover Sheet fields
+    const regNo = concatenatedResponses['Registration'] || responses['Registration']?.join('') || undefined;
+    const subCode = concatenatedResponses['SubjectCode'] || responses['SubjectCode']?.join('') || 
+                    concatenatedResponses['SubjectCodePart2'] || responses['SubjectCodePart2']?.join('') || undefined;
+    const scriptSerial = concatenatedResponses['ScriptSerial'] || responses['ScriptSerial']?.join('') || undefined;
+    const cqObtainedMarks = concatenatedResponses['ObtainedMarks'] || responses['ObtainedMarks']?.join('');
+    const isCQ = Boolean(cqObtainedMarks || concatenatedResponses['SubjectCodePart2'] || concatenatedResponses['ScriptSerial']);
+
     // Resolve set-specific answer key if multi-set keys are configured
     let answerKey = this.config.answerKey;
     if (this.config.multiSetAnswerKeys) {
@@ -171,13 +179,23 @@ export class EvaluationEngine {
       };
     }
 
+    // For CQ Top Sheet: If ObtainedMarks bubbles are present, set directly as totalScore
+    if (isCQ && cqObtainedMarks && !isNaN(Number(cqObtainedMarks))) {
+      totalScore = parseFloat(cqObtainedMarks);
+      maxScore = maxScore > 0 ? maxScore : 100;
+    }
+
     const percentage = maxScore > 0 ? parseFloat(((totalScore / maxScore) * 100).toFixed(2)) : 0;
-    const needsReview = studentFlags.length > 0 || totalScore < 0 || unmarkedCount > Object.keys(answerKey).length * 0.7;
+    const needsReview = studentFlags.length > 0 || totalScore < 0 || (Object.keys(answerKey).length > 0 && unmarkedCount > Object.keys(answerKey).length * 0.7);
 
     return {
       sheetId,
       filename,
       rollNumber,
+      registrationNo: regNo,
+      subjectCode: subCode,
+      scriptSerial,
+      isCQScript: isCQ,
       serialNo,
       examSet,
       totalScore: parseFloat(totalScore.toFixed(2)),

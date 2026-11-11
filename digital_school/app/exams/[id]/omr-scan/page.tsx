@@ -1578,7 +1578,19 @@ export default function ExamBatchScanPage() {
                           #{toBengaliNumerals(card.rank || 1)}
                         </td>
                         <td className="py-2 px-3 font-bold text-white">
-                          {card.rollNumber}
+                          <div className="flex items-center gap-1.5">
+                            <span>{card.rollNumber}</span>
+                            {card.isCQScript && (
+                              <span className="px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 text-[9px] font-bold">
+                                CQ
+                              </span>
+                            )}
+                          </div>
+                          {card.registrationNo && (
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              রেজি: {card.registrationNo}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-3 font-medium text-slate-200">
                           {card.studentName || (
@@ -1845,36 +1857,102 @@ export default function ExamBatchScanPage() {
               </button>
             </div>
 
-            <div className="p-4 flex-1 overflow-y-auto space-y-2 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
-                <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                  <div className="text-[10px] text-slate-400">সঠিক উত্তর</div>
-                  <div className="text-sm font-bold text-emerald-400">
-                    {toBengaliNumerals(selectedScoreCard.correctCount)}
+            <div className="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+              {/* CQ Script Specialized Identification View */}
+              {selectedScoreCard.isCQScript ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-300 flex items-center gap-1.5 text-xs">
+                        <FileText className="w-4 h-4 text-purple-400" />
+                        বোর্ড সৃজনশীল (CQ) স্ক্রিপ্ট আইডেন্টিফিকেশন
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-200 text-[10px] font-bold border border-purple-700/50">
+                        টপশিট ও প্রাপ্ত নম্বর ওএমআর
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-1">
+                      <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <div className="text-[10px] text-slate-400">রোল নম্বর</div>
+                        <div className="text-sm font-bold text-white font-mono">
+                          {selectedScoreCard.rollNumber || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <div className="text-[10px] text-slate-400">রেজিস্ট্রেশন নম্বর</div>
+                        <div className="text-sm font-bold text-indigo-300 font-mono">
+                          {selectedScoreCard.registrationNo || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <div className="text-[10px] text-slate-400">বিষয় কোড</div>
+                        <div className="text-sm font-bold text-amber-300 font-mono">
+                          {selectedScoreCard.subjectCode || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
+                        <div className="text-[10px] text-slate-400">উত্তরপত্র ক্রমিক</div>
+                        <div className="text-sm font-bold text-emerald-300 font-mono">
+                          {selectedScoreCard.scriptSerial || selectedScoreCard.serialNo || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="text-[11px] text-slate-400">শিক্ষক প্রদত্ত প্রাপ্ত নম্বর (Obtained Marks):</div>
+                        <div className="text-lg font-bold text-emerald-400 font-mono">
+                          {toBengaliNumerals(selectedScoreCard.totalScore)} / {toBengaliNumerals(selectedScoreCard.maxScore)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-950 border border-emerald-800 text-emerald-300 text-xs font-bold">
+                          {toBengaliNumerals(selectedScoreCard.percentage)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedScoreCard.studentName && (
+                      <div className="p-2 bg-slate-900 rounded-lg border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                        <span>শনাক্তকৃত শিক্ষার্থী: <strong className="text-white">{selectedScoreCard.studentName}</strong></span>
+                        <span className="text-[10px] text-slate-400 font-mono">ID: {selectedScoreCard.studentId}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                  <div className="text-[10px] text-slate-400">ভুল উত্তর</div>
-                  <div className="text-sm font-bold text-rose-400">
-                    {toBengaliNumerals(selectedScoreCard.incorrectCount)}
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
+                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">সঠিক উত্তর</div>
+                    <div className="text-sm font-bold text-emerald-400">
+                      {toBengaliNumerals(selectedScoreCard.correctCount)}
+                    </div>
+                  </div>
+                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">ভুল উত্তর</div>
+                    <div className="text-sm font-bold text-rose-400">
+                      {toBengaliNumerals(selectedScoreCard.incorrectCount)}
+                    </div>
+                  </div>
+                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">ফাঁকা</div>
+                    <div className="text-sm font-bold text-slate-400">
+                      {toBengaliNumerals(selectedScoreCard.unmarkedCount)}
+                    </div>
+                  </div>
+                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">শতাংশ</div>
+                    <div className="text-sm font-bold text-indigo-400">
+                      {toBengaliNumerals(selectedScoreCard.percentage)}%
+                    </div>
                   </div>
                 </div>
-                <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                  <div className="text-[10px] text-slate-400">ফাঁকা</div>
-                  <div className="text-sm font-bold text-slate-400">
-                    {toBengaliNumerals(selectedScoreCard.unmarkedCount)}
-                  </div>
-                </div>
-                <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                  <div className="text-[10px] text-slate-400">শতাংশ</div>
-                  <div className="text-sm font-bold text-indigo-400">
-                    {toBengaliNumerals(selectedScoreCard.percentage)}%
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* Questions Grid */}
-              <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+              {!selectedScoreCard.isCQScript && (
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                 {Object.entries(selectedScoreCard.questionVerdicts || {}).map(([qKey, verdict]) => {
                   const isCorrect = verdict.verdict === 'correct';
                   const isIncorrect = verdict.verdict === 'incorrect';

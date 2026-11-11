@@ -155,6 +155,10 @@ export interface StudentScoreCard {
   sheetId: string;
   filename: string;
   rollNumber: string;
+  registrationNo?: string;
+  subjectCode?: string;
+  scriptSerial?: string;
+  isCQScript?: boolean;
   serialNo?: string;
   studentName?: string;
   studentId?: string;

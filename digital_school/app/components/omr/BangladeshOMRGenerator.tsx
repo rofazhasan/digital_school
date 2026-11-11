@@ -17,6 +17,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import type { Template } from '@/lib/omr/types';
 import { toBengaliNumerals as toBanglaNumber } from '@/utils/numeralConverter';
+import { BangladeshBoardCQ3PartSheet } from './BangladeshBoardCQ3PartSheet';
 import './omr.css';
 
 interface BangladeshOMRGeneratorProps {
@@ -34,6 +35,7 @@ export type PresetType =
   | 'du_admission' 
   | 'gst_cluster' 
   | 'agri_cluster' 
+  | 'board_cq_3part'
   | 'custom';
 
 export type ThemeColor = 'magenta' | 'blue' | 'black' | 'green';
@@ -207,6 +209,27 @@ export function BangladeshOMRGenerator({
       setShowBarcodeSecurity(true);
       setSerialNumber('AGRI-2026-881204');
       setStatusMessage('Loaded Agriculture Cluster 5-Column 100-Question Preset');
+    } else if (preset === 'board_cq_3part') {
+      setInstituteNameBangla('মাধ্যমিক ও উচ্চ মাধ্যমিক শিক্ষা বোর্ড, ঢাকা');
+      setExamTitleBangla('এস.এস.সি / এইচ.এস.সি / ডিআইবিএস পরীক্ষা');
+      setNumQuestions(20);
+      setNumColumns(1);
+      setLayoutMode('split');
+      setOptionLanguage('BANGLA');
+      setNumberingLanguage('BANGLA');
+      setThemeColor('magenta');
+      setShowRollNumber(true);
+      setRollDigits(6);
+      setShowRegNumber(true);
+      setRegDigits(10);
+      setShowSubjectCode(true);
+      setSubjectCodeDigits(3);
+      setShowSetCode(false);
+      setShowSignatures(true);
+      setShowInstructions(true);
+      setShowBarcodeSecurity(true);
+      setSerialNumber('T2301139641');
+      setStatusMessage('Loaded Official Bangladesh Board 3-Part CQ Script Cover Sheet (সৃজনশীল ও রচনামূলক)');
     }
   };
 
@@ -464,6 +487,7 @@ export function BangladeshOMRGenerator({
           <span className="chips-label"><Bookmark size={15} /> Official Presets:</span>
           {[
             { id: 'hsc_ssc_50', label: 'HSC / SSC 50-Q (Board Authentic)' },
+            { id: 'board_cq_3part', label: '📝 Board CQ 3-Part Cover (সৃজনশীল)' },
             { id: 'hsc_ssc_25', label: 'HSC 25-Q (Short Syllabus)' },
             { id: 'medical_100', label: 'Medical & Dental 100-Q (DGHS)' },
             { id: 'du_admission', label: 'DU Ka/Kha 60-Q (Dhaka Univ)' },
@@ -753,16 +777,27 @@ export function BangladeshOMRGenerator({
 
         {/* Right Side: Pixel-Perfect Printable A4 Sheet Viewport */}
         <div className="generator-sheet-viewport">
-          <div 
-            className={`bd-omr-printable-sheet layout-${layoutMode}`} 
-            ref={printContainerRef}
-            style={{
-              '--omr-theme': themeStyles.primary,
-              '--omr-theme-stripe': themeStyles.stripe,
-              '--omr-theme-bg': themeStyles.lightBg,
-              '--omr-theme-border': themeStyles.border,
-            } as any}
-          >
+          {selectedPreset === 'board_cq_3part' ? (
+            <div ref={printContainerRef} className="w-full flex justify-center">
+              <BangladeshBoardCQ3PartSheet
+                serialNumber={serialNumber}
+                examYear={examYear}
+                examId={examId}
+                instituteName={instituteNameBangla}
+                themeColor={themeColor as any}
+              />
+            </div>
+          ) : (
+            <div 
+              className={`bd-omr-printable-sheet layout-${layoutMode}`} 
+              ref={printContainerRef}
+              style={{
+                '--omr-theme': themeStyles.primary,
+                '--omr-theme-stripe': themeStyles.stripe,
+                '--omr-theme-bg': themeStyles.lightBg,
+                '--omr-theme-border': themeStyles.border,
+              } as any}
+            >
             {/* 4 Corner High-Precision Optical Registration Markers */}
             <div className="fiducial-marker top-left">
               <div className="marker-cross-circle">
@@ -1258,6 +1293,7 @@ export function BangladeshOMRGenerator({
             {/* Bottom Optical Registration Bar */}
             <div className="timing-marker-bottom-center"></div>
           </div>
+        )}
         </div>
       </div>
     </div>
