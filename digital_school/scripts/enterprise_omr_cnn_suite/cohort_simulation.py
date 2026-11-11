@@ -182,3 +182,4 @@ class StandardOMRSheetGenerator:
                         cv2.circle(img, (bx, cy), 10, (25, 20, 20), -1)
 
         return img, bubble_coords
+

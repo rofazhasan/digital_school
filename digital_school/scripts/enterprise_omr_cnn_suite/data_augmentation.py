@@ -201,3 +201,4 @@ class PhysicalAugmentationPipeline:
             cv2.line(image, p3, p4, ink_color, thickness=2)
 
         return image
+

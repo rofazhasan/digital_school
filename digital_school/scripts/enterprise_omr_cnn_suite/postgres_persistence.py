@@ -235,3 +235,4 @@ def batch_insert_tabulations(conn, tabulations):
     psycopg2.extras.execute_values(cur, query, records)
     conn.commit()
     cur.close()
+
