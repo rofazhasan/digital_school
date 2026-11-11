@@ -134,13 +134,26 @@
 }
 
 .generator-sheet-viewport {
-  background: #1e1b4b;
-  border: 1px solid var(--glass-border);
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 2rem 1rem;
-  overflow: auto;
+  padding: 1.5rem 1rem;
+  overflow-x: auto;
+  overflow-y: visible;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.sheet-zoom-ribbon {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.sheet-zoom-container {
+  transform-origin: top center;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 2rem;
 }
 
 /* ==========================================================================
@@ -918,7 +931,8 @@
   .main-content,
   .bangladesh-omr-generator,
   .generator-split-layout,
-  .generator-sheet-viewport {
+  .generator-sheet-viewport,
+  .sheet-zoom-container {
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
