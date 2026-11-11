@@ -1973,7 +1973,8 @@ export default function ExamBatchScanPage() {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between gap-3">
