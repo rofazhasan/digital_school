@@ -54,7 +54,7 @@ CANONICAL_FIDS = np.float32([
 ])
 
 def get_base_cq_sheet():
-    pdf_path = '/Users/md.rofazhasanrafiu/.gemini/antigravity/brain/5ff4c3cc-1a5d-46d8-9446-9c98479f2926/cq_formal_same_line_verified.pdf'
+    pdf_path = '/Users/md.rofazhasanrafiu/.gemini/antigravity/brain/5ff4c3cc-1a5d-46d8-9446-9c98479f2926/cq_double_line_formal_verified.pdf'
     doc = fitz.open(pdf_path)
     page = doc[0]
     pix = page.get_pixmap(dpi=150)
