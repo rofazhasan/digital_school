@@ -54,7 +54,7 @@ CANONICAL_FIDS = np.float32([
 ])
 
 def get_base_cq_sheet():
-    pdf_path = '/Users/md.rofazhasanrafiu/.gemini/antigravity/brain/5ff4c3cc-1a5d-46d8-9446-9c98479f2926/cq_worldclass_verified.pdf'
+    pdf_path = '/Users/md.rofazhasanrafiu/.gemini/antigravity/brain/5ff4c3cc-1a5d-46d8-9446-9c98479f2926/cq_formal_same_line_verified.pdf'
     doc = fitz.open(pdf_path)
     page = doc[0]
     pix = page.get_pixmap(dpi=150)
@@ -89,10 +89,6 @@ class CalibratedCQScanner:
         # Part 1 Exam Type
         ex_cx, ex_cy = P1_EXAM_BUBBLES[ground_truth['exam_type']]
         fill_bubble(ex_cx, ex_cy, fill_quality=ground_truth['quality'])
-
-        # Part 1 Set Code
-        set_cx, set_cy = P1_SET_BUBBLES[ground_truth['set_code']]
-        fill_bubble(set_cx, set_cy, fill_quality=ground_truth['quality'])
 
         # Part 1 Roll Number (6 digits)
         for col, digit in enumerate(ground_truth['roll']):
@@ -270,10 +266,6 @@ class CalibratedCQScanner:
         exam_d, _, _ = self.decode_discrete_bubbles(gray, P1_EXAM_BUBBLES)
         decoded['exam_type'] = exam_d
 
-        # Part 1 Set Code
-        set_d, _, _ = self.decode_discrete_bubbles(gray, P1_SET_BUBBLES)
-        decoded['set_code'] = set_d
-
         # Part 1 Roll Number (6)
         decoded_roll = []
         for cx in P1_ROLL_COLS:
@@ -365,7 +357,6 @@ def run_calibrated_benchmark(num_sheets=100):
         'reg': 0,
         'sub': 0,
         'extra': 0,
-        'set_code': 0,
         'exam_type': 0,
         'p2_sub': 0,
         'p2_ex': 0,
@@ -386,7 +377,6 @@ def run_calibrated_benchmark(num_sheets=100):
             'reg': [random.randint(0, 9) for _ in range(10)],
             'sub': [random.randint(0, 9) for _ in range(3)],
             'extra': [random.randint(0, 2), random.randint(0, 9)],
-            'set_code': random.randint(0, 3),
             'exam_type': random.randint(0, 2),
             'p2_sub': [random.randint(0, 9) for _ in range(3)],
             'p2_ex': [random.randint(0, 9) for _ in range(4)],
