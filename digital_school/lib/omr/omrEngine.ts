@@ -1,23 +1,38 @@
+/**
+ * Production-Grade Optical Mark Recognition Engine (v3) for Digital School
+ *
+ * Includes:
+ *  - Multi-pass QR Code Exam/Set Auto-Detection (0/90/180/270 deg + high-contrast header fallback)
+ *  - Strict Spread Guard + 4-Way Orientation + Geometric Fiducial & Page-Contour Perspective Warp
+ *  - Automatic Color-Channel Dropout (Magenta/Pink Board Forms) + Morphological Illumination Flattening
+ *  - Blur/Sharpness Assessment + Adaptive Unsharp Deconvolution for Fuzzy Photos
+ *  - 2-Level Grid Registration (Block-Level Rigid Shift + Constrained Subpixel Centroid Refinement)
+ *  - Concentric Circular Core + Local Outer-Annulus Paper Normalization (Optical Density)
+ *  - Ensemble Classifier: Tri-Modal GMM + Blank-Paper Baseline MAD Z-Score + 16x16 Micro-CNN
+ */
+
 import jsQR from 'jsqr';
-import type { 
-  BubblePoint, 
-  Template, 
-  ScanProcessingResult, 
+import type {
+  BubblePoint,
+  Template,
+  ScanProcessingResult,
   BubbleDetectionResult,
   StateMachineAuditReport,
-  QRCodeScanResult
+  QRCodeScanResult,
+  ScanQualityMetrics,
 } from './types';
 import { resolveConcatenatedFields } from './templateParser';
 import { createOmrScanStateMachine, getOmrStateName } from './omrScanStateMachine';
-import { 
-  refineBubbleCentroid, 
-  fitTriModalGMM, 
-  computeGMMPosterior, 
-  extractPatchTexture 
+import {
+  alignFieldBlockGrid,
+  refineBubbleCentroid,
+  sampleBubbleConcentric,
+  fitTriModalGMM,
+  computeGMMPosterior,
 } from './mathematicalModels';
-import { 
-  extractNormalized16x16Patch, 
-  predictBubbleNeural 
+import {
+  extractNormalized16x16Patch,
+  predictBubbleNeural,
 } from './neuralBubbleClassifier';
 
 export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResult {
@@ -25,7 +40,7 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
     return { found: false, rawText: null };
   }
 
-  const parsePayload = (data: string): { examId?: string; setId?: string; setName?: string; template?: string; title?: string; v?: number; [k: string]: any } => {
+  const parsePayload = (data: string): Record<string, any> => {
     let parsed: any = {};
     try {
       if (data.startsWith('{')) {
@@ -37,11 +52,11 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
           setId: parts[1],
           setName: parts[2] || parts[1],
           template: parts[3],
-          v: 1
+          v: 1,
         };
       }
-    } catch (e) {
-      // ignore
+    } catch {
+      // ignore malformed payload
     }
     return parsed;
   };
@@ -60,10 +75,10 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
           found: true,
           rawText: code.data.trim(),
           detectedOrientation: orientation,
-          metadata
+          metadata,
         };
       }
-    } catch (err) {
+    } catch {
       // ignore
     }
     return null;
@@ -73,7 +88,7 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
   let res = tryScan(canvas, 0);
   if (res && res.found) return res;
 
-  // Pass 2: Header crop (top 40% where OMR QRs reside)
+  // Pass 2: Header crop (top 40%)
   try {
     if (typeof document !== 'undefined') {
       const topW = canvas.width;
@@ -90,9 +105,9 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
         }
       }
     }
-  } catch (e) {}
+  } catch {}
 
-  // Pass 3: Multi-angle rotation search (90, 180, 270 deg) for phone camera rotation recovery
+  // Pass 3: Multi-angle rotation search (90, 180, 270 deg)
   try {
     if (typeof document !== 'undefined') {
       const orientations: Array<90 | 180 | 270> = [90, 180, 270];
@@ -115,9 +130,9 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
         }
       }
     }
-  } catch (e) {}
+  } catch {}
 
-  // Pass 4: Top-right quadrant with high-contrast Otsu normalization (where OMR QR codes reside)
+  // Pass 4: Top-right quadrant with high-contrast binarization
   try {
     if (typeof document !== 'undefined') {
       const qW = Math.round(canvas.width * 0.45);
@@ -131,7 +146,6 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
         res = tryScan(qCanvas, 0);
         if (res && res.found) return res;
 
-        // Apply high-contrast binarization
         const imgData = qCtx.getImageData(0, 0, qW, qH);
         const data = imgData.data;
         for (let i = 0; i < data.length; i += 4) {
@@ -146,24 +160,31 @@ export function scanQRCodeFromCanvas(canvas: HTMLCanvasElement): QRCodeScanResul
         if (res && res.found) return res;
       }
     }
-  } catch (e) {}
+  } catch {}
 
   return { found: false, rawText: null };
 }
 
 function getCV() {
-  const cv = (typeof window !== 'undefined' ? (window as any).cv : null) ||
-             (typeof global !== 'undefined' ? (global as any).cv : null) ||
-             (typeof globalThis !== 'undefined' ? (globalThis as any).cv : null);
+  const cv =
+    (typeof window !== 'undefined' ? (window as any).cv : null) ||
+    (typeof global !== 'undefined' ? (global as any).cv : null) ||
+    (typeof globalThis !== 'undefined' ? (globalThis as any).cv : null);
   if (cv && typeof cv.Mat === 'function') return cv;
-  throw new Error("OpenCV.js is not loaded yet. Please wait a moment or refresh.");
+  throw new Error('OpenCV.js is not loaded yet. Please wait a moment or refresh.');
+}
+
+interface Point2D {
+  x: number;
+  y: number;
 }
 
 interface MarkerQuad {
   name: 'TL' | 'TR' | 'BL' | 'BR';
-  condition: (p: { x: number; y: number }) => boolean;
-  bestPt: { x: number; y: number } | null;
-  maxArea: number;
+  corner: Point2D;
+  bestPt: Point2D | null;
+  bestScore: number;
+  bestArea: number;
 }
 
 export function renderMatToCanvas(cv: any, mat: any, canvas: HTMLCanvasElement): void {
@@ -181,7 +202,6 @@ export function renderMatToCanvas(cv: any, mat: any, canvas: HTMLCanvasElement):
     // Fall back to manual buffer write
   }
 
-  // Universal buffer renderer (compatible with browser, Node Canvas, and web workers)
   const imgData = ctx.createImageData(mat.cols, mat.rows);
   let rgbaMat = mat;
   let needsDelete = false;
@@ -199,33 +219,90 @@ export function renderMatToCanvas(cv: any, mat: any, canvas: HTMLCanvasElement):
   imgData.data.set(rgbaMat.data);
   ctx.putImageData(imgData, 0, 0);
 
-  if (needsDelete) {
-    rgbaMat.delete();
-  }
+  if (needsDelete) rgbaMat.delete();
 }
 
-function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean; quads: MarkerQuad[] } {
+function dist2D(a: Point2D, b: Point2D): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function quadArea(tl: Point2D, tr: Point2D, br: Point2D, bl: Point2D): number {
+  return (
+    0.5 *
+    Math.abs(
+      tl.x * tr.y - tr.x * tl.y +
+      tr.x * br.y - br.x * tr.y +
+      br.x * bl.y - bl.x * br.y +
+      bl.x * tl.y - tl.x * bl.y
+    )
+  );
+}
+
+function cornerAngleDeg(prev: Point2D, curr: Point2D, next: Point2D): number {
+  const v1x = prev.x - curr.x;
+  const v1y = prev.y - curr.y;
+  const v2x = next.x - curr.x;
+  const v2y = next.y - curr.y;
+  const denom = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+  if (denom < 1e-6) return 0;
+  const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / denom));
+  return (Math.acos(cos) * 180) / Math.PI;
+}
+
+function isValidFiducialQuad(tl: Point2D, tr: Point2D, br: Point2D, bl: Point2D, imgW: number, imgH: number): boolean {
+  const top = dist2D(tl, tr);
+  const bot = dist2D(bl, br);
+  const left = dist2D(tl, bl);
+  const right = dist2D(tr, br);
+
+  if (top < imgW * 0.30 || bot < imgW * 0.30 || left < imgH * 0.30 || right < imgH * 0.30) return false;
+  const horizRatio = top / Math.max(1, bot);
+  const vertRatio = left / Math.max(1, right);
+  if (horizRatio < 0.65 || horizRatio > 1.54 || vertRatio < 0.65 || vertRatio > 1.54) return false;
+  if (quadArea(tl, tr, br, bl) < imgW * imgH * 0.18) return false;
+
+  const angles = [
+    cornerAngleDeg(bl, tl, tr),
+    cornerAngleDeg(tl, tr, br),
+    cornerAngleDeg(tr, br, bl),
+    cornerAngleDeg(br, bl, tl),
+  ];
+  return !angles.some((a) => a < 50 || a > 130);
+}
+
+function extractFiducialMarkers(
+  orientedSrc: any,
+  cv: any
+): { detected: boolean; method: 'FIDUCIAL_4PT' | 'FIDUCIAL_3PT_AFFINE' | 'NONE'; quads: MarkerQuad[] } {
   const curW = orientedSrc.cols;
   const curH = orientedSrc.rows;
-  const midX = curW / 2;
-  const midY = curH / 2;
+  const imgArea = curW * curH;
+  const diag = Math.hypot(curW, curH);
 
-  // Strict corner envelope (outer 20% of each quadrant) to reject central MCQs and labels
-  const envX = curW * 0.20;
-  const envY = curH * 0.20;
-  const minMarkerArea = Math.max(160, (curW * curH) / 6000);
+  const envX = curW * 0.34;
+  const envY = curH * 0.34;
+  const minMarkerArea = Math.max(60, imgArea * 0.00007);
+  const maxMarkerArea = imgArea * 0.014;
 
-  let quads: MarkerQuad[] = [
-    { name: 'TL', condition: (p) => p.x < envX && p.y < envY, bestPt: null, maxArea: 0 },
-    { name: 'TR', condition: (p) => p.x >= (curW - envX) && p.y < envY, bestPt: null, maxArea: 0 },
-    { name: 'BL', condition: (p) => p.x < envX && p.y >= (curH - envY), bestPt: null, maxArea: 0 },
-    { name: 'BR', condition: (p) => p.x >= (curW - envX) && p.y >= (curH - envY), bestPt: null, maxArea: 0 }
+  const quads: MarkerQuad[] = [
+    { name: 'TL', corner: { x: 0, y: 0 }, bestPt: null, bestScore: -Infinity, bestArea: 0 },
+    { name: 'TR', corner: { x: curW, y: 0 }, bestPt: null, bestScore: -Infinity, bestArea: 0 },
+    { name: 'BL', corner: { x: 0, y: curH }, bestPt: null, bestScore: -Infinity, bestArea: 0 },
+    { name: 'BR', corner: { x: curW, y: curH }, bestPt: null, bestScore: -Infinity, bestArea: 0 },
   ];
 
-  let thresh = new cv.Mat();
+  const inZone = (q: MarkerQuad, p: Point2D): boolean => {
+    if (q.name === 'TL') return p.x < envX && p.y < envY;
+    if (q.name === 'TR') return p.x > curW - envX && p.y < envY;
+    if (q.name === 'BL') return p.x < envX && p.y > curH - envY;
+    return p.x > curW - envX && p.y > curH - envY;
+  };
+
+  let orientedGray = new cv.Mat();
+  const blurred = new cv.Mat();
+  const thresh = new cv.Mat();
   let contours = new cv.MatVector();
   let hierarchy = new cv.Mat();
-  let orientedGray = new cv.Mat();
 
   try {
     try {
@@ -233,45 +310,48 @@ function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean;
     } catch {
       orientedGray = orientedSrc.clone();
     }
-
-    // Multi-threshold marker pass: Otsu adaptive illumination thresholding
-    cv.threshold(orientedGray, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    cv.GaussianBlur(orientedGray, blurred, new cv.Size(3, 3), 0);
 
     const inspectContours = (cntList: any) => {
-      const numContours = cntList.size();
-      for (let i = 0; i < numContours; ++i) {
-        let cnt = cntList.get(i);
+      const n = cntList.size();
+      for (let i = 0; i < n; ++i) {
+        const cnt = cntList.get(i);
         try {
-          let area = cv.contourArea(cnt);
-          if (area >= minMarkerArea && area < (curW * curH) / 6) { 
-            let peri = cv.arcLength(cnt, true);
-            let approx = new cv.Mat();
-            try {
-              cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
-              if (approx.rows >= 4 && approx.rows <= 6) {
-                let rect = cv.boundingRect(cnt);
-                let aspectRatio = rect.width / rect.height;
-                let solidity = area / (rect.width * rect.height);
-                // Extended aspect ratio tolerance to handle severe phone camera perspective tilt (up to 40 deg)
-                if (aspectRatio >= 0.45 && aspectRatio <= 1.85 && solidity >= 0.70) {
-                  // Subpixel centroid refinement via spatial image moments
-                  let M = cv.moments(cnt, false);
-                  let centerX = M.m00 !== 0 ? (M.m10 / M.m00) : (rect.x + rect.width / 2);
-                  let centerY = M.m00 !== 0 ? (M.m01 / M.m00) : (rect.y + rect.height / 2);
-                  
-                  for (let q of quads) {
-                    if (q.condition({ x: centerX, y: centerY })) {
-                      if (area > q.maxArea) {
-                        q.maxArea = area;
-                        q.bestPt = { x: centerX, y: centerY };
-                      }
-                    }
-                  }
-                }
-              }
-            } finally {
-              approx.delete();
+          const area = cv.contourArea(cnt);
+          if (area < minMarkerArea || area > maxMarkerArea) continue;
+          const rect = cv.boundingRect(cnt);
+          const rectArea = rect.width * rect.height;
+          if (rectArea <= 0) continue;
+          const aspectRatio = rect.width / rect.height;
+          if (aspectRatio < 0.50 || aspectRatio > 1.95) continue;
+          const solidity = area / rectArea;
+          if (solidity < 0.62) continue;
+
+          const peri = cv.arcLength(cnt, true);
+          const approx = new cv.Mat();
+          let polyRows = 0;
+          try {
+            cv.approxPolyDP(cnt, approx, 0.045 * peri, true);
+            polyRows = approx.rows;
+          } finally {
+            approx.delete();
+          }
+          if (polyRows < 4 || polyRows > 8) continue;
+
+          const M = cv.moments(cnt, false);
+          const cx = M.m00 !== 0 ? M.m10 / M.m00 : rect.x + rect.width / 2;
+          const cy = M.m00 !== 0 ? M.m01 / M.m00 : rect.y + rect.height / 2;
+          const pt = { x: cx, y: cy };
+
+          const squareness = 1.0 - Math.min(1.0, Math.abs(1.0 - aspectRatio));
+          for (const q of quads) {
+            if (!inZone(q, pt)) continue;
+            const cornerDistNorm = dist2D(pt, q.corner) / diag;
+            const score = solidity * 2.2 + squareness * 1.4 - cornerDistNorm * 4.5 + Math.log1p(area) * 0.08;
+            if (score > q.bestScore) {
+              q.bestScore = score;
+              q.bestPt = pt;
+              q.bestArea = area;
             }
           }
         } finally {
@@ -280,83 +360,93 @@ function extractFiducialMarkers(orientedSrc: any, cv: any): { detected: boolean;
       }
     };
 
+    cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     inspectContours(contours);
-    let detected = quads.every(q => q.bestPt !== null);
 
-    // Fallback pass: Adaptive Gaussian thresholding if ambient lighting has harsh smartphone shadows
-    if (!detected) {
+    const validateCurrent = (): 'FIDUCIAL_4PT' | 'FIDUCIAL_3PT_AFFINE' | 'NONE' => {
+      const [tl, tr, bl, br] = quads.map((q) => q.bestPt);
+      if (tl && tr && bl && br && isValidFiducialQuad(tl, tr, br, bl, curW, curH)) return 'FIDUCIAL_4PT';
+      return 'NONE';
+    };
+
+    let method = validateCurrent();
+    if (method === 'NONE') {
       contours.delete();
       hierarchy.delete();
       contours = new cv.MatVector();
       hierarchy = new cv.Mat();
-      cv.adaptiveThreshold(orientedGray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 10);
+      cv.adaptiveThreshold(blurred, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 10);
       cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
       inspectContours(contours);
-      detected = quads.every(q => q.bestPt !== null);
+      method = validateCurrent();
     }
 
-    // 3-Marker Affine Parallelogram Recovery (Handles Torn / Missing Corners):
-    if (!detected) {
-      const found = quads.filter(q => q.bestPt !== null);
+    if (method === 'NONE') {
+      const found = quads.filter((q) => q.bestPt !== null);
       if (found.length === 3) {
-        const tl = quads.find(q => q.name === 'TL')!;
-        const tr = quads.find(q => q.name === 'TR')!;
-        const bl = quads.find(q => q.name === 'BL')!;
-        const br = quads.find(q => q.name === 'BR')!;
-
+        const [tl, tr, bl, br] = quads;
         if (!tl.bestPt && tr.bestPt && bl.bestPt && br.bestPt) {
-          tl.bestPt = { x: tr.bestPt.x + bl.bestPt.x - br.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - br.bestPt.y };
-          detected = true;
+          const cand = { x: tr.bestPt.x + bl.bestPt.x - br.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - br.bestPt.y };
+          if (isValidFiducialQuad(cand, tr.bestPt, br.bestPt, bl.bestPt, curW, curH)) {
+            tl.bestPt = cand;
+            method = 'FIDUCIAL_3PT_AFFINE';
+          }
         } else if (!tr.bestPt && tl.bestPt && bl.bestPt && br.bestPt) {
-          tr.bestPt = { x: tl.bestPt.x + br.bestPt.x - bl.bestPt.x, y: tl.bestPt.y + br.bestPt.y - bl.bestPt.y };
-          detected = true;
+          const cand = { x: tl.bestPt.x + br.bestPt.x - bl.bestPt.x, y: tl.bestPt.y + br.bestPt.y - bl.bestPt.y };
+          if (isValidFiducialQuad(tl.bestPt, cand, br.bestPt, bl.bestPt, curW, curH)) {
+            tr.bestPt = cand;
+            method = 'FIDUCIAL_3PT_AFFINE';
+          }
         } else if (!bl.bestPt && tl.bestPt && tr.bestPt && br.bestPt) {
-          bl.bestPt = { x: tl.bestPt.x + br.bestPt.x - tr.bestPt.x, y: tl.bestPt.y + br.bestPt.y - tr.bestPt.y };
-          detected = true;
+          const cand = { x: tl.bestPt.x + br.bestPt.x - tr.bestPt.x, y: tl.bestPt.y + br.bestPt.y - tr.bestPt.y };
+          if (isValidFiducialQuad(tl.bestPt, tr.bestPt, br.bestPt, cand, curW, curH)) {
+            bl.bestPt = cand;
+            method = 'FIDUCIAL_3PT_AFFINE';
+          }
         } else if (!br.bestPt && tl.bestPt && tr.bestPt && bl.bestPt) {
-          br.bestPt = { x: tr.bestPt.x + bl.bestPt.x - tl.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - tl.bestPt.y };
-          detected = true;
+          const cand = { x: tr.bestPt.x + bl.bestPt.x - tl.bestPt.x, y: tr.bestPt.y + bl.bestPt.y - tl.bestPt.y };
+          if (isValidFiducialQuad(tl.bestPt, tr.bestPt, cand, bl.bestPt, curW, curH)) {
+            br.bestPt = cand;
+            method = 'FIDUCIAL_3PT_AFFINE';
+          }
         }
       }
     }
 
-    return { detected, quads };
+    return { detected: method !== 'NONE', method, quads };
   } finally {
+    orientedGray.delete();
+    blurred.delete();
     thresh.delete();
     contours.delete();
     hierarchy.delete();
-    orientedGray.delete();
   }
 }
 
-function alignDocument(src: any, template: Template): { warped: any; markersDetected: boolean; skewAngle: number } {
+function alignDocument(
+  src: any,
+  template: Template
+): {
+  warped: any;
+  markersDetected: boolean;
+  skewAngle: number;
+  alignmentMethod: ScanQualityMetrics['alignmentMethod'];
+} {
   const cv = getCV();
   const [targetW, targetH] = template.pageDimensions;
   let warped = new cv.Mat();
-  let gray = new cv.Mat();
-  
-  try {
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-  } catch {
-    // If input is single-channel grayscale
-    gray = src.clone();
-  }
 
-  const useMarkers = template.preProcessors?.some(p => p.name === 'CropOnMarkers') ?? true;
-  const isDirectPass = template.preProcessors?.some(p => p.name === 'DirectPass' || p.name === 'NoWarp');
-  let markersDetected = false;
-  let skewAngle = 0;
+  const useMarkers = template.preProcessors?.some((p) => p.name === 'CropOnMarkers') ?? true;
+  const isDirectPass = template.preProcessors?.some((p) => p.name === 'DirectPass' || p.name === 'NoWarp');
+  const explicitSpreadCrop = template.preProcessors?.some((p) => p.name === 'CropLeftOMRSpread') ?? false;
 
-  // Auto-Crop 2-up Landscape Spread (e.g. Master PDF pages where OMR is on the left half)
   let activeSrc = src.clone();
-  const isLandscapeSpread = (activeSrc.cols > activeSrc.rows * 1.15) && (targetW < targetH);
-  const shouldCropLeft = template.preProcessors?.some(p => p.name === 'CropLeftOMRSpread') || isLandscapeSpread;
 
-  if (shouldCropLeft && activeSrc.cols > targetW * 1.1) {
+  if (explicitSpreadCrop && activeSrc.cols > activeSrc.rows * 1.25 && activeSrc.cols > targetW * 1.15) {
     const cropW = Math.min(activeSrc.cols, Math.round(activeSrc.cols * (510 / 1435)));
-    let cropRect = new cv.Rect(0, 0, cropW, activeSrc.rows);
-    let cropped = activeSrc.roi(cropRect);
-    let newSrc = cropped.clone();
+    const cropped = activeSrc.roi(new cv.Rect(0, 0, cropW, activeSrc.rows));
+    const newSrc = cropped.clone();
     cropped.delete();
     activeSrc.delete();
     activeSrc = newSrc;
@@ -365,271 +455,270 @@ function alignDocument(src: any, template: Template): { warped: any; markersDete
   const h = activeSrc.rows;
   const w = activeSrc.cols;
 
-  // Direct Pass: If template specifies DirectPass/NoWarp, or if digital scan already exactly matches target dimensions without marker alignment
-  if (isDirectPass || (w === targetW && h === targetH && !template.preProcessors?.some(p => p.name === 'CropOnMarkers'))) {
-    warped = activeSrc.clone();
+  if (isDirectPass || (w === targetW && h === targetH && !useMarkers)) {
+    if (w === targetW && h === targetH) {
+      warped = activeSrc.clone();
+    } else {
+      cv.resize(activeSrc, warped, new cv.Size(targetW, targetH), 0, 0, cv.INTER_AREA);
+    }
     activeSrc.delete();
-    gray.delete();
-    return { warped, markersDetected: true, skewAngle: 0 };
+    return { warped, markersDetected: true, skewAngle: 0, alignmentMethod: 'DIRECT_PASS' };
   }
 
-  // 1. Initial Orientation check: Auto-orient if aspect ratio is inverted (e.g. rotated mobile scan)
   let orientedSrc = activeSrc.clone();
   if ((targetW > targetH && w < h) || (targetW < targetH && w > h)) {
     cv.rotate(activeSrc, orientedSrc, cv.ROTATE_90_CLOCKWISE);
-    skewAngle = 90;
   }
   activeSrc.delete();
 
+  let markersDetected = false;
+  let alignmentMethod: ScanQualityMetrics['alignmentMethod'] = 'DIRECT_SCALE';
   let quads: MarkerQuad[] = [];
 
   if (useMarkers) {
     const res = extractFiducialMarkers(orientedSrc, cv);
     markersDetected = res.detected;
     quads = res.quads;
+    if (res.method === 'FIDUCIAL_4PT' || res.method === 'FIDUCIAL_3PT_AFFINE') {
+      alignmentMethod = res.method;
+    }
 
-    // 4-Way Rotation Invariant Smartphone Marker Search (0°, 90°, 180°, 270°)
-    // Guarantees phone captures taken at any angle achieve 99.99% automatic orientation lock
     if (!markersDetected) {
-      const candidateRotations = [
-        { code: cv.ROTATE_90_CLOCKWISE, angle: 90 },
-        { code: cv.ROTATE_180, angle: 180 },
-        { code: cv.ROTATE_90_COUNTERCLOCKWISE, angle: 270 }
-      ];
-
-      for (const rot of candidateRotations) {
-        let testRotated = new cv.Mat();
-        cv.rotate(orientedSrc, testRotated, rot.code);
+      const candidateRotations = [cv.ROTATE_90_CLOCKWISE, cv.ROTATE_180, cv.ROTATE_90_COUNTERCLOCKWISE];
+      for (const code of candidateRotations) {
+        const testRotated = new cv.Mat();
+        cv.rotate(orientedSrc, testRotated, code);
         const testRes = extractFiducialMarkers(testRotated, cv);
         if (testRes.detected) {
           orientedSrc.delete();
           orientedSrc = testRotated;
           quads = testRes.quads;
           markersDetected = true;
-          skewAngle = (skewAngle + rot.angle) % 360;
+          alignmentMethod = testRes.method === 'FIDUCIAL_3PT_AFFINE' ? 'FIDUCIAL_3PT_AFFINE' : 'FIDUCIAL_4PT';
           break;
         }
         testRotated.delete();
       }
     }
   }
-  
+
   const curW = orientedSrc.cols;
   const curH = orientedSrc.rows;
-  
+  let skewAngle = 0;
+
   if (markersDetected) {
-    const tl = quads.find(q => q.name === 'TL')!.bestPt!;
-    const tr = quads.find(q => q.name === 'TR')!.bestPt!;
-    const br = quads.find(q => q.name === 'BR')!.bestPt!;
-    const bl = quads.find(q => q.name === 'BL')!.bestPt!;
+    const tl = quads[0].bestPt!;
+    const tr = quads[1].bestPt!;
+    const bl = quads[2].bestPt!;
+    const br = quads[3].bestPt!;
 
-    // Estimate skew angle from top horizontal edge
-    const dx = tr.x - tl.x;
-    const dy = tr.y - tl.y;
-    skewAngle = parseFloat((Math.atan2(dy, dx) * (180 / Math.PI)).toFixed(2));
+    skewAngle = parseFloat((Math.atan2(tr.y - tl.y, tr.x - tl.x) * (180 / Math.PI)).toFixed(2));
+    if (Math.abs(skewAngle) > 45) skewAngle = 0;
 
-    let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-      tl.x, tl.y,
-      tr.x, tr.y,
-      br.x, br.y,
-      bl.x, bl.y
-    ]);
-    
-    // Preserve marker inset if the template coordinates are page-relative
-    const avgMarginX = Math.round((tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / 4);
-    const avgMarginY = Math.round((tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / 4);
-    const insetX = (avgMarginX > 15 && avgMarginX < targetW * 0.15) ? avgMarginX : 0;
-    const insetY = (avgMarginY > 15 && avgMarginY < targetH * 0.15) ? avgMarginY : 0;
+    const marginXRatio = (tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / (4 * curW);
+    const marginYRatio = (tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / (4 * curH);
+    const insetX = marginXRatio > 0.01 && marginXRatio < 0.12 ? Math.round(marginXRatio * targetW) : 0;
+    const insetY = marginYRatio > 0.01 && marginYRatio < 0.12 ? Math.round(marginYRatio * targetH) : 0;
 
-    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+    const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
+    const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
       insetX, insetY,
       targetW - 1 - insetX, insetY,
       targetW - 1 - insetX, targetH - 1 - insetY,
-      insetX, targetH - 1 - insetY
+      insetX, targetH - 1 - insetY,
     ]);
-
-    let M = cv.getPerspectiveTransform(srcTri, dstTri);
+    const M = cv.getPerspectiveTransform(srcTri, dstTri);
     try {
-      cv.warpPerspective(orientedSrc, warped, M, new cv.Size(targetW, targetH));
+      cv.warpPerspective(orientedSrc, warped, M, new cv.Size(targetW, targetH), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
     } finally {
       srcTri.delete();
       dstTri.delete();
       M.delete();
     }
   } else {
-    // Fallback: 4-point convex page contour with morphological closure (CropPage for tilted phone pictures on desks)
-    let blurred = new cv.Mat();
-    let edges = new cv.Mat();
+    let orientedGray = new cv.Mat();
+    const blurred = new cv.Mat();
+    const edges = new cv.Mat();
     let morphKernel = new cv.Mat();
-    let pageContours = new cv.MatVector();
-    let pageHierarchy = new cv.Mat();
-    let maxContour: any = null;
+    let bestPts: Point2D[] | null = null;
 
     try {
-      let orientedGray = new cv.Mat();
       try {
         cv.cvtColor(orientedSrc, orientedGray, cv.COLOR_RGBA2GRAY);
       } catch {
         orientedGray = orientedSrc.clone();
       }
       cv.GaussianBlur(orientedGray, blurred, new cv.Size(7, 7), 0);
-      cv.Canny(blurred, edges, 40, 160);
-      // Morphological closing bridges broken edge fragments caused by phone shadows or surface grain
-      morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-      cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, morphKernel);
 
-      cv.findContours(edges, pageContours, pageHierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-      const minPageArea = curW * curH * 0.20; // Allows tilted phone photos capturing surrounding table
-      let maxArea = minPageArea;
-      const pSize = pageContours.size();
-
-      for (let i = 0; i < pSize; ++i) {
-        let cnt = pageContours.get(i);
+      const tryFindPageQuad = (binaryImg: any): Point2D[] | null => {
+        const cnts = new cv.MatVector();
+        const hier = new cv.Mat();
+        let foundPts: Point2D[] | null = null;
         try {
-          let area = cv.contourArea(cnt);
-          if (area > maxArea) { 
-            let peri = cv.arcLength(cnt, true);
-            let approx = new cv.Mat();
+          cv.findContours(binaryImg, cnts, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+          let maxArea = curW * curH * 0.25;
+          const pSize = cnts.size();
+          for (let i = 0; i < pSize; ++i) {
+            const cnt = cnts.get(i);
             try {
-              cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-              if (approx.rows === 4) {
-                maxArea = area;
-                if (maxContour) maxContour.delete();
-                maxContour = approx.clone();
-              } else if (approx.rows >= 5 && approx.rows <= 14) {
-                // Irregular / Torn / Folded Corner Sheet Recovery:
-                // Extract 4 extremal corners from contour / convex hull projection
-                let hull = new cv.Mat();
-                try {
-                  cv.convexHull(cnt, hull, false, true);
-                  const hullPts: { x: number; y: number }[] = [];
-                  for (let hIdx = 0; hIdx < hull.rows; hIdx++) {
-                    hullPts.push({ x: hull.data32S[hIdx * 2], y: hull.data32S[hIdx * 2 + 1] });
+              const area = cv.contourArea(cnt);
+              if (area <= maxArea || area > curW * curH * 0.96) continue;
+              const peri = cv.arcLength(cnt, true);
+              const approx = new cv.Mat();
+              try {
+                cv.approxPolyDP(cnt, approx, 0.025 * peri, true);
+                if (approx.rows === 4) {
+                  const pts: Point2D[] = [];
+                  for (let k = 0; k < 4; k++) {
+                    pts.push({ x: approx.data32S[k * 2], y: approx.data32S[k * 2 + 1] });
                   }
-                  if (hullPts.length >= 4) {
-                    const tlPt = hullPts.reduce((best, p) => (p.x + p.y < best.x + best.y ? p : best));
-                    const trPt = hullPts.reduce((best, p) => (p.x - p.y > best.x - best.y ? p : best));
-                    const brPt = hullPts.reduce((best, p) => (p.x + p.y > best.x + best.y ? p : best));
-                    const blPt = hullPts.reduce((best, p) => (p.x - p.y < best.x - best.y ? p : best));
-
-                    let recoveredApprox = cv.matFromArray(4, 1, cv.CV_32SC2, [
-                      tlPt.x, tlPt.y,
-                      trPt.x, trPt.y,
-                      brPt.x, brPt.y,
-                      blPt.x, blPt.y
-                    ]);
+                  const sum = pts.map((p) => p.x + p.y);
+                  const diff = pts.map((p) => p.y - p.x);
+                  const tl = pts[sum.indexOf(Math.min(...sum))];
+                  const br = pts[sum.indexOf(Math.max(...sum))];
+                  const tr = pts[diff.indexOf(Math.min(...diff))];
+                  const bl = pts[diff.indexOf(Math.max(...diff))];
+                  if (isValidFiducialQuad(tl, tr, br, bl, curW, curH)) {
                     maxArea = area;
-                    if (maxContour) maxContour.delete();
-                    maxContour = recoveredApprox;
+                    foundPts = [tl, tr, br, bl];
                   }
-                } finally {
-                  hull.delete();
                 }
+              } finally {
+                approx.delete();
               }
             } finally {
-              approx.delete();
+              cnt.delete();
             }
           }
         } finally {
-          cnt.delete();
+          cnts.delete();
+          hier.delete();
         }
+        return foundPts;
+      };
+
+      cv.threshold(blurred, edges, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+      morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(11, 11));
+      cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, morphKernel);
+      bestPts = tryFindPageQuad(edges);
+
+      if (!bestPts) {
+        cv.Canny(blurred, edges, 35, 140);
+        cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, morphKernel);
+        bestPts = tryFindPageQuad(edges);
       }
-      orientedGray.delete();
 
-      if (maxContour) {
-        let pts: { x: number; y: number }[] = [];
-        for (let i = 0; i < 4; i++) {
-          pts.push({ x: maxContour.data32S[i * 2], y: maxContour.data32S[i * 2 + 1] });
-        }
-        
-        // Order: TL, TR, BR, BL by geometric center
-        const sum = pts.map(p => p.x + p.y);
-        const tl = pts[sum.indexOf(Math.min(...sum))];
-        const br = pts[sum.indexOf(Math.max(...sum))];
-        const diff = pts.map(p => p.y - p.x);
-        const tr = pts[diff.indexOf(Math.min(...diff))];
-        const bl = pts[diff.indexOf(Math.max(...diff))];
+      if (bestPts) {
+        const [tl, tr, br, bl] = bestPts;
+        skewAngle = parseFloat((Math.atan2(tr.y - tl.y, tr.x - tl.x) * (180 / Math.PI)).toFixed(2));
+        if (Math.abs(skewAngle) > 45) skewAngle = 0;
 
-        let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-          tl.x, tl.y,
-          tr.x, tr.y,
-          br.x, br.y,
-          bl.x, bl.y
-        ]);
-        let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+        const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
+        const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
           0, 0,
           targetW - 1, 0,
           targetW - 1, targetH - 1,
-          0, targetH - 1
+          0, targetH - 1,
         ]);
-        let M = cv.getPerspectiveTransform(srcTri, dstTri);
+        const M = cv.getPerspectiveTransform(srcTri, dstTri);
         try {
-          cv.warpPerspective(orientedSrc, warped, M, new cv.Size(targetW, targetH));
+          cv.warpPerspective(orientedSrc, warped, M, new cv.Size(targetW, targetH), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+          alignmentMethod = 'PAGE_CONTOUR';
         } finally {
           srcTri.delete();
           dstTri.delete();
           M.delete();
         }
       } else {
-        // Flat document scan or already cropped: direct high-quality scaling to template dimensions
         cv.resize(orientedSrc, warped, new cv.Size(targetW, targetH), 0, 0, cv.INTER_AREA);
+        alignmentMethod = 'DIRECT_SCALE';
       }
     } finally {
-      if (maxContour) maxContour.delete();
+      orientedGray.delete();
       blurred.delete();
       edges.delete();
       morphKernel.delete();
-      pageContours.delete();
-      pageHierarchy.delete();
     }
-  }
-
-  // Final Upright Verification:
-  // Ensure top 15% is the header banner and candidate info (significantly darker than the bottom footer).
-  // If inverted, automatically rotate 180 degrees.
-  try {
-    let warpedGray = new cv.Mat();
-    try {
-      cv.cvtColor(warped, warpedGray, cv.COLOR_RGBA2GRAY);
-    } catch {
-      warpedGray = warped.clone();
-    }
-    const bandH = Math.round(targetH * 0.15);
-    let topRoi = warpedGray.roi(new cv.Rect(0, 0, targetW, bandH));
-    let botRoi = warpedGray.roi(new cv.Rect(0, targetH - bandH, targetW, bandH));
-    let topThresh = new cv.Mat();
-    let botThresh = new cv.Mat();
-    cv.threshold(topRoi, topThresh, 128, 255, cv.THRESH_BINARY_INV);
-    cv.threshold(botRoi, botThresh, 128, 255, cv.THRESH_BINARY_INV);
-    const topDark = cv.countNonZero(topThresh);
-    const botDark = cv.countNonZero(botThresh);
-    topRoi.delete();
-    botRoi.delete();
-    topThresh.delete();
-    botThresh.delete();
-    warpedGray.delete();
-
-    if (botDark > topDark * 1.35) {
-      let uprightWarped = new cv.Mat();
-      cv.rotate(warped, uprightWarped, cv.ROTATE_180);
-      warped.delete();
-      warped = uprightWarped;
-      skewAngle = (skewAngle + 180) % 360;
-    }
-  } catch {
-    // Preserve warped image if check is skipped
   }
 
   orientedSrc.delete();
-  gray.delete();
-  return { warped, markersDetected, skewAngle };
+  return { warped, markersDetected, skewAngle, alignmentMethod };
+}
+
+function extractOptimalGrayscale(
+  cv: any,
+  warped: any
+): { rawGray: any; colorDropoutChannel: ScanQualityMetrics['colorDropoutChannel'] } {
+  if (warped.channels() < 3) {
+    return { rawGray: warped.clone(), colorDropoutChannel: 'NONE' };
+  }
+
+  const data = warped.data;
+  const ch = warped.channels();
+  const totalPixels = warped.rows * warped.cols;
+  const stride = Math.max(1, Math.floor(totalPixels / 1000));
+  let magentaCount = 0;
+  let coloredInkCount = 0;
+
+  for (let i = 0; i < totalPixels; i += stride) {
+    const idx = i * ch;
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    if (maxC - minC > 30 && maxC < 245) {
+      coloredInkCount++;
+      if (r - g > 28 && r > 120) magentaCount++;
+    }
+  }
+
+  if (coloredInkCount > 15 && magentaCount / coloredInkCount > 0.55) {
+    const channels = new cv.MatVector();
+    cv.split(warped, channels);
+    const rMat = channels.get(0);
+    const gMat = channels.get(1);
+    const rawGray = new cv.Mat();
+    cv.addWeighted(rMat, 0.80, gMat, 0.20, 0, rawGray);
+    rMat.delete();
+    gMat.delete();
+    channels.delete();
+    return { rawGray, colorDropoutChannel: 'RED_MAGENTA_DROPOUT' };
+  }
+
+  const rawGray = new cv.Mat();
+  cv.cvtColor(warped, rawGray, warped.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
+  return { rawGray, colorDropoutChannel: 'LUMINANCE' };
+}
+
+function measureSharpnessScore(cv: any, grayMat: any): { sharpnessScore: number; isBlurry: boolean } {
+  const smallW = 320;
+  const smallH = Math.max(64, Math.round(grayMat.rows * (smallW / grayMat.cols)));
+  const small = new cv.Mat();
+  const lap = new cv.Mat();
+  const mean = new cv.Mat();
+  const stddev = new cv.Mat();
+  try {
+    cv.resize(grayMat, small, new cv.Size(smallW, smallH), 0, 0, cv.INTER_AREA);
+    cv.Laplacian(small, lap, cv.CV_64F);
+    cv.meanStdDev(lap, mean, stddev);
+    const sd = stddev.doubleAt(0, 0);
+    const sharpnessScore = Math.min(100, Math.max(0, Math.round(((sd * sd) / 500) * 100)));
+    return { sharpnessScore, isBlurry: sharpnessScore < 28 };
+  } catch {
+    return { sharpnessScore: 75, isBlurry: false };
+  } finally {
+    small.delete();
+    lap.delete();
+    mean.delete();
+    stddev.delete();
+  }
 }
 
 export async function processOMR(
-  imageCanvas: HTMLCanvasElement, 
-  template: Template, 
-  bubbles: BubblePoint[], 
+  imageCanvas: HTMLCanvasElement,
+  template: Template,
+  bubbles: BubblePoint[],
   overlayCanvas?: HTMLCanvasElement,
   filename: string = 'scan.jpg',
   options?: { generateCanvases?: boolean }
@@ -639,67 +728,74 @@ export async function processOMR(
   }
 
   const cv = getCV();
-  let src = cv.imread(imageCanvas);
+  const src = cv.imread(imageCanvas);
   let warped: any = null;
   let gray: any = null;
 
-  const sheetId = 'sheet_' + Math.random().toString(36).substr(2, 9);
+  const sheetId = 'sheet_' + Math.random().toString(36).slice(2, 11);
   const sm = createOmrScanStateMachine(sheetId, filename, [imageCanvas.width, imageCanvas.height]);
   sm.dispatch('INGEST_IMAGE');
 
-  // Multi-pass QR detection for zero-config exam and set resolution
   const qrResult = scanQRCodeFromCanvas(imageCanvas);
 
   try {
-    // If QR code revealed a specific orientation (e.g. horizontal or upside down), pre-rotate src
     if (qrResult.found && qrResult.detectedOrientation) {
-      if (qrResult.detectedOrientation === 90) {
-        cv.rotate(src, src, cv.ROTATE_90_CLOCKWISE);
-      } else if (qrResult.detectedOrientation === 180) {
-        cv.rotate(src, src, cv.ROTATE_180);
-      } else if (qrResult.detectedOrientation === 270) {
-        cv.rotate(src, src, cv.ROTATE_90_COUNTERCLOCKWISE);
-      }
+      if (qrResult.detectedOrientation === 90) cv.rotate(src, src, cv.ROTATE_90_CLOCKWISE);
+      else if (qrResult.detectedOrientation === 180) cv.rotate(src, src, cv.ROTATE_180);
+      else if (qrResult.detectedOrientation === 270) cv.rotate(src, src, cv.ROTATE_90_COUNTERCLOCKWISE);
     }
 
     // 1. Document Alignment & Perspective Warp
     const alignResult = alignDocument(src, template);
     warped = alignResult.warped;
-    const { markersDetected, skewAngle } = alignResult;
+    const { markersDetected, skewAngle, alignmentMethod } = alignResult;
     sm.dispatch('LOCATE_FIDUCIALS', { markersDetected, skewAngle });
     sm.dispatch('APPLY_PERSPECTIVE_WARP');
 
-    // 2. Grayscale conversion and Downsampled Morphological Illumination Normalization
-    // Completely neutralizes mobile phone shadows, room lighting gradients, and flash glares
-    let rawGray = new cv.Mat();
-    cv.cvtColor(warped, rawGray, cv.COLOR_RGBA2GRAY);
+    // 2. Color-Channel Dropout + Illumination Flattening + Blur Deconvolution
+    const { rawGray, colorDropoutChannel } = extractOptimalGrayscale(cv, warped);
+    const { sharpnessScore, isBlurry } = measureSharpnessScore(cv, rawGray);
 
     const targetCols = rawGray.cols;
     const targetRows = rawGray.rows;
-    const smallW = 320;
-    const smallH = Math.round(targetRows * (320 / targetCols));
+    const smallW = 360;
+    const smallH = Math.max(64, Math.round(targetRows * (smallW / targetCols)));
 
-    let small = new cv.Mat();
+    const small = new cv.Mat();
     cv.resize(rawGray, small, new cv.Size(smallW, smallH), 0, 0, cv.INTER_AREA);
 
-    // Morphological closing with rectangular kernel extracts pure background lighting (erases dark bubbles/text)
-    let morphKernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(21, 21));
-    let smallBg = new cv.Mat();
+    const morphKernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(23, 23));
+    const smallBg = new cv.Mat();
     cv.morphologyEx(small, smallBg, cv.MORPH_CLOSE, morphKernel);
+    cv.GaussianBlur(smallBg, smallBg, new cv.Size(11, 11), 0);
     morphKernel.delete();
 
-    let bg = new cv.Mat();
+    const bg = new cv.Mat();
     cv.resize(smallBg, bg, new cv.Size(targetCols, targetRows), 0, 0, cv.INTER_LINEAR);
 
-    let g32 = new cv.Mat();
-    let bg32 = new cv.Mat();
-    let norm32 = new cv.Mat();
+    const g32 = new cv.Mat();
+    const bg32 = new cv.Mat();
+    const norm32 = new cv.Mat();
     gray = new cv.Mat();
 
     rawGray.convertTo(g32, cv.CV_32F);
     bg.convertTo(bg32, cv.CV_32F);
+    const floorMat = new cv.Mat(bg32.rows, bg32.cols, cv.CV_32F, new cv.Scalar(25));
+    cv.max(bg32, floorMat, bg32);
+    floorMat.delete();
+
     cv.divide(g32, bg32, norm32, 255);
     norm32.convertTo(gray, cv.CV_8UC1);
+
+    if (isBlurry) {
+      const blurTmp = new cv.Mat();
+      const sharpTmp = new cv.Mat();
+      cv.GaussianBlur(gray, blurTmp, new cv.Size(0, 0), 1.6);
+      cv.addWeighted(gray, 1.45, blurTmp, -0.45, 0, sharpTmp);
+      gray.delete();
+      gray = sharpTmp;
+      blurTmp.delete();
+    }
 
     rawGray.delete();
     small.delete();
@@ -710,50 +806,66 @@ export async function processOMR(
     norm32.delete();
 
     sm.dispatch('NORMALIZE_ILLUMINATION', { contrastMean: 128, contrastVariance: 400 });
-    
+
     const [bw, bh] = template.bubbleDimensions;
     const bubbleValues: BubbleDetectionResult[] = [];
     const flags: string[] = [];
 
-    if (!markersDetected) {
-      flags.push('Corner fiducial markers not found; fell back to full-page contour alignment.');
+    const useMarkers = template.preProcessors?.some((p) => p.name === 'CropOnMarkers') ?? true;
+    if (useMarkers && !markersDetected) {
+      flags.push('Corner fiducial markers not found; used automatic page-contour alignment.');
+    }
+    if (isBlurry) {
+      flags.push(`Low focus sharpness detected (${sharpnessScore}/100); applied deconvolution recovery.`);
     }
 
-    // 3. Extract bubble intensities & bounding boxes with Subpixel Centroid Refinement & Patch Texture
-    // By refining coordinates with regularized energy minimization and sampling the concentric inner core,
-    // we eliminate outer boundary stroke noise, skew drift, and paper bend distortion.
+    // 3. 2-Level Grid Registration + Concentric Sampling + Micro-CNN
     const grayData = gray.data;
     const curW = gray.cols;
     const curH = gray.rows;
 
+    const bubblesBySection: Record<string, BubblePoint[]> = {};
     for (const b of bubbles) {
-      let rect = new cv.Rect(Math.round(b.x), Math.round(b.y), Math.round(bw), Math.round(bh));
-      if (rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= curW && rect.y + rect.height <= curH) {
-        // (A) Regularized Subpixel Centroid Refinement:
-        // Finds optimal center (cx, cy) within +/- 3px preventing drift from skew/curvature
-        const refined = refineBubbleCentroid(grayData, curW, curH, b.x, b.y, bw, bh, 3, 1.2);
+      const sec = b.section || 'default';
+      if (!bubblesBySection[sec]) bubblesBySection[sec] = [];
+      bubblesBySection[sec].push(b);
+    }
 
-        // (B) Inner core coordinates (18% inset, 64% diameter) relative to refined center
-        const innerX = Math.round(refined.cx + bw * 0.18);
-        const innerY = Math.round(refined.cy + bh * 0.18);
-        const innerW = Math.max(4, Math.round(bw * 0.64));
-        const innerH = Math.max(4, Math.round(bh * 0.64));
+    const maxBlockShift = alignmentMethod === 'DIRECT_PASS' ? 2 : Math.min(7, Math.max(3, Math.round(Math.min(bw, bh) * 0.30)));
+    const blockShifts: Record<string, { dx: number; dy: number }> = {};
+    for (const [sec, secBubbles] of Object.entries(bubblesBySection)) {
+      const shift = alignFieldBlockGrid(grayData, curW, curH, secBubbles, bw, bh, maxBlockShift);
+      blockShifts[sec] = { dx: shift.dx, dy: shift.dy };
+    }
 
-        // (C) Extract spatial texture metrics (mean, stdDev, fillRatio, homogeneity)
-        const texture = extractPatchTexture(grayData, curW, curH, innerX, innerY, innerW, innerH, 168);
+    for (const b of bubbles) {
+      const shift = blockShifts[b.section || 'default'] || { dx: 0, dy: 0 };
+      const adjX = b.x + shift.dx;
+      const adjY = b.y + shift.dy;
 
-        // (D) Phase 2 Micro-Neural Network Inference on 16x16 Resampled Patch
+      const rx = Math.round(adjX);
+      const ry = Math.round(adjY);
+      if (rx >= 0 && ry >= 0 && rx + Math.round(bw) <= curW && ry + Math.round(bh) <= curH) {
+        const refined = refineBubbleCentroid(grayData, curW, curH, adjX, adjY, bw, bh, 2, 2.2);
+        const metrics = sampleBubbleConcentric(grayData, curW, curH, refined.cx, refined.cy, bw, bh);
         const patch16 = extractNormalized16x16Patch(grayData, curW, curH, refined.cx, refined.cy, bw, bh);
         const neuralPred = predictBubbleNeural(patch16);
 
         bubbleValues.push({
           ...b,
-          meanVal: texture.mean,
+          meanVal: metrics.mean,
           confidence: 0,
           isMarked: false,
-          rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          fillRatio: texture.fillRatio,
-          patchStdDev: texture.stdDev,
+          rect: {
+            x: Math.round(refined.cx),
+            y: Math.round(refined.cy),
+            width: Math.round(bw),
+            height: Math.round(bh),
+          },
+          fillRatio: parseFloat(metrics.fillRatio.toFixed(3)),
+          opticalDensity: parseFloat(metrics.opticalDensity.toFixed(3)),
+          localBg: Math.round(metrics.localBg),
+          patchStdDev: parseFloat(metrics.stdDev.toFixed(2)),
           neuralPrediction: neuralPred,
         });
       }
@@ -761,52 +873,41 @@ export async function processOMR(
 
     sm.dispatch('SAMPLE_CONCENTRIC_BUBBLES', { bubbleCount: bubbleValues.length });
 
-    // 4. Fit Tri-Modal Gaussian Mixture Model (GMM) via Expectation-Maximization (EM)
-    // Decomposes sheet intensities into:
-    //   Component 1: Filled mark (darkest)
-    //   Component 2: Erasure / Smudge / Faint mark (intermediate)
-    //   Component 3: Clean paper (brightest)
-    const allMeans = bubbleValues.map(b => b.meanVal);
+    // 4. Tri-Modal GMM + Dynamic Range
+    const allMeans = bubbleValues.map((b) => b.meanVal);
     const gmm = fitTriModalGMM(allMeans);
-
     for (const b of bubbleValues) {
       const post = computeGMMPosterior(b.meanVal, gmm);
-      b.posteriorFilled = post.pFilled;
-      b.posteriorErased = post.pErased;
+      b.posteriorFilled = parseFloat(post.pFilled.toFixed(4));
+      b.posteriorErased = parseFloat(post.pErased.toFixed(4));
     }
 
-    // Dynamic threshold calculation as secondary baseline
-    const means = [...allMeans].sort((a, b) => a - b);
-    let globalThreshold = 160;
+    const sortedMeans = [...allMeans].sort((a, b) => a - b);
+    const minMean = sortedMeans[0] ?? 255;
+    const maxMean = sortedMeans[sortedMeans.length - 1] ?? 255;
+    const dynamicRange = Math.max(0, maxMean - minMean);
+
+    let globalThreshold = 165;
     let maxGap = 0;
     let hasBiModalGap = false;
-
-    if (means.length > 2) {
-      const minMean = means[0];
-      const maxMean = means[means.length - 1];
-      const dynamicRange = maxMean - minMean;
-
-      for (let i = 1; i < means.length; i++) {
-        const gap = means[i] - means[i - 1];
-        if (gap > maxGap && gap >= 12) { 
+    if (sortedMeans.length > 2) {
+      for (let i = 1; i < sortedMeans.length; i++) {
+        const gap = sortedMeans[i] - sortedMeans[i - 1];
+        if (gap > maxGap && gap >= 12) {
           maxGap = gap;
-          globalThreshold = means[i - 1] + gap / 2;
+          globalThreshold = sortedMeans[i - 1] + gap / 2;
           hasBiModalGap = true;
         }
       }
-
-      if (!hasBiModalGap || dynamicRange < 20) {
-        flags.push('Uniform or faint sheet detected; applying conservative baseline thresholding.');
-        globalThreshold = minMean - 10;
+      if (!hasBiModalGap || dynamicRange < 18) {
+        flags.push('Low-contrast or faint sheet detected; applying adaptive density thresholding.');
+        globalThreshold = minMean - 8;
       } else {
-        globalThreshold = Math.max(50, Math.min(215, globalThreshold));
+        globalThreshold = Math.max(55, Math.min(220, globalThreshold));
       }
     }
 
-    // 5. Dual-Metric Group-Aware Classification (99.999% Accuracy Mathematical Engine)
-    // Segregates evaluation into:
-    // (A) Column-Constrained Softmax Maximum A Posteriori (MAP) + GMM for numeric ID fields (Roll, Reg, Sub)
-    // (B) Scale-Invariant Robust Order Statistics (Z-Score + MAD + Texture Homogeneity) for MCQ options
+    // 5. Ensemble Probabilistic Classification
     const bubblesByLabel: Record<string, BubbleDetectionResult[]> = {};
     for (const b of bubbleValues) {
       if (!bubblesByLabel[b.label]) bubblesByLabel[b.label] = [];
@@ -814,174 +915,166 @@ export async function processOMR(
     }
 
     const responses: Record<string, string[]> = {};
+    let ambiguousBubbleCount = 0;
+    let multiMarkCount = 0;
+    let erasureCount = 0;
 
     for (const [lbl, group] of Object.entries(bubblesByLabel)) {
       if (group.length === 1) {
-        // Single isolated bubble (e.g. boolean checkbox)
         const b = group[0];
-        const isMarked = 
-          (b.posteriorFilled !== undefined && b.posteriorFilled > 0.60) ||
-          b.meanVal < globalThreshold || 
-          (b.fillRatio && b.fillRatio > 0.25);
-        b.isMarked = !!isMarked;
-        b.confidence = parseFloat(Math.min(0.999, Math.abs(b.meanVal - globalThreshold) / 35).toFixed(3));
+        const od = b.opticalDensity ?? 0;
+        const isMarked = od >= 0.22 || b.meanVal < globalThreshold || (b.fillRatio ?? 0) >= 0.30;
+        b.isMarked = isMarked;
+        b.confidence = parseFloat(Math.min(0.999, Math.max(0.65, od * 1.4)).toFixed(3));
         if (isMarked) responses[lbl] = [b.value];
         continue;
       }
 
-      // Sort candidate bubbles from darkest (lowest mean) to lightest
-      group.sort((a, b) => a.meanVal - b.meanVal);
-      const minB = group[0];
-      const secondB = group[1];
-      const medianVal = group[Math.floor(group.length / 2)].meanVal;
-      const gapToMedian = medianVal - minB.meanVal;
-      const deltaE = secondB.meanVal - minB.meanVal;
+      group.sort((a, b) => (b.opticalDensity ?? 0) - (a.opticalDensity ?? 0) || a.meanVal - b.meanVal);
+      const best = group[0];
 
-      const isIdColumn = 
-        lbl.toLowerCase().startsWith('roll') || 
-        lbl.toLowerCase().startsWith('reg') || 
-        lbl.toLowerCase().startsWith('sub') || 
-        lbl.toLowerCase().includes('id');
+      const odAsc = group.map((b) => b.opticalDensity ?? 0).sort((a, b) => a - b);
+      const meanDesc = group.map((b) => b.meanVal).sort((a, b) => b - a);
+      const baseIdx = group.length <= 5 ? Math.min(1, group.length - 1) : Math.floor(group.length * 0.35);
+      const medianOD = odAsc[baseIdx];
+      const medianMean = meanDesc[baseIdx];
 
-      if (isIdColumn) {
-        // -------------------------------------------------------------
-        // (A) COLUMN-CONSTRAINED SOFTMAX MAXIMUM A POSTERIORI (MAP) + GMM + NEURAL
-        // -------------------------------------------------------------
-        // A bubble is marked if verified by:
-        // 1. High Neural confidence (neuralPrediction.pFilled >= 0.52 and not ERASED)
-        // 2. High Bayesian posterior probability of being filled (P(Filled | x) >= 0.60) with contrast gap >= 18
-        // 3. Strong contrast drop (gapToMedian >= 30 or (mean < 165 and gapToMedian >= 20))
-        const isDigitMarked = 
-          (minB.neuralPrediction && minB.neuralPrediction.pFilled >= 0.52 && gapToMedian >= 16 && minB.neuralPrediction.predictedClass !== 'ERASED') ||
-          (minB.posteriorFilled !== undefined && minB.posteriorFilled >= 0.60 && gapToMedian >= 18) ||
-          (gapToMedian >= 30) ||
-          (minB.meanVal < 165 && gapToMedian >= 20) ||
-          (minB.meanVal < globalThreshold && gapToMedian >= 18 && (minB.fillRatio && minB.fillRatio >= 0.40));
+      const bestOD = best.opticalDensity ?? 0;
+      const deltaOD = bestOD - medianOD;
+      const gapToMedian = medianMean - best.meanVal;
+      const fillRatio = best.fillRatio ?? 0;
 
-        if (isDigitMarked) {
-          minB.isMarked = true;
-          const confidenceScore = Math.min(0.999, Math.max(0.75, (gapToMedian / 40) * 0.5 + (minB.fillRatio || 0.4) * 0.25 + ((minB.neuralPrediction?.pFilled || 0.5) * 0.25)));
-          minB.confidence = parseFloat(confidenceScore.toFixed(3));
-          responses[lbl] = [minB.value];
+      const absDevs = odAsc.map((v) => Math.abs(v - medianOD)).sort((a, b) => a - b);
+      const madOD = absDevs[Math.min(baseIdx, absDevs.length - 1)];
+      const zOD = deltaOD / (1.4826 * madOD + 0.015);
 
-          // Collision vs. Erasure discrimination using Neural Network, GMM Posteriors, and Patch Texture:
-          const secondGapToMedian = medianVal - secondB.meanVal;
-          const secondIsErased = 
-            (secondB.neuralPrediction && (secondB.neuralPrediction.predictedClass === 'ERASED' || secondB.neuralPrediction.pErased > 0.48)) ||
-            (secondB.posteriorErased !== undefined && secondB.posteriorErased > 0.45) ||
-            (secondB.patchStdDev !== undefined && secondB.patchStdDev > 22 && secondB.meanVal > minB.meanVal + 15);
+      const lowerLbl = lbl.toLowerCase();
+      const isIdColumn =
+        lowerLbl.startsWith('roll') ||
+        lowerLbl.startsWith('reg') ||
+        lowerLbl.startsWith('sub') ||
+        lowerLbl.startsWith('serial') ||
+        lowerLbl.startsWith('marks') ||
+        lowerLbl.startsWith('extra') ||
+        lowerLbl.startsWith('check') ||
+        lowerLbl.startsWith('stu') ||
+        lowerLbl.includes('id');
 
-          if (deltaE <= 10 && secondGapToMedian >= 25 && secondB.meanVal < 165 && !secondIsErased) {
-            // Both bubbles are genuinely dark -> True Multi-Mark Anomaly
-            secondB.isMarked = true;
-            secondB.confidence = parseFloat(Math.min(0.99, secondGapToMedian / 35).toFixed(3));
-            responses[lbl].push(secondB.value);
-            flags.push(`Multiple digits filled in ${lbl}: [${minB.value}, ${secondB.value}]`);
-          } else if (secondGapToMedian >= 18) {
-            // Secondary bubble is an erased stroke
-            secondB.isErasureAnomaly = true;
-            flags.push(`Incomplete erasure in ${lbl} (Selected '${minB.value}' [contrast ${Math.round(gapToMedian)}] over erased '${secondB.value}')`);
-          }
-        }
-        continue;
-      }
+      const blurRelax = isBlurry ? 0.85 : 1.0;
 
-      // -------------------------------------------------------------
-      // (B) SCALE-INVARIANT ROBUST ORDER STATISTICS (Z-SCORE + MAD + GMM + NEURAL)
-      // -------------------------------------------------------------
-      const absDevs = group.map(b => Math.abs(b.meanVal - medianVal)).sort((a, b) => a - b);
-      const mad = absDevs[Math.floor(absDevs.length / 2)];
-      const zContrast = gapToMedian / (1.4826 * mad + 1.0);
+      const isPrimaryMarked =
+        (deltaOD >= 0.14 * blurRelax && bestOD >= 0.18 * blurRelax) ||
+        (gapToMedian >= 28 * blurRelax && bestOD >= 0.14 * blurRelax) ||
+        (fillRatio >= 0.36 * blurRelax && deltaOD >= 0.10 * blurRelax) ||
+        (zOD >= 3.2 && deltaOD >= 0.11 * blurRelax && bestOD >= 0.16 * blurRelax) ||
+        ((best.neuralPrediction?.pFilled ?? 0) >= 0.55 && deltaOD >= 0.10 * blurRelax && best.neuralPrediction?.predictedClass !== 'ERASED');
 
-      const isOptionMarked = 
-        (minB.neuralPrediction && minB.neuralPrediction.pFilled >= 0.52 && gapToMedian >= 16 && minB.neuralPrediction.predictedClass !== 'ERASED') ||
-        (minB.posteriorFilled !== undefined && minB.posteriorFilled >= 0.60 && gapToMedian >= 18) ||
-        (gapToMedian >= 35) ||
-        (minB.meanVal < 165 && gapToMedian >= 22) ||
-        (minB.fillRatio && minB.fillRatio >= 0.40 && gapToMedian >= 18) ||
-        (zContrast >= 3.0 && gapToMedian >= 22 && minB.meanVal < 175);
+      if (isPrimaryMarked) {
+        best.isMarked = true;
+        const confRaw =
+          Math.min(1, deltaOD / 0.32) * 0.45 +
+          Math.min(1, fillRatio / 0.65) * 0.30 +
+          (best.neuralPrediction?.pFilled ?? 0.6) * 0.25;
+        best.confidence = parseFloat(Math.min(0.999, Math.max(0.72, confRaw)).toFixed(3));
+        responses[lbl] = [best.value];
 
-      if (isOptionMarked) {
-        minB.isMarked = true;
-        const confidenceScore = Math.min(0.999, Math.max(0.70, (gapToMedian / 45) * 0.50 + (minB.fillRatio || 0.4) * 0.25 + ((minB.neuralPrediction?.pFilled || 0.5) * 0.25)));
-        minB.confidence = parseFloat(confidenceScore.toFixed(3));
-        responses[lbl] = [minB.value];
-
-        // Multi-mark discrimination for MCQs with neural erasure filtering
         for (let i = 1; i < group.length; i++) {
-          const sibling = group[i];
-          const diffToMin = sibling.meanVal - minB.meanVal;
-          const siblingGapToMedian = medianVal - sibling.meanVal;
-          const siblingIsErased = 
-            (sibling.neuralPrediction && (sibling.neuralPrediction.predictedClass === 'ERASED' || sibling.neuralPrediction.pErased > 0.48)) ||
-            (sibling.posteriorErased !== undefined && sibling.posteriorErased > 0.45) ||
-            (sibling.patchStdDev !== undefined && sibling.patchStdDev > 22 && sibling.meanVal > minB.meanVal + 15);
+          const sib = group[i];
+          const sibOD = sib.opticalDensity ?? 0;
+          const sibDeltaOD = sibOD - medianOD;
+          const odDiff = bestOD - sibOD;
+          const sibFill = sib.fillRatio ?? 0;
 
-          if (diffToMin <= 10 && siblingGapToMedian >= 22 && sibling.meanVal < 165 && !siblingIsErased) {
-            sibling.isMarked = true;
-            sibling.confidence = parseFloat(Math.min(0.99, siblingGapToMedian / 35).toFixed(3));
-            responses[lbl].push(sibling.value);
-          } else if (siblingGapToMedian >= 20 && diffToMin >= 18) {
-            sibling.isErasureAnomaly = true;
-            flags.push(`Incomplete erasure or faint mark at ${lbl} (Selected '${minB.value}' over faint '${sibling.value}')`);
+          const sibIsErased =
+            (sib.neuralPrediction && (sib.neuralPrediction.predictedClass === 'ERASED' || sib.neuralPrediction.pErased > 0.48)) ||
+            ((sib.posteriorErased ?? 0) > 0.48 && odDiff > 0.08) ||
+            ((sib.patchStdDev ?? 0) > 24 && odDiff > 0.09);
+
+          const isGenuineSecondMark =
+            !sibIsErased &&
+            sibDeltaOD >= 0.14 * blurRelax &&
+            sibOD >= 0.19 * blurRelax &&
+            (odDiff <= 0.10 || (sibFill >= 0.38 && sibDeltaOD >= 0.18));
+
+          if (isGenuineSecondMark) {
+            sib.isMarked = true;
+            sib.confidence = parseFloat(Math.min(0.99, Math.max(0.70, sibDeltaOD / 0.30)).toFixed(3));
+            responses[lbl].push(sib.value);
+            multiMarkCount++;
+          } else if (sibDeltaOD >= 0.09 && odDiff >= 0.08) {
+            sib.isErasureAnomaly = true;
+            erasureCount++;
+            flags.push(`Incomplete erasure in ${lbl}: selected '${best.value}' over faint/erased '${sib.value}'.`);
           }
         }
-      } else {
-        if (gapToMedian >= 15 && gapToMedian < 22) {
-          flags.push(`Faint mark at ${lbl} (${minB.value}): gap ${Math.round(gapToMedian)} below confidence margin.`);
+
+        if (responses[lbl].length > 1) {
+          flags.push(
+            isIdColumn
+              ? `Multiple digits filled in ${lbl}: [${responses[lbl].join(', ')}]`
+              : `Multiple marks detected for ${lbl}: [${responses[lbl].join(', ')}]`
+          );
         }
+      } else if (deltaOD >= 0.075 && bestOD >= 0.12 && (zOD >= 2.2 || gapToMedian >= 14)) {
+        best.isAmbiguous = true;
+        best.confidence = parseFloat(Math.min(0.69, Math.max(0.35, deltaOD * 3.5)).toFixed(3));
+        ambiguousBubbleCount++;
+        flags.push(`Ambiguous faint mark at ${lbl} (${best.value}): optical density ${(bestOD * 100).toFixed(0)}% below certainty margin.`);
       }
     }
 
-    // Flag multiple marks in single-selection question blocks
-    for (const [label, vals] of Object.entries(responses)) {
-      if (vals.length > 1 && !label.toLowerCase().includes('roll') && !label.toLowerCase().includes('reg') && !label.toLowerCase().includes('id')) {
-        flags.push(`Multiple marks detected for ${label}: [${vals.join(', ')}]`);
-      }
-    }
+    const markedBubbles = bubbleValues.filter((b) => b.isMarked);
+    const markedCount = markedBubbles.length;
+    const avgConfidence =
+      markedCount > 0
+        ? parseFloat((markedBubbles.reduce((acc, b) => acc + b.confidence, 0) / markedCount).toFixed(4))
+        : 0;
 
-    const markedCount = bubbleValues.filter(b => b.isMarked).length;
-    sm.dispatch('CLASSIFY_DUAL_METRIC', { 
-      markedCount, 
-      ambiguousCount: flags.length, 
-      confidence: flags.length > 0 ? 0.80 : 0.9999 
+    sm.dispatch('CLASSIFY_DUAL_METRIC', {
+      markedCount,
+      ambiguousCount: flags.length,
+      confidence: flags.length > 0 ? Math.min(0.84, Math.max(0.5, avgConfidence)) : Math.max(0.95, avgConfidence || 0.99),
     });
 
-    const concatenatedResponses = resolveConcatenatedFields(responses, template.customLabels, template.emptyValue ?? "");
+    const concatenatedResponses = resolveConcatenatedFields(responses, template.customLabels, template.emptyValue ?? '');
     sm.dispatch('RESOLVE_METADATA_FIELDS', {
       roll: concatenatedResponses['Roll'] || concatenatedResponses['RollNo'] || concatenatedResponses['Stu'] || '',
       reg: concatenatedResponses['Reg'] || concatenatedResponses['Registration'] || '',
-      set: concatenatedResponses['Set'] || concatenatedResponses['SetCode'] || ''
+      set: concatenatedResponses['Set'] || concatenatedResponses['SetCode'] || '',
     });
 
-    if (flags.length > 0 || !markersDetected) {
+    if (flags.length > 0 || (useMarkers && !markersDetected)) {
       sm.dispatch('FLAG_FOR_AUDIT', { flagReason: flags.join('; ') || 'Fiducials missing' });
     } else {
       sm.dispatch('GRADE_AND_SCORE', { score: markedCount });
       sm.dispatch('FINALIZE_RESULT');
     }
 
-    // 6. Draw enterprise diagnostic overlay on warped canvas
-    let displayCopy = warped.clone();
+    // 6. Diagnostic Overlay Rendering
+    const displayCopy = warped.clone();
     try {
-      bubbleValues.forEach(b => {
+      bubbleValues.forEach((b) => {
         let color: any;
         let thickness = 2;
 
         if (b.isMarked) {
           if (responses[b.label] && responses[b.label].length > 1) {
-            color = new cv.Scalar(255, 60, 60, 255); // Red warning for multi-mark
+            color = new cv.Scalar(239, 68, 68, 255);
             thickness = 3;
           } else {
-            color = new cv.Scalar(16, 185, 129, 255); // Emerald green for valid mark
+            color = new cv.Scalar(16, 185, 129, 255);
             thickness = 3;
           }
+        } else if (b.isAmbiguous || b.isErasureAnomaly) {
+          color = new cv.Scalar(245, 158, 11, 255);
+          thickness = 2;
         } else {
-          color = new cv.Scalar(59, 130, 246, 120); // Cyan outline for blank
+          color = new cv.Scalar(59, 130, 246, 110);
+          thickness = 1;
         }
 
-        let p1 = new cv.Point(b.rect.x, b.rect.y);
-        let p2 = new cv.Point(b.rect.x + b.rect.width, b.rect.y + b.rect.height);
+        const p1 = new cv.Point(b.rect.x, b.rect.y);
+        const p2 = new cv.Point(b.rect.x + b.rect.width, b.rect.y + b.rect.height);
         cv.rectangle(displayCopy, p1, p2, color, thickness);
       });
 
@@ -994,7 +1087,6 @@ export async function processOMR(
 
     const status: ScanProcessingResult['status'] = flags.length > 0 ? 'FLAGGED' : 'SUCCESS';
 
-    // 7. Generate high-resolution warped and studio-beautified document canvases (opt-in to preserve RAM and prevent cache bloat)
     let warpedImageCanvas: HTMLCanvasElement | undefined;
     let enhancedImageCanvas: HTMLCanvasElement | undefined;
 
@@ -1003,22 +1095,19 @@ export async function processOMR(
         warpedImageCanvas = document.createElement('canvas');
         renderMatToCanvas(cv, warped, warpedImageCanvas);
 
-        // Studio Document Scanner Enhancement Engine (Auto-brightens, removes shadows, whitens paper):
         enhancedImageCanvas = document.createElement('canvas');
-
-        let enhancedGray = new cv.Mat();
-        let minMax = cv.minMaxLoc(gray);
-        let alpha = 255.0 / Math.max(1, (245 - minMax.minVal));
-        let beta = -minMax.minVal * alpha;
+        const enhancedGray = new cv.Mat();
+        const minMax = cv.minMaxLoc(gray);
+        const alpha = 255.0 / Math.max(1, 245 - minMax.minVal);
+        const beta = -minMax.minVal * alpha;
         gray.convertTo(enhancedGray, cv.CV_8U, alpha, beta);
 
-        // Subtle unsharp masking for crisp text, numbers, and clean bubble perimeters
-        let blurredEnh = new cv.Mat();
-        cv.GaussianBlur(enhancedGray, blurredEnh, new cv.Size(0, 0), 2.0);
-        let sharpEnh = new cv.Mat();
+        const blurredEnh = new cv.Mat();
+        cv.GaussianBlur(enhancedGray, blurredEnh, new cv.Size(0, 0), 1.8);
+        const sharpEnh = new cv.Mat();
         cv.addWeighted(enhancedGray, 1.30, blurredEnh, -0.30, 0, sharpEnh);
 
-        let enhancedRgba = new cv.Mat();
+        const enhancedRgba = new cv.Mat();
         cv.cvtColor(sharpEnh, enhancedRgba, cv.COLOR_GRAY2RGBA);
         renderMatToCanvas(cv, enhancedRgba, enhancedImageCanvas);
 
@@ -1039,13 +1128,25 @@ export async function processOMR(
       totalLatencyNs,
       averageTransitionNs: Math.round(totalLatencyNs / Math.max(1, auditHistory.length)),
       lyapunovFinalEnergy: sm.getPayload().remainingStepsToComplete,
-      history: auditHistory.map(h => ({
+      history: auditHistory.map((h) => ({
         step: h.step,
         from: getOmrStateName(h.from),
         to: getOmrStateName(h.to),
         event: h.event,
-        latencyNs: h.latencyNs
-      }))
+        latencyNs: h.latencyNs,
+      })),
+    };
+
+    const qualityMetrics: ScanQualityMetrics = {
+      sharpnessScore,
+      isBlurry,
+      dynamicRange: Math.round(dynamicRange),
+      averageConfidence: avgConfidence,
+      alignmentMethod,
+      colorDropoutChannel,
+      ambiguousBubbleCount,
+      multiMarkCount,
+      erasureCount,
     };
 
     return {
@@ -1063,7 +1164,8 @@ export async function processOMR(
       warpedImageCanvas,
       enhancedImageCanvas,
       stateMachineAudit,
-      qrResult
+      qrResult,
+      qualityMetrics,
     };
   } finally {
     src.delete();

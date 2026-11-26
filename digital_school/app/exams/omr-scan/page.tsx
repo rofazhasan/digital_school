@@ -122,8 +122,30 @@ export default function UniversalOMRScannerPage() {
   const isCapturingFrameRef = useRef<boolean>(false);
   const autoScanLoopRef = useRef<number | null>(null);
 
-  // Initialize Template
+  // Initialize Template (supports ?preset=... and custom template handoff from /exams/omr-templates)
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlPreset = params.get('preset');
+      if (urlPreset === 'custom') {
+        const saved = localStorage.getItem('rofaz_active_omr_template');
+        if (saved) {
+          try {
+            const customTpl = JSON.parse(saved) as Template;
+            const parsed = parseTemplate(customTpl);
+            setActiveTemplate(parsed.template);
+            setParsedBubbles(parsed.bubbles);
+            setStatusMessage(`কাস্টম OMR টেমপ্লেট লোড হয়েছে (${parsed.bubbles.length} বাবলস)`);
+            return;
+          } catch (err) {
+            console.warn('Invalid custom OMR template in storage:', err);
+          }
+        }
+      } else if (urlPreset && PRESET_TEMPLATES.some(p => p.id === urlPreset) && urlPreset !== selectedPresetId) {
+        setSelectedPresetId(urlPreset);
+        return;
+      }
+    }
     const preset = PRESET_TEMPLATES.find(p => p.id === selectedPresetId) || PRESET_TEMPLATES[0];
     setActiveTemplate(preset.template);
     const parsed = parseTemplate(preset.template);
@@ -788,8 +810,8 @@ export default function UniversalOMRScannerPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                <QrCode className="w-3 h-3" /> UNIVERSAL SCANNER
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <QrCode className="w-3 h-3" /> OMR v3 ENGINE
               </span>
               <h1 className="text-base sm:text-lg font-bold text-white">
                 স্মার্ট ইউনিভার্সাল OMR স্ক্যানার
@@ -803,6 +825,13 @@ export default function UniversalOMRScannerPage() {
 
         {/* Global Actions */}
         <div className="flex items-center gap-2">
+          <Link
+            href="/exams/omr-templates"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700/70 transition"
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            <span>টেমপ্লেট হাব</span>
+          </Link>
           {scoreCards.length > 0 && (
             <button
               onClick={syncCohortToDatabase}

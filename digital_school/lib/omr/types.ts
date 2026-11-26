@@ -57,11 +57,26 @@ export interface BubbleDetectionResult extends BubblePoint {
   isMarked: boolean;
   rect: { x: number; y: number; width: number; height: number };
   fillRatio?: number;
+  opticalDensity?: number;
+  localBg?: number;
   patchStdDev?: number;
   posteriorFilled?: number;
   posteriorErased?: number;
   isErasureAnomaly?: boolean;
+  isAmbiguous?: boolean;
   neuralPrediction?: NeuralClassification;
+}
+
+export interface ScanQualityMetrics {
+  sharpnessScore: number; // 0..100
+  isBlurry: boolean;
+  dynamicRange: number;
+  averageConfidence: number;
+  alignmentMethod: 'FIDUCIAL_4PT' | 'FIDUCIAL_3PT_AFFINE' | 'PAGE_CONTOUR' | 'DIRECT_PASS' | 'DIRECT_SCALE';
+  colorDropoutChannel: 'NONE' | 'RED_MAGENTA_DROPOUT' | 'LUMINANCE';
+  ambiguousBubbleCount: number;
+  multiMarkCount: number;
+  erasureCount: number;
 }
 
 export interface StateMachineAuditReport {
@@ -110,6 +125,7 @@ export interface ScanProcessingResult {
   enhancedImageCanvas?: HTMLCanvasElement;
   stateMachineAudit?: StateMachineAuditReport;
   qrResult?: QRCodeScanResult;
+  qualityMetrics?: ScanQualityMetrics;
 }
 
 export interface MarkingScheme {
