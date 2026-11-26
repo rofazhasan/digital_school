@@ -155,7 +155,7 @@ function loadScriptCandidate(src: string): Promise<any> {
       ...prevModule,
       onRuntimeInitialized: () => {
         if (typeof prevInit === 'function') {
-          try { prevInit(); } catch {}
+          try { prevInit(); } catch { }
         }
         tryCandidate((window as any).cv || (window as any).Module);
       },

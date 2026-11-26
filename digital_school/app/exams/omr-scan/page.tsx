@@ -420,7 +420,7 @@ export default function UniversalOMRScannerPage() {
           parsedBubbles,
           undefined,
           item.name,
-          { generateCanvases: false }
+          { generateCanvases: false, preScannedQR: qr }
         );
 
         // Store lightweight scan result
