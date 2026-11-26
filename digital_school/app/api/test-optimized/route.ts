@@ -1,39 +1,26 @@
-import { NextResponse } from 'next/server';
-import ServerlessDatabaseManager from '@/lib/db-optimized';
+import { NextRequest, NextResponse } from 'next/server';
+import { getTokenFromRequest, hasPermission } from '@/lib/auth';
+import prismadb from '@/lib/db';
 
-export async function GET() {
-    try {
-        const startTime = Date.now();
-
-        const result = await (prisma as any).executeWithConnection(async (db: any) => {
-            // Simple query to test performance
-            const examCount = await db.exam.count();
-            const userCount = await db.user.count();
-
-            return {
-                examCount,
-                userCount,
-                timestamp: new Date().toISOString(),
-            };
-        });
-
-        const responseTime = Date.now() - startTime;
-
-        return NextResponse.json({
-            success: true,
-            data: result,
-            responseTime: `${responseTime}ms`,
-            message: 'Optimized database query completed successfully',
-        });
-    } catch (error) {
-        console.error('Optimized test failed:', error);
-        return NextResponse.json(
-            {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-                message: 'Database operation failed',
-            },
-            { status: 500 }
-        );
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await getTokenFromRequest(request);
+    if (!auth || !hasPermission(auth.user.role, 'SUPER_USER')) {
+      return NextResponse.json({ error: 'Forbidden: SUPER_USER role required' }, { status: 403 });
     }
-} 
+
+    const startTime = Date.now();
+    const [examCount, userCount] = await Promise.all([
+      prismadb.exam.count(),
+      prismadb.user.count(),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: { examCount, userCount, timestamp: new Date().toISOString() },
+      responseTime: `${Date.now() - startTime}ms`,
+    });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Database operation failed' }, { status: 500 });
+  }
+}

@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTokenFromRequest, hasPermission } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  try {
-    return NextResponse.json({
-      success: true,
-      message: 'Simple API endpoint working',
-      timestamp: new Date().toISOString(),
-      env: {
-        hasDatabaseUrl: !!process.env.DATABASE_URL,
-        nodeEnv: process.env.NODE_ENV,
-        hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
-        hasJwtSecret: !!process.env.JWT_SECRET,
-      }
-    });
-  } catch (error) {
-    console.error('Simple test error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+  const auth = await getTokenFromRequest(request);
+  if (!auth || !hasPermission(auth.user.role, 'SUPER_USER')) {
+    return NextResponse.json({ error: 'Forbidden: SUPER_USER role required' }, { status: 403 });
   }
-} 
+
+  return NextResponse.json({
+    success: true,
+    message: 'Authenticated diagnostic endpoint active',
+    timestamp: new Date().toISOString(),
+  });
+}

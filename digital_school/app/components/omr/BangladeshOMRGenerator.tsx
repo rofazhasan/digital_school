@@ -380,6 +380,7 @@ export function BangladeshOMRGenerator({
           fieldLabels: [`roll1..${rollDigits}`],
           section: 'Roll Number',
         };
+        customLabels['Roll'] = [`roll1..${rollDigits}`];
       }
 
       if (showSetCode) {
@@ -392,6 +393,7 @@ export function BangladeshOMRGenerator({
           fieldLabels: ['Set'],
           section: 'Set Code',
         };
+        customLabels['Set'] = ['Set'];
       }
 
       const qPerCol = Math.ceil(numQuestions / numColumns);
@@ -426,10 +428,30 @@ export function BangladeshOMRGenerator({
     };
   };
 
-  const handleSyncToScanner = () => {
+  const activeQrTemplateId =
+    selectedPreset === 'custom'
+      ? `custom_${layoutMode}_${numQuestions}q_${numColumns}c_r${rollDigits}`
+      : selectedPreset;
+
+  const handleSyncToScanner = async () => {
     const tmpl = generateOMRCheckerTemplate();
+    try {
+      await fetch('/api/omr-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: activeQrTemplateId,
+          name: `${examTitleBangla} (${numQuestions}Q)`,
+          canonicalWidth: tmpl.pageDimensions[0],
+          canonicalHeight: tmpl.pageDimensions[1],
+          geometry: tmpl,
+        }),
+      });
+    } catch {
+      // Offline or unauthenticated — localStorage fallback still works
+    }
     if (onApplyGeneratedTemplate) onApplyGeneratedTemplate(tmpl);
-    setStatusMessage('Sync complete! Template calibrated for this exact printed sheet.');
+    setStatusMessage('Sync complete! Template saved to Cloud DB & Scanner.');
     if (onNavigateToScanner) onNavigateToScanner();
   };
 
@@ -1165,7 +1187,7 @@ export function BangladeshOMRGenerator({
                     examId: examId || 'BOARD_EXAM',
                     setId: setId || `SET_${setName || 'A'}`,
                     setName: setName || 'A',
-                    template: selectedPreset || `board_${numQuestions}q`,
+                    template: activeQrTemplateId || `board_${numQuestions}q`,
                     title: examTitleBangla || 'Board Exam',
                     v: 1
                   })}

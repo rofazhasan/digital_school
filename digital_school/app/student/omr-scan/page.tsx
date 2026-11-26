@@ -31,10 +31,11 @@ import type {
   EvaluationConfig,
   QRCodeScanResult
 } from '@/lib/omr/types';
-import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
+import { PRESET_TEMPLATES, resolveTemplateByIdOrQR } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
-import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
+import { processOMR } from '@/lib/omr/omrEngine';
+import { scanQRCodeOffThread } from '@/lib/omr/omrWorkerClient';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
 import { ScannerAudioHaptics } from '@/lib/omr/streamAutoScanner';
@@ -241,46 +242,102 @@ export default function StudentOMRScannerPage() {
         await loadOpenCV();
       }
 
-      // Step 1: Decode QR Code (with 4-angle rotation recovery: 0, 90, 180, 270 deg)
-      const qr = scanQRCodeFromCanvas(canvas);
+      // Step 1: Decode QR Code off-thread (with 4-angle rotation recovery) & auto-resolve template!
+      const qr = await scanQRCodeOffThread(canvas);
       const qrExamId = qr?.metadata?.examId || (qr as any)?.examId;
       const qrSet = qr?.metadata?.setName || qr?.metadata?.setId || (qr as any)?.setName;
+      const qrTemplateTag = qr?.metadata?.template;
 
-      let examBundle: { exam: any; config: EvaluationConfig } | null = null;
-      if (qrExamId) {
-        examBundle = await fetchExamEvaluationConfig(qrExamId);
+      let effectiveTemplate = activeTemplate;
+      let effectiveBubbles = parsedBubbles;
+      if (qrTemplateTag) {
+        const resolved = await resolveTemplateByIdOrQR(qrTemplateTag);
+        if (resolved) {
+          effectiveTemplate = resolved.template;
+          effectiveBubbles = parseTemplate(resolved.template).bubbles;
+          setSelectedPresetId(resolved.presetId);
+        }
       }
 
-      const evalConfig = examBundle?.config || {
-        examName: 'Student OMR Exam',
-        examCode: qrExamId || 'EXAM',
-        totalMarks: 100,
-        answerKey: {},
-        multiSetAnswerKeys: {},
-        rollNumberField: 'Roll',
-        serialNumberField: 'Serial',
-        setNameField: 'Set',
-        markingSchemes: {
-          default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
-        },
-      };
-
-      // Step 2: Run OMR Engine (Perspective Homography + Concentric Dual-Radius Moments)
+      // Step 2: Run OMR v3 Engine
       const scanRes = await processOMR(
         canvas,
-        activeTemplate,
-        parsedBubbles,
+        effectiveTemplate,
+        effectiveBubbles,
         undefined,
         filename,
-        { generateCanvases: false }
+        { generateCanvases: false, preScannedQR: qr }
       );
 
-      // Override / set detected Set from QR if available
       const detectedSet = qrSet || scanRes.responses['Set']?.[0] || 'A';
       const effectiveResponses = { ...scanRes.responses, Set: [detectedSet] };
 
-      // Step 3: Evaluate Student Card
-      const evalEngine = new EvaluationEngine(evalConfig);
+      // Step 3: Secure Server-Side Self-Evaluation (protects answer keys during live ongoing exams!)
+      if (qrExamId) {
+        setIsSubmitting(true);
+        try {
+          const selfRes = await fetch('/api/student/omr-self-evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              examId: qrExamId,
+              examSet: detectedSet,
+              sheetId: scanRes.sheetId,
+              templateId: qrTemplateTag || selectedPresetId,
+              rawResponses: effectiveResponses,
+              qualityMetrics: scanRes.qualityMetrics,
+            }),
+          });
+
+          const selfData = await selfRes.json();
+          if (!selfRes.ok) {
+            setErrorMsg(selfData.error || 'পরীক্ষার নির্ধারিত সময় শেষ হওয়ার পর ফলাফল দেখা যাবে।');
+            setScanResult(scanRes);
+            return;
+          }
+
+          const serverCard: StudentScoreCard = {
+            sheetId: scanRes.sheetId,
+            filename,
+            rollNumber: currentStudent?.studentProfile?.roll || scanRes.concatenatedResponses?.['Roll'] || 'N/A',
+            registrationNo: scanRes.concatenatedResponses?.['Registration'],
+            studentId: currentStudent?.studentProfile?.id || currentStudent?.id,
+            studentName: currentStudent?.name,
+            examSet: selfData.examSet || detectedSet,
+            totalScore: selfData.totalScore,
+            maxScore: selfData.maxScore,
+            percentage: selfData.percentage,
+            correctCount: selfData.correctCount,
+            incorrectCount: selfData.incorrectCount,
+            unmarkedCount: selfData.unmarkedCount,
+            sectionScores: {},
+            questionVerdicts: selfData.questionVerdicts || {},
+            flags: scanRes.flags,
+            needsReview: scanRes.flags.length > 0,
+          };
+
+          ScannerAudioHaptics.playSuccessChirp();
+          setDetectedExamMeta({ id: qrExamId, name: selfData.examName });
+          setScanResult(scanRes);
+          setScoreCard(serverCard);
+          setSubmissionSuccess(true);
+          setStatusMessage('ওএমআর সফলভাবে স্ক্যান ও সার্ভার দ্বারা মূল্যায়ন করা হয়েছে!');
+          return;
+        } finally {
+          setIsSubmitting(false);
+        }
+      }
+
+      // Offline / No-QR fallback preview
+      const evalEngine = new EvaluationEngine({
+        examName: 'Offline OMR Bubble Check',
+        examCode: 'PRACTICE',
+        totalMarks: 100,
+        answerKey: {},
+        rollNumberField: 'Roll',
+        setNameField: 'Set',
+        markingSchemes: { default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 } },
+      });
       const card = evalEngine.evaluateCandidate(
         scanRes.sheetId,
         filename,
@@ -288,28 +345,10 @@ export default function StudentOMRScannerPage() {
         scanRes.concatenatedResponses,
         scanRes.flags
       );
-
-      // Link to logged-in student
-      if (currentStudent) {
-        card.studentId = currentStudent.studentProfile?.id || currentStudent.id;
-        card.studentName = currentStudent.name;
-        if (!card.rollNumber && currentStudent.studentProfile?.roll) {
-          card.rollNumber = currentStudent.studentProfile.roll;
-        }
-      }
-
-      (card as any).examId = qrExamId;
-
       ScannerAudioHaptics.playSuccessChirp();
       setScanResult(scanRes);
       setScoreCard(card);
-      setDetectedExamMeta(examBundle?.exam || null);
-      setStatusMessage('ওএমআর সফলভাবে স্ক্যান ও মূল্যায়ন করা হয়েছে!');
-
-      // Auto-submit submission to DB
-      if (qrExamId) {
-        await submitScoreToDatabase(card, qrExamId);
-      }
+      setStatusMessage('বাবল সনাক্তকরণ সম্পন্ন (QR কোড না থাকায় শুধু রিডিং দেখানো হচ্ছে)।');
     } catch (err: any) {
       console.error('Scan error:', err);
       setErrorMsg('ওএমআর শিট সনাক্ত করা যায়নি। অনুগ্রহ করে আলো বাড়িয়ে সোজাভাবে পেপারের ছবি তুলুন।');

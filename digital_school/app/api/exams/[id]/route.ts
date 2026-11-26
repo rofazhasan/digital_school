@@ -5,6 +5,7 @@ import { Question, QuestionType, Difficulty, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { shuffleArray } from '@/lib/utils';
 import { DatabaseClient } from '@/lib/db';
+import { getTokenFromRequest, hasPermission } from '@/lib/auth';
 
 // Zod schema for query parameter validation
 const getQuestionsQuerySchema = z.object({
@@ -102,7 +103,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                   request.nextUrl.searchParams.get('omr') === '1';
 
     if (isOmr) {
-      const classStudents = exam.classId ? await prisma.studentProfile.findMany({
+      const auth = await getTokenFromRequest(request);
+      if (!auth) {
+        return NextResponse.json({ error: 'Authentication required for OMR exam metadata' }, { status: 401 });
+      }
+
+      const isStaff = hasPermission(auth.user.role, 'TEACHER');
+      const examEnded = exam.endTime ? new Date(exam.endTime).getTime() <= Date.now() : false;
+      const canRevealAnswers = isStaff || examEnded || !exam.isActive;
+
+      // Only staff (TEACHER/ADMIN/SUPER_USER) can pull the full student PII directory
+      const classStudents = (isStaff && exam.classId) ? await prisma.studentProfile.findMany({
         where: { classId: exam.classId },
         select: {
           id: true,
@@ -112,16 +123,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         },
       }) : [];
 
-      // Optimize examSets to strip heavy descriptions, questionsText, SVG formulas, while preserving exact answers
+      // Optimize examSets to strip heavy descriptions/SVG formulas; withhold answer keys from students during active exam
       const slimSets = (exam.examSets || []).map((s: any) => {
         const rawQs = Array.isArray(s.questionsJson) ? s.questionsJson : [];
         const slimQs = rawQs.map((q: any, idx: number) => ({
           id: q.id || `q_${idx + 1}`,
-          correctAnswer: q.correctAnswer,
-          correctOption: q.correctOption,
+          correctAnswer: canRevealAnswers ? q.correctAnswer : undefined,
+          correctOption: canRevealAnswers ? q.correctOption : undefined,
           negativeMarks: q.negativeMarks ?? exam.mcqNegativeMarking ?? 0.25,
           options: Array.isArray(q.options) ? q.options.map((opt: any) => ({
-            isCorrect: Boolean(opt?.isCorrect || opt?.correct),
+            isCorrect: canRevealAnswers ? Boolean(opt?.isCorrect || opt?.correct) : false,
           })) : [],
         }));
         return {
@@ -138,6 +149,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           totalMarks: exam.totalMarks,
           mcqNegativeMarking: exam.mcqNegativeMarking,
           classId: exam.classId,
+          endTime: exam.endTime,
+          isActive: exam.isActive,
+          answerKeyReleased: canRevealAnswers,
           students: classStudents,
           examSets: slimSets,
         },

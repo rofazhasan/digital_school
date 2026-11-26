@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   Upload,
   Camera,
@@ -11,25 +12,20 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Search,
-  Settings,
-  Sparkles,
   ArrowLeft,
   Printer,
   Eye,
+  EyeOff,
   Send,
   Zap,
   BarChart3,
   ShieldCheck,
-  FileText,
-  Clock,
   QrCode,
-  Check,
-  ChevronDown,
   Flashlight,
-  Volume2,
-  Play,
-  Pause,
-  Video
+  Download,
+  Trash2,
+  Edit3,
+  Database,
 } from 'lucide-react';
 
 import type {
@@ -38,19 +34,22 @@ import type {
   ScanProcessingResult,
   StudentScoreCard,
   EvaluationConfig,
-  QRCodeScanResult
+  AuditLogEntry,
 } from '@/lib/omr/types';
-import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
+import { PRESET_TEMPLATES, resolveTemplateByIdOrQR } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import { EvaluationEngine } from '@/lib/omr/evaluationEngine';
-import { processOMR, scanQRCodeFromCanvas } from '@/lib/omr/omrEngine';
+import { AnalyticsEngine } from '@/lib/omr/analyticsEngine';
+import { processOMR } from '@/lib/omr/omrEngine';
+import { scanQRCodeOffThread } from '@/lib/omr/omrWorkerClient';
+import { OmrOfflineStore } from '@/lib/omr/omrOfflineStore';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
-import { 
-  StreamMotionAnalyzer, 
-  ScannerAudioHaptics, 
-  TorchController, 
-  DuplicateSuppressor 
+import {
+  StreamMotionAnalyzer,
+  ScannerAudioHaptics,
+  TorchController,
+  DuplicateSuppressor,
 } from '@/lib/omr/streamAutoScanner';
 
 interface ExamMetadata {
@@ -73,41 +72,50 @@ interface ExamMetadata {
 }
 
 export default function UniversalOMRScannerPage() {
-  // Available exams list for manual selection fallback
-  const [examsList, setExamsList] = useState<Array<{ id: string; name: string; totalMarks?: number }>>([]);
-  const [loadingExamsList, setLoadingExamsList] = useState<boolean>(true);
-  const [selectedExamId, setSelectedExamId] = useState<string>('');
+  const routeParams = useParams();
+  const routeExamId = typeof routeParams?.id === 'string' ? routeParams.id : Array.isArray(routeParams?.id) ? routeParams.id[0] || '' : '';
 
-  // Cached Exam Data indexed by examId
-  const [examCache, setExamCache] = useState<Record<string, { exam: ExamMetadata; config: EvaluationConfig; studentDir: Map<string, { id: string; name: string }> }>>({});
+  const [examsList, setExamsList] = useState<Array<{ id: string; name: string; totalMarks?: number }>>([]);
+  const [selectedExamId, setSelectedExamId] = useState<string>(routeExamId);
+
+  const [examCache, setExamCache] = useState<
+    Record<string, { exam: ExamMetadata; config: EvaluationConfig; studentDir: Map<string, { id: string; name: string }> }>
+  >({});
 
   // Active Template
   const [selectedPresetId, setSelectedPresetId] = useState<string>('medical_admission_100q');
   const [activeTemplate, setActiveTemplate] = useState<Template>(PRESET_TEMPLATES[0].template);
   const [parsedBubbles, setParsedBubbles] = useState<BubblePoint[]>([]);
 
-  // Batch Processing state
+  // Batch & HITL Review State
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [scanResults, setScanResults] = useState<Record<string, ScanProcessingResult>>({});
+  const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
+  const [correctionLogs, setCorrectionLogs] = useState<Record<string, AuditLogEntry[]>>({});
   const [scoreCards, setScoreCards] = useState<StudentScoreCard[]>([]);
   const [selectedScoreCard, setSelectedScoreCard] = useState<StudentScoreCard | null>(null);
   const [searchFilter, setSearchFilter] = useState<string>('');
+  const [reviewFilterOnly, setReviewFilterOnly] = useState<boolean>(false);
+  const [showVisualSheet, setShowVisualSheet] = useState<boolean>(true);
+  const [editingMeta, setEditingMeta] = useState<boolean>(false);
+  const [draftRoll, setDraftRoll] = useState<string>('');
+  const [draftReg, setDraftReg] = useState<string>('');
+  const [draftSet, setDraftSet] = useState<string>('A');
   const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'results' | 'analytics'>('upload');
 
   // DB Sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [offlineRestoredCount, setOfflineRestoredCount] = useState<number>(0);
 
   // Live Camera state
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraFeedback, setCameraFeedback] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
 
-  // Hands-Free Continuous Auto-Scan Stream State
   const [isAutoScanMode, setIsAutoScanMode] = useState<boolean>(true);
   const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
   const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
@@ -141,26 +149,71 @@ export default function UniversalOMRScannerPage() {
             console.warn('Invalid custom OMR template in storage:', err);
           }
         }
-      } else if (urlPreset && PRESET_TEMPLATES.some(p => p.id === urlPreset) && urlPreset !== selectedPresetId) {
-        setSelectedPresetId(urlPreset);
-        return;
+      } else if (urlPreset) {
+        const matched = PRESET_TEMPLATES.find(
+          (p) => p.id === urlPreset || (p.aliases && p.aliases.includes(urlPreset))
+        );
+        if (matched && matched.id !== selectedPresetId) {
+          setSelectedPresetId(matched.id);
+          return;
+        }
       }
     }
-    const preset = PRESET_TEMPLATES.find(p => p.id === selectedPresetId) || PRESET_TEMPLATES[0];
+    const preset = PRESET_TEMPLATES.find((p) => p.id === selectedPresetId) || PRESET_TEMPLATES[0];
     setActiveTemplate(preset.template);
     const parsed = parseTemplate(preset.template);
     setParsedBubbles(parsed.bubbles);
   }, [selectedPresetId]);
 
-  // Preload OpenCV in background idle time so scans start instantly with zero latency
+  // Preload OpenCV in background idle time
   useEffect(() => {
     if (typeof window !== 'undefined' && !isOpenCVLoaded()) {
       const timer = setTimeout(() => {
-        loadOpenCV().catch(err => console.debug('OpenCV background prefetch deferred:', err));
-      }, 800);
+        loadOpenCV().catch((err) => console.debug('OpenCV background prefetch deferred:', err));
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, []);
+
+  // Restore any unsynced or recent batch from Offline IndexedDB Store on mount
+  useEffect(() => {
+    let mounted = true;
+    OmrOfflineStore.loadAll().then((items) => {
+      if (!mounted || items.length === 0) return;
+      const restoredScans: Record<string, ScanProcessingResult> = {};
+      const restoredPreviews: Record<string, string> = {};
+      const restoredLogs: Record<string, AuditLogEntry[]> = {};
+      const restoredCards: StudentScoreCard[] = [];
+
+      items.forEach((it) => {
+        restoredScans[it.sheetId] = it.scanResult as ScanProcessingResult;
+        if (it.previewDataUrl) restoredPreviews[it.sheetId] = it.previewDataUrl;
+        if (it.corrections?.length) restoredLogs[it.sheetId] = it.corrections;
+        restoredCards.push(it.scoreCard);
+      });
+
+      const ranked = EvaluationEngine.rankCohort(restoredCards);
+      setScanResults(restoredScans);
+      setPreviewImages(restoredPreviews);
+      setCorrectionLogs(restoredLogs);
+      setScoreCards(ranked);
+      setSelectedScoreCard(ranked[0] || null);
+      setOfflineRestoredCount(items.filter((i) => !i.synced).length);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Sync draft meta inputs when selectedScoreCard changes
+  useEffect(() => {
+    if (selectedScoreCard) {
+      setDraftRoll(selectedScoreCard.rollNumber || '');
+      setDraftReg(selectedScoreCard.registrationNo || '');
+      setDraftSet(selectedScoreCard.examSet || 'A');
+      setEditingMeta(false);
+    }
+  }, [selectedScoreCard?.sheetId]);
 
   // Fetch list of available exams on mount
   useEffect(() => {
@@ -169,22 +222,22 @@ export default function UniversalOMRScannerPage() {
         const res = await fetch('/api/exams?limit=50', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          const list = Array.isArray(data.exams) ? data.exams : (Array.isArray(data) ? data : []);
-          setExamsList(list.map((e: any) => ({ id: e.id, name: e.name, totalMarks: e.totalMarks })));
-          if (list.length > 0 && !selectedExamId) {
+          const raw = data?.data || data?.exams || data;
+          const list = Array.isArray(raw) ? raw : [];
+          setExamsList(list.map((e: any) => ({ id: e.id, name: e.name || e.title || 'Exam', totalMarks: e.totalMarks })));
+          if (routeExamId) {
+            setSelectedExamId(routeExamId);
+          } else if (list.length > 0 && !selectedExamId) {
             setSelectedExamId(list[0].id);
           }
         }
       } catch (err) {
         console.warn('Could not fetch exams list:', err);
-      } finally {
-        setLoadingExamsList(false);
       }
     }
     loadExams();
   }, []);
 
-  // Helper to compile Exam details into evaluation config and student directory
   const processAndCacheExam = useCallback((data: ExamMetadata) => {
     if (!data || !data.id) return null;
 
@@ -204,7 +257,6 @@ export default function UniversalOMRScannerPage() {
     const multiSetKeys: Record<string, Record<string, string>> = {};
     const defaultKey: Record<string, string> = {};
     const examSets = Array.isArray(data.examSets) ? data.examSets : [];
-
     const indexToLetter = (idx: number) => ['A', 'B', 'C', 'D', 'E'][idx] || 'A';
 
     const extractAnswers = (qList: any[]) => {
@@ -221,11 +273,14 @@ export default function UniversalOMRScannerPage() {
             letter = bnMap[c] || '';
           }
         }
+        if (!letter && typeof q.correctOption === 'number') {
+          letter = indexToLetter(q.correctOption);
+        }
         if (!letter && Array.isArray(q.options)) {
           const cIdx = q.options.findIndex((opt: any) => opt?.isCorrect || opt?.correct);
           if (cIdx >= 0) letter = indexToLetter(cIdx);
         }
-        map[qKey] = letter || 'A';
+        if (letter) map[qKey] = letter;
       });
       return map;
     };
@@ -268,37 +323,37 @@ export default function UniversalOMRScannerPage() {
     };
 
     const entry = { exam: data, config, studentDir: dirMap };
-    setExamCache(prev => ({ ...prev, [data.id]: entry }));
+    setExamCache((prev) => ({ ...prev, [data.id]: entry }));
     return entry;
   }, []);
 
-  // Fetch single exam details by ID with caching
-  const getExamData = useCallback(async (id: string) => {
-    if (!id) return null;
-    if (examCache[id]) return examCache[id];
+  const getExamData = useCallback(
+    async (id: string) => {
+      if (!id) return null;
+      if (examCache[id]) return examCache[id];
 
-    try {
-      const res = await fetch(`/api/exams/${id}?mode=omr`);
-      if (!res.ok) return null;
-      const json = await res.json();
-      const examData = json.exam || json;
-      return processAndCacheExam(examData);
-    } catch (e) {
-      console.error(`Failed to fetch exam ${id}:`, e);
-      return null;
-    }
-  }, [examCache, processAndCacheExam]);
+      try {
+        const res = await fetch(`/api/exams/${id}?mode=omr`);
+        if (!res.ok) return null;
+        const json = await res.json();
+        const examData = json.exam || json;
+        return processAndCacheExam(examData);
+      } catch (e) {
+        console.error(`Failed to fetch exam ${id}:`, e);
+        return null;
+      }
+    },
+    [examCache, processAndCacheExam]
+  );
 
-  // Clean up Camera Stream on unmount
   useEffect(() => {
     return () => {
       if (activeStreamRef.current) {
-        activeStreamRef.current.getTracks().forEach(t => t.stop());
+        activeStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
 
-  // Helper to load image
   const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
@@ -315,6 +370,116 @@ export default function UniversalOMRScannerPage() {
     });
   };
 
+  /**
+   * Compresses an overlay canvas to a lightweight 640px-wide JPEG DataURL (~45KB)
+   * so visual HITL Quality Review works across 200+ sheets without exhausting RAM.
+   */
+  const createCompactOverlayPreview = (overlayCanvas: HTMLCanvasElement): string | undefined => {
+    try {
+      if (overlayCanvas.width === 0 || overlayCanvas.height === 0) return undefined;
+      const targetW = Math.min(680, overlayCanvas.width);
+      const scale = targetW / overlayCanvas.width;
+      const targetH = Math.round(overlayCanvas.height * scale);
+      const thumb = document.createElement('canvas');
+      thumb.width = targetW;
+      thumb.height = targetH;
+      const ctx = thumb.getContext('2d');
+      if (!ctx) return undefined;
+      ctx.drawImage(overlayCanvas, 0, 0, targetW, targetH);
+      const dataUrl = thumb.toDataURL('image/jpeg', 0.68);
+      thumb.width = 0;
+      thumb.height = 0;
+      return dataUrl;
+    } catch {
+      return undefined;
+    }
+  };
+
+  /**
+   * Core Single-Sheet Ingestion Pipeline (used by both Bulk Upload & Hands-Free Camera)
+   */
+  const ingestSingleSheetCanvas = async (
+    canvas: HTMLCanvasElement,
+    name: string
+  ): Promise<{ scanRes: ScanProcessingResult; card: StudentScoreCard; previewUrl?: string; resolvedPresetId: string } | null> => {
+    // 1. Off-Main-Thread Worker QR Decode
+    const qr = await scanQRCodeOffThread(canvas);
+    const qrExamId = qr?.metadata?.examId || (qr as any)?.examId;
+    const qrSet = qr?.metadata?.setName || qr?.metadata?.setId || (qr as any)?.setName;
+    const qrTemplateTag = qr?.metadata?.template;
+
+    // 2. Auto-Switch Template Geometry if QR specifies a template ID!
+    let effectiveTemplate = activeTemplate;
+    let effectiveBubbles = parsedBubbles;
+    let effectivePresetId = selectedPresetId;
+
+    if (qrTemplateTag) {
+      const resolved = await resolveTemplateByIdOrQR(qrTemplateTag);
+      if (resolved) {
+        effectiveTemplate = resolved.template;
+        effectiveBubbles = parseTemplate(resolved.template).bubbles;
+        effectivePresetId = resolved.presetId;
+      }
+    }
+
+    const targetExamId = qrExamId || selectedExamId;
+    const examInfo = await getExamData(targetExamId);
+
+    const evalConfig: EvaluationConfig = examInfo?.config || {
+      examName: 'General OMR Exam',
+      examCode: targetExamId || 'EXAM',
+      totalMarks: 100,
+      answerKey: {},
+      multiSetAnswerKeys: {},
+      rollNumberField: 'Roll',
+      serialNumberField: 'Serial',
+      setNameField: 'Set',
+      markingSchemes: {
+        default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
+      },
+    };
+
+    const tempOverlay = document.createElement('canvas');
+    const scanRes = await processOMR(
+      canvas,
+      effectiveTemplate,
+      effectiveBubbles,
+      tempOverlay,
+      name,
+      { generateCanvases: false, preScannedQR: qr }
+    );
+
+    const previewUrl = createCompactOverlayPreview(tempOverlay);
+    tempOverlay.width = 0;
+    tempOverlay.height = 0;
+
+    const evalEngine = new EvaluationEngine(evalConfig);
+    const detectedSet = qrSet || scanRes.responses['Set']?.[0] || 'A';
+    const normSet = ({ 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' } as Record<string, string>)[detectedSet] || detectedSet;
+    const responsesWithSet = { ...scanRes.responses, Set: [normSet] };
+
+    const card = evalEngine.evaluateCandidate(
+      scanRes.sheetId,
+      name,
+      responsesWithSet,
+      scanRes.concatenatedResponses,
+      scanRes.flags
+    );
+
+    const rollStr = card.rollNumber || '';
+    const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
+    const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
+    if (matched) {
+      card.studentId = matched.id;
+      card.studentName = matched.name;
+    }
+
+    (card as any).examId = targetExamId;
+    (card as any).templateId = effectivePresetId;
+
+    return { scanRes, card, previewUrl, resolvedPresetId: effectivePresetId };
+  };
+
   // Process Batch Files
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -324,7 +489,7 @@ export default function UniversalOMRScannerPage() {
     setStatusMessage('ডকুমেন্ট প্রসেসিং এবং পেজ লোডিং শুরু হচ্ছে...');
 
     if (!isOpenCVLoaded()) {
-      setStatusMessage('OMR Vision ইঞ্জিন (OpenCV) লোড হচ্ছে...');
+      setStatusMessage('OMR v3 Vision ইঞ্জিন (OpenCV WASM) লোড হচ্ছে...');
       try {
         await loadOpenCV();
       } catch (cvErr: any) {
@@ -339,19 +504,12 @@ export default function UniversalOMRScannerPage() {
     try {
       for (const file of files) {
         if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
-          const isMasterSpread = file.name.toLowerCase().includes('medical') || 
-                                 file.name.toLowerCase().includes('master') ||
-                                 activeTemplate.pageDimensions[0] === 1060;
-          
           const { renderPdfToCanvases } = await import('@/lib/omr/pdfLoader');
-          const pdfPages = await renderPdfToCanvases(file, {
-            dpi: 200,
-          });
-
+          const pdfPages = await renderPdfToCanvases(file, { dpi: 200 });
           pdfPages.forEach((p, idx) => {
             itemsToProcess.push({
               canvas: p.canvas,
-              name: `${file.name.replace(/\.[^/.]+$/, '')}_p${p.pageNumber || idx + 1}`
+              name: `${file.name.replace(/\.[^/.]+$/, '')}_p${p.pageNumber || idx + 1}`,
             });
           });
         } else if (file.type.startsWith('image/')) {
@@ -365,7 +523,6 @@ export default function UniversalOMRScannerPage() {
         }
       }
     } catch (err: any) {
-      console.error('File extraction error:', err);
       setStatusMessage('ফাইল প্রসেসিং ত্রুটি: ' + err.message);
       setIsProcessing(false);
       return;
@@ -381,6 +538,7 @@ export default function UniversalOMRScannerPage() {
     setStatusMessage(`${itemsToProcess.length} টি OMR শিট স্ক্যান ও মূল্যায়ন করা হচ্ছে...`);
 
     const newScanResults = { ...scanResults };
+    const newPreviews = { ...previewImages };
     const newScoreCards: StudentScoreCard[] = [...scoreCards];
 
     let successCount = 0;
@@ -389,79 +547,33 @@ export default function UniversalOMRScannerPage() {
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
       setProgress({ current: i + 1, total: itemsToProcess.length });
-      await new Promise(r => setTimeout(r, 16));
+      await new Promise((r) => setTimeout(r, 8));
 
       try {
-        // Step 1: Scan QR Code from Canvas to auto-detect Exam & Set
-        const qr = scanQRCodeFromCanvas(item.canvas);
+        const res = await ingestSingleSheetCanvas(item.canvas, item.name);
+        if (res) {
+          const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = res.scanRes;
+          newScanResults[res.scanRes.sheetId] = leanScanRes as ScanProcessingResult;
+          if (res.previewUrl) newPreviews[res.scanRes.sheetId] = res.previewUrl;
+          newScoreCards.push(res.card);
+          successCount++;
 
-        const qrExamId = qr?.metadata?.examId || (qr as any)?.examId;
-        const qrSet = qr?.metadata?.setName || qr?.metadata?.setId || (qr as any)?.setName;
-        let targetExamId = qrExamId || selectedExamId;
-        let examInfo = await getExamData(targetExamId);
-
-        let evalConfig = examInfo?.config || {
-          examName: 'General OMR Exam',
-          examCode: targetExamId || 'EXAM',
-          totalMarks: 100,
-          answerKey: {},
-          multiSetAnswerKeys: {},
-          rollNumberField: 'Roll',
-          serialNumberField: 'Serial',
-          setNameField: 'Set',
-          markingSchemes: {
-            default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
-          },
-        };
-
-        const scanRes = await processOMR(
-          item.canvas,
-          activeTemplate,
-          parsedBubbles,
-          undefined,
-          item.name,
-          { generateCanvases: false, preScannedQR: qr }
-        );
-
-        // Store lightweight scan result
-        const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
-        newScanResults[scanRes.sheetId] = leanScanRes as any;
-
-        const evalEngine = new EvaluationEngine(evalConfig);
-
-        // If QR had a specific set name, override or match with scan responses
-        const detectedSet = qrSet || scanRes.responses['Set']?.[0] || 'A';
-        const responsesWithSet = { ...scanRes.responses, Set: [detectedSet] };
-
-        const card = evalEngine.evaluateCandidate(
-          scanRes.sheetId,
-          item.name,
-          responsesWithSet,
-          scanRes.concatenatedResponses,
-          scanRes.flags
-        );
-
-        // Pre-resolve candidate name and ID from student directory
-        const rollStr = card.rollNumber || '';
-        const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
-        const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
-        if (matched) {
-          card.studentId = matched.id;
-          card.studentName = matched.name;
+          await OmrOfflineStore.saveItem({
+            sheetId: res.scanRes.sheetId,
+            examId: (res.card as any).examId || selectedExamId,
+            presetId: res.resolvedPresetId,
+            timestamp: Date.now(),
+            synced: false,
+            previewDataUrl: res.previewUrl,
+            scanResult: leanScanRes,
+            scoreCard: res.card,
+            corrections: [],
+          });
         }
-
-        // Store target examId on the card for bulk syncing
-        (card as any).examId = targetExamId;
-
-        newScoreCards.push(card);
-        successCount++;
-
-        // Free canvas bitmap memory
-        item.canvas.width = 0;
-        item.canvas.height = 0;
-      } catch (err: any) {
+      } catch (err) {
         console.error(`Error scanning ${item.name}:`, err);
         failCount++;
+      } finally {
         item.canvas.width = 0;
         item.canvas.height = 0;
       }
@@ -469,13 +581,16 @@ export default function UniversalOMRScannerPage() {
 
     const ranked = EvaluationEngine.rankCohort(newScoreCards);
     setScanResults(newScanResults);
+    setPreviewImages(newPreviews);
     setScoreCards(ranked);
+    if (ranked.length > 0 && !selectedScoreCard) setSelectedScoreCard(ranked[0]);
     setIsProcessing(false);
     setStatusMessage(`ব্যাচ স্ক্যান সম্পন্ন: ${successCount} টি সফল${failCount > 0 ? `, ${failCount} টি ত্রুটি` : ''}!`);
     setActiveTab('results');
+    e.target.value = '';
   };
 
-  // Start Camera Stream
+  // Camera Controls
   const startCamera = async () => {
     try {
       if (!isOpenCVLoaded()) {
@@ -487,8 +602,8 @@ export default function UniversalOMRScannerPage() {
         video: {
           facingMode: { ideal: 'environment' },
           width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
+          height: { ideal: 1080 },
+        },
       });
       activeStreamRef.current = stream;
       const torchSupported = await TorchController.isSupported(stream);
@@ -501,15 +616,13 @@ export default function UniversalOMRScannerPage() {
       setActiveTab('camera');
       setCameraFeedback('ক্যামেরা প্রস্তুত। ওএমআর শিট ফ্রেমের নিচে রাখুন — স্বয়ংক্রিয়ভাবে স্ক্যান হবে!');
     } catch (err: any) {
-      console.error('Camera access error:', err);
       alert('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
     }
   };
 
-  // Stop Camera
   const stopCamera = () => {
     if (activeStreamRef.current) {
-      activeStreamRef.current.getTracks().forEach(t => t.stop());
+      activeStreamRef.current.getTracks().forEach((t) => t.stop());
       activeStreamRef.current = null;
     }
     setIsCameraActive(false);
@@ -520,7 +633,6 @@ export default function UniversalOMRScannerPage() {
     }
   };
 
-  // Toggle Flashlight / Torch
   const toggleTorch = async () => {
     if (!activeStreamRef.current) return;
     const nextState = !isTorchOn;
@@ -528,7 +640,6 @@ export default function UniversalOMRScannerPage() {
     if (ok) setIsTorchOn(nextState);
   };
 
-  // Hands-Free Auto-Capture Trigger Function
   const triggerAutoCapture = async () => {
     if (isCapturingFrameRef.current || !videoRef.current) return;
     const v = videoRef.current;
@@ -546,101 +657,61 @@ export default function UniversalOMRScannerPage() {
     ctx.drawImage(v, 0, 0);
 
     try {
-      const qr = scanQRCodeFromCanvas(c);
-      const qrExamId = qr?.metadata?.examId || (qr as any)?.examId;
-      const qrSet = qr?.metadata?.setName || qr?.metadata?.setId || (qr as any)?.setName;
-      let targetExamId = qrExamId || selectedExamId;
-      let examInfo = await getExamData(targetExamId);
+      const res = await ingestSingleSheetCanvas(c, `Camera_${Date.now()}.jpg`);
+      if (!res) return;
 
-      let evalConfig = examInfo?.config || {
-        examName: 'General OMR Exam',
-        examCode: targetExamId || 'EXAM',
-        totalMarks: 100,
-        answerKey: {},
-        multiSetAnswerKeys: {},
-        rollNumberField: 'Roll',
-        serialNumberField: 'Serial',
-        setNameField: 'Set',
-        markingSchemes: {
-          default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
-        },
-      };
+      const rollStr = res.card.rollNumber || '';
+      const targetExamId = (res.card as any).examId || selectedExamId;
+      const sheetFingerprint = `${targetExamId}_${res.card.examSet || 'A'}_${rollStr || res.scanRes.sheetId}`;
 
-      const scanRes = await processOMR(
-        c,
-        activeTemplate,
-        parsedBubbles,
-        undefined,
-        `Camera_${Date.now()}`,
-        { generateCanvases: false }
-      );
-
-      const rollStr = scanRes.concatenatedResponses?.['Roll'] || scanRes.responses['Roll']?.[0] || '';
-      const sheetFingerprint = `${targetExamId}_${qrSet || 'A'}_${rollStr || scanRes.sheetId}`;
-
-      // Prevent duplicate scan of the same sheet resting on the desk
       if (!duplicateSuppressorRef.current.canCapture(sheetFingerprint)) {
-        isCapturingFrameRef.current = false;
         return;
       }
-
       duplicateSuppressorRef.current.recordCapture(sheetFingerprint);
 
-      // Multi-Sensory Feedback: Audio Chime + Tactile Haptics + Emerald Border Flash
       ScannerAudioHaptics.playSuccessChirp();
       setFlashGlow(true);
       setTimeout(() => setFlashGlow(false), 300);
 
-      const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = scanRes;
-      setScanResults(prev => ({ ...prev, [scanRes.sheetId]: leanScanRes as any }));
-
-      const evalEngine = new EvaluationEngine(evalConfig);
-      const detectedSet = qrSet || scanRes.responses['Set']?.[0] || 'A';
-      const responsesWithSet = { ...scanRes.responses, Set: [detectedSet] };
-
-      const card = evalEngine.evaluateCandidate(
-        scanRes.sheetId,
-        `Sheet_${toBengaliNumerals(new Date().toLocaleTimeString())}`,
-        responsesWithSet,
-        scanRes.concatenatedResponses,
-        scanRes.flags
-      );
-
-      const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
-      const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
-      if (matched) {
-        card.studentId = matched.id;
-        card.studentName = matched.name;
+      const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = res.scanRes;
+      setScanResults((prev) => ({ ...prev, [res.scanRes.sheetId]: leanScanRes as ScanProcessingResult }));
+      if (res.previewUrl) {
+        setPreviewImages((prev) => ({ ...prev, [res.scanRes.sheetId]: res.previewUrl! }));
       }
-      (card as any).examId = targetExamId;
+      setScoreCards((prev) => EvaluationEngine.rankCohort([...prev, res.card]));
+      setSelectedScoreCard(res.card);
 
-      setScoreCards(prev => EvaluationEngine.rankCohort([...prev, card]));
-      setSelectedScoreCard(card);
+      await OmrOfflineStore.saveItem({
+        sheetId: res.scanRes.sheetId,
+        examId: targetExamId,
+        presetId: res.resolvedPresetId,
+        timestamp: Date.now(),
+        synced: false,
+        previewDataUrl: res.previewUrl,
+        scanResult: leanScanRes,
+        scoreCard: res.card,
+        corrections: [],
+      });
 
       setRecentCapturePill({
-        roll: card.rollNumber || 'N/A',
-        score: card.totalScore,
-        set: card.examSet || detectedSet || 'A'
+        roll: res.card.rollNumber || 'N/A',
+        score: res.card.totalScore,
+        set: res.card.examSet || 'A',
       });
-      setCameraFeedback(`✅ শিট #${toBengaliNumerals(scoreCards.length + 1)} স্ক্যান হয়েছে! রোল: ${card.rollNumber || 'N/A'} • সেট: ${card.examSet || 'A'} • নম্বর: ${card.totalScore}`);
-    } catch (err: any) {
+      setCameraFeedback(
+        `✅ শিট #${toBengaliNumerals(scoreCards.length + 1)} স্ক্যান হয়েছে! রোল: ${res.card.rollNumber || 'N/A'} • সেট: ${res.card.examSet || 'A'} • নম্বর: ${res.card.totalScore}`
+      );
+    } catch (err) {
       console.error('Camera auto-capture error:', err);
     } finally {
       c.width = 0;
       c.height = 0;
-      // Allow 450ms cooldown before next frame capture to give user time to slide sheet
       setTimeout(() => {
         isCapturingFrameRef.current = false;
       }, 450);
     }
   };
 
-  // Manual Trigger Fallback
-  const captureFrameAndProcess = async () => {
-    await triggerAutoCapture();
-  };
-
-  // Continuous Auto-Scan Analysis Loop (20-25 FPS lightweight motion & focus tracking)
   useEffect(() => {
     if (!isCameraActive || activeTab !== 'camera') {
       if (autoScanLoopRef.current) {
@@ -665,7 +736,6 @@ export default function UniversalOMRScannerPage() {
       if (!isCameraActive || !videoRef.current) return;
       const v = videoRef.current;
 
-      // Analyze at ~20 FPS (every 45ms)
       if (time - lastAnalysisTime >= 45 && v.videoWidth > 0 && v.videoHeight > 0 && lowCtx) {
         lastAnalysisTime = time;
         lowCtx.drawImage(v, 0, 0, 160, 120);
@@ -678,20 +748,14 @@ export default function UniversalOMRScannerPage() {
           duplicateSuppressorRef.current.onMotionSpikeDetected();
         }
 
-        if (
-          isAutoScanMode &&
-          analysis.isAutoCaptureReady &&
-          !isCapturingFrameRef.current
-        ) {
+        if (isAutoScanMode && analysis.isAutoCaptureReady && !isCapturingFrameRef.current) {
           triggerAutoCapture();
         }
       }
-
       autoScanLoopRef.current = requestAnimationFrame(frameTick);
     };
 
     autoScanLoopRef.current = requestAnimationFrame(frameTick);
-
     return () => {
       if (autoScanLoopRef.current) {
         cancelAnimationFrame(autoScanLoopRef.current);
@@ -699,6 +763,241 @@ export default function UniversalOMRScannerPage() {
       }
     };
   }, [isCameraActive, activeTab, isAutoScanMode, selectedExamId, activeTemplate, parsedBubbles]);
+
+  /**
+   * HITL (Human-in-the-Loop) Override: Edit Roll / Reg / Set or Question Answer with Audit Trail
+   */
+  const handleSaveMetaOverride = async () => {
+    if (!selectedScoreCard) return;
+    const sheetId = selectedScoreCard.sheetId;
+    const targetExamId = (selectedScoreCard as any).examId || selectedExamId;
+    const examInfo = await getExamData(targetExamId);
+
+    const newLogs: AuditLogEntry[] = [...(correctionLogs[sheetId] || [])];
+    if (draftRoll !== selectedScoreCard.rollNumber) {
+      newLogs.push({
+        id: `corr_${Date.now()}_roll`,
+        timestamp: Date.now(),
+        sheetId,
+        field: 'Roll',
+        previousValue: selectedScoreCard.rollNumber,
+        newValue: draftRoll,
+        reason: 'Manual HITL Roll correction',
+        operator: 'Teacher',
+      });
+    }
+    if (draftSet !== selectedScoreCard.examSet) {
+      newLogs.push({
+        id: `corr_${Date.now()}_set`,
+        timestamp: Date.now(),
+        sheetId,
+        field: 'Set',
+        previousValue: selectedScoreCard.examSet,
+        newValue: draftSet,
+        reason: 'Manual HITL Set correction',
+        operator: 'Teacher',
+      });
+    }
+
+    const rawScan = scanResults[sheetId];
+    let updatedCard: StudentScoreCard = {
+      ...selectedScoreCard,
+      rollNumber: draftRoll.trim(),
+      registrationNo: draftReg.trim() || undefined,
+      examSet: draftSet.trim().toUpperCase() || 'A',
+      manualOverride: true,
+      needsReview: false,
+    };
+
+    // Re-evaluate against new Set if exam config is loaded
+    if (examInfo?.config && rawScan) {
+      const evalEngine = new EvaluationEngine(examInfo.config);
+      const reEval = evalEngine.evaluateCandidate(
+        sheetId,
+        selectedScoreCard.filename,
+        { ...rawScan.responses, Set: [updatedCard.examSet] },
+        { ...rawScan.concatenatedResponses, Roll: updatedCard.rollNumber, Registration: updatedCard.registrationNo || '' },
+        []
+      );
+      updatedCard = {
+        ...reEval,
+        rollNumber: updatedCard.rollNumber,
+        registrationNo: updatedCard.registrationNo,
+        examSet: updatedCard.examSet,
+        manualOverride: true,
+        needsReview: false,
+      };
+      (updatedCard as any).examId = targetExamId;
+      (updatedCard as any).templateId = (selectedScoreCard as any).templateId || selectedPresetId;
+    }
+
+    const stripped = updatedCard.rollNumber.replace(/^0+/, '') || updatedCard.rollNumber;
+    const matched = examInfo?.studentDir.get(updatedCard.rollNumber) || examInfo?.studentDir.get(stripped);
+    if (matched) {
+      updatedCard.studentId = matched.id;
+      updatedCard.studentName = matched.name;
+    }
+
+    const nextCards = EvaluationEngine.rankCohort(
+      scoreCards.map((c) => (c.sheetId === sheetId ? updatedCard : c))
+    );
+    const refreshed = nextCards.find((c) => c.sheetId === sheetId) || updatedCard;
+
+    setCorrectionLogs((prev) => ({ ...prev, [sheetId]: newLogs }));
+    setScoreCards(nextCards);
+    setSelectedScoreCard(refreshed);
+    setEditingMeta(false);
+
+    if (rawScan) {
+      await OmrOfflineStore.saveItem({
+        sheetId,
+        examId: targetExamId,
+        presetId: (updatedCard as any).templateId || selectedPresetId,
+        timestamp: Date.now(),
+        synced: false,
+        previewDataUrl: previewImages[sheetId],
+        scanResult: rawScan,
+        scoreCard: refreshed,
+        corrections: newLogs,
+      });
+    }
+  };
+
+  /**
+   * 1-Click Question Bubble Override (Cycles A -> B -> C -> D -> Blank)
+   */
+  const handleCycleQuestionOverride = async (qKey: string) => {
+    if (!selectedScoreCard) return;
+    const sheetId = selectedScoreCard.sheetId;
+    const curVerdict = selectedScoreCard.questionVerdicts?.[qKey];
+    if (!curVerdict) return;
+
+    const cycle = ['A', 'B', 'C', 'D', ''];
+    const curAns = (curVerdict.studentAnswer || '').toUpperCase();
+    const nextIdx = (cycle.indexOf(curAns) + 1) % cycle.length;
+    const nextAns = cycle[nextIdx];
+
+    const targetExamId = (selectedScoreCard as any).examId || selectedExamId;
+    const examInfo = await getExamData(targetExamId);
+    const negMark = Math.abs(Number(examInfo?.exam?.mcqNegativeMarking ?? 0.25));
+
+    const correctStr = Array.isArray(curVerdict.correctAnswer)
+      ? String(curVerdict.correctAnswer[0] || '')
+      : String(curVerdict.correctAnswer || '');
+
+    let newVerdictType: 'correct' | 'incorrect' | 'unmarked' = 'unmarked';
+    let newScore = 0;
+    if (!nextAns) {
+      newVerdictType = 'unmarked';
+      newScore = 0;
+    } else if (nextAns.toUpperCase() === correctStr.toUpperCase()) {
+      newVerdictType = 'correct';
+      newScore = 1.0;
+    } else {
+      newVerdictType = 'incorrect';
+      newScore = -negMark;
+    }
+
+    const updatedVerdicts = {
+      ...selectedScoreCard.questionVerdicts,
+      [qKey]: {
+        ...curVerdict,
+        studentAnswer: nextAns,
+        verdict: newVerdictType,
+        score: newScore,
+      },
+    };
+
+    let total = 0, corr = 0, incorr = 0, unm = 0;
+    Object.values(updatedVerdicts).forEach((v) => {
+      total += v.score;
+      if (v.verdict === 'correct' || v.verdict === 'bonus') corr++;
+      else if (v.verdict === 'unmarked') unm++;
+      else incorr++;
+    });
+    total = parseFloat(total.toFixed(2));
+    const maxS = selectedScoreCard.maxScore || Object.keys(updatedVerdicts).length || 100;
+    const pct = maxS > 0 ? parseFloat(((total / maxS) * 100).toFixed(2)) : 0;
+
+    const qNum = parseInt(qKey.replace(/\D/g, ''), 10) || undefined;
+    const auditEntry: AuditLogEntry = {
+      id: `corr_${Date.now()}_${qKey}`,
+      timestamp: Date.now(),
+      sheetId,
+      field: qKey,
+      previousValue: curAns,
+      newValue: nextAns,
+      reason: `Teacher HITL override on ${qKey.toUpperCase()}`,
+      operator: 'Teacher',
+    };
+    (auditEntry as any).questionNo = qNum;
+
+    const newLogs = [...(correctionLogs[sheetId] || []), auditEntry];
+    const updatedCard: StudentScoreCard = {
+      ...selectedScoreCard,
+      totalScore: total,
+      percentage: pct,
+      correctCount: corr,
+      incorrectCount: incorr,
+      unmarkedCount: unm,
+      questionVerdicts: updatedVerdicts,
+      manualOverride: true,
+      needsReview: false,
+    };
+    (updatedCard as any).examId = targetExamId;
+    (updatedCard as any).templateId = (selectedScoreCard as any).templateId || selectedPresetId;
+
+    const nextCards = EvaluationEngine.rankCohort(
+      scoreCards.map((c) => (c.sheetId === sheetId ? updatedCard : c))
+    );
+    const refreshed = nextCards.find((c) => c.sheetId === sheetId) || updatedCard;
+
+    setCorrectionLogs((prev) => ({ ...prev, [sheetId]: newLogs }));
+    setScoreCards(nextCards);
+    setSelectedScoreCard(refreshed);
+
+    const rawScan = scanResults[sheetId];
+    if (rawScan) {
+      rawScan.responses = { ...rawScan.responses, [qKey]: nextAns ? [nextAns] : [] };
+      await OmrOfflineStore.saveItem({
+        sheetId,
+        examId: targetExamId,
+        presetId: (updatedCard as any).templateId || selectedPresetId,
+        timestamp: Date.now(),
+        synced: false,
+        previewDataUrl: previewImages[sheetId],
+        scanResult: rawScan,
+        scoreCard: refreshed,
+        corrections: newLogs,
+      });
+    }
+  };
+
+  // Clear Batch
+  const handleClearBatch = async () => {
+    if (!confirm('আপনি কি বর্তমান ব্যাচের সকল স্ক্যান ফলাফল মুছে ফেলতে চান?')) return;
+    await OmrOfflineStore.clearAll();
+    setScanResults({});
+    setPreviewImages({});
+    setCorrectionLogs({});
+    setScoreCards([]);
+    setSelectedScoreCard(null);
+    setOfflineRestoredCount(0);
+    setStatusMessage('সকল ব্যাচ ডেটা পরিষ্কার করা হয়েছে।');
+  };
+
+  // Export Cohort CSV
+  const handleDownloadCSV = () => {
+    if (scoreCards.length === 0) return;
+    const csv = AnalyticsEngine.exportCohortToCSV(scoreCards);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `OMR_Cohort_Results_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Sync / Batch Submit to PostgreSQL DB
   const syncCohortToDatabase = async () => {
@@ -710,9 +1009,8 @@ export default function UniversalOMRScannerPage() {
     setIsSyncing(true);
     setSyncStatus(null);
 
-    // Group scorecards by examId
     const groups: Record<string, StudentScoreCard[]> = {};
-    scoreCards.forEach(c => {
+    scoreCards.forEach((c) => {
       const eid = (c as any).examId || selectedExamId;
       if (!groups[eid]) groups[eid] = [];
       groups[eid].push(c);
@@ -720,28 +1018,49 @@ export default function UniversalOMRScannerPage() {
 
     let totalSaved = 0;
     let anyError = '';
+    const syncedSheetIds: string[] = [];
 
     for (const [eId, cards] of Object.entries(groups)) {
       if (!eId) continue;
       try {
         const payload = {
-          scans: cards.map(c => {
+          scans: cards.map((c) => {
+            const rawScan = scanResults[c.sheetId];
             const rawAns: Record<string, any> = {};
             if (c.questionVerdicts) {
               Object.entries(c.questionVerdicts).forEach(([k, v]) => {
                 rawAns[k] = v.studentAnswer;
               });
             }
+            const cqObtainedStr = rawScan?.concatenatedResponses?.['ObtainedMarks'];
+            const cqObtained = cqObtainedStr && !isNaN(Number(cqObtainedStr)) ? Number(cqObtainedStr) : undefined;
+            const tplId = (c as any).templateId || selectedPresetId;
+
             return {
               sheetId: c.sheetId,
+              idempotencyKey: `${eId}:${c.sheetId}:${(correctionLogs[c.sheetId] || []).length}`,
               rollNumber: c.rollNumber || '000000',
+              registrationNo: c.registrationNo || rawScan?.concatenatedResponses?.['Registration'] || undefined,
               examSet: c.examSet || 'A',
               totalScore: c.totalScore,
               maxScore: c.maxScore || 100,
+              isCQScript: Boolean(c.isCQScript || cqObtained !== undefined || tplId === 'bangladesh_board_cq_top_sheet'),
+              obtainedMarksCQ: cqObtained,
               rawAnswers: rawAns,
               evaluatedAnswers: c.questionVerdicts || {},
-              templateId: selectedPresetId,
+              templateId: tplId,
               accuracyPercentage: c.percentage,
+              qrFound: Boolean(rawScan?.qrResult?.found),
+              markersDetected: rawScan?.markersDetected,
+              skewAngle: rawScan?.skewAngle,
+              qualityMetrics: rawScan?.qualityMetrics,
+              corrections: (correctionLogs[c.sheetId] || []).map((log: any) => ({
+                field: log.field,
+                questionNo: log.questionNo,
+                previousValue: log.previousValue,
+                newValue: log.newValue,
+                reason: log.reason,
+              })),
             };
           }),
         };
@@ -759,17 +1078,23 @@ export default function UniversalOMRScannerPage() {
 
         const data = await res.json();
         totalSaved += data.count || cards.length;
+        cards.forEach((c) => syncedSheetIds.push(c.sheetId));
       } catch (err: any) {
         console.error(`Sync error for exam ${eId}:`, err);
         anyError = err.message;
       }
     }
 
+    if (syncedSheetIds.length > 0) {
+      await OmrOfflineStore.markSynced(syncedSheetIds);
+      setOfflineRestoredCount(0);
+    }
+
     setIsSyncing(false);
     if (totalSaved > 0) {
       setSyncStatus({
         success: true,
-        message: `সফলভাবে ${totalSaved} টি ফলাফল ডাটাবেসে সেভ করা হয়েছে এবং শিক্ষার্থীদের ড্যাশবোর্ডে প্রকাশিত হয়েছে!`,
+        message: `সফলভাবে ${totalSaved} টি খাতার ফলাফল (MCQ/CQ মার্জ ও কোয়ালিটি লগসহ) ডাটাবেসে প্রকাশিত হয়েছে!`,
       });
     } else {
       setSyncStatus({
@@ -780,51 +1105,100 @@ export default function UniversalOMRScannerPage() {
   };
 
   // Filtered Cards
-  const filteredScoreCards = scoreCards.filter(c => {
-    if (!searchFilter.trim()) return true;
-    const q = searchFilter.toLowerCase();
-    return (
-      c.rollNumber.toLowerCase().includes(q) ||
-      (c.studentName && c.studentName.toLowerCase().includes(q)) ||
-      c.examSet.toLowerCase().includes(q) ||
-      c.filename.toLowerCase().includes(q)
-    );
-  });
+  const flaggedCount = useMemo(
+    () => scoreCards.filter((c) => c.needsReview || (c.flags && c.flags.length > 0)).length,
+    [scoreCards]
+  );
 
-  // Analytics Metrics
+  const filteredScoreCards = useMemo(() => {
+    return scoreCards.filter((c) => {
+      if (reviewFilterOnly && !c.needsReview && (!c.flags || c.flags.length === 0)) {
+        return false;
+      }
+      if (!searchFilter.trim()) return true;
+      const q = searchFilter.toLowerCase();
+      return (
+        c.rollNumber.toLowerCase().includes(q) ||
+        (c.registrationNo && c.registrationNo.toLowerCase().includes(q)) ||
+        (c.studentName && c.studentName.toLowerCase().includes(q)) ||
+        c.examSet.toLowerCase().includes(q) ||
+        c.filename.toLowerCase().includes(q)
+      );
+    });
+  }, [scoreCards, reviewFilterOnly, searchFilter]);
+
+  const psychometrics = useMemo(() => AnalyticsEngine.computePsychometrics(scoreCards), [scoreCards]);
+
   const totalScans = scoreCards.length;
-  const avgScore = totalScans > 0 ? (scoreCards.reduce((acc, c) => acc + c.totalScore, 0) / totalScans).toFixed(2) : '0';
-  const highestScore = totalScans > 0 ? Math.max(...scoreCards.map(c => c.totalScore)).toFixed(2) : '0';
-  const passCount = scoreCards.filter(c => c.percentage >= 40).length;
+  const avgScore = totalScans > 0 ? psychometrics.averageScore.toFixed(2) : '0';
+  const highestScore = totalScans > 0 ? psychometrics.highestScore.toFixed(2) : '0';
+  const passCount = scoreCards.filter((c) => c.percentage >= 40).length;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
             href="/exams"
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 <QrCode className="w-3 h-3" /> OMR v3 ENGINE
               </span>
-              <h1 className="text-base sm:text-lg font-bold text-white">
-                স্মার্ট ইউনিভার্সাল OMR স্ক্যানার
+              <h1 className="text-base sm:text-lg font-bold text-white truncate">
+                স্মার্ট ইউনিভার্সাল OMR স্ক্যানার ও QC স্টুডিও
               </h1>
+              {offlineRestoredCount > 0 && (
+                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <Database className="w-3 h-3" /> {toBengaliNumerals(offlineRestoredCount)} আন-সিঙ্কড ড্রাফট
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400 hidden sm:block">
-              কিউআর কোড ভিত্তিক স্বয়ংক্রিয় পরীক্ষা সনাক্তকরণ, ফোন ক্যামেরা স্ক্যান ও ইনস্ট্যান্ট রেজাল্ট সিঙ্ক
+            <p className="text-xs text-slate-400 hidden sm:block truncate">
+              অটো-QR টেমপ্লেট সুইচ, ভিজ্যুয়াল HITL কারেকশন, অফলাইন রিকভারি ও তাৎক্ষণিক ডাটাবেস সিঙ্ক
             </p>
           </div>
         </div>
 
-        {/* Global Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          {scoreCards.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={handleDownloadCSV}
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                title="Excel CSV এক্সপোর্ট করুন"
+              >
+                <Download className="w-3.5 h-3.5 text-sky-400" />
+                <span>CSV</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={syncCohortToDatabase}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>সিঙ্ক হচ্ছে...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>ডাটাবেসে পাবলিশ ({scoreCards.length})</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+
           <Link
             href="/exams/omr-templates"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700/70 transition"
@@ -832,57 +1206,49 @@ export default function UniversalOMRScannerPage() {
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
             <span>টেমপ্লেট হাব</span>
           </Link>
-          {scoreCards.length > 0 && (
-            <button
-              onClick={syncCohortToDatabase}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer"
-            >
-              {isSyncing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>সিঙ্ক হচ্ছে...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>ডাটাবেসে পাবলিশ ({scoreCards.length})</span>
-                </>
-              )}
-            </button>
-          )}
 
           <Link
             href="/exams/print"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">OMR প্রিন্ট ও টেমপ্লেট</span>
+            <span className="hidden lg:inline">প্রিন্ট</span>
           </Link>
         </div>
       </header>
 
       {/* Sync Status Banner */}
       {syncStatus && (
-        <div className={`px-4 sm:px-6 py-2.5 text-xs font-semibold flex items-center justify-between ${
-          syncStatus.success ? 'bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300' : 'bg-rose-500/15 border-b border-rose-500/30 text-rose-300'
-        }`}>
+        <div
+          className={`px-4 sm:px-6 py-2.5 text-xs font-semibold flex items-center justify-between ${
+            syncStatus.success
+              ? 'bg-emerald-500/15 border-b border-emerald-500/30 text-emerald-300'
+              : 'bg-rose-500/15 border-b border-rose-500/30 text-rose-300'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            {syncStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+            {syncStatus.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+            )}
             <span>{syncStatus.message}</span>
           </div>
-          <button onClick={() => setSyncStatus(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
+          <button onClick={() => setSyncStatus(null)} className="text-slate-400 hover:text-white text-xs cursor-pointer">
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Main Workspace Layout */}
+      {/* Main Workspace */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* Navigation Tabs & Config Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
               onClick={() => setActiveTab('upload')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'upload'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                   : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
@@ -893,39 +1259,55 @@ export default function UniversalOMRScannerPage() {
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 setActiveTab('camera');
                 if (!isCameraActive) startCamera();
               }}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'camera'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                   : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
               <Camera className="w-4 h-4" />
-              <span>লাইভ ক্যামেরা</span>
+              <span>লাইভ অটো-ক্যামেরা</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('results')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition relative ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'results'
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                   : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>ফলাফল ও খাতা ({scoreCards.length})</span>
-              {scoreCards.length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <ShieldCheck className="w-4 h-4" />
+              <span>ফলাফল ও HITL রিভিউ ({scoreCards.length})</span>
+              {flaggedCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                  {flaggedCount}
+                </span>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('analytics')}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'analytics'
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>আইটেম অ্যানালিটিক্স</span>
             </button>
           </div>
 
           {/* Exam & Template Selectors */}
-          <div className="flex items-center gap-2">
-            {/* Fallback Exam Selector (If Sheet Lacks QR) */}
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
               <span className="text-slate-400 text-[11px]">ফলব্যাক পরীক্ষা:</span>
               <select
@@ -933,7 +1315,7 @@ export default function UniversalOMRScannerPage() {
                 onChange={(e) => setSelectedExamId(e.target.value)}
                 className="bg-transparent text-white font-medium focus:outline-none max-w-[160px] truncate cursor-pointer"
               >
-                {examsList.map(e => (
+                {examsList.map((e) => (
                   <option key={e.id} value={e.id} className="bg-slate-900 text-white">
                     {e.name}
                   </option>
@@ -941,21 +1323,31 @@ export default function UniversalOMRScannerPage() {
               </select>
             </div>
 
-            {/* Template Preset Selector */}
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
               <span className="text-slate-400 text-[11px]">টেমপ্লেট:</span>
               <select
                 value={selectedPresetId}
                 onChange={(e) => setSelectedPresetId(e.target.value)}
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                className="bg-transparent text-white font-medium focus:outline-none max-w-[200px] truncate cursor-pointer"
               >
-                {PRESET_TEMPLATES.map(p => (
+                {PRESET_TEMPLATES.map((p) => (
                   <option key={p.id} value={p.id} className="bg-slate-900 text-white">
                     {p.name}
                   </option>
                 ))}
               </select>
             </div>
+
+            {scoreCards.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearBatch}
+                className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition cursor-pointer"
+                title="ব্যাচ পরিষ্কার করুন"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -967,10 +1359,10 @@ export default function UniversalOMRScannerPage() {
                 <Upload className="w-8 h-8" />
               </div>
               <h3 className="text-base font-bold text-white mb-1">
-                OMR শিট ফাইল এখানে ড্রপ করুন অথবা নির্বাচন করুন
+                OMR শিট ফাইল এখানে আপলোড করুন (JPG, PNG বা মাল্টি-পেজ PDF)
               </h3>
-              <p className="text-xs text-slate-400 max-w-md mb-6">
-                কিউআর কোড সম্বলিত যেকোনো ওএমআর শিটের একাধিক ছবি (JPEG/PNG) অথবা পিডিএফ ফাইল একসঙ্গে আপলোড করুন। স্বয়ংক্রিয়ভাবে পরীক্ষা ও সেট সনাক্ত হবে।
+              <p className="text-xs text-slate-400 max-w-lg mb-6">
+                কিউআর কোড থাকলে স্বয়ংক্রিয়ভাবে পরীক্ষা, সেট এবং কাস্টম টেমপ্লেট সনাক্ত হবে। প্রতিটি স্ক্যান স্বয়ংক্রিয়ভাবে অফলাইন মেমোরিতে সংরক্ষিত থাকে — রিফ্রেশ হলেও কোনো ডেটা হারাবে না।
               </p>
 
               <label className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer">
@@ -990,7 +1382,9 @@ export default function UniversalOMRScannerPage() {
                 <div className="mt-6 w-full max-w-md space-y-2">
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span>{statusMessage}</span>
-                    <span>{progress.current} / {progress.total}</span>
+                    <span>
+                      {progress.current} / {progress.total}
+                    </span>
                   </div>
                   <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
                     <div
@@ -1004,7 +1398,6 @@ export default function UniversalOMRScannerPage() {
               )}
             </div>
 
-            {/* Quick Metrics Bar */}
             {scoreCards.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
@@ -1030,30 +1423,26 @@ export default function UniversalOMRScannerPage() {
           </div>
         )}
 
-        {/* Tab 2: Live Camera Scanner - Hands-Free Bulk Stream Engine */}
+        {/* Tab 2: Live Camera Scanner */}
         {activeTab === 'camera' && (
           <div className="space-y-4">
-            <div className={`relative rounded-2xl overflow-hidden bg-black border transition-all duration-300 flex flex-col items-center justify-center min-h-[480px] ${
-              flashGlow 
-                ? 'ring-8 ring-emerald-400 shadow-[0_0_60px_rgba(52,211,153,0.85)] border-emerald-400 scale-[1.005]' 
-                : 'border-slate-800'
-            }`}>
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                className="w-full max-h-[560px] object-contain"
-              />
+            <div
+              className={`relative rounded-2xl overflow-hidden bg-black border transition-all duration-300 flex flex-col items-center justify-center min-h-[480px] ${
+                flashGlow
+                  ? 'ring-8 ring-emerald-400 shadow-[0_0_60px_rgba(52,211,153,0.85)] border-emerald-400 scale-[1.005]'
+                  : 'border-slate-800'
+              }`}
+            >
+              <video ref={videoRef} playsInline muted className="w-full max-h-[560px] object-contain" />
 
-              {/* Top HUD: Real-time Radar & Hardware Controls */}
               <div className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-auto">
                 <div className="flex items-center gap-2">
-                  {/* Auto-Scan Stream Toggle */}
                   <button
+                    type="button"
                     onClick={() => setIsAutoScanMode(!isAutoScanMode)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur shadow-lg transition cursor-pointer ${
-                      isAutoScanMode 
-                        ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 shadow-emerald-500/20' 
+                      isAutoScanMode
+                        ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300'
                         : 'bg-slate-900/80 border border-slate-700 text-slate-400'
                     }`}
                   >
@@ -1061,53 +1450,55 @@ export default function UniversalOMRScannerPage() {
                     <span>{isAutoScanMode ? 'অটো-স্ট্রিম: চালু' : 'ম্যানুয়াল মোড'}</span>
                   </button>
 
-                  {/* Motion State Radar */}
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono backdrop-blur border ${
-                    cameraMotionState === 'STATIONARY' 
-                      ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300' 
-                      : cameraMotionState === 'SETTLING'
-                      ? 'bg-sky-500/20 border-sky-400/40 text-sky-300'
-                      : 'bg-amber-500/20 border-amber-400/40 text-amber-300'
-                  }`}>
-                    <span className="w-2 h-2 rounded-full animate-ping" style={{
-                      backgroundColor: cameraMotionState === 'STATIONARY' ? '#34d399' : (cameraMotionState === 'SETTLING' ? '#38bdf8' : '#fbbf24')
-                    }} />
+                  <div
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono backdrop-blur border ${
+                      cameraMotionState === 'STATIONARY'
+                        ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                        : cameraMotionState === 'SETTLING'
+                        ? 'bg-sky-500/20 border-sky-400/40 text-sky-300'
+                        : 'bg-amber-500/20 border-amber-400/40 text-amber-300'
+                    }`}
+                  >
                     <span>
-                      {cameraMotionState === 'STATIONARY' ? '🎯 স্থির (লকড)' : (cameraMotionState === 'SETTLING' ? '⏳ স্থির হচ্ছে...' : '🖐️ হাত নড়ছে')}
+                      {cameraMotionState === 'STATIONARY'
+                        ? '🎯 স্থির (লকড)'
+                        : cameraMotionState === 'SETTLING'
+                        ? '⏳ স্থির হচ্ছে...'
+                        : '🖐️ হাত নড়ছে'}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Sharpness Meter */}
                   <div className="hidden sm:flex items-center gap-2 bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
                     <span className="text-[11px] text-slate-400">শার্পনেস:</span>
                     <div className="w-16 h-2 bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-150 ${sharpnessScore > 65 ? 'bg-emerald-400' : (sharpnessScore > 35 ? 'bg-amber-400' : 'bg-rose-400')}`}
+                      <div
+                        className={`h-full transition-all duration-150 ${
+                          sharpnessScore > 65 ? 'bg-emerald-400' : sharpnessScore > 35 ? 'bg-amber-400' : 'bg-rose-400'
+                        }`}
                         style={{ width: `${Math.min(100, sharpnessScore)}%` }}
                       />
                     </div>
                     <span className="font-mono text-[11px] text-white">{sharpnessScore}%</span>
                   </div>
 
-                  {/* Flashlight / Torch Toggle */}
                   {isTorchSupported && (
                     <button
+                      type="button"
                       onClick={toggleTorch}
                       className={`p-2 rounded-xl backdrop-blur border transition cursor-pointer ${
-                        isTorchOn 
-                          ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-lg shadow-amber-500/20' 
-                          : 'bg-slate-900/80 border-slate-700 text-slate-300 hover:text-white'
+                        isTorchOn
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                          : 'bg-slate-900/80 border-slate-700 text-slate-300'
                       }`}
-                      title="ফ্ল্যাশলাইট চালু/বন্ধ করুন"
                     >
                       <Flashlight className="w-4 h-4" />
                     </button>
                   )}
 
-                  {/* Stop Camera Button */}
                   <button
+                    type="button"
                     onClick={stopCamera}
                     className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold backdrop-blur transition cursor-pointer"
                   >
@@ -1116,31 +1507,25 @@ export default function UniversalOMRScannerPage() {
                 </div>
               </div>
 
-              {/* Scanning Crosshair Overlay with Corner Targeting Brackets */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4">
-                <div className={`w-full max-w-xs sm:max-w-sm h-72 sm:h-96 border-2 rounded-2xl relative transition-all duration-200 ${
-                  cameraMotionState === 'STATIONARY' 
-                    ? 'border-emerald-400/80 shadow-[0_0_30px_rgba(52,211,153,0.3)]' 
-                    : (cameraMotionState === 'SETTLING' ? 'border-sky-400/60' : 'border-indigo-400/40')
-                }`}>
-                  {/* Corner Targeting Marks */}
+                <div
+                  className={`w-full max-w-xs sm:max-w-sm h-72 sm:h-96 border-2 rounded-2xl relative transition-all duration-200 ${
+                    cameraMotionState === 'STATIONARY'
+                      ? 'border-emerald-400/80 shadow-[0_0_30px_rgba(52,211,153,0.3)]'
+                      : cameraMotionState === 'SETTLING'
+                      ? 'border-sky-400/60'
+                      : 'border-indigo-400/40'
+                  }`}
+                >
                   <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl" />
                   <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr" />
                   <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl" />
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br" />
-
-                  <div className="absolute top-2 left-2 text-[10px] text-emerald-300 font-mono bg-slate-950/85 px-2.5 py-1 rounded-md border border-emerald-500/30 flex items-center gap-1.5">
-                    <QrCode className="w-3 h-3 text-emerald-400" />
-                    <span>OMR ALIGNMENT FRAME</span>
-                  </div>
-
-                  <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-0.5 bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent animate-pulse" />
                 </div>
               </div>
 
-              {/* Floating Instant Score Pill Toast */}
               {recentCapturePill && (
-                <div className="absolute top-16 inset-x-4 flex justify-center pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300">
+                <div className="absolute top-16 inset-x-4 flex justify-center pointer-events-none">
                   <div className="bg-emerald-950/90 border border-emerald-400/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-300 font-bold text-xs">
                       ✓
@@ -1148,19 +1533,18 @@ export default function UniversalOMRScannerPage() {
                     <div>
                       <div className="text-xs font-bold text-white flex items-center gap-2">
                         <span>রোল: {recentCapturePill.roll}</span>
-                        <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[10px]">
+                        <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[10px]">
                           সেট {recentCapturePill.set}
                         </span>
                       </div>
                       <div className="text-[11px] text-emerald-300 font-medium">
-                        প্রাপ্ত নম্বর: {toBengaliNumerals(recentCapturePill.score)} • ব্যাচে যুক্ত হয়েছে
+                        প্রাপ্ত নম্বর: {toBengaliNumerals(recentCapturePill.score)} • অফলাইন সেভ সম্পন্ন
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Bottom Mobile Command Deck */}
               <div className="absolute bottom-3 inset-x-3 bg-slate-950/85 backdrop-blur-md border border-slate-800/90 p-3 rounded-2xl shadow-2xl space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
                   <div className="text-slate-300 truncate max-w-[55%] flex items-center gap-1.5">
@@ -1173,147 +1557,293 @@ export default function UniversalOMRScannerPage() {
                       মোট: {toBengaliNumerals(scoreCards.length)} টি
                     </span>
                     <button
-                      onClick={captureFrameAndProcess}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                      type="button"
+                      onClick={triggerAutoCapture}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg transition cursor-pointer"
                     >
                       <Zap className="w-3.5 h-3.5" />
                       <span>ম্যানুয়াল স্ক্যান</span>
                     </button>
                   </div>
                 </div>
-
-                {/* Scanned Roster Strip (Horizontal Scroller) */}
-                {scoreCards.length > 0 && (
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-                    <div className="text-[11px] text-slate-400 shrink-0 font-medium">
-                      সর্বশেষ:
-                    </div>
-                    {scoreCards.slice(-6).reverse().map((c, i) => (
-                      <div 
-                        key={c.sheetId || i}
-                        className="shrink-0 flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/70 px-2.5 py-1 rounded-lg text-xs"
-                      >
-                        <span className="font-mono font-bold text-white text-[11px]">
-                          {c.rollNumber || 'N/A'}
-                        </span>
-                        <span className="text-emerald-400 font-bold text-[11px]">
-                          ({toBengaliNumerals(c.totalScore)})
-                        </span>
-                      </div>
-                    ))}
-
-                    <button
-                      onClick={syncCohortToDatabase}
-                      disabled={isSyncing}
-                      className="ml-auto shrink-0 inline-flex items-center gap-1 px-3 py-1 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition shadow cursor-pointer disabled:opacity-50"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'ডাটাবেসে সেভ'}</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab 3: Results Cohort Table & Beautified OMR Inspection */}
+        {/* Tab 3: Results Cohort & Visual HITL Quality Control */}
         {activeTab === 'results' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Roster List */}
-            <div className="lg:col-span-5 space-y-3">
-              <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
-                <div className="relative flex-1">
+            <div className="lg:col-span-4 space-y-3">
+              <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl space-y-2">
+                <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="রোল, নাম বা সেট দিয়ে খুঁজুন..."
+                    placeholder="রোল, রেজি, নাম বা সেট দিয়ে খুঁজুন..."
                     value={searchFilter}
                     onChange={(e) => setSearchFilter(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-950 rounded-lg border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
-                <span className="text-xs text-slate-400 font-mono px-2">
-                  {filteredScoreCards.length} টি
-                </span>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setReviewFilterOnly(false)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold cursor-pointer ${
+                        !reviewFilterOnly ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      সকল ({scoreCards.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReviewFilterOnly(true)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer ${
+                        reviewFilterOnly
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'bg-slate-800 text-amber-300 border border-amber-500/30'
+                      }`}
+                    >
+                      <AlertTriangle className="w-3 h-3" /> ফ্ল্যাগড ({flaggedCount})
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCSV}
+                    disabled={scoreCards.length === 0}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 text-emerald-400" /> CSV
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[650px] overflow-y-auto pr-1">
                 {filteredScoreCards.length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-500 bg-slate-900/30 rounded-xl border border-slate-800">
                     কোনো পরীক্ষার্থীর ফলাফল পাওয়া যায়নি
                   </div>
                 ) : (
-                  filteredScoreCards.map((card, idx) => (
-                    <div
-                      key={card.sheetId || idx}
-                      onClick={() => setSelectedScoreCard(card)}
-                      className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                        selectedScoreCard?.sheetId === card.sheetId
-                          ? 'bg-indigo-600/15 border-indigo-500/50'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-mono text-xs font-bold text-slate-300">
-                          #{card.rank || idx + 1}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <span>রোল: {card.rollNumber || 'N/A'}</span>
-                            <span className="px-1.5 py-0.2 bg-slate-800 text-[10px] text-slate-300 rounded">
-                              সেট {card.examSet || 'A'}
-                            </span>
+                  filteredScoreCards.map((card, idx) => {
+                    const hasFlags = card.needsReview || (card.flags && card.flags.length > 0);
+                    return (
+                      <div
+                        key={card.sheetId || idx}
+                        onClick={() => setSelectedScoreCard(card)}
+                        className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                          selectedScoreCard?.sheetId === card.sheetId
+                            ? 'bg-indigo-600/15 border-indigo-500/60'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center font-mono text-xs font-bold text-slate-300 shrink-0">
+                            #{card.rank || idx + 1}
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate max-w-[150px]">
-                            {card.studentName || card.filename}
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                              <span>রোল: {card.rollNumber || 'N/A'}</span>
+                              <span className="px-1.5 py-0.5 bg-slate-800 text-[10px] text-slate-300 rounded">
+                                সেট {card.examSet || 'A'}
+                              </span>
+                              {hasFlags && (
+                                <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px]">
+                                  QC
+                                </span>
+                              )}
+                              {card.manualOverride && (
+                                <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded text-[9px]">
+                                  Edited
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 truncate">
+                              {card.studentName || card.registrationNo || card.filename}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="text-right">
-                        <div className="text-xs font-bold text-emerald-400">
-                          {toBengaliNumerals(card.totalScore)}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          সঠিক: {card.correctCount} | ভুল: {card.incorrectCount}
+                        <div className="text-right shrink-0 ml-2">
+                          <div className="text-xs font-bold text-emerald-400">{toBengaliNumerals(card.totalScore)}</div>
+                          <div className="text-[10px] text-slate-400">
+                            ✓{card.correctCount} • ✕{card.incorrectCount}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
 
-            {/* Right Detailed OMR Card Inspection */}
-            <div className="lg:col-span-7">
+            {/* Right Visual Sheet Overlay + HITL Override Inspector */}
+            <div className="lg:col-span-8">
               {selectedScoreCard ? (
                 <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-5">
-                  {/* Candidate Header Banner */}
-                  <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-base font-bold text-white">
-                          {selectedScoreCard.studentName || `শিক্ষার্থী রোল: ${selectedScoreCard.rollNumber}`}
-                        </h2>
-                        <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold font-mono">
-                          সেট {selectedScoreCard.examSet}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        ফাইল: {selectedScoreCard.filename} • মেধা ক্রম: #{selectedScoreCard.rank}
-                      </p>
+                  {/* Candidate Header & Inline HITL Roll/Set Editor */}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div className="space-y-2 flex-1">
+                      {!editingMeta ? (
+                        <>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-base font-bold text-white">
+                              {selectedScoreCard.studentName || `শিক্ষার্থী রোল: ${selectedScoreCard.rollNumber}`}
+                            </h2>
+                            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold font-mono">
+                              সেট {selectedScoreCard.examSet}
+                            </span>
+                            {selectedScoreCard.registrationNo && (
+                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs font-mono">
+                                রেজি: {selectedScoreCard.registrationNo}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setEditingMeta(true)}
+                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit3 className="w-3 h-3" /> রোল/সেট সংশোধন
+                            </button>
+                          </div>
+                          <p className="text-xs text-slate-400">
+                            ফাইল: {selectedScoreCard.filename} • মেধা ক্রম: #{selectedScoreCard.rank} • যেকোনো প্রশ্নের কার্ডে ক্লিক করে উত্তর ম্যানুয়ালি সংশোধন (HITL Override) করতে পারবেন
+                          </p>
+                        </>
+                      ) : (
+                        <div className="flex flex-wrap items-end gap-2 bg-slate-950 p-3 rounded-xl border border-indigo-500/40">
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">রোল নম্বর</label>
+                            <input
+                              value={draftRoll}
+                              onChange={(e) => setDraftRoll(e.target.value)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white w-28 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">রেজিস্ট্রেশন</label>
+                            <input
+                              value={draftReg}
+                              onChange={(e) => setDraftReg(e.target.value)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white w-36 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">সেট</label>
+                            <select
+                              value={draftSet}
+                              onChange={(e) => setDraftSet(e.target.value)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white"
+                            >
+                              {['A', 'B', 'C', 'D'].map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSaveMetaOverride}
+                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white cursor-pointer"
+                          >
+                            সেভ করুন
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingMeta(false)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 cursor-pointer"
+                          >
+                            বাতিল
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="text-2xl font-black text-emerald-400">
                         {toBengaliNumerals(selectedScoreCard.totalScore)}
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        মোট {toBengaliNumerals(selectedScoreCard.maxScore || Object.keys(selectedScoreCard.questionVerdicts || {}).length)} এর মধ্যে ({selectedScoreCard.percentage}%)
+                        পূর্ণমান {toBengaliNumerals(selectedScoreCard.maxScore || 100)} ({selectedScoreCard.percentage}%)
                       </div>
                     </div>
                   </div>
+
+                  {/* Optical Quality Telemetry & Flags */}
+                  {(() => {
+                    const qm = scanResults[selectedScoreCard.sheetId]?.qualityMetrics;
+                    return (
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2 text-[11px]">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {qm && (
+                            <>
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">
+                                Confidence: {Math.round((qm.averageConfidence || 0) * 100)}%
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded border font-semibold ${
+                                  qm.isBlurry
+                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                                }`}
+                              >
+                                Sharpness: {qm.sharpnessScore}/100 {qm.isBlurry ? '(Deconvolved)' : ''}
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                                {qm.alignmentMethod}
+                              </span>
+                            </>
+                          )}
+                          {(correctionLogs[selectedScoreCard.sheetId]?.length || 0) > 0 && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold">
+                              Audit Edits: {correctionLogs[selectedScoreCard.sheetId].length}
+                            </span>
+                          )}
+                        </div>
+
+                        {previewImages[selectedScoreCard.sheetId] && (
+                          <button
+                            type="button"
+                            onClick={() => setShowVisualSheet(!showVisualSheet)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 cursor-pointer"
+                          >
+                            {showVisualSheet ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            <span>{showVisualSheet ? 'শিট ইমেজ লুকান' : 'শিট ওভারলে দেখুন'}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {selectedScoreCard.flags && selectedScoreCard.flags.length > 0 && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                        <AlertTriangle className="w-4 h-4" /> কোয়ালিটি অডিট নোট ({selectedScoreCard.flags.length}):
+                      </div>
+                      <ul className="list-disc pl-5 space-y-0.5 text-[11px]">
+                        {selectedScoreCard.flags.map((f, idx) => (
+                          <li key={idx}>{f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Visual Warped + Bubble-Annotated OMR Sheet Preview */}
+                  {showVisualSheet && previewImages[selectedScoreCard.sheetId] && (
+                    <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-2 flex flex-col items-center">
+                      <img
+                        src={previewImages[selectedScoreCard.sheetId]}
+                        alt="Aligned OMR Overlay"
+                        className="max-h-[420px] w-auto object-contain rounded-lg"
+                      />
+                      <span className="text-[10px] text-slate-400 mt-1.5">
+                        সবুজ বক্স: বৈধ ভরাট • লাল বক্স: ডাবল মার্ক • হলুদ বক্স: অস্পষ্ট/ইরেজার দাগ
+                      </span>
+                    </div>
+                  )}
 
                   {/* Summary Metric Chips */}
                   <div className="grid grid-cols-3 gap-2">
@@ -1322,7 +1852,7 @@ export default function UniversalOMRScannerPage() {
                       <div className="text-base font-bold text-white mt-0.5">{selectedScoreCard.correctCount}</div>
                     </div>
                     <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-center">
-                      <div className="text-[10px] text-rose-400 font-bold">ভুল উত্তর</div>
+                      <div className="text-[10px] text-rose-400 font-bold">ভুল / মাল্টি-মার্ক</div>
                       <div className="text-base font-bold text-white mt-0.5">{selectedScoreCard.incorrectCount}</div>
                     </div>
                     <div className="p-2.5 rounded-lg bg-slate-800/60 border border-slate-700/60 text-center">
@@ -1331,43 +1861,41 @@ export default function UniversalOMRScannerPage() {
                     </div>
                   </div>
 
-                  {/* Beautified Question Answer Grid */}
+                  {/* Interactive Question Answer Grid (Click any tile to override!) */}
                   <div>
                     <h3 className="text-xs font-bold text-slate-300 mb-2.5 flex items-center justify-between">
-                      <span>প্রশ্নভিত্তিক বিস্তারিত মূল্যায়ন:</span>
+                      <span>প্রশ্নভিত্তিক বিস্তারিত মূল্যায়ন (ক্লিক করে সংশোধনযোগ্য):</span>
                       <span className="text-[11px] text-slate-400 font-normal">
                         সবুজ: সঠিক • লাল: ভুল • ধূসর: অনুত্তরিত
                       </span>
                     </h3>
 
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 max-h-[380px] overflow-y-auto p-1 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-1.5 max-h-[360px] overflow-y-auto p-1.5 bg-slate-950/60 rounded-xl border border-slate-800/80">
                       {Object.keys(selectedScoreCard.questionVerdicts || {}).map((qKey, qIdx) => {
                         const verdict = selectedScoreCard.questionVerdicts[qKey];
-                        const isCorrect = verdict.verdict === 'correct';
-                        const isWrong = verdict.studentAnswer && !isCorrect;
-                        const isUnmarked = !verdict.studentAnswer;
+                        const isCorrect = verdict.verdict === 'correct' || verdict.verdict === 'bonus';
+                        const isWrong = Boolean(verdict.studentAnswer) && !isCorrect;
 
                         return (
-                          <div
+                          <button
                             key={qKey}
-                            className={`p-1.5 rounded-lg border text-center transition ${
+                            type="button"
+                            onClick={() => handleCycleQuestionOverride(qKey)}
+                            title="ক্লিক করে উত্তর পরিবর্তন করুন (A → B → C → D → Blank)"
+                            className={`p-1.5 rounded-lg border text-center transition cursor-pointer hover:scale-[1.03] ${
                               isCorrect
                                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                                 : isWrong
                                 ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                                : 'bg-slate-900 border-slate-800 text-slate-400'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-600'
                             }`}
                           >
-                            <div className="text-[10px] font-mono text-slate-400 font-semibold">
-                              Q{qIdx + 1}
-                            </div>
-                            <div className="text-xs font-bold mt-0.5">
-                              {verdict.studentAnswer || '-'}
-                            </div>
+                            <div className="text-[10px] font-mono text-slate-400 font-semibold">Q{qIdx + 1}</div>
+                            <div className="text-xs font-bold mt-0.5">{verdict.studentAnswer || '-'}</div>
                             <div className="text-[9px] text-slate-500 mt-0.5">
                               সঠিক: {Array.isArray(verdict.correctAnswer) ? verdict.correctAnswer.join(',') : verdict.correctAnswer}
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -1377,11 +1905,114 @@ export default function UniversalOMRScannerPage() {
                 <div className="h-full min-h-[360px] border border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-slate-900/20">
                   <Eye className="w-8 h-8 mb-2 text-slate-600" />
                   <p className="text-xs">
-                    বামদিকের তালিকা থেকে যেকোনো পরীক্ষার্থীর কার্ড নির্বাচন করে ওএমআর শিট এবং বিস্তারিত প্রশ্নভিত্তিক ফলাফল দেখুন।
+                    বামদিকের তালিকা থেকে যেকোনো পরীক্ষার্থীর কার্ড নির্বাচন করে ভিজ্যুয়াল ওএমআর শিট ও প্রশ্নভিত্তিক ফলাফল দেখুন।
                   </p>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Tab 4: Cohort Psychometrics & Item Analysis */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            {scoreCards.length === 0 ? (
+              <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-slate-400 text-xs">
+                অ্যানালিটিক্স দেখার জন্য প্রথমে অন্তত ১টি OMR শিট স্ক্যান করুন।
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="text-[11px] text-slate-400">মোট পরীক্ষার্থী</div>
+                    <div className="text-xl font-bold text-white mt-1">{psychometrics.totalCandidates}</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="text-[11px] text-slate-400">গড় নম্বর (Mean)</div>
+                    <div className="text-xl font-bold text-indigo-400 mt-1">{psychometrics.averageScore}</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="text-[11px] text-slate-400">মধ্যমা (Median)</div>
+                    <div className="text-xl font-bold text-sky-400 mt-1">{psychometrics.medianScore}</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="text-[11px] text-slate-400">পরিমিত ব্যবধান (SD)</div>
+                    <div className="text-xl font-bold text-purple-400 mt-1">{psychometrics.standardDeviation}</div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="text-[11px] text-slate-400">পাসের হার</div>
+                    <div className="text-xl font-bold text-emerald-400 mt-1">{psychometrics.passPercentage}%</div>
+                  </div>
+                </div>
+
+                {/* Grade Distribution */}
+                <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                  <h3 className="text-sm font-bold text-white">গ্রেড ডিস্ট্রিবিউশন</h3>
+                  <div className="grid grid-cols-5 gap-3 text-center text-xs">
+                    {(['A', 'B', 'C', 'D', 'F'] as const).map((g) => (
+                      <div key={g} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <div className="font-bold text-slate-300">Grade {g}</div>
+                        <div className="text-lg font-black text-indigo-400 mt-1">
+                          {psychometrics.gradeDistribution[g]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Per-Question Item Psychometrics Table */}
+                <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-white">প্রশ্নভিত্তিক সাইকোমেট্রিক বিশ্লেষণ (Item Analysis)</h3>
+                      <p className="text-[11px] text-slate-400">
+                        Difficulty Index (p-value) ও Discrimination Index (D: Upper 27% vs Lower 27%)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto max-h-[460px]">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-950 text-slate-400 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2.5">প্রশ্ন</th>
+                          <th className="px-4 py-2.5">সঠিকের হার (p)</th>
+                          <th className="px-4 py-2.5">বৈষম্য সূচক (D)</th>
+                          <th className="px-4 py-2.5">অপশন বণ্টন (A / B / C / D / Blank)</th>
+                          <th className="px-4 py-2.5">মান নির্ণয়</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/70">
+                        {Object.values(psychometrics.itemAnalysis).map((item) => (
+                          <tr key={item.question} className="hover:bg-slate-800/40">
+                            <td className="px-4 py-2 font-mono font-bold text-white">{item.question.toUpperCase()}</td>
+                            <td className="px-4 py-2">{Math.round(item.difficultyIndex * 100)}%</td>
+                            <td className="px-4 py-2 font-mono">{item.discriminationIndex.toFixed(2)}</td>
+                            <td className="px-4 py-2 text-slate-300 font-mono text-[11px]">
+                              A:{item.distractorCounts.A || 0} • B:{item.distractorCounts.B || 0} • C:
+                              {item.distractorCounts.C || 0} • D:{item.distractorCounts.D || 0} • -:
+                              {item.distractorCounts.UNMARKED || 0}
+                            </td>
+                            <td className="px-4 py-2">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.classification === 'Ideal'
+                                    ? 'bg-emerald-500/15 text-emerald-300'
+                                    : item.classification === 'Poor Discriminator'
+                                    ? 'bg-rose-500/15 text-rose-300'
+                                    : 'bg-amber-500/15 text-amber-300'
+                                }`}
+                              >
+                                {item.classification}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
