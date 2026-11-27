@@ -1,588 +1,234 @@
-# Digital School Management System
-
 <div align="center">
 
 # 🎓 Digital School Management System
 
-<img src="./digital_school/public/hero-mockup.png" alt="Digital School Multi-Device Mockup" width="100%" style="border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" />
+<img src="./digital_school/public/hero-mockup.png" alt="Digital School Multi-Device Mockup" width="100%" style="border-radius: 14px; margin-bottom: 18px;" />
 
-**An ultra-high-performance, AI-integrated school management system built for maximum velocity.**
+**Production-grade Academic LMS, Online & Offline Exam Engine, and High-Precision Optical Mark Recognition (OMR) + Blind-Grading CQ Platform — built for schools, coaching centers, and university admission batches.**
 
-[![Deploy on Vercel](https://img.shields.io/badge/Deploy%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
-[![Deploy on Netlify](https://img.shields.io/badge/Deploy%20on-Netlify-00C7B7?style=for-the-badge&logo=netlify)](https://netlify.com)
+[![Live Platform](https://img.shields.io/badge/Live-rofazacademy.dev-6366f1?style=for-the-badge&logo=vercel)](https://rofazacademy.dev)
+[![Next.js](https://img.shields.io/badge/Next.js-15.3-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Prisma](https://img.shields.io/badge/Prisma-6.10-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io)
+[![PostgreSQL](https://img.shields.io/badge/Neon_PostgreSQL-Pooler-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://neon.tech)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Capacitor](https://img.shields.io/badge/Android-Capacitor_8-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com)
+[![License](https://img.shields.io/badge/License-ISC-f97316?style=for-the-badge)](#-license)
 
-![Next.js](https://img.shields.io/badge/Next.js-15.3.4-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue?style=for-the-badge&logo=typescript)
-![Prisma](https://img.shields.io/badge/Prisma-6.10.1-2D3748?style=for-the-badge&logo=prisma)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-336791?style=for-the-badge&logo=postgresql)
+[Key Capabilities](#-key-capabilities) • [Architecture](#-system-architecture) • [OMR & CQ Engine](#-omr--blind-grading-cq-engine) • [Quick Start](#-quick-start) • [Security](#-security--scalability) • [Deployment](#-deployment)
 
-[![License](https://img.shields.io/badge/License-ISC-orange?style=for-the-badge)](#-license)
-[![Version](https://img.shields.io/badge/Version-0.1.0-green?style=for-the-badge)]()
-
-[Explore Features](#-key-features) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [Contributing](#-contributing)
 </div>
 
 ---
 
+## ⚡ Why Digital School?
 
-**Project:** Digital School Management System  
-**Version:** 0.1.0  
-**License:** ISC License  
-**Status:** Active Development  
+Most school systems stop at attendance and static PDFs. **Digital School** unifies **online CBT exams**, **offline printed OMR & Bangladesh Board 3-Part CQ exams**, **AI-assisted question authoring & mistake analysis**, and **instant result publishing** in a single, mobile-first Next.js 15 + Neon PostgreSQL platform.
 
-
-## 🚀 Features
-
-### 🎓 Core Academic Features
-- **Exam Management System**
-  - Create and manage comprehensive exams
-  - Support for multiple question types (MCQ, Descriptive, Math)
-  - LaTeX and MathJax support for mathematical expressions
-  - Question bank management with categorization
-  - Exam scheduling and time management
-
-- **OMR (Optical Mark Recognition) System**
-  - Advanced bubble detection and classification
-  - QR code integration for exam identification
-  - Real-time image processing and validation
-  - Batch processing capabilities
-  - Error review and correction system
-
-- **Result Management**
-  - Automated grading and scoring
-  - Detailed result analytics and reports
-  - Individual and bulk result generation
-  - Result review and appeal system
-  - Export to PDF and Excel formats
-
-### 👥 User Management
-- **Role-Based Access Control**
-  - Super User (System Administrator)
-  - Institute Admin
-  - Teacher/Evaluator
-  - Student
-  - Custom permission system
-
-- **Institute Management**
-  - Multi-institute support
-  - Custom branding and themes
-  - Institute-specific settings
-  - User management per institute
-
-### 📊 Analytics & Reporting
-- **Comprehensive Analytics Dashboard**
-  - Real-time performance metrics
-  - Student progress tracking
-  - Exam statistics and trends
-  - Attendance monitoring
-  - AI usage analytics
-
-- **Advanced Reporting**
-  - Custom report generation
-  - Data export capabilities
-  - Chart.js integration for visualizations
-  - Export to multiple formats
-
-### 🔔 Communication & Notifications
-- **Real-time Notifications**
-  - Socket.io integration
-  - Push notifications
-  - Email notifications
-  - In-app notification system
-
-- **Communication Tools**
-  - Chat system for teachers and students
-  - Notice board management
-  - Announcement system
-  - File sharing capabilities
-
-### 🎨 Modern UI/UX
-- **Responsive Design**
-  - Mobile-first approach
-  - Progressive Web App (PWA) support
-  - Dark/Light theme toggle
-  - Accessibility features
-
-- **Advanced UI Components**
-  - Radix UI components
-  - Framer Motion animations
-  - Custom design system
-  - Interactive charts and graphs
-
-### 🤖 AI Integration
-- **Google Generative AI**
-  - AI-powered question generation
-  - Automated grading assistance
-  - Content analysis and suggestions
-  - Smart recommendations
-
-### 📱 Progressive Web App
-- **PWA Features**
-  - Offline functionality
-  - App-like experience
-  - Push notifications
-  - Install prompts
-  - Service worker integration
+| Capability | Production Benchmark / Guarantee |
+| :--- | :--- |
+| **OMR + Detached CQ Scanning** | **100.00% (100/100 papers)** verified on real production exam data (~105 ms/paper client-side via OpenCV.js WebWorkers — zero server CPU cost) |
+| **Bulk Exam Sync** | **500+ sheets/exam** via chunked, resumable uploads (`25/chunk`) with deferred ranking recomputation |
+| **Blind-Grading CQ Pairing** | Order-independent **Part 1 (`পরীক্ষার্থীর অংশ`) ↔ Part 2 (`পরীক্ষকের অংশ`)** pairing backed by PostgreSQL (`cq_strip_links`) across multiple simultaneous scanning stations |
+| **Student Identity Resilience** | Strict DB-enforced **4-digit Roll** & **6-digit Registration** with 3-tier fault-tolerant matching, 1-digit typo auto-recovery, and 1-click HITL duplicate-roll disambiguation |
+| **Security Posture** | Strict RBAC (`SUPER_USER`, `ADMIN`, `TEACHER`, `STUDENT`) across 115+ API routes, fail-closed JWT, IDOR protection, parameterized Prisma queries, and hardened HTTP security headers |
 
 ---
 
-## 🛠️ Technology Stack
+## 🏗️ System Architecture
 
-### Frontend
-- **Next.js 15.3.4** - React framework with App Router
-- **TypeScript 5.8.3** - Type-safe JavaScript
-- **Tailwind CSS 4** - Utility-first CSS framework
-- **Radix UI** - Accessible component primitives
-- **Framer Motion** - Animation library
-- **React Hook Form** - Form management
-- **Zod** - Schema validation
+```mermaid
+flowchart LR
+    subgraph Clients["Clients (Web • PWA • Android Capacitor 8)"]
+        Portal["Role Portals<br/>Super Admin • Admin • Teacher • Student"]
+        OMRWorker["Client-Side OMR Engine<br/>OpenCV.js • jsQR • Multi-Worker Pool"]
+    end
 
-### Backend & Database
-- **Prisma 6.10.1** - Database ORM
-- **PostgreSQL** - Primary database
-- **NextAuth.js** - Authentication system
-- **Socket.io** - Real-time communication
+    subgraph NextApp["Next.js 15 App Router (Vercel)"]
+        MW["Edge Middleware<br/>Stateless JWT (jose) + RBAC"]
+        API["115+ Hardened API Routes<br/>Zod Validation • Bounded Pagination"]
+        AI["AI Services<br/>Gemini Question Gen • Mistake Analyzer"]
+    end
 
-### AI & ML
-- **Google Generative AI** - AI-powered features
-- **TensorFlow.js** - Machine learning capabilities
-- **Tesseract.js** - OCR functionality
+    subgraph Data["Persistence & Media"]
+        Neon[("Neon PostgreSQL<br/>PgBouncer Pooler • 36+ Migrations")]
+        Cloud["Cloudinary / UploadThing"]
+    end
 
-### File Processing
-- **Puppeteer** - PDF generation
-- **React PDF** - PDF rendering
-- **Jimp** - Image processing
-- **Canvas** - Graphics manipulation
-
-### Math & Science
-- **KaTeX** - Math rendering
-- **MathJax** - Mathematical expressions
-- **React MathLive** - Math input
-- **Better React MathJax** - Enhanced math display
-
-### Utilities
-- **Cloudinary** - Cloud image management
-- **UploadThing** - File upload service
-- **QR Code** - QR code generation
-- **Excel/CSV** - Data import/export
+    Portal --> MW --> API
+    OMRWorker -->|"Chunked Resumable Sync (25/batch)"| API
+    OMRWorker -->|"Multi-Device CQ Strip Pairing"| API
+    API --> Neon
+    API --> AI
+    API --> Cloud
+```
 
 ---
 
-## 📋 Prerequisites
+## 🎯 Key Capabilities
 
-- **Node.js** 18+ 
-- **npm** or **yarn** package manager
-- **PostgreSQL** database (13+)
-- **Git** for version control
+### 📝 OMR & Blind-Grading CQ Engine
+- **Photocopy-Safe B&W OMR Sheets (`25Q–100Q`, `4` or `5` Options)**:
+  - Crisp single-page borderless A4 printing (`<ExamName>_<Class>.pdf`), 4 Solid Pro concentric bullseye fiducials, lateral timing tracks, Latin `0–9` digits for Roll/Registration/Subject Code, and automatic zero-drift DOM coordinate calibration.
+- **Bangladesh Board 3-Part Detachable CQ Top Cover**:
+  - **Part 1 (`পরীক্ষার্থীর অংশ`)** & **Part 2 (`পরীক্ষকের অংশ`)** each carry independent 4-corner fiducials, clear quiet zones, edge-to-edge scissor perforation cut guides, English `0–9` bubbles, and matching cryptographic `serial` QR codes while keeping **Part 3 (`উত্তরপত্রের অংশ`)** untouched.
+  - Detach Part 1 before blind grading; scan Part 1 and Part 2 on **any device in any order** — PostgreSQL (`cq_strip_links`) automatically pairs the student identity with the examiner's marks.
+- **Template Studio & Batch Tools**:
+  - Live X-Ray scanner calibration preview, Pre-Flight Scanability Health Score, 1-click enrolled class roster loader (`⚡ ক্লাস লোড`), pre-bubbled student batches, Master Answer Key scanning, Live AR Camera HUD, Live Absentee Tracker, Instant Batch Re-Grade, Printable Class Merit List, 2-sheet Excel export, and WhatsApp/SMS result copy.
 
-### System Requirements
-- **RAM:** Minimum 4GB (8GB recommended)
-- **Storage:** 2GB free space
-- **OS:** Windows, macOS, or Linux
+### 🎓 Exam, Question Bank & Evaluation Suite
+- **12 Question Types**: `MCQ`, `SMCQ`, `MC`, `CQ`, `SQ`, `INT`, `AR`, `MTF`, `DESCRIPTIVE`, `CMA`, `MPC`, and `CODING` with full **LaTeX / KaTeX / MathJax / Chemfig / Free-Body Diagram (FBD)** rendering.
+- **Multi-Set Generation & Online/Offline Unification**: Auto-generates shuffled exam sets (`A`, `B`, `C`, `D`), prints matching Question Papers + OMR + CQ Top Covers, and routes both online CBT and scanned offline OMR/CQ submissions into `/exams/evaluations` for Superadmin review or auto-release directly to the Student Dashboard.
+- **Digital Script Evaluation**: Canvas drawing/annotation on student scripts, evaluator assignment, scrutiny/review requests, and automated percentage-based negative marking.
+
+### 👥 Multi-Role Portals & Student Corner
+- **4-Tier Role Hierarchy**: `SUPER_USER`, `ADMIN`, `TEACHER`, and `STUDENT` with tailored dashboards, class/invoice/fee management, admit cards, seating plans, and activity audit logs.
+- **Student Corner & Practice Arena**: Focus timer, syllabus tracker, mistake logbook with AI mistake analysis, revision planner, and `Prac-Perfect` adaptive practice sessions.
+- **Mobile & Native Ready**: Mobile-first responsive Tailwind CSS 4 design system, WCAG-AA keyboard focus & reduced-motion support, Sonner toast notifications, PWA offline support, and **Capacitor 8 Android** build with native document scanner & biometrics.
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### Prerequisites
+- **Node.js `>= 22.0.0`** (`node -v`)
+- **PostgreSQL 14+** (recommended: [Neon Serverless Postgres](https://neon.tech) with connection pooling)
+- **npm** & **Git**
 
+### 1. Clone & Install
 ```bash
 git clone https://github.com/rofazhasan/digital_school.git
-cd digital_school
-```
-
-### 2. Install Dependencies
-
-```bash
+cd digital_school/digital_school
 npm install
 ```
 
-### 3. Environment Setup
-
-Create a `.env.local` file in the root directory:
+### 2. Configure Environment Variables
+Create `digital_school/.env.local`:
 
 ```env
-# Database Configuration
-DATABASE_URL="postgresql://username:password@host:port/database"
+# Database (Neon PostgreSQL pooled connection string)
+DATABASE_URL="postgresql://user:password@ep-example-pooler.region.aws.neon.tech/neondb?sslmode=require"
 
-# Authentication
-NEXTAUTH_SECRET="your-super-secret-key-here"
+# Security (REQUIRED in production — app fails closed if missing)
+JWT_SECRET="replace-with-a-64-char-cryptographically-random-hex-string"
+NEXTAUTH_SECRET="replace-with-a-separate-64-char-random-secret"
 NEXTAUTH_URL="http://localhost:3000"
 
-# Cloud Services (Optional)
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME="your-cloud-name"
-CLOUDINARY_API_KEY="your-api-key"
-CLOUDINARY_API_SECRET="your-api-secret"
+# Optional: AI Question Generation & Mistake Analyzer
+GOOGLE_GENERATIVE_AI_API_KEY=""
 
-# AI Services (Optional)
-GOOGLE_GENERATIVE_AI_API_KEY="your-google-ai-key"
-
-# File Upload (Optional)
-UPLOADTHING_SECRET="your-uploadthing-secret"
-UPLOADTHING_APP_ID="your-uploadthing-app-id"
+# Optional: Cloud Image & File Uploads
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=""
+CLOUDINARY_API_KEY=""
+CLOUDINARY_API_SECRET=""
+UPLOADTHING_SECRET=""
+UPLOADTHING_APP_ID=""
 ```
 
-### 4. Database Setup
+> **Tip:** Generate cryptographically strong secrets with `npm run generate-secrets` or `openssl rand -hex 32`.
 
-#### Option 1: Quick Setup (Recommended)
+### 3. Apply Migrations & Start Development Server
 ```bash
-npm run db:setup
-```
-
-#### Option 2: Manual Setup
-```bash
-# Generate Prisma client
 npx prisma generate
-
-# Push schema to database
-npx prisma db push
-
-# Seed initial data
-npm run db:seed
-```
-
-#### Option 3: Fresh Start
-```bash
-# Reset and setup database
-npm run db:fresh
-```
-
-### 5. Start Development Server
-
-```bash
+npx prisma migrate deploy
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
-
----
-
-## 🗄️ Database Setup Options
-
-### Option 1: Vercel Postgres (Recommended for Vercel deployment)
-1. Go to your [Vercel dashboard](https://vercel.com/dashboard)
-2. Navigate to your project
-3. Go to Storage tab
-4. Create a new Postgres database
-5. Copy the connection string
-6. Add it as `DATABASE_URL` environment variable
-
-### Option 2: Supabase (Free tier available)
-1. Go to [supabase.com](https://supabase.com)
-2. Create a new project
-3. Go to Settings > Database
-4. Copy the connection string
-5. Add it as `DATABASE_URL` environment variable
-
-### Option 3: PlanetScale (Free tier available)
-1. Go to [planetscale.com](https://planetscale.com)
-2. Create a new database
-3. Copy the connection string
-4. Add it as `DATABASE_URL` environment variable
-
-### Option 4: Neon (Serverless Postgres)
-1. Go to [neon.tech](https://neon.tech)
-2. Create a new project
-3. Copy the connection string
-4. Add it as `DATABASE_URL` environment variable
+Open [http://localhost:3000](http://localhost:3000) — on a fresh database, visit `/setup` to initialize your institute and first `SUPER_USER` account.
 
 ---
 
 ## 📁 Project Structure
 
-```
-digital_school/
-├── 📁 app/                          # Next.js App Router
-│   ├── 📁 api/                      # API Routes
-│   │   ├── 📁 auth/                 # Authentication endpoints
-│   │   ├── 📁 exams/                # Exam management APIs
-│   │   ├── 📁 analytics/            # Analytics and reporting
-│   │   ├── 📁 student/              # Student-specific APIs
-│   │   └── 📁 admin/                # Admin panel APIs
-│   ├── 📁 dashboard/                # Main dashboard
-│   ├── 📁 exams/                    # Exam management pages
-│   ├── 📁 admin/                    # Admin panel
-│   ├── 📁 student/                  # Student portal
-│   ├── 📁 teacher/                  # Teacher portal
-│   └── 📁 super-user/               # Super user panel
-├── 📁 components/                    # Reusable UI components
-│   ├── 📁 ui/                       # Base UI components
-│   ├── 📁 analytics/                # Analytics components
-│   └── 📁 forms/                    # Form components
-├── 📁 lib/                          # Utility libraries
-│   ├── 📁 api/                      # API utilities
-│   ├── 📁 auth/                     # Authentication utilities
-│   ├── 📁 db/                       # Database utilities
-│   └── 📁 utils/                    # General utilities
-├── 📁 prisma/                       # Database schema and migrations
-│   ├── 📄 schema.prisma             # Database schema
-│   ├── 📁 migrations/               # Database migrations
-│   └── 📄 seed.ts                   # Database seeder
-├── 📁 scripts/                      # Utility scripts
-├── 📁 types/                        # TypeScript type definitions
-├── 📁 public/                       # Static assets
-└── 📁 utils/                        # Additional utilities
+```text
+digital_school/                       # Repository root
+├── README.md
+└── digital_school/                   # Next.js 15 application root
+    ├── app/
+    │   ├── api/                      # 115+ RBAC-protected REST API routes
+    │   │   ├── admin/                # Admin & data engineering APIs
+    │   │   ├── ai/                   # Gemini generation & mistake analyzer
+    │   │   ├── auth/                 # JWT login, signup, OTP, email verify
+    │   │   ├── exams/                # Online CBT, OMR batch sync, CQ strip links, evaluations
+    │   │   ├── question-bank/        # Paginated CRUD & Excel bulk upload
+    │   │   └── super-user/           # System audit, stats, approvals
+    │   ├── components/
+    │   │   ├── OMRSheet.tsx          # B&W Board-style auto-calibrating OMR sheet
+    │   │   └── omr/                  # Template Studio, 3-Part CQ Sheet, Calibration, Merit List
+    │   ├── exams/                    # Exam hub, /print, /omr-scan, /omr-templates, /evaluations, /online
+    │   ├── admin/ teacher/ student/ super-user/
+    │   ├── globals.css               # Tailwind v4 design tokens, responsive & A11y rules
+    │   └── layout.tsx                # Fonts, ThemeProvider, MathJax, ErrorBoundary, Toaster
+    ├── lib/
+    │   ├── auth-config.ts            # Fail-closed JWT secret & algorithm config
+    │   ├── db.ts                     # Singleton Prisma client
+    │   ├── studentIdGenerator.ts     # 4-digit Roll & 6-digit Reg generator
+    │   └── omr/                      # omrEngine, streamAutoScanner, studentIdentityMatcher, cqSerialLinker
+    ├── prisma/
+    │   ├── schema.prisma             # Full relational schema + 35+ indexes
+    │   └── migrations/               # Version-controlled PostgreSQL migrations
+    ├── middleware.ts                 # Edge JWT verification & role-based route protection
+    └── next.config.ts                # Security headers, PWA, standalone build
 ```
 
 ---
 
 ## 🎯 Available Scripts
 
-```bash
-# Development
-npm run dev              # Start development server
-npm run build            # Build for production
-npm run start            # Start production server
-npm run lint             # Run ESLint
+Run from `digital_school/digital_school`:
 
-# Database Management
-npm run db:setup         # Quick database setup
-npm run db:reset         # Reset database
-npm run db:fresh         # Fresh database setup
-npm run db:seed          # Seed database with initial data
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Start Next.js 15 dev server with Turbopack |
+| `npm run build` | Generate Prisma client and build production bundle |
+| `npm run start` | Start production server (`PORT` defaults to `3000`) |
+| `npm run lint` | Run ESLint across the codebase |
+| `npm test` | Execute Jest test suite |
+| `npm run db:setup` / `db:seed` | Initialize or seed the PostgreSQL database |
+| `npm run cap:build` | Build web bundle and sync Android Capacitor project |
+| `npm run cap:open` | Open the native Android project in Android Studio |
 
-# Production
-npm run build:deploy     # Build for deployment
-npm run deploy:netlify   # Deploy to Netlify
+---
 
-# Utilities
-npm run generate-secrets # Generate secure secrets
-npm run setup-production # Production environment setup
-npm run monitor-performance # Performance monitoring
-```
+## 🔒 Security & Scalability
+
+### Security Controls
+- **Zero SQL Injection**: All database queries use Prisma ORM or parameterized tagged templates (`$queryRaw` / `$executeRaw`).
+- **Defense-in-Depth RBAC**: Both Edge `middleware.ts` and server-side route handlers enforce `SUPER_USER` / `ADMIN` / `TEACHER` / `STUDENT` permissions, preventing unauthorized exam tampering, answer-key leaks, or cross-student IDOR.
+- **Fail-Closed Auth**: `JWT_SECRET` is strictly required in production (`lib/auth-config.ts`); sessions use signed `HS256` tokens via `jose`.
+- **Hardened HTTP Headers (`next.config.ts`)**: Enforces `Strict-Transport-Security`, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and disables `X-Powered-By`.
+- **Safe Expression & Code Sandboxing**: Strict identifier allowlisting in `lib/math-parser.ts` and auth + payload/timeout caps on `/api/code/run`.
+
+### Scalability Architecture
+- **Edge-Offloaded Computer Vision**: OMR & CQ image alignment/decoding runs in client WebWorkers, allowing 500–2,000+ sheets to be scanned without saturating serverless compute.
+- **Pooled & Paginated Data Layer**: Singleton Prisma client + Neon PgBouncer pooling + 35+ database indexes + bounded server-side pagination on Question Bank, Questions, and Exams endpoints.
+- **Multi-Device CQ Sync**: Atomic Postgres transactions (`cq_strip_links`) enable parallel scanning across multiple workstations.
 
 ---
 
 ## 🚀 Deployment
 
-### Vercel Deployment (Recommended)
-
-1. **Push to GitHub**
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git push origin main
-   ```
-
-2. **Connect to Vercel**
-   - Go to [vercel.com](https://vercel.com)
-   - Import your GitHub repository
-   - Configure environment variables
-
-3. **Set Environment Variables**
-   - `DATABASE_URL` - Your PostgreSQL connection string
-   - `NEXTAUTH_SECRET` - Your NextAuth secret
-   - `NEXTAUTH_URL` - Your production URL
-
-4. **Deploy**
-   - Vercel will automatically build and deploy
-   - Database migrations will run automatically
-
-### Netlify Deployment
-
-```bash
-npm run deploy:netlify
-```
-
-### Manual Deployment
-
-```bash
-# Build the application
-npm run build
-
-# Start the production server
-npm start
-```
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | ✅ | - |
-| `NEXTAUTH_SECRET` | NextAuth secret key | ✅ | - |
-| `NEXTAUTH_URL` | Application URL | ✅ | `http://localhost:3000` |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Google AI API key | ❌ | - |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | ❌ | - |
-| `CLOUDINARY_API_KEY` | Cloudinary API key | ❌ | - |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret | ❌ | - |
-
-### Database Configuration
-
-The application uses Prisma with PostgreSQL. Key features:
-
-- **Connection Pooling** - Optimized database connections
-- **Migration System** - Version-controlled schema changes
-- **Seeding** - Initial data population
-- **Optimization** - Query optimization and indexing
-
----
-
-## 🧪 Testing
-
-```bash
-# Run tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run specific test file
-npm test -- --testPathPattern=exam
-```
-
----
-
-## 📊 Performance Optimization
-
-### Database Optimization
-- Connection pooling
-- Query optimization
-- Indexed queries
-- Efficient migrations
-
-### Frontend Optimization
-- Code splitting
-- Lazy loading
-- Image optimization
-- Bundle analysis
-
-### Caching Strategy
-- Redis caching (optional)
-- Browser caching
-- CDN integration
-- Static generation
-
----
-
-## 🔒 Security Features
-
-- **Authentication & Authorization**
-  - NextAuth.js integration
-  - Role-based access control
-  - JWT token management
-  - Session management
-
-- **Data Protection**
-  - Input validation with Zod
-  - SQL injection prevention
-  - XSS protection
-  - CSRF protection
-
-- **File Security**
-  - Secure file uploads
-  - File type validation
-  - Size limits
-  - Virus scanning
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Run tests**
-   ```bash
-   npm test
-   ```
-5. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-6. **Push to the branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Write meaningful commit messages
-- Add tests for new features
-- Update documentation
-- Follow the existing code style
+### Vercel (Recommended)
+1. Import `rofazhasan/digital_school` in [Vercel](https://vercel.com) and set the **Root Directory** to `digital_school`.
+2. Add `DATABASE_URL`, `JWT_SECRET`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` under **Settings → Environment Variables**.
+3. Deploy — `prisma generate && next build` runs automatically on every push to `main`.
 
 ---
 
 ## 📝 License
 
-This project is licensed under the **ISC License**.
-
-```
-Copyright (c) 2024 Md. Rofaz Hasan Rafiu
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-```
-
----
-
-## 📞 Support & Contact
-
-**Developer:** Md. Rofaz Hasan Rafiu  
-**Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
-**GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
-**LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
-**Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
-**Address:** Tangail, Dhaka, Bangladesh
-
-### 💼 Professional Services
-Feel free to reach out to me with any inquiries, project proposals, or just to say hello. I'm here to assist you with any questions you may have. Let's start a conversation and explore how we can collaborate to bring your ideas to life.
-
-**Services Available:**
-- 🎨 **Web Design & Development**
-- 📱 **Mobile App Development**
-- 📢 **Digital Advertising & Marketing**
-- 🤖 **AI & Machine Learning Solutions**
-- 📊 **Data Analysis & Visualization**
-
-### Getting Help
-
-- 📖 **Documentation:** Check the project wiki
-- 🐛 **Bug Reports:** Create an issue on GitHub
-- 💡 **Feature Requests:** Submit via GitHub issues
-- 💬 **Discussions:** Join our GitHub discussions
-- 📧 **Direct Contact:** mdrofazhasanrafiu@gmail.com
-
----
-
-## 🙏 Acknowledgments
-
-- **Next.js Team** - For the amazing framework
-- **Prisma Team** - For the excellent ORM
-- **Vercel Team** - For seamless deployment
-- **Open Source Community** - For all the amazing libraries
+Licensed under the **ISC License** — Copyright © 2024–2026 **Md. Rofaz Hasan Rafiu**.
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by Md. Rofaz Hasan Rafiu**
+**Built with ❤️ by Md. Rofaz Hasan Rafiu** — Tangail, Dhaka, Bangladesh
 
+[![Live](https://img.shields.io/badge/Live-rofazacademy.dev-6366f1?style=for-the-badge)](https://rofazacademy.dev)
 [![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://rofazhasan.github.io/rofaz-portfolio/)
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rofazhasan)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/md-rofaz-hasan-rafiu)
-[![Facebook](https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white)](https://facebook.com/rofazhasanrafiu)
-[![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mdrofazhasanrafiu@gmail.com)
+[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mdrofazhasanrafiu@gmail.com)
 
-</div> 
+</div>
