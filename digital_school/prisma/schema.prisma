@@ -1745,3 +1745,26 @@ model AdmissionTarget {
   @@index([studentProfileId])
   @@map("admission_targets")
 }
+
+model CqStripLink {
+  id                String    @id @default(cuid())
+  examId            String
+  serial            String
+  studentId         String?
+  rollNumber        String?
+  registrationNo    String?
+  studentName       String?
+  obtainedMarksCQ   Float?
+  headExaminerMarks Float?
+  examinerCode      String?
+  status            String    @default("WAITING_PART2")
+  part1ScannedAt    DateTime?
+  part2ScannedAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([examId, serial])
+  @@index([examId, status])
+  @@index([serial])
+  @@map("cq_strip_links")
+}

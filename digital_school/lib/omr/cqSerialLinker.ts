@@ -144,3 +144,140 @@ export function clearCqSerialLinker(): void {
     }
   }
 }
+
+/**
+ * Multi-Device Cloud Sync: Pull all unpaired & paired CQ strip links for an exam
+ * from PostgreSQL into the local linker cache so multiple scanning stations share state.
+ */
+export async function hydrateCqSerialLinkerFromCloud(examId: string): Promise<number> {
+  if (!examId || typeof fetch === 'undefined') return 0;
+  hydrate();
+  try {
+    const res = await fetch(`/api/exams/${encodeURIComponent(examId)}/cq-strip-links`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    const links: any[] = Array.isArray(data?.links) ? data.links : [];
+    for (const row of links) {
+      const key = normalizeSerialKey(row.serial);
+      if (!key) continue;
+      const existing = memoryMap.get(key) || { serial: key };
+      memoryMap.set(key, {
+        ...existing,
+        serial: key,
+        examId: row.examId || examId,
+        rollNumber: row.rollNumber || existing.rollNumber,
+        registrationNo: row.registrationNo || existing.registrationNo,
+        studentId: row.studentId || existing.studentId,
+        studentName: row.studentName || existing.studentName,
+        obtainedMarksCQ:
+          row.obtainedMarksCQ !== null && row.obtainedMarksCQ !== undefined
+            ? Number(row.obtainedMarksCQ)
+            : existing.obtainedMarksCQ,
+        headExaminerMarks:
+          row.headExaminerMarks !== null && row.headExaminerMarks !== undefined
+            ? Number(row.headExaminerMarks)
+            : existing.headExaminerMarks,
+        examinerCode: row.examinerCode || existing.examinerCode,
+        part1ScannedAt: row.part1ScannedAt ? new Date(row.part1ScannedAt).getTime() : existing.part1ScannedAt,
+        part2ScannedAt: row.part2ScannedAt ? new Date(row.part2ScannedAt).getTime() : existing.part2ScannedAt,
+      });
+    }
+    persist();
+    return links.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Multi-Device Cloud Sync: Persist a Part 1 (Student Identity) strip to PostgreSQL
+ * and return the merged pair if another device already scanned Part 2.
+ */
+export async function syncCqPart1ToCloud(input: {
+  serial: string;
+  examId?: string;
+  rollNumber?: string;
+  registrationNo?: string;
+  studentId?: string;
+  studentName?: string;
+}): Promise<{ record: CqSerialPairRecord; isPaired: boolean }> {
+  const local = registerCqPart1Student(input);
+  if (!input.examId || typeof fetch === 'undefined') return local;
+  try {
+    const res = await fetch(`/api/exams/${encodeURIComponent(input.examId)}/cq-strip-links`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ part: 'PART1', ...input }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (data?.record) {
+      const key = normalizeSerialKey(data.record.serial);
+      const merged: CqSerialPairRecord = {
+        ...local.record,
+        rollNumber: data.record.rollNumber || local.record.rollNumber,
+        registrationNo: data.record.registrationNo || local.record.registrationNo,
+        studentId: data.record.studentId || local.record.studentId,
+        studentName: data.record.studentName || local.record.studentName,
+        obtainedMarksCQ:
+          data.record.obtainedMarksCQ !== null && data.record.obtainedMarksCQ !== undefined
+            ? Number(data.record.obtainedMarksCQ)
+            : local.record.obtainedMarksCQ,
+        examinerCode: data.record.examinerCode || local.record.examinerCode,
+      };
+      memoryMap.set(key, merged);
+      persist();
+      return { record: merged, isPaired: Boolean(merged.rollNumber && merged.obtainedMarksCQ !== undefined) };
+    }
+  } catch {
+    // Offline fallback: local cache already saved
+  }
+  return local;
+}
+
+/**
+ * Multi-Device Cloud Sync: Persist a Part 2 (Examiner Marks) strip to PostgreSQL
+ * and return the merged pair if another device already scanned Part 1.
+ */
+export async function syncCqPart2ToCloud(input: {
+  serial: string;
+  examId?: string;
+  obtainedMarksCQ: number;
+  headExaminerMarks?: number;
+  examinerCode?: string;
+}): Promise<{ record: CqSerialPairRecord; isPaired: boolean }> {
+  const local = registerCqPart2Marks(input);
+  if (!input.examId || typeof fetch === 'undefined') return local;
+  try {
+    const res = await fetch(`/api/exams/${encodeURIComponent(input.examId)}/cq-strip-links`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ part: 'PART2', ...input }),
+    });
+    if (!res.ok) return local;
+    const data = await res.json();
+    if (data?.record) {
+      const key = normalizeSerialKey(data.record.serial);
+      const merged: CqSerialPairRecord = {
+        ...local.record,
+        rollNumber: data.record.rollNumber || local.record.rollNumber,
+        registrationNo: data.record.registrationNo || local.record.registrationNo,
+        studentId: data.record.studentId || local.record.studentId,
+        studentName: data.record.studentName || local.record.studentName,
+        obtainedMarksCQ:
+          data.record.obtainedMarksCQ !== null && data.record.obtainedMarksCQ !== undefined
+            ? Number(data.record.obtainedMarksCQ)
+            : local.record.obtainedMarksCQ,
+        examinerCode: data.record.examinerCode || local.record.examinerCode,
+      };
+      memoryMap.set(key, merged);
+      persist();
+      return { record: merged, isPaired: Boolean(merged.rollNumber && merged.obtainedMarksCQ !== undefined) };
+    }
+  } catch {
+    // Offline fallback: local cache already saved
+  }
+  return local;
+}

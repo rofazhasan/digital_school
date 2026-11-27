@@ -64,8 +64,9 @@ import {
   sanitizeNumericId,
 } from '@/lib/omr/studentIdentityMatcher';
 import {
-  registerCqPart1Student,
-  registerCqPart2Marks,
+  syncCqPart1ToCloud,
+  syncCqPart2ToCloud,
+  hydrateCqSerialLinkerFromCloud,
 } from '@/lib/omr/cqSerialLinker';
 
 interface ExamMetadata {
@@ -93,6 +94,12 @@ export default function UniversalOMRScannerPage() {
 
   const [examsList, setExamsList] = useState<Array<{ id: string; name: string; totalMarks?: number }>>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>(routeExamId);
+
+  // Hydrate multi-device CQ Top-Cover Part 1 <-> Part 2 serial links from Cloud DB when exam changes
+  useEffect(() => {
+    if (!selectedExamId) return;
+    void hydrateCqSerialLinkerFromCloud(selectedExamId);
+  }, [selectedExamId]);
 
   const [examCache, setExamCache] = useState<
     Record<string, { exam: ExamMetadata; config: EvaluationConfig; studentDir: Map<string, { id: string; name: string }> }>
@@ -583,7 +590,7 @@ export default function UniversalOMRScannerPage() {
     const isPart2Strip = sheetType === 'CQ_PART2_MARKS' || sheetType === 'P2_EXAMINER' || effectivePresetId === 'cq_part2_examiner_strip';
 
     if (qrSerial && isPart1Strip) {
-      const { record, isPaired } = registerCqPart1Student({
+      const { record, isPaired } = await syncCqPart1ToCloud({
         serial: qrSerial,
         examId: targetExamId,
         rollNumber: card.rollNumber,
@@ -597,13 +604,13 @@ export default function UniversalOMRScannerPage() {
         card.totalScore = record.obtainedMarksCQ;
         card.flags = [...(card.flags || []), `Paired with CQ Part 2 (SL: ${qrSerial}) — CQ Marks: ${record.obtainedMarksCQ}`];
       } else {
-        card.flags = [...(card.flags || []), `CQ Part 1 saved (SL: ${qrSerial}) — scan Part 2 marks strip to auto-link.`];
+        card.flags = [...(card.flags || []), `CQ Part 1 synced to Cloud DB (SL: ${qrSerial}) — scan Part 2 from any device to auto-link.`];
       }
     } else if (qrSerial && isPart2Strip) {
       const rawMarks = sanitizeNumericId(scanRes.concatenatedResponses['ObtainedMarks']).digits;
       const rawHead = sanitizeNumericId(scanRes.concatenatedResponses['HeadExaminerMarks']).digits;
       const cqScore = rawHead && Number(rawHead) > 0 ? Number(rawHead) : Number(rawMarks || 0);
-      const { record, isPaired } = registerCqPart2Marks({
+      const { record, isPaired } = await syncCqPart2ToCloud({
         serial: qrSerial,
         examId: targetExamId,
         obtainedMarksCQ: cqScore,
@@ -621,7 +628,7 @@ export default function UniversalOMRScannerPage() {
         card.flags = [...(card.flags || []), `Auto-linked to Student Roll ${record.rollNumber} via SL: ${qrSerial}`];
       } else {
         card.needsReview = true;
-        card.flags = [...(card.flags || []), `CQ Part 2 Marks (${cqScore}) saved (SL: ${qrSerial}) — scan Part 1 student strip to auto-link.`];
+        card.flags = [...(card.flags || []), `CQ Part 2 Marks (${cqScore}) synced to Cloud DB (SL: ${qrSerial}) — scan Part 1 from any device to auto-link.`];
       }
     }
 

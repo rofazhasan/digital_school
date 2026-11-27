@@ -113,9 +113,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Fetch exams with caching and pagination (SWR)
-  const page = parseInt(url.searchParams.get('page') || '1');
-  const limit = parseInt(url.searchParams.get('limit') || '1000');
+  // Fetch exams with caching and bounded pagination (SWR)
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10) || 50));
   const summary = url.searchParams.get('summary') === 'true';
   const skip = (page - 1) * limit;
 
