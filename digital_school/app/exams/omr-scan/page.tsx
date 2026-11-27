@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Upload,
   Camera,
@@ -917,7 +918,7 @@ export default function UniversalOMRScannerPage() {
       setActiveTab('camera');
       setCameraFeedback('ক্যামেরা প্রস্তুত। ওএমআর শিট ফ্রেমের নিচে রাখুন — স্বয়ংক্রিয়ভাবে স্ক্যান হবে!');
     } catch (err: any) {
-      alert('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
+      toast.error('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
     }
   };
 
@@ -1112,7 +1113,7 @@ export default function UniversalOMRScannerPage() {
     const cleanDraftRoll = sanitizeNumericId(draftRoll).digits;
     const cleanDraftReg = sanitizeNumericId(draftReg).digits;
     if (!cleanDraftRoll) {
-      alert('রোল নম্বর অবশ্যই শুধুমাত্র সংখ্যা (0-9) হতে হবে!');
+      toast.error('রোল নম্বর অবশ্যই শুধুমাত্র সংখ্যা (0-9) হতে হবে!');
       return;
     }
     if (cleanDraftRoll !== draftRoll) setDraftRoll(cleanDraftRoll);
@@ -1356,7 +1357,7 @@ export default function UniversalOMRScannerPage() {
   // Sync / Batch Submit to PostgreSQL DB
   const syncCohortToDatabase = async () => {
     if (scoreCards.length === 0) {
-      alert('ডাটাবেসে পাঠানোর জন্য কোনো স্ক্যান ফলাফল নেই।');
+      toast.error('ডাটাবেসে পাঠানোর জন্য কোনো স্ক্যান ফলাফল নেই।');
       return;
     }
 

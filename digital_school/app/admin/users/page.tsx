@@ -199,10 +199,10 @@ export default function AdminUsersPage() {
                 setNewClassSection("");
                 await fetchClasses();
             } else {
-                alert(data.error || "Failed to create class");
+                toast.error(data.error || "Failed to create class");
             }
         } catch (err) {
-            alert("An error occurred while creating the class");
+            toast.error("An error occurred while creating the class");
         } finally {
             setIsCreatingClass(false);
         }
@@ -793,7 +793,7 @@ export default function AdminUsersPage() {
                                 const phone = formData.get('phone') as string;
 
                                 if (!email && !phone) {
-                                    alert("Please provide either an Email or a Phone number.");
+                                    toast.error("Please provide either an Email or a Phone number.");
                                     return;
                                 }
 
@@ -885,7 +885,7 @@ export default function AdminUsersPage() {
                                 const phone = formData.get('phone') as string;
 
                                 if (!email && !phone) {
-                                    alert("Please provide either an Email or a Phone number.");
+                                    toast.error("Please provide either an Email or a Phone number.");
                                     return;
                                 }
 

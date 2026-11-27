@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Camera,
   Upload,
@@ -217,7 +218,7 @@ export default function StudentOMRScannerPage() {
       setCameraFeedback('ক্যামেরা প্রস্তুত। ওএমআর শিট এবং কিউআর কোড ফ্রেমের মধ্যে সোজা রাখুন।');
     } catch (err: any) {
       console.error('Camera access error:', err);
-      alert('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
+      toast.error('ক্যামেরা চালু করতে সমস্যা হয়েছে: ' + err.message);
     }
   };
 

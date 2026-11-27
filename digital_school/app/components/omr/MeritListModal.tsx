@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { X, Printer, Award, FileSpreadsheet, Trophy, CheckCircle2, XCircle, MessageSquare, Copy } from 'lucide-react';
 import type { StudentScoreCard } from '@/lib/omr/types';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
@@ -49,7 +50,7 @@ export function MeritListModal({
       setSmsCopiedMsg(`${rankedRows.length} জন শিক্ষার্থীর SMS/WhatsApp বার্তা কপি হয়েছে!`);
       setTimeout(() => setSmsCopiedMsg(null), 3000);
     } catch {
-      alert('ক্লিপবোর্ডে কপি করতে সমস্যা হয়েছে।');
+      toast.error('ক্লিপবোর্ডে কপি করতে সমস্যা হয়েছে।');
     }
   };
 
@@ -267,7 +268,7 @@ export function MeritListModal({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Excel export failed:', err);
-      alert('Excel এক্সপোর্ট করতে সমস্যা হয়েছে।');
+      toast.error('Excel এক্সপোর্ট করতে সমস্যা হয়েছে।');
     } finally {
       setExportingXlsx(false);
     }

@@ -104,7 +104,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5, // Allow zooming for accessibility
   userScalable: true,
-  themeColor: "#ffffff",
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1120' },
+  ],
 };
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -159,7 +163,7 @@ export default function RootLayout({
                 <MobileNavigationControls />
                 <MaintenanceGuard>
                   <SessionGuard />
-                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
+                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-300 ease-out">
                     {children}
                   </div>
                   <AppFooter />

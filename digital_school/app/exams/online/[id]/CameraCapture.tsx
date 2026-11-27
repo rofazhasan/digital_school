@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { X, Camera, RotateCcw, Upload } from "lucide-react";
@@ -41,7 +42,7 @@ export default function CameraCapture({ onCapture, onClose, questionId, examId }
       setIsCameraOn(true);
     } catch (error) {
       console.error("Error accessing camera:", error);
-      alert("ক্যামেরা অ্যাক্সেস করতে সমস্যা হয়েছে। অনুগ্রহ করে ক্যামেরা অনুমতি দিন।");
+      toast.error("ক্যামেরা অ্যাক্সেস করতে সমস্যা হয়েছে। অনুগ্রহ করে ক্যামেরা অনুমতি দিন।");
     }
   };
 
@@ -121,7 +122,7 @@ export default function CameraCapture({ onCapture, onClose, questionId, examId }
       
     } catch (error) {
       console.error("Image processing error:", error);
-      alert("ছবি প্রক্রিয়া করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      toast.error("ছবি প্রক্রিয়া করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
     } finally {
       setIsUploading(false);
     }
