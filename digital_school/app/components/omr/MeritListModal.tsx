@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { X, Printer, Award, FileSpreadsheet, Trophy, CheckCircle2, XCircle } from 'lucide-react';
+import { X, Printer, Award, FileSpreadsheet, Trophy, CheckCircle2, XCircle, MessageSquare, Copy } from 'lucide-react';
 import type { StudentScoreCard } from '@/lib/omr/types';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
 
@@ -33,6 +33,25 @@ export function MeritListModal({
   passThresholdPct = 33,
 }: MeritListModalProps) {
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [smsCopiedMsg, setSmsCopiedMsg] = useState<string | null>(null);
+
+  const formatStudentSmsText = (row: (typeof rankedRows)[number]) =>
+    `${instituteName}\nপরীক্ষা: ${examTitle}\nনাম: ${row.card.studentName || 'Student'} | রোল: ${row.card.rollNumber}${
+      row.card.registrationNo ? ` | রেজি: ${row.card.registrationNo}` : ''
+    }\nনম্বর: ${row.card.totalScore.toFixed(2)}/${row.card.maxScore} (${row.card.percentage.toFixed(1)}%)\nগ্রেড: ${
+      row.grade
+    } (GPA ${row.gpa.toFixed(2)}) | মেধাক্রম: #${row.rank} | ফলাফল: ${row.passed ? 'PASS' : 'FAIL'}`;
+
+  const handleCopyBulkSms = async () => {
+    const bulkText = rankedRows.map(formatStudentSmsText).join('\n--------------------\n');
+    try {
+      await navigator.clipboard.writeText(bulkText);
+      setSmsCopiedMsg(`${rankedRows.length} জন শিক্ষার্থীর SMS/WhatsApp বার্তা কপি হয়েছে!`);
+      setTimeout(() => setSmsCopiedMsg(null), 3000);
+    } catch {
+      alert('ক্লিপবোর্ডে কপি করতে সমস্যা হয়েছে।');
+    }
+  };
 
   const rankedRows = useMemo(() => {
     const sorted = [...scoreCards].sort((a, b) => {
@@ -271,7 +290,22 @@ export function MeritListModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {smsCopiedMsg && (
+              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 px-2.5 py-1 rounded-lg">
+                {smsCopiedMsg}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleCopyBulkSms}
+              disabled={rankedRows.length === 0}
+              className="px-3 py-2 rounded-lg bg-sky-600/20 hover:bg-sky-600/35 border border-sky-500/40 disabled:opacity-50 text-sky-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="সব শিক্ষার্থীর অভিভাবকদের পাঠানোর জন্য Bulk SMS/WhatsApp ফরম্যাট কপি করুন"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Bulk SMS কপি</span>
+            </button>
             <button
               type="button"
               onClick={handleExportStyledExcel}
@@ -388,6 +422,20 @@ export function MeritListModal({
                           <XCircle className="w-3.5 h-3.5" /> FAIL
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(formatStudentSmsText(row));
+                            setSmsCopiedMsg(`রোল ${row.card.rollNumber} এর WhatsApp/SMS কপি হয়েছে!`);
+                            setTimeout(() => setSmsCopiedMsg(null), 2500);
+                          } catch {}
+                        }}
+                        className="no-print ml-1.5 inline-flex items-center text-slate-400 hover:text-indigo-600 cursor-pointer"
+                        title="এই শিক্ষার্থীর ফলাফল SMS/WhatsApp কপি করুন"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
                     </td>
                   </tr>
                 ))}

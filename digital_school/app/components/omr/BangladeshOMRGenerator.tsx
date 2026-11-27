@@ -159,6 +159,38 @@ export function BangladeshOMRGenerator({
   const [rosterPreviewIdx, setRosterPreviewIdx] = useState<number>(0);
   const [rangeStartRoll, setRangeStartRoll] = useState<string>('1001');
   const [rangeCount, setRangeCount] = useState<number>(10);
+  const [loadingExamRoster, setLoadingExamRoster] = useState<boolean>(false);
+
+  const handleLoadEnrolledClassRoster = async () => {
+    if (!examId) {
+      setStatusMessage('এনরোলড রোস্টার লোড করতে /exams/print থেকে একটি পরীক্ষা নির্বাচন করুন।');
+      return;
+    }
+    setLoadingExamRoster(true);
+    try {
+      const res = await fetch(`/api/exams/${examId}?mode=omr`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const students = json?.exam?.students || json?.students || [];
+      if (!Array.isArray(students) || students.length === 0) {
+        setStatusMessage('এই পরীক্ষার ক্লাসে কোনো এনরোলড শিক্ষার্থী পাওয়া যায়নি।');
+        return;
+      }
+      const lines = students.map((st: any) => {
+        const roll = String(st.roll || '').replace(/\D/g, '').padStart(rollDigits, '0').slice(-rollDigits);
+        const name = String(st.user?.name || `Student ${roll}`).replace(/,/g, ' ');
+        const reg = String(st.registrationNo || '').replace(/\D/g, '');
+        return `${roll}, ${name}, ${reg}, ${setName || 'A'}`;
+      });
+      setRosterText(lines.join('\n'));
+      setRosterPreviewIdx(0);
+      setStatusMessage(`সফলভাবে ${lines.length} জন এনরোলড শিক্ষার্থীর রোল, নাম ও রেজিস্ট্রেশন লোড হয়েছে!`);
+    } catch (err: any) {
+      setStatusMessage('রোস্টার লোড করতে সমস্যা হয়েছে: ' + (err?.message || err));
+    } finally {
+      setLoadingExamRoster(false);
+    }
+  };
 
   const parsedRoster = React.useMemo(() => {
     const lines = rosterText
@@ -1763,22 +1795,34 @@ export function BangladeshOMRGenerator({
             {/* Pre-Filled Class Roster Generator (MCQ Batch) */}
             {selectedPreset !== 'board_cq_3part' && (
               <div className="field-group pt-2 border-t border-slate-800/80">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <label className="text-xs font-bold text-indigo-300">
                     👥 প্রি-ফিলড স্টুডেন্ট রোস্টার (Class Batch)
                   </label>
-                  {parsedRoster.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRosterText('');
-                        setRosterPreviewIdx(0);
-                      }}
-                      className="text-[10px] text-rose-400 hover:text-rose-300 underline cursor-pointer"
-                    >
-                      মুছুন ({parsedRoster.length})
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {examId && (
+                      <button
+                        type="button"
+                        onClick={handleLoadEnrolledClassRoster}
+                        disabled={loadingExamRoster}
+                        className="px-2 py-0.5 rounded bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold cursor-pointer"
+                      >
+                        {loadingExamRoster ? 'লোড হচ্ছে...' : '⚡ ক্লাস লোড'}
+                      </button>
+                    )}
+                    {parsedRoster.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRosterText('');
+                          setRosterPreviewIdx(0);
+                        }}
+                        className="text-[10px] text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                      >
+                        মুছুন ({parsedRoster.length})
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Quick Roll Range Generator */}

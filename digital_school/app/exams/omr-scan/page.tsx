@@ -112,6 +112,7 @@ export default function UniversalOMRScannerPage() {
   const [syncChunkProgress, setSyncChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [scanPhase, setScanPhase] = useState<'mcq' | 'cq'>('mcq');
   const [scanSpeedSps, setScanSpeedSps] = useState<number>(0);
+  const [showAbsenteePanel, setShowAbsenteePanel] = useState<boolean>(false);
   const cancelBatchRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -1443,6 +1444,105 @@ export default function UniversalOMRScannerPage() {
     }
   };
 
+  // Instant In-Memory Re-Grade of Entire Batch (e.g. after scanning a Master Key or switching Exam)
+  const handleRegradeAllScannedSheets = async () => {
+    if (scoreCards.length === 0) return;
+    const examInfo = await getExamData(selectedExamId);
+    const baseConfig: EvaluationConfig = examInfo?.config || {
+      examName: 'General OMR Exam',
+      examCode: selectedExamId || 'EXAM',
+      totalMarks: 100,
+      answerKey: {},
+      multiSetAnswerKeys: {},
+      rollNumberField: 'Roll',
+      serialNumberField: 'Serial',
+      setNameField: 'Set',
+      markingSchemes: { default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 } },
+    };
+
+    const mergedMultiSet: Record<string, Record<string, string | string[]>> = {
+      ...(baseConfig.multiSetAnswerKeys || {}),
+    };
+    Object.entries(scannedMasterKeys).forEach(([setCode, keyMap]) => {
+      mergedMultiSet[setCode] = { ...(mergedMultiSet[setCode] || {}), ...keyMap };
+    });
+    const primaryFallbackKey =
+      Object.keys(baseConfig.answerKey || {}).length > 0
+        ? baseConfig.answerKey
+        : scannedMasterKeys['A'] || Object.values(scannedMasterKeys)[0] || {};
+
+    const evalEngine = new EvaluationEngine({
+      ...baseConfig,
+      answerKey: primaryFallbackKey,
+      multiSetAnswerKeys: mergedMultiSet,
+      totalMarks: baseConfig.totalMarks || Math.max(Object.keys(primaryFallbackKey).length, 100),
+    });
+
+    const rosterIdx =
+      examInfo?.exam?.students && examInfo.exam.students.length > 0
+        ? buildRosterIndex(examInfo.exam.students)
+        : null;
+
+    const regraded = scoreCards.map((c) => {
+      const rawScan = scanResults[c.sheetId];
+      if (!rawScan) return c;
+      const responsesWithSet = { ...rawScan.responses, Set: [c.examSet || 'A'] };
+      const fresh = evalEngine.evaluateCandidate(
+        c.sheetId,
+        c.filename,
+        responsesWithSet,
+        rawScan.concatenatedResponses,
+        rawScan.flags
+      );
+      fresh.rollNumber = c.rollNumber;
+      fresh.registrationNo = c.registrationNo;
+      fresh.studentId = c.studentId;
+      fresh.studentName = c.studentName;
+      if (rosterIdx) {
+        const m = matchStudentByRollOrReg(rosterIdx, fresh.rollNumber, fresh.registrationNo);
+        if (m.student) {
+          fresh.studentId = m.student.id;
+          fresh.studentName = m.student.user?.name || fresh.studentName;
+        }
+      }
+      (fresh as any).examId = selectedExamId || (c as any).examId;
+      (fresh as any).templateId = (c as any).templateId;
+      return fresh;
+    });
+
+    const ranked = EvaluationEngine.rankCohort(regraded);
+    setScoreCards(ranked);
+    if (selectedScoreCard) {
+      const updatedSel = ranked.find((r) => r.sheetId === selectedScoreCard.sheetId);
+      if (updatedSel) setSelectedScoreCard(updatedSel);
+    }
+    setStatusMessage(`সফল! ${ranked.length} টি স্ক্যান করা খাতা নতুন অ্যান্সার কী দিয়ে পুনরায় মূল্যায়ন হয়েছে।`);
+  };
+
+  // Live Absentee & Missing-Sheet Reconciliation against Enrolled Class Roster
+  const absenteeStats = useMemo(() => {
+    const cached = selectedExamId ? examCache[selectedExamId] : null;
+    const enrolled = cached?.exam?.students || [];
+    if (!Array.isArray(enrolled) || enrolled.length === 0) {
+      return { enrolledCount: 0, scannedMatchedCount: 0, absent: [] as typeof enrolled };
+    }
+    const scannedIds = new Set(scoreCards.map((c) => c.studentId).filter(Boolean));
+    const scannedRolls = new Set(
+      scoreCards.map((c) => sanitizeNumericId(c.rollNumber).digits).filter(Boolean)
+    );
+    const absent = enrolled.filter((st) => {
+      if (scannedIds.has(st.id)) return false;
+      const r = sanitizeNumericId(st.roll).digits;
+      if (r && scannedRolls.has(r)) return false;
+      return true;
+    });
+    return {
+      enrolledCount: enrolled.length,
+      scannedMatchedCount: enrolled.length - absent.length,
+      absent,
+    };
+  }, [selectedExamId, examCache, scoreCards]);
+
   // Duplicate-Roll Collision Detector
   const duplicateRolls = useMemo(() => {
     const counts = new Map<string, number>();
@@ -2121,6 +2221,81 @@ export default function UniversalOMRScannerPage() {
         {/* Tab 3: Results Cohort & Visual HITL Quality Control */}
         {activeTab === 'results' && (
           <div className="space-y-4">
+            {/* Live Roster Attendance / Absentee Reconciliation + Instant Batch Re-Grade Bar */}
+            {scoreCards.length > 0 && (
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-3">
+                  {absenteeStats.enrolledCount > 0 && (
+                    <>
+                      <span className="text-slate-300">
+                        মোট এনরোলড: <strong className="text-white">{toBengaliNumerals(absenteeStats.enrolledCount)}</strong>
+                      </span>
+                      <span className="text-emerald-400">
+                        স্ক্যান সম্পন্ন: <strong>{toBengaliNumerals(absenteeStats.scannedMatchedCount)}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAbsenteePanel((v) => !v)}
+                        className={`px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer ${
+                          absenteeStats.absent.length > 0
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                            : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        }`}
+                      >
+                        অনুপস্থিত / বাকি: {toBengaliNumerals(absenteeStats.absent.length)} জন{' '}
+                        {absenteeStats.absent.length > 0 ? (showAbsenteePanel ? '▲' : '▼') : '✓'}
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRegradeAllScannedSheets}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-200 font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    title="নতুন মাস্টার কী বা নির্বাচিত পরীক্ষার উত্তরপত্র দিয়ে সব খাতা তাৎক্ষণিক পুনরায় মূল্যায়ন করুন"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>পুনরায় মূল্যায়ন (Re-Grade)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showAbsenteePanel && absenteeStats.absent.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-200">
+                    অনুপস্থিত / স্ক্যান না হওয়া পরীক্ষার্থী ({toBengaliNumerals(absenteeStats.absent.length)} জন)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const txt = absenteeStats.absent
+                        .map((st) => `রোল: ${st.roll} | ${st.user?.name || 'Student'} | রেজি: ${st.registrationNo || '-'}`)
+                        .join('\n');
+                      navigator.clipboard?.writeText(txt);
+                      setStatusMessage(`${absenteeStats.absent.length} জন অনুপস্থিত শিক্ষার্থীর তালিকা কপি হয়েছে!`);
+                    }}
+                    className="px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold cursor-pointer"
+                  >
+                    তালিকা কপি করুন
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {absenteeStats.absent.map((st) => (
+                    <span
+                      key={st.id}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-mono"
+                    >
+                      {st.roll} — {st.user?.name || 'Student'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {duplicateRolls.size > 0 && (
               <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-200 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 font-semibold">
