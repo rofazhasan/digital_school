@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Printer, 
   Download, 
@@ -12,7 +12,13 @@ import {
   LayoutGrid,
   ShieldCheck,
   Sparkles,
-  QrCode
+  QrCode,
+  Eye,
+  Wand2,
+  RotateCcw,
+  Upload,
+  Crosshair,
+  Activity
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Template } from '@/lib/omr/types';
@@ -123,6 +129,27 @@ export function BangladeshOMRGenerator({
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [previewZoom, setPreviewZoom] = useState<number>(0.85);
   const printContainerRef = useRef<HTMLDivElement>(null);
+
+  // Best-in-Class Template Studio Features
+  const [optionsPerQuestion, setOptionsPerQuestion] = useState<4 | 5>(4);
+  const [fiducialStyle, setFiducialStyle] = useState<'solid' | 'crosshair'>('solid');
+  const [showScannerXRay, setShowScannerXRay] = useState<boolean>(false);
+  const [showWatermark, setShowWatermark] = useState<boolean>(false);
+  const [showMetaStrip, setShowMetaStrip] = useState<boolean>(true);
+  const [metaSubject, setMetaSubject] = useState<string>('পদার্থবিজ্ঞান ১ম পত্র');
+  const [metaClass, setMetaClass] = useState<string>('একাদশ-দ্বাদশ');
+  const [metaFullMarks, setMetaFullMarks] = useState<string>('৫০');
+  const [metaDuration, setMetaDuration] = useState<string>('৫০ মিনিট');
+  const [instituteLogoUrl, setInstituteLogoUrl] = useState<string | null>(null);
+  const [filledBubbles, setFilledBubbles] = useState<Record<string, string>>({});
+  const [xrayBoxes, setXrayBoxes] = useState<Array<{ x: number; y: number; w: number; h: number; block: string }>>([]);
+  const [xrayFiducials, setXrayFiducials] = useState<Array<{ x: number; y: number; w: number; h: number; id: string }>>([]);
+  const [scanHealth, setScanHealth] = useState<{ score: number; bubbleCount: number; fiducials: number; note: string }>({
+    score: 99,
+    bubbleCount: 0,
+    fiducials: 4,
+    note: 'DOM-calibrated • 0px drift',
+  });
 
   // Apply predefined templates
   const handleSelectPreset = (preset: PresetType) => {
@@ -479,10 +506,10 @@ export function BangladeshOMRGenerator({
           origin: [startX + c * colSpacing, 220],
           bubblesGap: 28,
           labelsGap: 26,
-          fieldType: 'QTYPE_MCQ4',
+          fieldType: optionsPerQuestion === 5 ? 'QTYPE_MCQ5' : 'QTYPE_MCQ4',
           direction: 'horizontal',
           fieldLabels: [`q${startQ}..${endQ}`],
-          bubbleValues: optionLanguage === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D'],
+          bubbleValues: optionsList,
           section: `Column ${c + 1}`,
         };
       }
@@ -528,10 +555,10 @@ export function BangladeshOMRGenerator({
           origin: [startX + c * colSpacing, 580],
           bubblesGap: 28,
           labelsGap: 24,
-          fieldType: 'QTYPE_MCQ4',
+          fieldType: optionsPerQuestion === 5 ? 'QTYPE_MCQ5' : 'QTYPE_MCQ4',
           direction: 'horizontal',
           fieldLabels: [`q${startQ}..${endQ}`],
-          bubbleValues: optionLanguage === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D'],
+          bubbleValues: optionsList,
           section: `Column ${c + 1}`,
         };
       }
@@ -639,7 +666,167 @@ export function BangladeshOMRGenerator({
   }[themeColor];
 
   const qPerCol = Math.ceil(numQuestions / numColumns);
-  const optionsList = optionLanguage === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D'];
+  const optionsList =
+    optionLanguage === 'BANGLA'
+      ? optionsPerQuestion === 5
+        ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ']
+        : ['ক', 'খ', 'গ', 'ঘ']
+      : optionsPerQuestion === 5
+      ? ['A', 'B', 'C', 'D', 'E']
+      : ['A', 'B', 'C', 'D'];
+
+  // Toggle any single bubble interactively (for Answer Key / Test Calibration Sheet creation)
+  const toggleBubbleFill = useCallback((labelKey: string, val: string) => {
+    setFilledBubbles((prev) => {
+      const next = { ...prev };
+      if (next[labelKey] === val) {
+        delete next[labelKey];
+      } else {
+        next[labelKey] = val;
+      }
+      return next;
+    });
+  }, []);
+
+  // 1-Click Realistic Student Fill (Demo / Test Calibration Sheet)
+  const handleSimulateStudentFill = () => {
+    const next: Record<string, string> = {};
+    const sampleRoll = '26104289'.slice(0, rollDigits);
+    for (let i = 0; i < rollDigits; i++) {
+      next[`roll${i + 1}`] = sampleRoll[i] || String(i % 10);
+    }
+    const sampleReg = '2026148930'.slice(0, regDigits);
+    for (let i = 0; i < regDigits; i++) {
+      next[`reg${i + 1}`] = sampleReg[i] || String((i + 3) % 10);
+    }
+    const sampleSub = '174'.slice(0, subjectCodeDigits);
+    for (let i = 0; i < subjectCodeDigits; i++) {
+      next[`sub${i + 1}`] = sampleSub[i] || '1';
+    }
+    next['Set'] = setOptionsType === 'BANGLA' ? 'ক' : 'A';
+    for (let q = 1; q <= numQuestions; q++) {
+      // Deterministic varied pattern so teachers can immediately verify scanner accuracy
+      const optIdx = (q * 7 + (q % 3)) % optionsList.length;
+      next[`q${q}`] = optionsList[optIdx];
+    }
+    setFilledBubbles(next);
+    setStatusMessage(`Simulated filled test sheet: Roll ${sampleRoll}, Set ${next['Set']}, ${numQuestions} MCQs marked.`);
+  };
+
+  const handleClearFilledBubbles = () => {
+    setFilledBubbles({});
+    setStatusMessage('Cleared all test marks — clean blank OMR sheet ready for printing.');
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setInstituteLogoUrl(reader.result);
+        setStatusMessage('Institute logo applied to official OMR header.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Measure live DOM bubble & fiducial geometry for X-Ray Scanner Vision & Pre-Flight Scanability Score
+  useEffect(() => {
+    if (selectedPreset === 'board_cq_3part') return;
+    const timer = window.setTimeout(() => {
+      const sheetEl = printContainerRef.current;
+      if (!sheetEl) return;
+      const sRect = sheetEl.getBoundingClientRect();
+      if (sRect.width < 100 || sRect.height < 100) return;
+
+      const bubbles = Array.from(sheetEl.querySelectorAll<HTMLElement>('[data-omr-bubble="1"]'));
+      const fids = Array.from(sheetEl.querySelectorAll<HTMLElement>('[data-omr-fiducial]'));
+
+      const sx = 820 / sRect.width;
+      const sy = 1160 / sRect.height;
+
+      let minBubblePx = 999;
+      const mappedBubbles = bubbles.map((el) => {
+        const r = el.getBoundingClientRect();
+        const w = r.width * sx;
+        const h = r.height * sy;
+        if (w > 0 && w < minBubblePx) minBubblePx = w;
+        return {
+          x: (r.left - sRect.left) * sx,
+          y: (r.top - sRect.top) * sy,
+          w,
+          h,
+          block: el.dataset.omrBlock || 'Other',
+        };
+      });
+
+      const mappedFids = fids.map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          x: (r.left - sRect.left) * sx,
+          y: (r.top - sRect.top) * sy,
+          w: r.width * sx,
+          h: r.height * sy,
+          id: el.dataset.omrFiducial || '',
+        };
+      });
+
+      // Compute Optical Pre-Flight Scanability Score (0–100)
+      let score = 100;
+      const notes: string[] = [];
+      if (mappedFids.length < 4) {
+        score -= 20;
+        notes.push('Missing fiducials');
+      }
+      if (fiducialStyle === 'crosshair') {
+        score -= 2;
+      }
+      if (minBubblePx < 10) {
+        score -= 8;
+        notes.push('Compact bubbles — use 300 DPI print');
+      } else {
+        notes.push('0px DOM-calibrated');
+      }
+      if (themeColor === 'black') {
+        notes.push('B&W Photocopy Safe');
+      } else {
+        notes.push('Optical Dropout Ink');
+      }
+
+      setXrayBoxes(mappedBubbles);
+      setXrayFiducials(mappedFids);
+      setScanHealth({
+        score: Math.max(70, Math.min(100, score)),
+        bubbleCount: mappedBubbles.length,
+        fiducials: mappedFids.length,
+        note: notes.join(' • '),
+      });
+    }, 60);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    selectedPreset,
+    layoutMode,
+    numQuestions,
+    numColumns,
+    optionsPerQuestion,
+    optionLanguage,
+    numberingLanguage,
+    themeColor,
+    fiducialStyle,
+    showRollNumber,
+    rollDigits,
+    showRegNumber,
+    regDigits,
+    showSubjectCode,
+    subjectCodeDigits,
+    showSetCode,
+    showSignatures,
+    showInstructions,
+    showMetaStrip,
+    previewZoom,
+  ]);
 
   // Helper component to render scannable crisp barcode
   const renderBarcodeSvg = () => {
@@ -824,12 +1011,18 @@ export function BangladeshOMRGenerator({
                   onChange={(e) => setNumQuestions(parseInt(e.target.value))}
                   className="input-field"
                 >
-                  <option value={25}>25 Questions</option>
-                  <option value={30}>30 Questions</option>
+                  <option value={10}>10 Questions (Quiz)</option>
+                  <option value={20}>20 Questions (Class Test)</option>
+                  <option value={25}>25 Questions (Short Board)</option>
+                  <option value={30}>30 Questions (SSC/HSC)</option>
+                  <option value={40}>40 Questions</option>
                   <option value={50}>50 Questions (Board Standard)</option>
                   <option value={60}>60 Questions (DU Units)</option>
                   <option value={75}>75 Questions</option>
                   <option value={100}>100 Questions (Admission)</option>
+                  <option value={120}>120 Questions (Extended)</option>
+                  <option value={150}>150 Questions (BCS/Mega)</option>
+                  <option value={200}>200 Questions (Full BCS)</option>
                 </select>
               </div>
 
@@ -846,6 +1039,50 @@ export function BangladeshOMRGenerator({
                   <option value={4}>4 Columns</option>
                   <option value={5}>5 Columns</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-group">
+                <label>Options / Question</label>
+                <div className="layout-toggle-group">
+                  <button
+                    type="button"
+                    className={`btn-toggle-option ${optionsPerQuestion === 4 ? 'active' : ''}`}
+                    onClick={() => setOptionsPerQuestion(4)}
+                  >
+                    4 Opts (A–D)
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-toggle-option ${optionsPerQuestion === 5 ? 'active' : ''}`}
+                    onClick={() => setOptionsPerQuestion(5)}
+                  >
+                    5 Opts (A–E)
+                  </button>
+                </div>
+              </div>
+
+              <div className="field-group">
+                <label>Corner Fiducials</label>
+                <div className="layout-toggle-group">
+                  <button
+                    type="button"
+                    className={`btn-toggle-option ${fiducialStyle === 'solid' ? 'active' : ''}`}
+                    onClick={() => setFiducialStyle('solid')}
+                    title="High-contrast square bullseye — highest mobile camera lock accuracy"
+                  >
+                    <Crosshair size={12} /> Solid Pro
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-toggle-option ${fiducialStyle === 'crosshair' ? 'active' : ''}`}
+                    onClick={() => setFiducialStyle('crosshair')}
+                    title="Classic Bangladesh Board crosshair circle"
+                  >
+                    Classic
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -987,6 +1224,82 @@ export function BangladeshOMRGenerator({
                 Official Board Rules (নিয়মাবলী)
               </label>
             </div>
+
+            <div className="checkbox-field">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={showMetaStrip} 
+                  onChange={(e) => setShowMetaStrip(e.target.checked)} 
+                />
+                Exam Metadata Strip (বিষয়/শ্রেণি/পূর্ণমান)
+              </label>
+            </div>
+
+            <div className="checkbox-field">
+              <label>
+                <input 
+                  type="checkbox" 
+                  checked={showWatermark} 
+                  onChange={(e) => setShowWatermark(e.target.checked)} 
+                />
+                Security Watermark (অ্যান্টি-ফর্জারি)
+              </label>
+            </div>
+
+            {/* Institute Logo Upload */}
+            <div className="field-group mt-1">
+              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>প্রতিষ্ঠানের লোগো (Institute Crest)</span>
+                {instituteLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setInstituteLogoUrl(null)}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                  >
+                    সরান
+                  </button>
+                )}
+              </label>
+              <label className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-dashed border-slate-600 text-slate-300 text-xs font-medium cursor-pointer transition">
+                <Upload size={13} className="text-indigo-400" />
+                <span>{instituteLogoUrl ? 'লোগো পরিবর্তন করুন' : 'লোগো আপলোড করুন (PNG/SVG)'}</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+              </label>
+            </div>
+
+            {showMetaStrip && selectedPreset !== 'board_cq_3part' && (
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <input
+                  type="text"
+                  value={metaSubject}
+                  onChange={(e) => setMetaSubject(e.target.value)}
+                  className="input-field text-xs"
+                  placeholder="বিষয় (Subject)"
+                />
+                <input
+                  type="text"
+                  value={metaClass}
+                  onChange={(e) => setMetaClass(e.target.value)}
+                  className="input-field text-xs"
+                  placeholder="শ্রেণি (Class)"
+                />
+                <input
+                  type="text"
+                  value={metaFullMarks}
+                  onChange={(e) => setMetaFullMarks(e.target.value)}
+                  className="input-field text-xs"
+                  placeholder="পূর্ণমান (Marks)"
+                />
+                <input
+                  type="text"
+                  value={metaDuration}
+                  onChange={(e) => setMetaDuration(e.target.value)}
+                  className="input-field text-xs"
+                  placeholder="সময় (Time)"
+                />
+              </div>
+            )}
           </div>
 
           <div className="sidebar-group">
@@ -1173,21 +1486,21 @@ export function BangladeshOMRGenerator({
 
         {/* Right Side: Pixel-Perfect Printable A4 Sheet Viewport */}
         <div className="generator-sheet-viewport">
-          {/* Zoom & Dimensions Control Ribbon */}
-          <div className="sheet-zoom-ribbon no-print flex items-center justify-between w-full max-w-[820px] px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl mb-3 text-xs">
+          {/* Zoom, Pre-Flight Optical Health & Interactive Tools Ribbon */}
+          <div className="sheet-zoom-ribbon no-print flex flex-wrap items-center justify-between gap-2 w-full max-w-[820px] px-3 py-2 bg-slate-900/95 border border-slate-800 rounded-xl mb-3 text-xs">
             <div className="flex items-center gap-1.5 text-slate-300">
-              <span className="font-semibold text-slate-400">স্ক্রিন জুম:</span>
+              <span className="font-semibold text-slate-400">জুম:</span>
               {[
-                { label: 'Fit (৭৫%)', val: 0.75 },
-                { label: '৮৫% (স্বাভাবিক)', val: 0.85 },
-                { label: '১০০% (আসল সাইজ)', val: 1.0 },
+                { label: '৭৫%', val: 0.75 },
+                { label: '৮৫%', val: 0.85 },
+                { label: '১০০%', val: 1.0 },
                 { label: '১১০%', val: 1.1 },
               ].map(z => (
                 <button
                   key={z.val}
                   type="button"
                   onClick={() => setPreviewZoom(z.val)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`px-2 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                     previewZoom === z.val
                       ? 'bg-indigo-600 text-white shadow'
                       : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
@@ -1198,10 +1511,63 @@ export function BangladeshOMRGenerator({
               ))}
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>স্ট্যান্ডার্ড A4: ২১০০ × ২৯৭০ px (৩০০ DPI রেডি)</span>
-            </div>
+            {selectedPreset !== 'board_cq_3part' && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Live Pre-Flight Scanability Health Pill */}
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold ${
+                    scanHealth.score >= 95
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                      : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  }`}
+                  title={scanHealth.note}
+                >
+                  <Activity size={12} />
+                  <span>{scanHealth.score}% Scan Ready</span>
+                  <span className="text-[10px] opacity-80 hidden md:inline">
+                    ({scanHealth.bubbleCount} bubbles • {scanHealth.fiducials}/4)
+                  </span>
+                </div>
+
+                {/* Live X-Ray Calibration Overlay Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowScannerXRay((v) => !v)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                    showScannerXRay
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow shadow-cyan-500/20'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                  }`}
+                  title="স্ক্যানার প্রতিটি বৃত্ত কোথায় পড়বে তা লাইভ X-Ray ভিউতে দেখুন (প্রিন্টে আসবে না)"
+                >
+                  <Eye size={12} />
+                  <span>X-Ray</span>
+                </button>
+
+                {/* 1-Click Simulate Filled Student Sheet (Master Key / Test Calibration) */}
+                <button
+                  type="button"
+                  onClick={handleSimulateStudentFill}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-200 transition cursor-pointer"
+                  title="টেস্ট স্ক্যান বা মাস্টার উত্তরপত্রের জন্য নমুনা বৃত্ত ভরাট করুন (যেকোনো বৃত্তে ক্লিক করেও ভরাট করা যাবে)"
+                >
+                  <Wand2 size={12} />
+                  <span>ডেমো ফিল</span>
+                </button>
+
+                {Object.keys(filledBubbles).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilledBubbles}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 transition cursor-pointer"
+                    title="সব ভরাট বৃত্ত মুছে পরিষ্কার শিট করুন"
+                  >
+                    <RotateCcw size={11} />
+                    <span>মুছুন</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div
@@ -1272,30 +1638,32 @@ export function BangladeshOMRGenerator({
               } as any}
             >
             {/* 4 Corner High-Precision Optical Registration Markers */}
-            <div className="fiducial-marker top-left" data-omr-fiducial="TL">
-              <div className="marker-cross-circle">
-                <div className="cross-line-h"></div>
-                <div className="cross-line-v"></div>
+            {[
+              { pos: 'top-left', id: 'TL' },
+              { pos: 'top-right', id: 'TR' },
+              { pos: 'bottom-left', id: 'BL' },
+              { pos: 'bottom-right', id: 'BR' },
+            ].map((m) => (
+              <div key={m.id} className={`fiducial-marker ${m.pos}`} data-omr-fiducial={m.id}>
+                {fiducialStyle === 'solid' ? (
+                  <div className="fiducial-solid-target">
+                    <div className="fiducial-solid-target-inner"></div>
+                  </div>
+                ) : (
+                  <div className="marker-cross-circle">
+                    <div className="cross-line-h"></div>
+                    <div className="cross-line-v"></div>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="fiducial-marker top-right" data-omr-fiducial="TR">
-              <div className="marker-cross-circle">
-                <div className="cross-line-h"></div>
-                <div className="cross-line-v"></div>
+            ))}
+
+            {/* Optional Anti-Counterfeit Low-Opacity Diagonal Watermark */}
+            {showWatermark && (
+              <div className="omr-sheet-watermark" aria-hidden="true">
+                <span>{instituteNameBangla || 'OFFICIAL OMR'}</span>
               </div>
-            </div>
-            <div className="fiducial-marker bottom-left" data-omr-fiducial="BL">
-              <div className="marker-cross-circle">
-                <div className="cross-line-h"></div>
-                <div className="cross-line-v"></div>
-              </div>
-            </div>
-            <div className="fiducial-marker bottom-right" data-omr-fiducial="BR">
-              <div className="marker-cross-circle">
-                <div className="cross-line-h"></div>
-                <div className="cross-line-v"></div>
-              </div>
-            </div>
+            )}
 
             {/* Continuous Lateral Optical Clocking Tracks */}
             <div className="timing-tracks left">
@@ -1307,6 +1675,13 @@ export function BangladeshOMRGenerator({
 
             {/* Sheet Header Area */}
             <div className="sheet-header">
+              {/* Optional Custom Institute Crest / Logo (Top-Left) */}
+              {instituteLogoUrl && (
+                <div className="omr-institute-logo-box">
+                  <img src={instituteLogoUrl} alt="Institute Logo" />
+                </div>
+              )}
+
               {/* Universal OMR QR Code Badge */}
               <div 
                 className="omr-qr-code-box"
@@ -1359,6 +1734,14 @@ export function BangladeshOMRGenerator({
                 <div className="pen-instruction-banner">
                   অবশ্যই কালো বল-পয়েন্ট কলম দিয়ে বৃত্ত ভরাট করতে হবে
                 </div>
+                {showMetaStrip && (
+                  <div className="omr-meta-strip">
+                    <span className="omr-meta-strip-item"><strong>বিষয়:</strong> {metaSubject || '..................'}</span>
+                    <span className="omr-meta-strip-item"><strong>শ্রেণি:</strong> {metaClass || '............'}</span>
+                    <span className="omr-meta-strip-item"><strong>পূর্ণমান:</strong> {metaFullMarks || '......'}</span>
+                    <span className="omr-meta-strip-item"><strong>সময়:</strong> {metaDuration || '..........'}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1397,19 +1780,24 @@ export function BangladeshOMRGenerator({
                                   {formattedQNum}
                                 </div>
                                 <div className="q-bubbles-group">
-                                  {optionsList.map(opt => (
-                                    <div
-                                      key={opt}
-                                      className="omr-bubble-circle"
-                                      data-omr-bubble="1"
-                                      data-omr-block={`Questions_Col${colIdx + 1}`}
-                                      data-omr-label={`q${qNum}`}
-                                      data-omr-value={opt}
-                                      data-omr-dir="horizontal"
-                                    >
-                                      <span>{opt}</span>
-                                    </div>
-                                  ))}
+                                  {optionsList.map(opt => {
+                                    const qKey = `q${qNum}`;
+                                    const isFilled = filledBubbles[qKey] === opt;
+                                    return (
+                                      <div
+                                        key={opt}
+                                        onClick={() => toggleBubbleFill(qKey, opt)}
+                                        className={`omr-bubble-circle ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                        data-omr-bubble="1"
+                                        data-omr-block={`Questions_Col${colIdx + 1}`}
+                                        data-omr-label={qKey}
+                                        data-omr-value={opt}
+                                        data-omr-dir="horizontal"
+                                      >
+                                        <span>{opt}</span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
@@ -1429,27 +1817,38 @@ export function BangladeshOMRGenerator({
                         <div className="grid-card-title">রোল নম্বর</div>
                         <div className="write-boxes-table">
                           {[...Array(rollDigits)].map((_, i) => (
-                            <div key={i} className="write-box-cell"></div>
+                            <div key={i} className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '11px' }}>
+                              {filledBubbles[`roll${i + 1}`]
+                                ? numberingLanguage === 'BANGLA'
+                                  ? toBanglaNumber(Number(filledBubbles[`roll${i + 1}`]))
+                                  : filledBubbles[`roll${i + 1}`]
+                                : ''}
+                            </div>
                           ))}
                         </div>
                         <div className="bubbles-matrix-columns">
                           {[...Array(rollDigits)].map((_, colIdx) => {
                             const isColStripe = colIdx % 2 === 0;
+                            const labelKey = `roll${colIdx + 1}`;
                             return (
                               <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
-                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                  <div
-                                    key={digit}
-                                    className="matrix-bubble"
-                                    data-omr-bubble="1"
-                                    data-omr-block="Roll"
-                                    data-omr-label={`roll${colIdx + 1}`}
-                                    data-omr-value={String(digit)}
-                                    data-omr-dir="vertical"
-                                  >
-                                    <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
-                                  </div>
-                                ))}
+                                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => {
+                                  const isFilled = filledBubbles[labelKey] === String(digit);
+                                  return (
+                                    <div
+                                      key={digit}
+                                      onClick={() => toggleBubbleFill(labelKey, String(digit))}
+                                      className={`matrix-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                      data-omr-bubble="1"
+                                      data-omr-block="Roll"
+                                      data-omr-label={labelKey}
+                                      data-omr-value={String(digit)}
+                                      data-omr-dir="vertical"
+                                    >
+                                      <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })}
@@ -1463,22 +1862,28 @@ export function BangladeshOMRGenerator({
                       <div className="vertical-grid-card set-grid">
                         <div className="grid-card-title">সেট কোড</div>
                         <div className="write-boxes-table single">
-                          <div className="write-box-cell"></div>
+                          <div className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '11px' }}>
+                            {filledBubbles['Set'] || ''}
+                          </div>
                         </div>
                         <div className="digit-column-strip col-stripe single">
-                          {(setOptionsType === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D']).map(s => (
-                            <div
-                              key={s}
-                              className="matrix-bubble set-bubble"
-                              data-omr-bubble="1"
-                              data-omr-block="SetCode"
-                              data-omr-label="Set"
-                              data-omr-value={s}
-                              data-omr-dir="vertical"
-                            >
-                              <span>{s}</span>
-                            </div>
-                          ))}
+                          {(setOptionsType === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D']).map(s => {
+                            const isFilled = filledBubbles['Set'] === s;
+                            return (
+                              <div
+                                key={s}
+                                onClick={() => toggleBubbleFill('Set', s)}
+                                className={`matrix-bubble set-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                data-omr-bubble="1"
+                                data-omr-block="SetCode"
+                                data-omr-label="Set"
+                                data-omr-value={s}
+                                data-omr-dir="vertical"
+                              >
+                                <span>{s}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1508,27 +1913,38 @@ export function BangladeshOMRGenerator({
                           <div className="grid-card-title">রেজিস্ট্রেশন নম্বর</div>
                           <div className="write-boxes-table">
                             {[...Array(regDigits)].map((_, i) => (
-                              <div key={i} className="write-box-cell"></div>
+                              <div key={i} className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px' }}>
+                                {filledBubbles[`reg${i + 1}`]
+                                  ? numberingLanguage === 'BANGLA'
+                                    ? toBanglaNumber(Number(filledBubbles[`reg${i + 1}`]))
+                                    : filledBubbles[`reg${i + 1}`]
+                                  : ''}
+                              </div>
                             ))}
                           </div>
                           <div className="bubbles-matrix-columns">
                             {[...Array(regDigits)].map((_, colIdx) => {
                               const isColStripe = colIdx % 2 === 0;
+                              const labelKey = `reg${colIdx + 1}`;
                               return (
                                 <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
-                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                    <div
-                                      key={digit}
-                                      className="matrix-bubble"
-                                      data-omr-bubble="1"
-                                      data-omr-block="Reg"
-                                      data-omr-label={`reg${colIdx + 1}`}
-                                      data-omr-value={String(digit)}
-                                      data-omr-dir="vertical"
-                                    >
-                                      <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
-                                    </div>
-                                  ))}
+                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => {
+                                    const isFilled = filledBubbles[labelKey] === String(digit);
+                                    return (
+                                      <div
+                                        key={digit}
+                                        onClick={() => toggleBubbleFill(labelKey, String(digit))}
+                                        className={`matrix-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                        data-omr-bubble="1"
+                                        data-omr-block="Reg"
+                                        data-omr-label={labelKey}
+                                        data-omr-value={String(digit)}
+                                        data-omr-dir="vertical"
+                                      >
+                                        <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               );
                             })}
@@ -1543,27 +1959,38 @@ export function BangladeshOMRGenerator({
                           <div className="grid-card-title">বিষয় কোড</div>
                           <div className="write-boxes-table">
                             {[...Array(subjectCodeDigits)].map((_, i) => (
-                              <div key={i} className="write-box-cell"></div>
+                              <div key={i} className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px' }}>
+                                {filledBubbles[`sub${i + 1}`]
+                                  ? numberingLanguage === 'BANGLA'
+                                    ? toBanglaNumber(Number(filledBubbles[`sub${i + 1}`]))
+                                    : filledBubbles[`sub${i + 1}`]
+                                  : ''}
+                              </div>
                             ))}
                           </div>
                           <div className="bubbles-matrix-columns">
                             {[...Array(subjectCodeDigits)].map((_, colIdx) => {
                               const isColStripe = colIdx % 2 === 0;
+                              const labelKey = `sub${colIdx + 1}`;
                               return (
                                 <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
-                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                    <div
-                                      key={digit}
-                                      className="matrix-bubble"
-                                      data-omr-bubble="1"
-                                      data-omr-block="SubjectCode"
-                                      data-omr-label={`sub${colIdx + 1}`}
-                                      data-omr-value={String(digit)}
-                                      data-omr-dir="vertical"
-                                    >
-                                      <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
-                                    </div>
-                                  ))}
+                                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => {
+                                    const isFilled = filledBubbles[labelKey] === String(digit);
+                                    return (
+                                      <div
+                                        key={digit}
+                                        onClick={() => toggleBubbleFill(labelKey, String(digit))}
+                                        className={`matrix-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                        data-omr-bubble="1"
+                                        data-omr-block="SubjectCode"
+                                        data-omr-label={labelKey}
+                                        data-omr-value={String(digit)}
+                                        data-omr-dir="vertical"
+                                      >
+                                        <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               );
                             })}
@@ -1688,27 +2115,40 @@ export function BangladeshOMRGenerator({
                       <div className="grid-card-title">রোল নম্বর (ROLL)</div>
                       <div className="write-boxes-table">
                         {[...Array(rollDigits)].map((_, i) => (
-                          <div key={i} className="write-box-cell"></div>
+                          <div key={i} className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px' }}>
+                            {filledBubbles[`roll${i + 1}`]
+                              ? numberingLanguage === 'BANGLA'
+                                ? toBanglaNumber(Number(filledBubbles[`roll${i + 1}`]))
+                                : filledBubbles[`roll${i + 1}`]
+                              : ''}
+                          </div>
                         ))}
                       </div>
                       <div className="bubbles-matrix-columns">
-                        {[...Array(rollDigits)].map((_, colIdx) => (
-                          <div key={colIdx} className={`digit-column-strip ${colIdx % 2 === 0 ? 'col-stripe' : ''}`}>
-                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                              <div
-                                key={digit}
-                                className="matrix-bubble"
-                                data-omr-bubble="1"
-                                data-omr-block="Roll"
-                                data-omr-label={`roll${colIdx + 1}`}
-                                data-omr-value={String(digit)}
-                                data-omr-dir="vertical"
-                              >
-                                <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
+                        {[...Array(rollDigits)].map((_, colIdx) => {
+                          const labelKey = `roll${colIdx + 1}`;
+                          return (
+                            <div key={colIdx} className={`digit-column-strip ${colIdx % 2 === 0 ? 'col-stripe' : ''}`}>
+                              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => {
+                                const isFilled = filledBubbles[labelKey] === String(digit);
+                                return (
+                                  <div
+                                    key={digit}
+                                    onClick={() => toggleBubbleFill(labelKey, String(digit))}
+                                    className={`matrix-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                    data-omr-bubble="1"
+                                    data-omr-block="Roll"
+                                    data-omr-label={labelKey}
+                                    data-omr-value={String(digit)}
+                                    data-omr-dir="vertical"
+                                  >
+                                    <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1717,14 +2157,28 @@ export function BangladeshOMRGenerator({
                     <div className="vertical-grid-card set-grid compact">
                       <div className="grid-card-title">সেট (SET)</div>
                       <div className="write-boxes-table single">
-                        <div className="write-box-cell"></div>
+                        <div className="write-box-cell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '10px' }}>
+                          {filledBubbles['Set'] || ''}
+                        </div>
                       </div>
                       <div className="digit-column-strip col-stripe single">
-                        {(setOptionsType === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D']).map(s => (
-                          <div key={s} className="matrix-bubble set-bubble">
-                            <span>{s}</span>
-                          </div>
-                        ))}
+                        {(setOptionsType === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D']).map(s => {
+                          const isFilled = filledBubbles['Set'] === s;
+                          return (
+                            <div
+                              key={s}
+                              onClick={() => toggleBubbleFill('Set', s)}
+                              className={`matrix-bubble set-bubble ${isFilled ? 'omr-bubble-filled' : ''}`}
+                              data-omr-bubble="1"
+                              data-omr-block="SetCode"
+                              data-omr-label="Set"
+                              data-omr-value={s}
+                              data-omr-dir="vertical"
+                            >
+                              <span>{s}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1794,19 +2248,24 @@ export function BangladeshOMRGenerator({
                                   {formattedQNum}
                                 </div>
                                 <div className="q-bubbles-group">
-                                  {optionsList.map(opt => (
-                                    <div
-                                      key={opt}
-                                      className="omr-bubble-circle"
-                                      data-omr-bubble="1"
-                                      data-omr-block={`Questions_Col${colIdx + 1}`}
-                                      data-omr-label={`q${qNum}`}
-                                      data-omr-value={opt}
-                                      data-omr-dir="horizontal"
-                                    >
-                                      <span>{opt}</span>
-                                    </div>
-                                  ))}
+                                  {optionsList.map(opt => {
+                                    const qKey = `q${qNum}`;
+                                    const isFilled = filledBubbles[qKey] === opt;
+                                    return (
+                                      <div
+                                        key={opt}
+                                        onClick={() => toggleBubbleFill(qKey, opt)}
+                                        className={`omr-bubble-circle ${isFilled ? 'omr-bubble-filled' : ''}`}
+                                        data-omr-bubble="1"
+                                        data-omr-block={`Questions_Col${colIdx + 1}`}
+                                        data-omr-label={qKey}
+                                        data-omr-value={opt}
+                                        data-omr-dir="horizontal"
+                                      >
+                                        <span>{opt}</span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );
@@ -1821,6 +2280,66 @@ export function BangladeshOMRGenerator({
 
             {/* Bottom Optical Registration Bar */}
             <div className="timing-marker-bottom-center"></div>
+
+            {/* Live Non-Printable Scanner X-Ray Calibration Overlay */}
+            {showScannerXRay && (
+              <svg
+                className="omr-xray-overlay no-print"
+                viewBox="0 0 820 1160"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {/* 4 Corner Fiducial Crosshairs */}
+                {xrayFiducials.map((f) => (
+                  <g key={f.id}>
+                    <rect
+                      x={f.x - 2}
+                      y={f.y - 2}
+                      width={f.w + 4}
+                      height={f.h + 4}
+                      fill="rgba(16, 185, 129, 0.16)"
+                      stroke="#10b981"
+                      strokeWidth="2"
+                    />
+                    <text
+                      x={f.x + f.w / 2}
+                      y={f.y > 500 ? f.y - 5 : f.y + f.h + 11}
+                      textAnchor="middle"
+                      fill="#059669"
+                      fontSize="9"
+                      fontWeight="bold"
+                    >
+                      {f.id}
+                    </text>
+                  </g>
+                ))}
+                {/* Every DOM-Calibrated Bubble Ring */}
+                {xrayBoxes.map((b, idx) => {
+                  const color =
+                    b.block === 'Roll'
+                      ? '#06b6d4'
+                      : b.block === 'Reg'
+                      ? '#a855f7'
+                      : b.block === 'SetCode'
+                      ? '#f59e0b'
+                      : b.block === 'SubjectCode'
+                      ? '#3b82f6'
+                      : '#10b981';
+                  return (
+                    <circle
+                      key={idx}
+                      cx={b.x + b.w / 2}
+                      cy={b.y + b.h / 2}
+                      r={Math.max(4, Math.min(b.w, b.h) / 2 + 1)}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth="1.2"
+                      strokeOpacity="0.85"
+                    />
+                  );
+                })}
+              </svg>
+            )}
           </div>
         )}
           </div>

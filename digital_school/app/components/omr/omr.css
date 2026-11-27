@@ -1946,3 +1946,139 @@
   border: 1px solid #94a3b8;
   display: flex;
 }
+
+/* ==========================================================================
+   PREMIUM OMR TEMPLATE STUDIO ENHANCEMENTS
+   Interactive Bubble Fill, High-Contrast Fiducials, Logo, Meta Strip, Watermark & X-Ray
+   ========================================================================== */
+
+.omr-bubble-circle,
+.matrix-bubble {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.12s ease, transform 0.1s ease;
+}
+
+.omr-bubble-circle:hover,
+.matrix-bubble:hover {
+  box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.7);
+}
+
+.omr-bubble-filled {
+  background: #0f172a !important;
+  border-color: #0f172a !important;
+  color: transparent !important;
+}
+
+.omr-bubble-filled span {
+  color: transparent !important;
+  opacity: 0 !important;
+}
+
+/* High-Contrast Solid Square-Bullseye Fiducial (Optimal for Smartphone & Camera OMR) */
+.fiducial-solid-target {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #000000;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fiducial-solid-target-inner {
+  width: 12px;
+  height: 12px;
+  background: #000000;
+}
+
+/* Optional Anti-Counterfeit Diagonal Watermark (Low-opacity so optical threshold ignores it) */
+.omr-sheet-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.omr-sheet-watermark span {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: rgba(15, 23, 42, 0.04);
+  transform: rotate(-32deg);
+  white-space: nowrap;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Institute Logo Badge on Top-Left of Sheet Header */
+.omr-institute-logo-box {
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 6px;
+  padding: 2px;
+  overflow: hidden;
+  z-index: 4;
+}
+
+.omr-institute-logo-box img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Compact Exam Metadata Strip (Subject / Class / Full Marks / Time) */
+.omr-meta-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+  padding: 2px 8px;
+  border: 1px solid var(--omr-theme-border, #d91884);
+  background: var(--omr-theme-bg, rgba(217, 24, 132, 0.06));
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.omr-meta-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.omr-meta-strip-item strong {
+  color: var(--omr-theme, #d91884);
+}
+
+/* Non-Printable Live Scanner X-Ray Calibration Overlay */
+.omr-xray-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 30;
+}
+
+@media print {
+  .omr-xray-overlay,
+  .no-print {
+    display: none !important;
+  }
+}
