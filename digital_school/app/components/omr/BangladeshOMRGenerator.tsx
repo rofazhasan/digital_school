@@ -151,6 +151,67 @@ export function BangladeshOMRGenerator({
     note: 'DOM-calibrated • 0px drift',
   });
 
+  // Class Roster & Pre-Filled Multi-Page MCQ Batch State
+  const [rosterText, setRosterText] = useState<string>('');
+  const [preBubbleRoster, setPreBubbleRoster] = useState<boolean>(true);
+  const [rosterPreviewIdx, setRosterPreviewIdx] = useState<number>(0);
+  const [rangeStartRoll, setRangeStartRoll] = useState<string>('261001');
+  const [rangeCount, setRangeCount] = useState<number>(10);
+
+  const parsedRoster = React.useMemo(() => {
+    const lines = rosterText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return lines.slice(0, 500).map((line, idx) => {
+      const parts = line.split(/[,\t|]+/).map((p) => p.trim());
+      return {
+        roll: (parts[0] || '').replace(/\D/g, ''),
+        name: parts[1] || '',
+        reg: (parts[2] || '').replace(/\D/g, ''),
+        set: parts[3] || '',
+        serial: incrementBoardSerial(serialNumber, idx),
+      };
+    });
+  }, [rosterText, serialNumber]);
+
+  const handleGenerateRollRange = () => {
+    const base = parseInt(rangeStartRoll.replace(/\D/g, '') || '261001', 10);
+    const padLen = Math.max(rollDigits, rangeStartRoll.replace(/\D/g, '').length);
+    const count = Math.max(1, Math.min(200, rangeCount || 10));
+    const lines: string[] = [];
+    for (let i = 0; i < count; i++) {
+      lines.push(String(base + i).padStart(padLen, '0'));
+    }
+    setRosterText(lines.join('\n'));
+    setRosterPreviewIdx(0);
+    setStatusMessage(`Generated ${count} pre-filled student sheets (${lines[0]} – ${lines[lines.length - 1]}).`);
+  };
+
+  const buildPreFilledMapForStudent = (student?: { roll?: string; reg?: string; set?: string }) => {
+    const map: Record<string, string> = { ...filledBubbles };
+    if (!student || !preBubbleRoster) return map;
+    if (student.roll) {
+      const padded = student.roll.padStart(rollDigits, '0').slice(-rollDigits);
+      for (let i = 0; i < rollDigits; i++) {
+        map[`roll${i + 1}`] = padded[i];
+      }
+    }
+    if (student.reg) {
+      const paddedReg = student.reg.padStart(regDigits, '0').slice(-regDigits);
+      for (let i = 0; i < regDigits; i++) {
+        map[`reg${i + 1}`] = paddedReg[i];
+      }
+    }
+    if (student.set) {
+      const sUp = student.set.toUpperCase();
+      const engToBn: Record<string, string> = { A: 'ক', B: 'খ', C: 'গ', D: 'ঘ' };
+      const bnToEng: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+      map['Set'] = setOptionsType === 'BANGLA' ? engToBn[sUp] || student.set : bnToEng[student.set] || sUp;
+    }
+    return map;
+  };
+
   // Apply predefined templates
   const handleSelectPreset = (preset: PresetType) => {
     setSelectedPreset(preset);
@@ -1479,8 +1540,78 @@ export function BangladeshOMRGenerator({
                 onChange={(e) => setBatchCopies(Math.max(1, parseInt(e.target.value) || 1))} 
                 className="input-field" 
               />
-              <span className="text-[10px] text-slate-400">প্রতিটি প্রিন্ট কপিতে স্বয়ংক্রিয়ভাবে পরবর্তী ধারাবাহিক সিরিয়াল নম্বর ও কিউআর কোড থাকবে।</span>
+              <span className="text-[10px] text-slate-400">MCQ ও CQ উভয় শিটেই প্রতিটি কপিতে ধারাবাহিক সিরিয়াল নম্বর ও ইউনিক QR কোড প্রিন্ট হবে।</span>
             </div>
+
+            {/* Pre-Filled Class Roster Generator (MCQ Batch) */}
+            {selectedPreset !== 'board_cq_3part' && (
+              <div className="field-group pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-indigo-300">
+                    👥 প্রি-ফিলড স্টুডেন্ট রোস্টার (Class Batch)
+                  </label>
+                  {parsedRoster.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRosterText('');
+                        setRosterPreviewIdx(0);
+                      }}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                    >
+                      মুছুন ({parsedRoster.length})
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Roll Range Generator */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={rangeStartRoll}
+                    onChange={(e) => setRangeStartRoll(e.target.value)}
+                    className="input-field font-mono text-xs flex-1"
+                    placeholder="শুরু রোল (261001)"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={rangeCount}
+                    onChange={(e) => setRangeCount(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))}
+                    className="input-field text-xs w-16"
+                    title="কতজন শিক্ষার্থী"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateRollRange}
+                    className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    তৈরি
+                  </button>
+                </div>
+
+                <textarea
+                  rows={3}
+                  value={rosterText}
+                  onChange={(e) => {
+                    setRosterText(e.target.value);
+                    setRosterPreviewIdx(0);
+                  }}
+                  placeholder={'রোল, নাম, রেজি, সেট (প্রতি লাইনে ১ জন)\n261001, রাফিউ হাসান, 2026140001, A\n261002, তানভীর আহমেদ, 2026140002, B'}
+                  className="input-field font-mono text-[11px] leading-snug"
+                />
+
+                <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={preBubbleRoster}
+                    onChange={(e) => setPreBubbleRoster(e.target.checked)}
+                  />
+                  <span>রোল, রেজি ও সেট বৃত্ত স্বয়ংক্রিয়ভাবে ভরাট করুন (Zero Roll-Error)</span>
+                </label>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1626,10 +1757,47 @@ export function BangladeshOMRGenerator({
                 </>
               )}
             </div>
-          ) : (
+          ) : (() => {
+            type McqBatchPage = {
+              key: string;
+              serial: string;
+              roll?: string;
+              reg?: string;
+              name?: string;
+              set?: string;
+            };
+            const mcqPages: McqBatchPage[] =
+              parsedRoster.length > 0
+                ? parsedRoster.map((st, idx) => ({
+                    key: `roster-${idx}-${st.roll}`,
+                    serial: st.serial,
+                    roll: st.roll,
+                    reg: st.reg,
+                    name: st.name,
+                    set: st.set,
+                  }))
+                : batchCopies > 1
+                ? Array.from({ length: batchCopies }, (_, idx) => ({
+                    key: `copy-${idx}`,
+                    serial: incrementBoardSerial(serialNumber, idx),
+                  }))
+                : [{ key: 'single', serial: serialNumber }];
+
+            const safePreviewIdx = Math.min(rosterPreviewIdx, Math.max(0, mcqPages.length - 1));
+            const previewPage = mcqPages[safePreviewIdx] || mcqPages[0];
+            const isMultiPageBatch = mcqPages.length > 1;
+
+            const renderMcqSheet = (pageCfg: McqBatchPage, isPrimaryPreview: boolean) => {
+              // Shadow filledBubbles for this sheet so pre-bubbled roster Roll/Reg/Set render identically everywhere
+              const filledBubbles = buildPreFilledMapForStudent(pageCfg);
+              const pageSerial = pageCfg.serial;
+              const pageSetName = pageCfg.set || setName || 'A';
+
+              return (
             <div 
-              className={`bd-omr-printable-sheet layout-${layoutMode}`} 
-              ref={printContainerRef}
+              key={pageCfg.key}
+              className={`bd-omr-printable-sheet layout-${layoutMode} ${!isPrimaryPreview ? 'omr-mcq-batch-page' : ''}`} 
+              ref={isPrimaryPreview ? printContainerRef : undefined}
               style={{
                 '--omr-theme': themeStyles.primary,
                 '--omr-theme-stripe': themeStyles.stripe,
@@ -1699,10 +1867,12 @@ export function BangladeshOMRGenerator({
                 <QRCodeSVG
                   value={JSON.stringify({
                     examId: examId || 'BOARD_EXAM',
-                    setId: setId || `SET_${setName || 'A'}`,
-                    setName: setName || 'A',
+                    setId: setId || `SET_${pageSetName}`,
+                    setName: pageSetName,
                     template: activeQrTemplateId || `board_${numQuestions}q`,
                     title: examTitleBangla || 'Board Exam',
+                    serial: pageSerial,
+                    ...(pageCfg.roll ? { rollNumber: pageCfg.roll } : {}),
                     v: 1
                   })}
                   size={52}
@@ -1710,7 +1880,7 @@ export function BangladeshOMRGenerator({
                   includeMargin={false}
                 />
                 <div style={{ fontSize: '7.5px', fontFamily: 'monospace', color: '#111', fontWeight: 'bold', marginTop: '1px' }}>
-                  {`SET-${setName || 'A'}`}
+                  {pageCfg.roll ? `R:${pageCfg.roll}` : `SET-${pageSetName}`}
                 </div>
               </div>
 
@@ -1734,12 +1904,17 @@ export function BangladeshOMRGenerator({
                 <div className="pen-instruction-banner">
                   অবশ্যই কালো বল-পয়েন্ট কলম দিয়ে বৃত্ত ভরাট করতে হবে
                 </div>
-                {showMetaStrip && (
+                {(showMetaStrip || pageCfg.name) && (
                   <div className="omr-meta-strip">
+                    {pageCfg.name && (
+                      <span className="omr-meta-strip-item"><strong>শিক্ষার্থী:</strong> {pageCfg.name}</span>
+                    )}
                     <span className="omr-meta-strip-item"><strong>বিষয়:</strong> {metaSubject || '..................'}</span>
                     <span className="omr-meta-strip-item"><strong>শ্রেণি:</strong> {metaClass || '............'}</span>
                     <span className="omr-meta-strip-item"><strong>পূর্ণমান:</strong> {metaFullMarks || '......'}</span>
-                    <span className="omr-meta-strip-item"><strong>সময়:</strong> {metaDuration || '..........'}</span>
+                    {!pageCfg.name && (
+                      <span className="omr-meta-strip-item"><strong>সময়:</strong> {metaDuration || '..........'}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -2017,7 +2192,7 @@ export function BangladeshOMRGenerator({
                         </div>
                         <div className="barcode-label">
                           <ShieldCheck size={11} style={{ display: 'inline', marginRight: 3 }} />
-                          <span>OMR SL NO: <strong>{serialNumber}</strong></span>
+                          <span>OMR SL NO: <strong>{pageSerial}</strong></span>
                         </div>
                       </div>
                     )}
@@ -2210,7 +2385,7 @@ export function BangladeshOMRGenerator({
                       {showBarcodeSecurity && (
                         <div className="admission-barcode-strip">
                           {renderBarcodeSvg()}
-                          <div className="barcode-serial-text">SL: {serialNumber}</div>
+                          <div className="barcode-serial-text">SL: {pageSerial}</div>
                         </div>
                       )}
                     </div>
@@ -2282,7 +2457,7 @@ export function BangladeshOMRGenerator({
             <div className="timing-marker-bottom-center"></div>
 
             {/* Live Non-Printable Scanner X-Ray Calibration Overlay */}
-            {showScannerXRay && (
+            {isPrimaryPreview && showScannerXRay && (
               <svg
                 className="omr-xray-overlay no-print"
                 viewBox="0 0 820 1160"
@@ -2341,7 +2516,58 @@ export function BangladeshOMRGenerator({
               </svg>
             )}
           </div>
-        )}
+              );
+            };
+
+            return (
+              <div className="w-full flex flex-col items-center">
+                {isMultiPageBatch && (
+                  <div className="no-print mb-3 w-full max-w-[820px] px-3.5 py-2 bg-indigo-950/85 border border-indigo-600/50 rounded-xl text-xs text-indigo-100 flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      📋 <strong>মাল্টি-পেজ ব্যাচ প্রিন্ট সক্রিয়:</strong> মোট <strong>{mcqPages.length}</strong> টি A4 শিট প্রিন্ট হবে
+                      {previewPage.roll ? ` • প্রিভিউ: রোল ${previewPage.roll}${previewPage.name ? ` (${previewPage.name})` : ''}` : ` • SL: ${previewPage.serial}`}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRosterPreviewIdx((i) => Math.max(0, i - 1))}
+                        disabled={safePreviewIdx <= 0}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold cursor-pointer"
+                      >
+                        ◀
+                      </button>
+                      <span className="font-mono font-bold text-[11px]">
+                        {safePreviewIdx + 1} / {mcqPages.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRosterPreviewIdx((i) => Math.min(mcqPages.length - 1, i + 1))}
+                        disabled={safePreviewIdx >= mcqPages.length - 1}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white font-bold cursor-pointer"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!isMultiPageBatch ? (
+                  renderMcqSheet(previewPage, true)
+                ) : (
+                  <>
+                    {/* Screen Preview */}
+                    <div className="no-print flex justify-center w-full">
+                      {renderMcqSheet(previewPage, true)}
+                    </div>
+                    {/* Full Multi-Page Batch for Print / PDF */}
+                    <div className="print-only w-full">
+                      {mcqPages.map((pg) => renderMcqSheet(pg, false))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           </div>
         </div>
       </div>

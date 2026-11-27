@@ -2081,4 +2081,14 @@
   .no-print {
     display: none !important;
   }
+  .omr-mcq-batch-page {
+    break-after: page;
+    page-break-after: always;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+  }
+  .omr-mcq-batch-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }

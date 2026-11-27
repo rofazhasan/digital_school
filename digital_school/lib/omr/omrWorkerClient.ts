@@ -1,51 +1,75 @@
 /**
- * Off-Main-Thread Web Worker Client for High-Volume OMR Batch Ingestion
+ * Multi-Worker Pool Client for High-Volume OMR Batch Ingestion
  *
- * Offloads multi-angle QR code decoding onto `/workers/omr-qr-worker.js` using
- * zero-copy Transferable ArrayBuffers (keeping UI smooth at 60 FPS), with seamless
- * fallback to main-thread `scanQRCodeFromCanvas` if Workers are unavailable.
+ * Maintains a pool of up to 4 Web Workers (`/workers/omr-qr-worker.js`) using
+ * zero-copy Transferable ArrayBuffers so QR decoding across large batches runs
+ * in parallel off the main thread, with automatic fallback to `scanQRCodeFromCanvas`.
  */
 
 import type { QRCodeScanResult } from './types';
 import { scanQRCodeFromCanvas } from './omrEngine';
 
-let workerInstance: Worker | null = null;
+let workerPool: Worker[] = [];
+let poolInitialized = false;
 let workerDisabled = false;
+let roundRobinIdx = 0;
 let nextMsgId = 1;
 const pending = new Map<number, { resolve: (r: QRCodeScanResult) => void; timer: ReturnType<typeof setTimeout> }>();
 
-function getQrWorker(): Worker | null {
+function getWorkerFromPool(): Worker | null {
   if (workerDisabled || typeof window === 'undefined' || typeof Worker === 'undefined') {
     return null;
   }
-  if (workerInstance) return workerInstance;
 
-  try {
-    const w = new Worker('/workers/omr-qr-worker.js');
-    w.onmessage = (e: MessageEvent) => {
-      const { id, result } = e.data || {};
-      const entry = pending.get(id);
-      if (entry) {
-        clearTimeout(entry.timer);
-        pending.delete(id);
-        entry.resolve(result || { found: false, rawText: null });
+  if (!poolInitialized) {
+    poolInitialized = true;
+    const hw = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2;
+    const poolSize = Math.max(2, Math.min(4, hw));
+    try {
+      for (let i = 0; i < poolSize; i++) {
+        const w = new Worker('/workers/omr-qr-worker.js');
+        w.onmessage = (e: MessageEvent) => {
+          const { id, result } = e.data || {};
+          const entry = pending.get(id);
+          if (entry) {
+            clearTimeout(entry.timer);
+            pending.delete(id);
+            entry.resolve(result || { found: false, rawText: null });
+          }
+        };
+        w.onerror = () => {
+          workerDisabled = true;
+          workerPool.forEach((wk) => {
+            try {
+              wk.terminate();
+            } catch {
+              // ignore
+            }
+          });
+          workerPool = [];
+          pending.forEach((entry) => {
+            clearTimeout(entry.timer);
+            entry.resolve({ found: false, rawText: null });
+          });
+          pending.clear();
+        };
+        workerPool.push(w);
       }
-    };
-    w.onerror = () => {
+    } catch {
       workerDisabled = true;
-      workerInstance = null;
-      pending.forEach((entry) => {
-        clearTimeout(entry.timer);
-        entry.resolve({ found: false, rawText: null });
-      });
-      pending.clear();
-    };
-    workerInstance = w;
-    return w;
-  } catch {
-    workerDisabled = true;
-    return null;
+      workerPool = [];
+      return null;
+    }
   }
+
+  if (workerPool.length === 0) return null;
+  const w = workerPool[roundRobinIdx % workerPool.length];
+  roundRobinIdx = (roundRobinIdx + 1) % workerPool.length;
+  return w;
+}
+
+export function getOmrWorkerPoolSize(): number {
+  return workerPool.length;
 }
 
 export async function scanQRCodeOffThread(canvas: HTMLCanvasElement): Promise<QRCodeScanResult> {
@@ -53,7 +77,7 @@ export async function scanQRCodeOffThread(canvas: HTMLCanvasElement): Promise<QR
     return { found: false, rawText: null };
   }
 
-  const worker = getQrWorker();
+  const worker = getWorkerFromPool();
   if (!worker || typeof document === 'undefined') {
     return scanQRCodeFromCanvas(canvas);
   }
@@ -73,6 +97,9 @@ export async function scanQRCodeOffThread(canvas: HTMLCanvasElement): Promise<QR
     ctx.drawImage(canvas, 0, 0, w, h);
     const imgData = ctx.getImageData(0, 0, w, h);
     const copyBuffer = imgData.data.buffer.slice(0);
+    // Free scratch canvas immediately
+    ds.width = 0;
+    ds.height = 0;
 
     const id = nextMsgId++;
     const workerRes = await new Promise<QRCodeScanResult>((resolve) => {
@@ -88,5 +115,35 @@ export async function scanQRCodeOffThread(canvas: HTMLCanvasElement): Promise<QR
     return { found: false, rawText: null };
   } catch {
     return scanQRCodeFromCanvas(canvas);
+  }
+}
+
+/**
+ * Generates a lightweight compressed JPEG thumbnail for HITL QC preview
+ * so scanning 200+ sheets never exhausts browser memory.
+ */
+export function createCompressedPreviewUrl(
+  canvas: HTMLCanvasElement,
+  maxWidth = 960,
+  quality = 0.68
+): string {
+  try {
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return '';
+    if (canvas.width <= maxWidth) {
+      return canvas.toDataURL('image/jpeg', quality);
+    }
+    const scale = maxWidth / canvas.width;
+    const thumb = document.createElement('canvas');
+    thumb.width = Math.round(canvas.width * scale);
+    thumb.height = Math.round(canvas.height * scale);
+    const ctx = thumb.getContext('2d');
+    if (!ctx) return canvas.toDataURL('image/jpeg', quality);
+    ctx.drawImage(canvas, 0, 0, thumb.width, thumb.height);
+    const dataUrl = thumb.toDataURL('image/jpeg', quality);
+    thumb.width = 0;
+    thumb.height = 0;
+    return dataUrl;
+  } catch {
+    return '';
   }
 }

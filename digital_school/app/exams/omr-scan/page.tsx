@@ -26,6 +26,9 @@ import {
   Trash2,
   Edit3,
   Database,
+  Trophy,
+  KeyRound,
+  Smartphone,
 } from 'lucide-react';
 
 import type {
@@ -52,6 +55,9 @@ import {
   DuplicateSuppressor,
 } from '@/lib/omr/streamAutoScanner';
 import { StudentOMRReportCardModal } from '@/app/components/omr/StudentOMRReportCardModal';
+import { MeritListModal } from '@/app/components/omr/MeritListModal';
+import { streamPdfPages } from '@/lib/omr/pdfLoader';
+import { isNativeCapacitorRuntime, captureWithNativeDocumentScanner } from '@/lib/omr/nativeScanner';
 
 interface ExamMetadata {
   id: string;
@@ -93,6 +99,20 @@ export default function UniversalOMRScannerPage() {
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [scanResults, setScanResults] = useState<Record<string, ScanProcessingResult>>({});
+  const [showMeritListModal, setShowMeritListModal] = useState<boolean>(false);
+  const [isNativeApp, setIsNativeApp] = useState<boolean>(false);
+  const [scannedMasterKeys, setScannedMasterKeys] = useState<Record<string, Record<string, string>>>({});
+  const [masterKeySetTarget, setMasterKeySetTarget] = useState<'A' | 'B' | 'C' | 'D'>('A');
+
+  useEffect(() => {
+    setIsNativeApp(isNativeCapacitorRuntime());
+    try {
+      const saved = localStorage.getItem('omr_scanned_master_keys_v1');
+      if (saved) setScannedMasterKeys(JSON.parse(saved));
+    } catch {
+      // ignore
+    }
+  }, []);
   const [previewImages, setPreviewImages] = useState<Record<string, string>>({});
   const [correctionLogs, setCorrectionLogs] = useState<Record<string, AuditLogEntry[]>>({});
   const [scoreCards, setScoreCards] = useState<StudentScoreCard[]>([]);
@@ -430,7 +450,7 @@ export default function UniversalOMRScannerPage() {
     const targetExamId = qrExamId || selectedExamId;
     const examInfo = await getExamData(targetExamId);
 
-    const evalConfig: EvaluationConfig = examInfo?.config || {
+    const baseConfig: EvaluationConfig = examInfo?.config || {
       examName: 'General OMR Exam',
       examCode: targetExamId || 'EXAM',
       totalMarks: 100,
@@ -442,6 +462,30 @@ export default function UniversalOMRScannerPage() {
       markingSchemes: {
         default: { correct: 1.0, incorrect: -0.25, unmarked: 0, bonus: 1.0 },
       },
+    };
+
+    // Merge teacher-scanned Master Key sheets (takes precedence if DB key is empty or overridden)
+    const hasMasterKeys = Object.keys(scannedMasterKeys).length > 0;
+    const mergedMultiSet: Record<string, Record<string, string | string[]>> = {
+      ...(baseConfig.multiSetAnswerKeys || {}),
+    };
+    if (hasMasterKeys) {
+      Object.entries(scannedMasterKeys).forEach(([setCode, keyMap]) => {
+        mergedMultiSet[setCode] = { ...(mergedMultiSet[setCode] || {}), ...keyMap };
+      });
+    }
+    const primaryFallbackKey =
+      Object.keys(baseConfig.answerKey || {}).length > 0
+        ? baseConfig.answerKey
+        : scannedMasterKeys['A'] || Object.values(scannedMasterKeys)[0] || {};
+
+    const evalConfig: EvaluationConfig = {
+      ...baseConfig,
+      answerKey: primaryFallbackKey,
+      multiSetAnswerKeys: mergedMultiSet,
+      totalMarks:
+        baseConfig.totalMarks ||
+        Math.max(Object.keys(primaryFallbackKey).length, 100),
     };
 
     const tempOverlay = document.createElement('canvas');
@@ -504,58 +548,21 @@ export default function UniversalOMRScannerPage() {
       }
     }
 
-    const itemsToProcess: { canvas: HTMLCanvasElement; name: string }[] = [];
-
-    try {
-      for (const file of files) {
-        if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
-          const { renderPdfToCanvases } = await import('@/lib/omr/pdfLoader');
-          const pdfPages = await renderPdfToCanvases(file, { dpi: 200 });
-          pdfPages.forEach((p, idx) => {
-            itemsToProcess.push({
-              canvas: p.canvas,
-              name: `${file.name.replace(/\.[^/.]+$/, '')}_p${p.pageNumber || idx + 1}`,
-            });
-          });
-        } else if (file.type.startsWith('image/')) {
-          const img = await loadImageFromFile(file);
-          const c = document.createElement('canvas');
-          c.width = img.width;
-          c.height = img.height;
-          const ctx = c.getContext('2d');
-          if (ctx) ctx.drawImage(img, 0, 0);
-          itemsToProcess.push({ canvas: c, name: file.name });
-        }
-      }
-    } catch (err: any) {
-      setStatusMessage('ফাইল প্রসেসিং ত্রুটি: ' + err.message);
-      setIsProcessing(false);
-      return;
-    }
-
-    if (itemsToProcess.length === 0) {
-      setIsProcessing(false);
-      setStatusMessage('কোনো বৈধ OMR ইমেজ বা পিডিএফ পাওয়া যায়নি।');
-      return;
-    }
-
-    setProgress({ current: 0, total: itemsToProcess.length });
-    setStatusMessage(`${itemsToProcess.length} টি OMR শিট স্ক্যান ও মূল্যায়ন করা হচ্ছে...`);
-
     const newScanResults = { ...scanResults };
     const newPreviews = { ...previewImages };
     const newScoreCards: StudentScoreCard[] = [...scoreCards];
 
     let successCount = 0;
     let failCount = 0;
+    let processedSoFar = 0;
+    let estimatedTotal = files.length;
 
-    for (let i = 0; i < itemsToProcess.length; i++) {
-      const item = itemsToProcess[i];
-      setProgress({ current: i + 1, total: itemsToProcess.length });
-      await new Promise((r) => setTimeout(r, 8));
-
+    const processSingleCanvasItem = async (canvas: HTMLCanvasElement, name: string) => {
+      processedSoFar++;
+      setProgress({ current: processedSoFar, total: Math.max(estimatedTotal, processedSoFar) });
+      await new Promise((r) => setTimeout(r, 6));
       try {
-        const res = await ingestSingleSheetCanvas(item.canvas, item.name);
+        const res = await ingestSingleSheetCanvas(canvas, name);
         if (res) {
           const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = res.scanRes;
           newScanResults[res.scanRes.sheetId] = leanScanRes as ScanProcessingResult;
@@ -576,12 +583,44 @@ export default function UniversalOMRScannerPage() {
           });
         }
       } catch (err) {
-        console.error(`Error scanning ${item.name}:`, err);
+        console.error(`Error scanning ${name}:`, err);
         failCount++;
       } finally {
-        item.canvas.width = 0;
-        item.canvas.height = 0;
+        canvas.width = 0;
+        canvas.height = 0;
       }
+    };
+
+    try {
+      for (const file of files) {
+        if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+          setStatusMessage(`PDF স্ট্রিমিং স্ক্যান চলছে: ${file.name}...`);
+          await streamPdfPages(file, { dpi: 185 }, async (page, idx, total) => {
+            if (idx === 0) estimatedTotal = estimatedTotal - 1 + total;
+            const pageName = `${file.name.replace(/\.[^/.]+$/, '')}_p${page.pageNumber}`;
+            await processSingleCanvasItem(page.canvas, pageName);
+          });
+        } else if (file.type.startsWith('image/')) {
+          setStatusMessage(`ইমেজ স্ক্যান চলছে: ${file.name}...`);
+          const img = await loadImageFromFile(file);
+          const c = document.createElement('canvas');
+          c.width = img.width;
+          c.height = img.height;
+          const ctx = c.getContext('2d');
+          if (ctx) ctx.drawImage(img, 0, 0);
+          await processSingleCanvasItem(c, file.name);
+        }
+      }
+    } catch (err: any) {
+      setStatusMessage('ফাইল প্রসেসিং ত্রুটি: ' + err.message);
+      setIsProcessing(false);
+      return;
+    }
+
+    if (processedSoFar === 0) {
+      setIsProcessing(false);
+      setStatusMessage('কোনো বৈধ OMR ইমেজ বা পিডিএফ পাওয়া যায়নি।');
+      return;
     }
 
     const ranked = EvaluationEngine.rankCohort(newScoreCards);
@@ -593,6 +632,145 @@ export default function UniversalOMRScannerPage() {
     setStatusMessage(`ব্যাচ স্ক্যান সম্পন্ন: ${successCount} টি সফল${failCount > 0 ? `, ${failCount} টি ত্রুটি` : ''}!`);
     setActiveTab('results');
     e.target.value = '';
+  };
+
+  // Scan Teacher's Filled Master Answer Key Sheet (No Manual Typing Needed!)
+  const handleMasterKeyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessing(true);
+    setStatusMessage(`মাস্টার অ্যান্সার কী (Set ${masterKeySetTarget}) স্ক্যান করা হচ্ছে...`);
+    try {
+      if (!isOpenCVLoaded()) await loadOpenCV();
+      let canvas: HTMLCanvasElement;
+      if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+        let firstCanvas: HTMLCanvasElement | null = null;
+        await streamPdfPages(file, { dpi: 185, pages: [1] }, async (p) => {
+          const clone = document.createElement('canvas');
+          clone.width = p.canvas.width;
+          clone.height = p.canvas.height;
+          clone.getContext('2d')?.drawImage(p.canvas, 0, 0);
+          firstCanvas = clone;
+        });
+        if (!firstCanvas) throw new Error('পিডিএফ থেকে প্রথম পেজ পাওয়া যায়নি।');
+        canvas = firstCanvas;
+      } else {
+        const img = await loadImageFromFile(file);
+        canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d')?.drawImage(img, 0, 0);
+      }
+
+      const qr = await scanQRCodeOffThread(canvas);
+      let effectiveTemplate = activeTemplate;
+      let effectiveBubbles = parsedBubbles;
+      if (qr.found && qr.parsedPayload?.template) {
+        const resolved = resolveTemplateByIdOrQR(qr.parsedPayload.template);
+        if (resolved) {
+          effectiveTemplate = resolved.template;
+          effectiveBubbles = parseTemplate(resolved.template).bubbles;
+        }
+      }
+
+      const scanRes = await processOMR(canvas, effectiveTemplate, effectiveBubbles, null, file.name, {
+        generateCanvases: false,
+        preScannedQR: qr,
+      });
+      canvas.width = 0;
+      canvas.height = 0;
+
+      const banglaToEng: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D', 'ঙ': 'E' };
+      const detectedSetRaw = scanRes.responses['Set']?.[0] || masterKeySetTarget;
+      const resolvedSet = banglaToEng[detectedSetRaw] || detectedSetRaw.toUpperCase() || masterKeySetTarget;
+
+      const extractedKey: Record<string, string> = {};
+      Object.entries(scanRes.responses).forEach(([k, vals]) => {
+        if (/^q\d+$/i.test(k) && vals && vals.length > 0) {
+          const v = vals[0];
+          extractedKey[k.toLowerCase()] = banglaToEng[v] || v.toUpperCase();
+        }
+      });
+
+      const qCount = Object.keys(extractedKey).length;
+      if (qCount === 0) {
+        throw new Error('মাস্টার কী শিটে কোনো ভরাট প্রশ্ন পাওয়া যায়নি।');
+      }
+
+      const updated = { ...scannedMasterKeys, [resolvedSet]: extractedKey };
+      setScannedMasterKeys(updated);
+      try {
+        localStorage.setItem('omr_scanned_master_keys_v1', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      setStatusMessage(`সফল! Set ${resolvedSet} এর ${qCount} টি প্রশ্নের মাস্টার অ্যান্সার কী লোড হয়েছে।`);
+    } catch (err: any) {
+      setStatusMessage('মাস্টার কী স্ক্যান ত্রুটি: ' + err.message);
+    } finally {
+      setIsProcessing(false);
+      e.target.value = '';
+    }
+  };
+
+  // Native Android/iOS Capacitor Document Scanner Capture
+  const handleNativeDocumentScan = async () => {
+    setIsProcessing(true);
+    setStatusMessage('নেটিভ ডকুমেন্ট স্ক্যানার চালু হচ্ছে...');
+    try {
+      if (!isOpenCVLoaded()) await loadOpenCV();
+      const captures = await captureWithNativeDocumentScanner(30);
+      if (captures.length === 0) {
+        setIsProcessing(false);
+        return;
+      }
+
+      const newScanResults = { ...scanResults };
+      const newPreviews = { ...previewImages };
+      const newScoreCards: StudentScoreCard[] = [...scoreCards];
+      let ok = 0;
+
+      for (let i = 0; i < captures.length; i++) {
+        setProgress({ current: i + 1, total: captures.length });
+        const item = captures[i];
+        try {
+          const res = await ingestSingleSheetCanvas(item.canvas, item.name);
+          if (res) {
+            const { warpedImageCanvas, enhancedImageCanvas, ...leanScanRes } = res.scanRes;
+            newScanResults[res.scanRes.sheetId] = leanScanRes as ScanProcessingResult;
+            if (res.previewUrl) newPreviews[res.scanRes.sheetId] = res.previewUrl;
+            newScoreCards.push(res.card);
+            ok++;
+            await OmrOfflineStore.saveItem({
+              sheetId: res.scanRes.sheetId,
+              examId: (res.card as any).examId || selectedExamId,
+              presetId: res.resolvedPresetId,
+              timestamp: Date.now(),
+              synced: false,
+              previewDataUrl: res.previewUrl,
+              scanResult: leanScanRes,
+              scoreCard: res.card,
+              corrections: [],
+            });
+          }
+        } finally {
+          item.canvas.width = 0;
+          item.canvas.height = 0;
+        }
+      }
+
+      const ranked = EvaluationEngine.rankCohort(newScoreCards);
+      setScanResults(newScanResults);
+      setPreviewImages(newPreviews);
+      setScoreCards(ranked);
+      if (ranked.length > 0 && !selectedScoreCard) setSelectedScoreCard(ranked[0]);
+      setStatusMessage(`নেটিভ স্ক্যান সম্পন্ন: ${ok} টি শিট মূল্যায়ন হয়েছে!`);
+      setActiveTab('results');
+    } catch (err: any) {
+      setStatusMessage('নেটিভ স্ক্যান ত্রুটি: ' + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Camera Controls
@@ -1244,6 +1422,16 @@ export default function UniversalOMRScannerPage() {
             <>
               <button
                 type="button"
+                onClick={() => setShowMeritListModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-lg text-xs font-bold border border-amber-500/40 transition cursor-pointer"
+                title="অফিসিয়াল মেধা তালিকা প্রিন্ট ও Styled Excel (.xlsx) এক্সপোর্ট"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">মেধা তালিকা / Excel</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleDownloadCSV}
                 className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition cursor-pointer"
                 title="Excel CSV এক্সপোর্ট করুন"
@@ -1439,18 +1627,100 @@ export default function UniversalOMRScannerPage() {
                 কিউআর কোড থাকলে স্বয়ংক্রিয়ভাবে পরীক্ষা, সেট এবং কাস্টম টেমপ্লেট সনাক্ত হবে। প্রতিটি স্ক্যান স্বয়ংক্রিয়ভাবে অফলাইন মেমোরিতে সংরক্ষিত থাকে — রিফ্রেশ হলেও কোনো ডেটা হারাবে না।
               </p>
 
-              <label className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>ফাইল সিলেক্ট করুন</span>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,application/pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={isProcessing}
-                />
-              </label>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <label className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  <span>ফাইল সিলেক্ট করুন (JPG/PNG/PDF)</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={isProcessing}
+                  />
+                </label>
+
+                {isNativeApp && (
+                  <button
+                    type="button"
+                    onClick={handleNativeDocumentScan}
+                    disabled={isProcessing}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/30 transition cursor-pointer"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>Android ডকুমেন্ট স্ক্যানার</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Teacher Master Answer Key Sheet Scanner Strip */}
+              <div className="mt-6 w-full max-w-2xl p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/15 text-amber-400">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-200">
+                      মাস্টার অ্যান্সার কী শিট স্ক্যান (No Typing Needed)
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {Object.keys(scannedMasterKeys).length > 0 ? (
+                        <span className="text-emerald-400 font-semibold">
+                          সক্রিয় কী:{' '}
+                          {Object.entries(scannedMasterKeys)
+                            .map(([s, m]) => `Set ${s} (${Object.keys(m).length}Q)`)
+                            .join(' • ')}
+                        </span>
+                      ) : (
+                        'শিক্ষকের ভরাট করা ১টি মাস্টার OMR শিট স্ক্যান করেই সম্পূর্ণ ব্যাচ মূল্যায়ন করুন'
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={masterKeySetTarget}
+                    onChange={(e) => setMasterKeySetTarget(e.target.value as any)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-200"
+                    title="টার্গেট সেট কোড"
+                  >
+                    <option value="A">Set A</option>
+                    <option value="B">Set B</option>
+                    <option value="C">Set C</option>
+                    <option value="D">Set D</option>
+                  </select>
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-bold transition cursor-pointer">
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>কী শিট স্ক্যান</span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={handleMasterKeyUpload}
+                      className="hidden"
+                      disabled={isProcessing}
+                    />
+                  </label>
+                  {Object.keys(scannedMasterKeys).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScannedMasterKeys({});
+                        try {
+                          localStorage.removeItem('omr_scanned_master_keys_v1');
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 text-xs font-semibold cursor-pointer"
+                      title="মাস্টার কী মুছুন"
+                    >
+                      মুছুন
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {isProcessing && (
                 <div className="mt-6 w-full max-w-md space-y-2">
@@ -2144,6 +2414,16 @@ export default function UniversalOMRScannerPage() {
           onClose={() => setPrintingCard(null)}
         />
       )}
+
+      {/* Printable Official Class Merit List & Styled Excel Export Modal */}
+      <MeritListModal
+        open={showMeritListModal}
+        onClose={() => setShowMeritListModal(false)}
+        scoreCards={scoreCards}
+        examTitle={
+          examsList.find((e) => e.id === selectedExamId)?.name || 'অফিসিয়াল OMR পরীক্ষা'
+        }
+      />
     </div>
   );
 }

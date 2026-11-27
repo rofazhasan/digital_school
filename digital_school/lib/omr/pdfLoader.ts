@@ -117,3 +117,88 @@ export async function renderPdfToCanvases(
   return results;
 }
 
+/**
+ * Memory-safe streaming PDF renderer for 100–1,000+ page ADF OMR stacks.
+ * Renders one page at a time, invokes `onPage`, and immediately releases the canvas
+ * and PDF.js page resources so browser RAM stays flat.
+ */
+export async function streamPdfPages(
+  fileOrBuffer: File | ArrayBuffer | Uint8Array,
+  options: PdfRenderOptions = {},
+  onPage: (page: RenderedPdfPage, index: number, total: number) => Promise<void> | void
+): Promise<number> {
+  const pdfjsLib = await getPdfJs();
+  const dpi = options.dpi || 180;
+  const scale = dpi / 72.0;
+
+  let data: ArrayBuffer | Uint8Array;
+  if (fileOrBuffer instanceof File) {
+    data = await fileOrBuffer.arrayBuffer();
+  } else {
+    data = fileOrBuffer;
+  }
+
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(data) });
+  const pdfDoc = await loadingTask.promise;
+  const totalPages = pdfDoc.numPages;
+
+  const targetPages: number[] = [];
+  if (options.pages && options.pages.length > 0) {
+    targetPages.push(...options.pages.filter((p) => p >= 1 && p <= totalPages));
+  } else if (options.oddPagesOnly) {
+    for (let p = 1; p <= totalPages; p += 2) targetPages.push(p);
+  } else {
+    for (let p = 1; p <= totalPages; p++) targetPages.push(p);
+  }
+
+  for (let i = 0; i < targetPages.length; i++) {
+    const pageNum = targetPages[i];
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      throw new Error(`Failed to acquire 2D canvas context for page ${pageNum}`);
+    }
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    try {
+      await onPage(
+        {
+          pageNumber: pageNum,
+          canvas,
+          width: canvas.width,
+          height: canvas.height,
+        },
+        i,
+        targetPages.length
+      );
+    } finally {
+      // Immediately reclaim GPU/CPU canvas memory & PDF.js page caches
+      canvas.width = 0;
+      canvas.height = 0;
+      if (typeof page.cleanup === 'function') {
+        try {
+          page.cleanup();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  if (typeof pdfDoc.destroy === 'function') {
+    try {
+      await pdfDoc.destroy();
+    } catch {
+      // ignore
+    }
+  }
+
+  return targetPages.length;
+}
+
