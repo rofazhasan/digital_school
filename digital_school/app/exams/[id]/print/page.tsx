@@ -13,10 +13,12 @@ import { Sparkles } from 'lucide-react';
 import QuestionPaper from '../../../components/QuestionPaper';
 import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper';
 import OMRSheet from '../../../components/OMRSheet';
+import { BangladeshBoardCQ3PartSheet } from '@/app/components/omr/BangladeshBoardCQ3PartSheet';
 import { A3MasterExamPaper } from '@/app/components/A3MasterExamPaper';
 import { estimateSqVisualUnits } from '@/utils/engineeringAnswerBox';
 
 import "./print.css";
+import "@/app/components/omr/omr.css";
 
 // --- Constants & Configuration ---
 const LANGS = {
@@ -984,7 +986,7 @@ export default function PrintExamPage() {
                 printFormat === 'a3_master'
                   ? '0mm'
                   : printFormat === 'omr_only'
-                    ? '4mm'
+                    ? '0mm'
                     : isBooklet
                       ? (paperSize === 'a3' ? '8mm' : '5mm')
                       : (paperSize === 'a3' ? '12mm' : paperSize === 'legal' ? '12mm' : '8mm')
@@ -1801,36 +1803,85 @@ const OMRPage = ({
     return maxOptions > 4 ? 5 : 4;
   }, [set.mcq]);
 
+  const hasWrittenQuestions = useMemo(() => {
+    const cqLen = Array.isArray(set?.cq) ? set.cq.length : 0;
+    const sqLen = Array.isArray(set?.sq) ? set.sq.length : 0;
+    const descLen = Array.isArray(set?.descriptive) ? set.descriptive.length : 0;
+    return cqLen + sqLen + descLen > 0;
+  }, [set]);
+
+  const instituteDisplay = !hideInstitute
+    ? customSchoolName || examInfo.schoolName || 'ROFAZ ACADEMY'
+    : '';
+
   return (
-    <div className={`print-page-container ${paperClass} omr-sheet-wrapper`} style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-      <OMRSheet
-        questions={set}
-        qrData={set.qrData || {
-          v: 1,
-          examId: examInfo.id || '',
-          setId: set.setId || set.setName || 'A',
-          setName: set.setName || 'A',
-          template: 'standard_100q',
-          title: examInfo.title || ''
+    <>
+      {/* 1. High-Contrast Monochrome (B&W) Board-Style MCQ OMR Sheet (1 Single Borderless A4 Page) */}
+      <div
+        className={`print-page-container ${paperClass} omr-sheet-wrapper`}
+        style={{
+          padding: 0,
+          margin: 0,
+          border: 'none',
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+          pageBreakAfter: 'always',
+          breakAfter: 'page',
         }}
-        rollDigits={6}
-        fontFamily={language === 'bn' ? "'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif" : "'ExamFont', Times New Roman, serif"}
-        mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
-        mcqOptionsCount={mcqOptionsCount}
-        setName={set.setName}
-        bubbleSize={18}
-        logoUrl={examInfo.schoolLogo}
-        instituteName={!hideInstitute ? (customSchoolName || examInfo.schoolName || 'ROFAZ ACADEMY') : ''}
-        schoolAddress={!hideInstitute ? (customSchoolAddress || examInfo.schoolAddress || '') : ''}
-        examTitle={examInfo.title}
-        examDate={examInfo.date}
-        subjectName={examInfo.subject}
-        uniqueCode={uniqueCode}
-        objectiveTime={examInfo.objectiveTime}
-        cqSqTime={examInfo.cqSqTime}
-        hideInstitute={hideInstitute}
-      />
-    </div>
+      >
+        <OMRSheet
+          questions={set}
+          qrData={{
+            ...(typeof set.qrData === 'object' ? set.qrData : {}),
+            v: 1,
+            examId: examInfo.id || '',
+            setId: set.setId || set.setName || 'A',
+            setName: set.setName || 'A',
+            title: examInfo.title || '',
+          }}
+          rollDigits={6}
+          regDigits={10}
+          fontFamily={language === 'bn' ? "'NikoshBAN', 'Hind Siliguri', 'SolaimanLipi', 'Noto Serif Bengali', serif" : "'ExamFont', Times New Roman, serif"}
+          mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
+          mcqOptionsCount={mcqOptionsCount}
+          setName={set.setName}
+          bubbleSize={18}
+          logoUrl={examInfo.schoolLogo}
+          instituteName={instituteDisplay}
+          schoolAddress={!hideInstitute ? (customSchoolAddress || examInfo.schoolAddress || '') : ''}
+          examTitle={examInfo.title}
+          examDate={examInfo.date}
+          subjectName={examInfo.subject}
+          uniqueCode={uniqueCode}
+          objectiveTime={examInfo.objectiveTime}
+          cqSqTime={examInfo.cqSqTime}
+          hideInstitute={hideInstitute}
+        />
+      </div>
+
+      {/* 2. Matching High-Contrast B&W CQ/SQ Top Cover Sheet (Auto-generated when exam includes CQ/SQ) */}
+      {hasWrittenQuestions && (
+        <div
+          className={`print-page-container ${paperClass} omr-sheet-wrapper`}
+          style={{
+            padding: 0,
+            margin: 0,
+            border: 'none',
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+            pageBreakAfter: 'always',
+            breakAfter: 'page',
+          }}
+        >
+          <BangladeshBoardCQ3PartSheet
+            examId={examInfo.id || 'BOARD_CQ_EXAM'}
+            instituteName={instituteDisplay || 'শিক্ষা প্রতিষ্ঠান'}
+            examTitle={examInfo.title || 'সৃজনশীল (CQ/SQ) উত্তরপত্র'}
+            themeColor="black"
+          />
+        </div>
+      )}
+    </>
   );
 };
 

@@ -125,11 +125,30 @@ export function BangladeshBoardCQ3PartSheet({
         '--cq-border': themePalette.border,
       } as React.CSSProperties}
     >
-      {/* 4 Optical Registration Crosshair Markers (⊕) */}
-      <div className="cq-crosshair top-left">⊕</div>
-      <div className="cq-crosshair top-right">⊕</div>
-      <div className="cq-crosshair bottom-left">⊕</div>
-      <div className="cq-crosshair bottom-right">⊕</div>
+      {/* 4 High-Contrast Solid Pro Concentric Bullseye Fiducials (Optimal for Phone & Flatbed Scan) */}
+      {[
+        { pos: 'top-left', id: 'TL' },
+        { pos: 'top-right', id: 'TR' },
+        { pos: 'bottom-left', id: 'BL' },
+        { pos: 'bottom-right', id: 'BR' },
+      ].map((m) => (
+        <div key={m.id} className={`cq-crosshair ${m.pos}`} data-omr-fiducial={m.id}>
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              border: '3px solid #000000',
+              background: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ width: 10, height: 10, background: '#000000' }} />
+          </div>
+        </div>
+      ))}
 
       {/* Lateral Continuous Timing Tracks (Left & Right) */}
       <div className="cq-side-timing left">
@@ -175,6 +194,9 @@ export function BangladeshBoardCQ3PartSheet({
               <QRCodeSVG
                 value={JSON.stringify({
                   part: 'P1_STUDENT',
+                  sheetType: 'CQ_COVER',
+                  template: 'bangladesh_board_cq_top_sheet',
+                  examId: examId,
                   sn: effectiveSerial,
                   ex: examId,
                   b: instituteName,
@@ -182,7 +204,7 @@ export function BangladeshBoardCQ3PartSheet({
                   yr: yearDigits.join(''),
                   v: 1
                 })}
-                size={36}
+                size={38}
                 level="M"
                 includeMargin={false}
               />

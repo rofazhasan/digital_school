@@ -1,18 +1,47 @@
-// Legal Paper OMR Layout (Top-Down)
-// Legal Paper OMR Layout (Top-Down)
-// - Full Width Question Grid
-// - Horizontal Student Info Band
-// - Optimized for Legal/A4 Vertical Space
+"use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import QRCode from "react-qr-code";
 import { toBengaliNumerals, formatBengaliDuration } from "@/utils/numeralConverter";
+import type { FieldBlock, Template } from "@/lib/omr/types";
+import { saveCalibratedTemplateLocal } from "@/lib/omr/presetTemplates";
 
-function FiducialMarker({ id, size = 40, className = "" }: { id?: number; size?: number; className?: string }) {
+/**
+ * High-Contrast Solid Pro Concentric Bullseye Fiducial
+ * Optimal for smartphone camera AR lock, perspective warp, and heavy-noise/shadow scans.
+ */
+function SolidProFiducial({
+  id,
+  className = "",
+}: {
+  id: "TL" | "TR" | "BL" | "BR";
+  className?: string;
+}) {
   return (
-    <div className={`flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
-      <div className="w-full h-full bg-black flex items-center justify-center">
-        <div className="w-1/2 h-1/2 bg-white" />
+    <div
+      data-omr-fiducial={id}
+      className={`absolute z-20 flex items-center justify-center ${className}`}
+      style={{ width: 24, height: 24 }}
+    >
+      <div
+        style={{
+          width: 24,
+          height: 24,
+          border: "3px solid #000000",
+          background: "#ffffff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            width: 11,
+            height: 11,
+            background: "#000000",
+          }}
+        />
       </div>
     </div>
   );
@@ -30,6 +59,7 @@ interface OMRSheetProps {
   };
   qrData: any;
   rollDigits?: number;
+  regDigits?: number;
   bubbleSize?: number;
   fontFamily?: string;
   extraFields?: Array<{ label: string; width?: number }>;
@@ -48,417 +78,616 @@ interface OMRSheetProps {
   hideInstitute?: boolean;
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
-const DIGITS = Array.from({ length: 10 }, (_, i) => i);
+const DEFAULT_BN_LABELS = ["ক", "খ", "গ", "ঘ", "ঙ"];
+const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+/**
+ * Official Board-Style High-Contrast Monochrome (B&W) OMR Sheet
+ * - Matches BangladeshOMRGenerator quality in crisp photocopy-safe Black & White
+ * - 100% Single-Page Borderless A4 (210mm x 297mm)
+ * - Auto-calibrates its exact fiducial-relative bubble coordinates to Scanner & Cloud DB on mount
+ */
 const OMRSheet: React.FC<OMRSheetProps> = ({
   questions,
   qrData,
   rollDigits = 6,
-  bubbleSize = 24, // Restored to 24px (Large)
-  fontFamily = "'NikoshBAN', 'SolaimanLipi', 'Noto Serif Bengali', serif",
-  extraFields = [],
-  mcqOptionLabels = MCQ_LABELS,
+  regDigits = 10,
+  fontFamily = "'NikoshBAN', 'Hind Siliguri', 'SolaimanLipi', 'Noto Serif Bengali', serif",
+  mcqOptionLabels = DEFAULT_BN_LABELS,
   mcqOptionsCount = 4,
-  setName,
+  setName = "A",
   logoUrl,
-  instituteName = 'শিক্ষা প্রতিষ্ঠান',
-  schoolAddress = '',
-  examTitle = 'পরীক্ষার নাম',
-  examDate = 'তারিখ',
-  subjectName = 'বিষয়',
+  instituteName = "শিক্ষা প্রতিষ্ঠান",
+  schoolAddress = "",
+  examTitle = "নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্র",
+  examDate = "",
+  subjectName = "",
   uniqueCode,
   objectiveTime,
-  cqSqTime,
   hideInstitute = false,
 }) => {
-  const totalQuestions = 100;
-  // Scaled bubbles to fit 100 questions perfectly on single A4 sheet
-  const answerBubbleSize = 20;
+  const sheetRef = useRef<HTMLDivElement>(null);
 
-  // Render a vertical digit column (for horizontal arrangement)
-  const verticalField = (label: string, digits: number, size = 18) => (
-    <div className="flex flex-col items-center mx-1.5">
-      <div className="text-[9.5px] font-bold mb-0.5 uppercase tracking-wider">{label}</div>
-      <div className="flex flex-row gap-0.5 mb-0.5">
-        {Array.from({ length: digits }).map((_, idx) => (
-          <div key={idx} className="border border-black bg-white flex items-center justify-center font-bold" style={{ width: size, height: size + 3, fontSize: size * 0.7 }}></div>
-        ))}
-      </div>
-      <div className="flex flex-row gap-0.5 p-0.5 bg-white border border-black rounded-sm">
-        {Array.from({ length: digits }).map((_, idx) => (
-          <div key={idx} className="flex flex-col items-center gap-0.5">
-            {DIGITS.map((d) => (
-              <div
-                key={d}
-                className="rounded-full border border-black flex items-center justify-center text-[9.5px] font-bold hover:bg-black hover:text-white transition-colors"
-                style={{ width: size - 1, height: size - 1 }}
-              >{toBengaliNumerals(d)}</div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const actualMcqCount = useMemo(() => {
+    const raw =
+      (questions?.mcq?.length || 0) +
+      (questions?.mc?.length || 0);
+    if (raw <= 0) return 50;
+    if (raw <= 25) return 25;
+    if (raw <= 50) return 50;
+    if (raw <= 60) return 60;
+    return Math.min(100, Math.ceil(raw / 10) * 10);
+  }, [questions]);
 
-  // Render a single column of 25 questions
-  const renderMCQColumn = (startIdx: number, endIdx: number) => (
-    <div className="flex flex-col w-full h-full">
-      {/* Column Header */}
-      <div className="flex justify-between items-center border-b border-black bg-black text-white px-2 py-0.5 mb-0.5 rounded-t-sm">
-        <div className="text-[9.5px] font-bold w-6 text-center">NO</div>
-        <div className="flex-1 flex justify-around">
-          {mcqOptionLabels.slice(0, mcqOptionsCount).map((l, i) => (
-            <div key={i} className="text-[9.5px] font-bold w-5 text-center">{l}</div>
+  const optCount: 4 | 5 = mcqOptionsCount >= 5 ? 5 : 4;
+  const activeOptions = mcqOptionLabels.slice(0, optCount);
+  const isBangla = activeOptions[0] === "ক";
+  const isSplitLayout = actualMcqCount <= 50;
+  const numColumns = isSplitLayout
+    ? actualMcqCount <= 25
+      ? 1
+      : 2
+    : actualMcqCount <= 60
+    ? 3
+    : 4;
+  const qPerCol = Math.ceil(actualMcqCount / numColumns);
+
+  const cleanSet = String(setName || "A")
+    .replace(/^(set|সেট)\s*[-:]?\s*/i, "")
+    .trim()
+    .split(/\s+/)[0] || "A";
+
+  const setOptions = isBangla ? ["ক", "খ", "গ", "ঘ"] : ["A", "B", "C", "D"];
+
+  // Unique deterministic template ID shared between QR code & auto-calibration
+  const resolvedTemplateId = useMemo(() => {
+    const exId = (typeof qrData === "object" && qrData?.examId) || "exam";
+    const safeEx = String(exId).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 16) || "exam";
+    return `bw_omr_${safeEx}_${actualMcqCount}q_${optCount}opt_${isSplitLayout ? "split" : "stack"}`;
+  }, [qrData, actualMcqCount, optCount, isSplitLayout]);
+
+  const qrPayloadString = useMemo(() => {
+    if (typeof qrData === "string") return qrData;
+    return JSON.stringify({
+      ...(qrData || {}),
+      v: 1,
+      examId: qrData?.examId || "",
+      setId: qrData?.setId || `SET_${cleanSet}`,
+      setName: cleanSet,
+      template: resolvedTemplateId,
+      title: examTitle,
+      sheetType: "MCQ",
+    });
+  }, [qrData, cleanSet, resolvedTemplateId, examTitle]);
+
+  // Automatic Zero-Drift Fiducial-Relative DOM Calibration on mount
+  useEffect(() => {
+    if (typeof window === "undefined" || !sheetRef.current) return;
+    const timer = window.setTimeout(() => {
+      const sheetEl = sheetRef.current;
+      if (!sheetEl) return;
+      const sheetRect = sheetEl.getBoundingClientRect();
+      if (sheetRect.width < 120 || sheetRect.height < 120) return;
+
+      const tlEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="TL"]');
+      const trEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="TR"]');
+      const blEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="BL"]');
+      const brEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="BR"]');
+      if (!tlEl || !trEl || !blEl || !brEl) return;
+
+      const bubbleNodes = Array.from(sheetEl.querySelectorAll<HTMLElement>('[data-omr-bubble="1"]'));
+      if (bubbleNodes.length < 10) return;
+
+      const pageW = 1240;
+      const pageH = 1754;
+      const fidInsetX = 30;
+      const fidInsetY = 30;
+
+      const rTL = tlEl.getBoundingClientRect();
+      const rTR = trEl.getBoundingClientRect();
+      const rBL = blEl.getBoundingClientRect();
+      const rBR = brEl.getBoundingClientRect();
+
+      const refLeft = (rTL.left + rTL.width / 2 + rBL.left + rBL.width / 2) / 2;
+      const refRight = (rTR.left + rTR.width / 2 + rBR.left + rBR.width / 2) / 2;
+      const refTop = (rTL.top + rTL.height / 2 + rTR.top + rTR.height / 2) / 2;
+      const refBot = (rBL.top + rBL.height / 2 + rBR.top + rBR.height / 2) / 2;
+      if (refRight - refLeft < 80 || refBot - refTop < 80) return;
+
+      const scaleX = (pageW - 1 - 2 * fidInsetX) / (refRight - refLeft);
+      const scaleY = (pageH - 1 - 2 * fidInsetY) / (refBot - refTop);
+
+      type MB = { block: string; label: string; value: string; dir: "vertical" | "horizontal"; x: number; y: number; w: number; h: number };
+      const grouped: Record<string, MB[]> = {};
+      let sumW = 0;
+      let sumH = 0;
+
+      for (const el of bubbleNodes) {
+        const r = el.getBoundingClientRect();
+        const block = el.dataset.omrBlock || "Block";
+        const label = el.dataset.omrLabel || "";
+        const value = el.dataset.omrValue || "";
+        const dir = (el.dataset.omrDir === "vertical" ? "vertical" : "horizontal") as "vertical" | "horizontal";
+        const x = fidInsetX + (r.left - refLeft) * scaleX;
+        const y = fidInsetY + (r.top - refTop) * scaleY;
+        const w = r.width * scaleX;
+        const h = r.height * scaleY;
+        sumW += w;
+        sumH += h;
+        if (!grouped[block]) grouped[block] = [];
+        grouped[block].push({ block, label, value, dir, x, y, w, h });
+      }
+
+      const avgW = Math.max(14, Math.round(sumW / bubbleNodes.length));
+      const avgH = Math.max(14, Math.round(sumH / bubbleNodes.length));
+      const fieldBlocks: Record<string, FieldBlock> = {};
+      const customLabels: Record<string, string[]> = {};
+
+      for (const [blockName, items] of Object.entries(grouped)) {
+        const labelOrder: string[] = [];
+        const byLabel: Record<string, MB[]> = {};
+        for (const it of items) {
+          if (!byLabel[it.label]) {
+            byLabel[it.label] = [];
+            labelOrder.push(it.label);
+          }
+          byLabel[it.label].push(it);
+        }
+        const firstGroup = byLabel[labelOrder[0]];
+        if (!firstGroup || firstGroup.length === 0) continue;
+        const dir = firstGroup[0].dir;
+        const originX = Math.round(firstGroup[0].x);
+        const originY = Math.round(firstGroup[0].y);
+
+        let bubblesGap = 24;
+        if (firstGroup.length > 1) {
+          const lastB = firstGroup[firstGroup.length - 1];
+          const span = dir === "horizontal" ? lastB.x - firstGroup[0].x : lastB.y - firstGroup[0].y;
+          bubblesGap = Number((span / (firstGroup.length - 1)).toFixed(2));
+        }
+
+        let labelsGap = 24;
+        if (labelOrder.length > 1) {
+          const lastFirst = byLabel[labelOrder[labelOrder.length - 1]][0];
+          const span = dir === "horizontal" ? lastFirst.y - firstGroup[0].y : lastFirst.x - firstGroup[0].x;
+          labelsGap = Number((span / (labelOrder.length - 1)).toFixed(2));
+        }
+
+        fieldBlocks[blockName] = {
+          origin: [originX, originY],
+          bubblesGap,
+          labelsGap,
+          direction: dir,
+          fieldLabels: labelOrder,
+          bubbleValues: firstGroup.map((b) => b.value),
+          section: blockName,
+        };
+
+        if (blockName === "Roll") customLabels["Roll"] = labelOrder;
+        if (blockName === "Reg") customLabels["Registration"] = labelOrder;
+        if (blockName === "SubjectCode") customLabels["SubjectCode"] = labelOrder;
+        if (blockName === "SetCode") customLabels["Set"] = labelOrder;
+      }
+
+      const calibrated: Template = {
+        pageDimensions: [pageW, pageH],
+        bubbleDimensions: [avgW, avgH],
+        fiducialInset: [fidInsetX, fidInsetY],
+        preProcessors: [{ name: "CropOnMarkers" }],
+        fieldBlocks,
+        customLabels,
+      };
+
+      saveCalibratedTemplateLocal(resolvedTemplateId, calibrated);
+      fetch("/api/omr-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: resolvedTemplateId,
+          name: `${examTitle} (${actualMcqCount}Q B&W)`,
+          canonicalWidth: pageW,
+          canonicalHeight: pageH,
+          geometry: calibrated,
+        }),
+      }).catch(() => {});
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [resolvedTemplateId, examTitle, actualMcqCount]);
+
+  // Render a vertical digit matrix (Roll, Registration, Subject Code) in crisp B&W
+  const renderDigitGrid = (
+    title: string,
+    blockName: string,
+    labelPrefix: string,
+    digits: number,
+    compact = false
+  ) => {
+    const cellSize = compact ? 14 : digits >= 10 ? 15 : 17;
+    return (
+      <div className="border-[1.4px] border-black bg-white flex flex-col">
+        <div className="bg-black text-white text-center font-bold tracking-wide py-0.5 px-1 text-[9.5px] leading-tight">
+          {title}
+        </div>
+        {/* Handwritten digit boxes */}
+        <div className="flex border-b-[1.2px] border-black">
+          {Array.from({ length: digits }).map((_, i) => (
+            <div
+              key={i}
+              className={`flex-1 bg-white ${i < digits - 1 ? "border-r border-black" : ""}`}
+              style={{ height: compact ? 18 : 21, minWidth: cellSize + 3 }}
+            />
           ))}
         </div>
-      </div>
-
-      {/* Rows */}
-      <div className="flex-1 flex flex-col justify-between">
-        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map((idx) => (
-          <div key={idx} className={`flex items - center justify - between py - [1px] hover: bg - gray - 50 ${idx % 5 === 4 ? 'border-b border-black/10' : ''} `}>
-            <div className="text-[12px] font-bold w-6 text-center leading-none border-r border-black/20 mr-1">
-              {toBengaliNumerals(idx + 1)}
-            </div>
-            <div className={`flex - 1 flex justify - around ${mcqOptionsCount === 5 ? 'gap-0.5' : 'gap-1'} `}>
-              {mcqOptionLabels.slice(0, mcqOptionsCount).map((l, oidx) => (
+        {/* 0-9 Bubbles matrix with alternating subtle B&W column stripes */}
+        <div className="flex">
+          {Array.from({ length: digits }).map((_, colIdx) => (
+            <div
+              key={colIdx}
+              className={`flex-1 flex flex-col items-center py-0.5 gap-[2px] ${
+                colIdx % 2 === 0 ? "bg-neutral-100" : "bg-white"
+              } ${colIdx < digits - 1 ? "border-r border-black/25" : ""}`}
+            >
+              {DIGITS.map((d) => (
                 <div
-                  key={oidx}
-                  className="rounded-full border-[1.5px] border-black flex items-center justify-center bg-white text-[10px] font-bold"
-                  style={{ width: answerBubbleSize, height: answerBubbleSize }}
+                  key={d}
+                  data-omr-bubble="1"
+                  data-omr-block={blockName}
+                  data-omr-label={`${labelPrefix}${colIdx + 1}`}
+                  data-omr-value={String(d)}
+                  data-omr-dir="vertical"
+                  className="rounded-full border-[1.3px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
+                  style={{
+                    width: cellSize,
+                    height: cellSize,
+                    fontSize: compact ? 8.5 : 9.5,
+                  }}
                 >
-                  {l}
+                  {isBangla ? toBengaliNumerals(d) : d}
                 </div>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Render MC (Multiple Correct) questions
-  const renderMCColumn = (startIdx: number, endIdx: number, mcQuestions: { q: string; options: string[] }[]) => (
-    <table className="w-full text-center border-collapse table-fixed">
-      <thead>
-        <tr className="bg-gray-100 border-b border-black text-[9px]">
-          <th className="py-0.5 w-8 border-r border-black/20">NO</th>
-          {mcqOptionLabels.slice(0, 5).map((l, i) => (
-            <th key={i} className="py-0.5">{l}</th>
           ))}
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
-          if (idx >= mcQuestions.length) return null;
-          return (
-            <tr key={idx} className="hover:bg-gray-50">
-              <td className="text-[11px] font-bold py-[1px] border-r border-black/20">{toBengaliNumerals(idx + 1)}</td>
-              {mcqOptionLabels.slice(0, 5).map((l, oidx) => (
-                <td key={oidx} className="py-[0px]">
-                  <div
-                    className="w-[16px] h-[16px] border border-black rounded-sm flex items-center justify-center mx-auto bg-white"
-                    aria-label={`MC ${idx + 1} option ${l} `}
-                  ></div>
-                </td>
-              ))}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-
-  // Render AR (Assertion-Reason)
-  const renderARColumn = (startIdx: number, endIdx: number, arQuestions: any[]) => {
-    const bengaliLabels = ['১', '২', '৩', '৪', '৫'];
-    return (
-      <table className="w-full text-center border-collapse table-fixed">
-        <thead>
-          <tr className="bg-gray-100 border-b border-black text-[9px]">
-            <th className="py-0.5 w-8 border-r border-black/20">NO</th>
-            {bengaliLabels.map((l, i) => (
-              <th key={i} className="py-0.5">{l}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
-            if (idx >= arQuestions.length) return null;
-            return (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="text-[11px] font-bold py-[1px] border-r border-black/20">{toBengaliNumerals(idx + 1)}</td>
-                {bengaliLabels.map((l, oidx) => (
-                  <td key={oidx} className="py-[0px]">
-                    <div
-                      className="w-[16px] h-[16px] border border-black rounded-full flex items-center justify-center mx-auto bg-white text-[9px] font-medium pb-[1px]"
-                    >{l}</div>
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+        </div>
+      </div>
     );
   };
 
-  // Render MTF (Match the Following)
-  const renderMTFSection = (mtfQuestions: any[]) => (
-    <div className="mt-2 space-y-2">
-      {mtfQuestions.map((q, qIndex) => (
-        <div key={qIndex} className="border border-black p-1 rounded-sm relative bg-white overflow-hidden">
-          <div className="text-[9px] font-bold uppercase mb-1 border-b border-black pb-0.5 flex justify-between items-center bg-gray-50 -mx-1 px-1">
-            <span>MTF {toBengaliNumerals(qIndex + 1)}</span>
-            <span className="opacity-50 text-[6px]">MATRIX</span>
-          </div>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="border-b border-black/30 text-[8px] w-6">#</th>
-                {q.rightColumn.map((rc: any) => (
-                  <th key={rc.id} className="border-b border-black/30 text-[9px] font-bold">{rc.id}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {q.leftColumn.map((lc: any) => (
-                <tr key={lc.id}>
-                  <td className="border-b border-black/10 text-[9px] font-bold py-[1px]">{lc.id}</td>
-                  {q.rightColumn.map((rc: any) => (
-                    <td key={rc.id} className="border-b border-black/10 py-[1px] text-center">
-                      <div className="w-3.5 h-3.5 rounded-full border border-black mx-auto hover:bg-black transition-colors duration-200"></div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  // Render Vertical Set Code block (crisp B&W)
+  const renderSetCodeGrid = (compact = false) => {
+    const cellSize = compact ? 15 : 18;
+    return (
+      <div className="border-[1.4px] border-black bg-white flex flex-col shrink-0" style={{ minWidth: compact ? 42 : 48 }}>
+        <div className="bg-black text-white text-center font-bold py-0.5 px-1 text-[9px] leading-tight">
+          {isBangla ? "সেট কোড" : "SET"}
         </div>
-      ))}
-    </div>
-  );
+        <div
+          className="border-b-[1.2px] border-black bg-white flex items-center justify-center font-black text-[11px] text-black"
+          style={{ height: compact ? 18 : 21 }}
+        >
+          {cleanSet}
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-around py-1 bg-neutral-100 gap-1">
+          {setOptions.map((s) => (
+            <div
+              key={s}
+              data-omr-bubble="1"
+              data-omr-block="SetCode"
+              data-omr-label="Set"
+              data-omr-value={s}
+              data-omr-dir="vertical"
+              className="rounded-full border-[1.3px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
+              style={{ width: cellSize, height: cellSize, fontSize: 9.5 }}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
-  // Render INT (Integer) Column
-  const renderINTColumn = (startIdx: number, endIdx: number, intQuestions: any[]) => (
-    <table className="w-full text-center border-collapse table-fixed">
-      <thead>
-        <tr className="bg-gray-100 border-b border-black text-[9px]">
-          <th className="py-0.5 w-6 border-r border-black/20">NO</th>
-          <th className="py-0.5">INT VALUE</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
-          if (idx >= intQuestions.length) return null;
-          return (
-            <tr key={idx} className="hover:bg-gray-50">
-              <td className="text-[10px] font-bold py-[1px] border-r border-black/20">{toBengaliNumerals(idx + 1)}</td>
-              <td className="py-[1px] flex justify-center gap-1">
-                {[1, 2, 3].map(pos => (
-                  <div key={pos} className="flex flex-col gap-[1px] bg-gray-50 p-[1px] border border-black rounded-[1px]">
-                    <div className="w-full h-2 bg-white border border-black flex items-center justify-center text-[6px] mb-[1px]"></div>
-                    <div className="grid grid-cols-2 gap-[1px]">
-                      {DIGITS.map(d => (
-                        <div key={d} className="w-2.5 h-2.5 border-[0.5px] border-black rounded-full text-[6px] flex items-center justify-center bg-white">{toBengaliNumerals(d)}</div>
-                      ))}
+  // Render a single MCQ Column (crisp B&W alternating row stripes, 4 or 5 options)
+  const renderQuestionColumn = (colIdx: number) => {
+    const startQ = colIdx * qPerCol + 1;
+    const endQ = Math.min(actualMcqCount, (colIdx + 1) * qPerCol);
+    if (startQ > actualMcqCount) return null;
+
+    const bubbleDim = isSplitLayout
+      ? optCount === 5
+        ? 18
+        : 20
+      : optCount === 5
+      ? 15
+      : 17;
+
+    return (
+      <div key={colIdx} className="border-[1.4px] border-black bg-white flex flex-col h-full">
+        {/* Column Header */}
+        <div className="flex items-center bg-black text-white text-[9.5px] font-bold py-1 px-1.5">
+          <div className="w-7 text-center border-r border-white/30 pr-1">
+            {isBangla ? "প্রশ্ন" : "Q#"}
+          </div>
+          <div className="flex-1 text-center">{isBangla ? "উত্তর (সঠিক বৃত্ত ভরাট করুন)" : "ANSWERS"}</div>
+        </div>
+        {/* Question Rows */}
+        <div className="flex-1 flex flex-col justify-between">
+          {Array.from({ length: endQ - startQ + 1 }).map((_, idx) => {
+            const qNum = startQ + idx;
+            const isStripe = idx % 2 === 0;
+            return (
+              <div
+                key={qNum}
+                className={`flex items-center px-1.5 py-[1.5px] ${
+                  isStripe ? "bg-neutral-100" : "bg-white"
+                } ${idx % 5 === 4 && qNum < endQ ? "border-b border-black/30" : ""}`}
+              >
+                <div className="w-7 text-center font-extrabold text-[11px] text-black border-r border-black/25 pr-1 leading-none">
+                  {isBangla ? toBengaliNumerals(qNum) : qNum}
+                </div>
+                <div className="flex-1 flex items-center justify-around pl-1">
+                  {activeOptions.map((opt) => (
+                    <div
+                      key={opt}
+                      data-omr-bubble="1"
+                      data-omr-block={`Questions_Col${colIdx + 1}`}
+                      data-omr-label={`q${qNum}`}
+                      data-omr-value={opt}
+                      data-omr-dir="horizontal"
+                      className="rounded-full border-[1.4px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
+                      style={{
+                        width: bubbleDim,
+                        height: bubbleDim,
+                        fontSize: bubbleDim <= 16 ? 8.5 : 9.5,
+                      }}
+                    >
+                      {opt}
                     </div>
-                  </div>
-                ))}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="w-full h-full flex flex-col pt-6 px-8 bg-white relative print:m-0 print:p-0"
+    <div
+      ref={sheetRef}
+      className="relative bg-white text-black mx-auto overflow-hidden select-none"
       style={{
         fontFamily,
-        width: '100%',
-        height: '100%',
-        boxSizing: 'border-box',
-        border: 'none',
-        position: 'relative'
-      }}>
+        width: "210mm",
+        height: "297mm",
+        maxWidth: "210mm",
+        maxHeight: "297mm",
+        padding: "11mm 11mm 10mm 11mm",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        pageBreakInside: "avoid",
+        breakInside: "avoid",
+      }}
+    >
+      {/* 4 Symmetric High-Contrast Solid Pro Bullseye Fiducials */}
+      <SolidProFiducial id="TL" className="top-[8px] left-[8px]" />
+      <SolidProFiducial id="TR" className="top-[8px] right-[8px]" />
+      <SolidProFiducial id="BL" className="bottom-[8px] left-[8px]" />
+      <SolidProFiducial id="BR" className="bottom-[8px] right-[8px]" />
 
-      {/* --- ARUCO FIDUCIAL MARKERS - FOR HIGH ACCURACY ALIGNMENT --- */}
-      <FiducialMarker id={0} size={40} className="absolute top-8 left-8" />
-      <FiducialMarker id={1} size={40} className="absolute top-8 right-8" />
-      <FiducialMarker id={2} size={40} className="absolute bottom-12 right-12" />
-      <FiducialMarker id={3} size={40} className="absolute bottom-12 left-12" />
-
-      {/* --- CONTENT CONTAINER --- */}
-      <div className="flex flex-col h-full mx-3 my-1 mb-1 border-[1.5px] border-black rounded-sm overflow-visible z-10 relative bg-white/50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-
-        {/* HEADER - Top Down 1/3 */}
-        <header className="flex flex-col border-b-[1.5px] border-black bg-white">
-          <div className="flex justify-between items-center p-2 pb-1">
-            {/* Balance the exam info on the right */}
-            <div className="w-[160px]" />
-
-            <div className="flex-1 flex flex-col items-center">
-              <div className="text-center">
-                {!hideInstitute && (
-                  <>
-                    <h1 className="text-xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
-                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mt-0.5">{schoolAddress}</p>
-                  </>
-                )}
-                <div className="inline-block bg-black text-white px-2 py-0.2 mt-1 rounded-sm">
-                  <h2 className="text-[9.5px] font-black uppercase tracking-[0.18em] leading-none">OMR ANSWER SHEET</h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="w-[160px] flex flex-col items-end">
-              <div className="text-base font-black uppercase text-black mb-0.5">{examTitle}</div>
-              <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
-                  তারিখ: {toBengaliNumerals(examDate)}
-                </span>
-                {subjectName && (
-                  <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
-                    বিষয়: {subjectName}
-                  </span>
-                )}
-                {objectiveTime && objectiveTime > 0 && (
-                  <span className="px-1.5 py-0.2 border border-black font-bold text-[9px] uppercase bg-white">
-                    সময়: {formatBengaliDuration(objectiveTime)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* INSTRUCTIONS + SET CODE Middle Band */}
-          <div className="flex justify-between items-center px-3 py-1 bg-gray-50 border-t border-black">
-            <div className="text-[8.5px] font-medium leading-tight max-w-[40%]">
-              <p>• Use Black Ballpoint Pen only. • Darken bubble completely: ⬤</p>
-              <p>• Do not fold or crush this sheet.</p>
-            </div>
-
-            {/* CENTER SET CODE BOX */}
-            <div className="flex flex-col items-center border-[1.5px] border-black p-0.5 bg-white rounded shadow-2xs">
-              <span className="text-[8.5px] font-black uppercase tracking-widest mb-0.5">SET CODE: {setName || 'A'}</span>
-              <div className="flex gap-1">
-                {mcqOptionLabels.slice(0, 4).map(l => (
-                  <div key={l} className={`w-4.5 h-4.5 rounded-full border border-black flex items-center justify-center text-[8.5px] font-black ${l === setName ? 'bg-black text-white' : 'bg-white'}`}>{l}</div>
-                ))}
-              </div>
-            </div>
-
-            {/* QR */}
-            <div className="flex items-center gap-1.5">
-              <div className="text-right">
-                <p className="text-[9px] font-bold">Secured ID</p>
-                <p className="text-[8px] font-mono">{uniqueCode?.slice(0, 8)}</p>
-              </div>
-              <div className="border border-black p-0.5 bg-white">
-                <QRCode
-                  value={
-                    typeof qrData === 'string'
-                      ? qrData
-                      : JSON.stringify(qrData || {
-                          v: 1,
-                          examId: uniqueCode || '',
-                          setName: setName || 'A',
-                          template: 'standard_100q',
-                          title: examTitle
-                        })
-                  }
-                  size={48}
-                  level="M"
-                />
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* MIDDLE BAND: STUDENT INFO (Horizontal) */}
-        <div className="flex flex-row justify-between items-stretch p-1.5 border-b-[1.5px] border-black bg-white gap-2">
-          {/* Section 1: Roll No */}
-          <div className="flex-1 border border-black p-1 rounded-sm bg-gray-50/50 flex justify-center">
-            {verticalField('ROLL NO / রোল নম্বর', rollDigits, 17)}
-          </div>
-
-          {/* Section 2: Registration No (Placeholder) or Subject Code */}
-          <div className="flex-1 border border-black p-1 rounded-sm bg-gray-50/50 flex justify-center">
-            {verticalField('REGISTRATION NO', rollDigits, 17)}
-          </div>
-
-          {/* Section 3: Signatures */}
-          <div className="w-[160px] flex flex-col justify-between py-1">
-            <div className="border border-black p-1 h-[46%] bg-white rounded-sm relative">
-              <span className="absolute bottom-0.5 right-1.5 text-[7.5px] font-bold uppercase text-gray-500">Student's Signature</span>
-            </div>
-            <div className="border border-black p-1 h-[46%] bg-white rounded-sm relative">
-              <span className="absolute bottom-0.5 right-1.5 text-[7.5px] font-bold uppercase text-gray-500">Invigilator's Signature</span>
-            </div>
-          </div>
-        </div>
-
-        {/* BOTTOM SECTION: QUESTION GRID (Full Width) */}
-        <div className="flex-1 p-1.5 bg-white">
-          <div className="grid grid-cols-4 gap-2 h-full">
-            {/* Column 1 */}
-            <div className="border border-black/50 p-0.5 h-full rounded-sm">
-              {renderMCQColumn(0, 25)}
-            </div>
-            {/* Column 2 */}
-            <div className="border border-black/50 p-0.5 h-full rounded-sm">
-              {renderMCQColumn(25, 50)}
-            </div>
-            {/* Column 3 */}
-            <div className="border border-black/50 p-0.5 h-full rounded-sm">
-              {/* Mix regular MCQs and Special Types if needed */}
-              {/* For now assuming std 100 questions flow, can inject types */}
-              {renderMCQColumn(50, 75)}
-            </div>
-            {/* Column 4 */}
-            <div className="border border-black/50 p-1 h-full rounded-sm">
-              {renderMCQColumn(75, 100)}
-            </div>
-          </div>
-          {/* Special Sections - Re-integrate as needed, perhaps below the main grid or in a separate area */}
-          {/* For now, commenting out the previous special sections layout */}
-          {/*
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {questions.mc && questions.mc.length > 0 && (
-                <div className="border border-black p-1 rounded-sm bg-gray-50">
-                  <div className="text-[9px] font-bold uppercase mb-1 border-b border-black px-1">MC (Multiple Correct)</div>
-                  {renderMCColumn(0, 10, questions.mc)}
-                </div>
-              )}
-              {questions.ar && questions.ar.length > 0 && (
-                <div className="border border-black p-1 rounded-sm bg-gray-50">
-                  <div className="text-[9px] font-bold uppercase mb-1 border-b border-black px-1">Assertion (AR)</div>
-                  {renderARColumn(0, 10, questions.ar)}
-                </div>
-              )}
-              {questions.int && questions.int.length > 0 && (
-                <div className="border border-black p-1 rounded-sm bg-gray-50">
-                  <div className="text-[9px] font-bold uppercase mb-1 border-b border-black px-1">Integer (INT)</div>
-                  {renderINTColumn(0, 10, questions.int)}
-                </div>
-              )}
-            </div>
-            {questions.mtf && questions.mtf.length > 0 && renderMTFSection(questions.mtf)}
-           */}
-        </div>
-
+      {/* Continuous Left & Right Lateral Optical Timing Tracks */}
+      <div className="absolute left-[10px] top-[90px] bottom-[60px] w-[10px] flex flex-col justify-between items-center pointer-events-none">
+        {Array.from({ length: 24 }).map((_, i) => (
+          <div key={i} className="w-[10px] h-[3.5px] bg-black" />
+        ))}
       </div>
-
-      {/* --- TIMING TRACKS (Bottom) --- */}
-      <div className="absolute bottom-1 left-0 right-0 h-3 flex justify-between px-12 pointer-events-none">
-        {Array.from({ length: 45 }).map((_, i) => (
-          <div key={i} className="w-[3px] h-full bg-black"></div>
+      <div className="absolute right-[10px] top-[90px] bottom-[60px] w-[10px] flex flex-col justify-between items-center pointer-events-none">
+        {Array.from({ length: 24 }).map((_, i) => (
+          <div key={i} className="w-[10px] h-[3.5px] bg-black" />
         ))}
       </div>
 
+      {/* HEADER: Official Board Monochrome Layout */}
+      <header className="relative border-b-[1.8px] border-black pb-2 mb-2 px-2">
+        {/* Top-Left Institute Logo (Grayscale B&W) */}
+        {logoUrl && !hideInstitute && (
+          <div className="absolute left-1 top-0 w-[48px] h-[48px] border border-black/30 rounded bg-white p-0.5 flex items-center justify-center">
+            <img
+              src={logoUrl}
+              alt="Logo"
+              className="max-w-full max-h-full object-contain grayscale contrast-125"
+            />
+          </div>
+        )}
+
+        {/* Top-Right Universal OMR QR Badge */}
+        <div className="absolute right-1 top-0 border-[1.3px] border-black bg-white p-1 rounded-sm text-center">
+          <QRCode value={qrPayloadString} size={46} level="M" />
+          <div className="text-[7.5px] font-mono font-bold text-black mt-0.5 leading-none">
+            SET-{cleanSet}
+          </div>
+        </div>
+
+        <div className="text-center px-14">
+          {!hideInstitute && instituteName && (
+            <div className="text-[15px] font-black tracking-tight text-black leading-tight">
+              {instituteName}
+            </div>
+          )}
+          {!hideInstitute && schoolAddress && (
+            <div className="text-[8.5px] font-semibold text-neutral-700 leading-tight">
+              {schoolAddress}
+            </div>
+          )}
+          <div className="text-[13px] font-extrabold text-black mt-0.5 leading-tight underline decoration-black/70 underline-offset-2">
+            {examTitle || (isBangla ? "নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্র" : "OMR ANSWER SHEET")}
+          </div>
+
+          {/* Crisp B&W Instruction Pill */}
+          <div className="mt-1 flex items-center justify-center gap-2 flex-wrap">
+            <span className="bg-black text-white px-2.5 py-0.5 text-[8.5px] font-bold rounded-xs">
+              {isBangla
+                ? "অবশ্যই কালো বল-পয়েন্ট কলম দিয়ে বৃত্ত সম্পূর্ণ ভরাট করতে হবে"
+                : "USE BLACK BALLPOINT PEN ONLY — DARKEN CIRCLES COMPLETELY"}
+            </span>
+          </div>
+
+          {/* Metadata Strip */}
+          <div className="mt-1.5 flex items-center justify-between border border-black bg-neutral-100 px-2 py-0.5 text-[9px] font-bold text-black">
+            <span>
+              {isBangla ? "বিষয়:" : "Subject:"} {subjectName || ".................."}
+            </span>
+            <span>
+              {isBangla ? "সেট:" : "Set:"} {cleanSet}
+            </span>
+            {objectiveTime && objectiveTime > 0 ? (
+              <span>
+                {isBangla ? "সময়:" : "Time:"} {formatBengaliDuration(objectiveTime)}
+              </span>
+            ) : null}
+            <span>
+              {isBangla ? "তারিখ:" : "Date:"} {examDate ? toBengaliNumerals(examDate) : "............"}
+            </span>
+            <span>
+              {isBangla ? "প্রশ্ন:" : "MCQs:"} {isBangla ? toBengaliNumerals(actualMcqCount) : actualMcqCount}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* BODY: Split Board Layout (<=50Q) OR Stacked Admission Layout (>50Q) */}
+      {isSplitLayout ? (
+        <div className="flex-1 grid grid-cols-12 gap-2.5 min-h-0 px-2">
+          {/* Left Side: Questions Columns */}
+          <div
+            className="col-span-6 grid gap-2 h-full"
+            style={{ gridTemplateColumns: `repeat(${numColumns}, 1fr)` }}
+          >
+            {Array.from({ length: numColumns }).map((_, c) => renderQuestionColumn(c))}
+          </div>
+
+          {/* Right Side: Roll, Set, Registration, Subject Code, Signatures & Rules */}
+          <div className="col-span-6 flex flex-col justify-between gap-2 h-full">
+            {/* Top Row: Roll + Set + Invigilator Sign */}
+            <div className="flex items-stretch gap-1.5">
+              <div className="flex-1">
+                {renderDigitGrid(isBangla ? "রোল নম্বর (ROLL)" : "ROLL NUMBER", "Roll", "roll", rollDigits)}
+              </div>
+              {renderSetCodeGrid()}
+              <div className="w-[82px] flex flex-col justify-between gap-1.5">
+                <div className="flex-1 border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+                  <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
+                    {isBangla ? "কক্ষ পরিদর্শকের স্বাক্ষর" : "Invigilator Sign"}
+                  </span>
+                </div>
+                <div className="h-[52px] border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+                  <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
+                    {isBangla ? "তারিখ" : "Date"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Row: 10-Digit Registration + 3-Digit Subject Code */}
+            <div className="flex items-stretch gap-1.5">
+              <div className="flex-1">
+                {renderDigitGrid(
+                  isBangla ? "রেজিস্ট্রেশন নম্বর (REG)" : "REGISTRATION NO",
+                  "Reg",
+                  "reg",
+                  regDigits
+                )}
+              </div>
+              <div className="w-[74px]">
+                {renderDigitGrid(isBangla ? "বিষয় কোড" : "SUB CODE", "SubjectCode", "sub", 3)}
+              </div>
+            </div>
+
+            {/* Candidate Signature & Serial Strip */}
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 border-[1.3px] border-black bg-white h-[44px] flex flex-col justify-end p-1">
+                <span className="text-[8px] font-bold text-center border-t border-black/40 pt-0.5">
+                  {isBangla ? "পরীক্ষার্থীর পূর্ণ স্বাক্ষর ও তারিখ" : "Candidate's Full Signature & Date"}
+                </span>
+              </div>
+              <div className="w-[125px] border-[1.3px] border-black bg-neutral-100 p-1 flex flex-col justify-center items-center">
+                <span className="text-[7.5px] font-bold uppercase tracking-wider">OMR SERIAL ID</span>
+                <span className="text-[10px] font-mono font-black tracking-tight">
+                  {(uniqueCode || "OMR2026001").slice(0, 12).toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            {/* Official Board Monochrome Fill Rules */}
+            <div className="border-[1.4px] border-black bg-white p-2 text-[8.5px] leading-snug">
+              <div className="text-center font-black border-b border-black pb-0.5 mb-1 text-[9.5px]">
+                {isBangla ? "বৃত্ত ভরাটের নিয়মাবলী (ভুল হলে উত্তর বাতিল হবে)" : "IMPORTANT MARKING INSTRUCTIONS"}
+              </div>
+              <div className="flex items-center justify-between bg-neutral-100 border border-black/30 px-2 py-1 mb-1">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span>{isBangla ? "সঠিক পদ্ধতি:" : "CORRECT:"}</span>
+                  <span className="inline-block w-3.5 h-3.5 rounded-full bg-black border border-black" />
+                </div>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span>{isBangla ? "ভুল পদ্ধতি:" : "WRONG:"}</span>
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-black text-[8px]">•</span>
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-black text-[8px]">✔</span>
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-black text-[8px]">✖</span>
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-black text-[8px]">◐</span>
+                </div>
+              </div>
+              <ol className="list-decimal pl-3.5 space-y-0.5 font-medium text-neutral-900">
+                <li>{isBangla ? "রোল নম্বর, রেজিস্ট্রেশন নম্বর ও সেট কোড সঠিকভাবে ইংরেজি/বাংলা সংখ্যায় লিখে নিচের বৃত্ত ভরাট করুন।" : "Write Roll, Registration & Set Code accurately and darken bubbles completely."}</li>
+                <li>{isBangla ? "এক প্রশ্নে একাধিক বৃত্ত ভরাট করলে বা ঘষাঘষি করলে উত্তর বাতিল গণ্য হবে।" : "Multiple marks or incomplete erasures invalidate the answer."}</li>
+                <li>{isBangla ? "উত্তরপত্র ভাঁজ করবেন না এবং নির্ধারিত স্থান ব্যতীত কোনো দাগ দেবেন না।" : "Do not fold, staple, or make stray marks outside the bubbles."}</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Stacked Monochrome Admission Layout (60–100 Questions) */
+        <div className="flex-1 flex flex-col gap-2 min-h-0 px-2">
+          {/* Top Identification Band */}
+          <div className="flex items-stretch gap-1.5">
+            {renderDigitGrid(isBangla ? "রোল নম্বর" : "ROLL NO", "Roll", "roll", rollDigits, true)}
+            {renderSetCodeGrid(true)}
+            {renderDigitGrid(isBangla ? "রেজিস্ট্রেশন নম্বর" : "REGISTRATION NO", "Reg", "reg", regDigits, true)}
+            <div className="flex-1 flex flex-col justify-between gap-1.5">
+              <div className="border-[1.3px] border-black p-1.5 bg-neutral-100 text-[8px] font-bold leading-tight">
+                <div>{isBangla ? "সঠিক: ●  |  ভুল: ⊙ ✔ ✖ ◐" : "CORRECT: ● | WRONG: ⊙ ✔ ✖"}</div>
+                <div className="mt-0.5 font-normal">
+                  {isBangla ? "কালো বলপেন ব্যবহার করুন। শিট ভাঁজ করবেন না।" : "Use black ballpoint pen. Do not fold."}
+                </div>
+              </div>
+              <div className="flex-1 border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+                <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
+                  {isBangla ? "কক্ষ পরিদর্শকের স্বাক্ষর" : "Invigilator Signature"}
+                </span>
+              </div>
+              <div className="flex-1 border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+                <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
+                  {isBangla ? "পরীক্ষার্থীর স্বাক্ষর" : "Candidate Signature"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Full-Width MCQ Matrix (3 or 4 Columns) */}
+          <div
+            className="flex-1 grid gap-2 min-h-0"
+            style={{ gridTemplateColumns: `repeat(${numColumns}, 1fr)` }}
+          >
+            {Array.from({ length: numColumns }).map((_, c) => renderQuestionColumn(c))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Center Optical Registration Sync Bar */}
+      <div className="mt-1.5 flex justify-center">
+        <div className="w-16 h-[3.5px] bg-black" />
+      </div>
     </div>
   );
 };
