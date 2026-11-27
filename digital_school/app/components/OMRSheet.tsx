@@ -80,6 +80,7 @@ interface OMRSheetProps {
 
 const DEFAULT_BN_LABELS = ["ক", "খ", "গ", "ঘ", "ঙ"];
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const LATIN_NUM_FONT = "'Inter', 'Helvetica Neue', Arial, Helvetica, sans-serif";
 
 /**
  * Official Board-Style High-Contrast Monochrome (B&W) OMR Sheet
@@ -137,7 +138,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
     .trim()
     .split(/\s+/)[0] || "A";
 
-  const setOptions = isBangla ? ["ক", "খ", "গ", "ঘ"] : ["A", "B", "C", "D"];
+  const setOptions = ["A", "B", "C", "D"];
 
   // Unique deterministic template ID shared between QR code & auto-calibration
   const resolvedTemplateId = useMemo(() => {
@@ -336,11 +337,12 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
                   data-omr-label={`${labelPrefix}${colIdx + 1}`}
                   data-omr-value={String(d)}
                   data-omr-dir="vertical"
-                  className="rounded-full border-[1.3px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
+                  className="omr-latin-num rounded-full border-[1.35px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
                   style={{
                     width: cellSize,
                     height: cellSize,
                     fontSize: compact ? 8.5 : 9.5,
+                    fontFamily: LATIN_NUM_FONT,
                   }}
                 >
                   {d}
@@ -362,12 +364,12 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           {isBangla ? "সেট কোড" : "SET"}
         </div>
         <div
-          className="border-b-[1.2px] border-black bg-white flex items-center justify-center font-black text-[11px] text-black"
-          style={{ height: compact ? 18 : 21 }}
+          className="omr-latin-num border-b-[1.2px] border-black bg-white flex items-center justify-center font-black text-[11px] text-black"
+          style={{ height: compact ? 18 : 21, fontFamily: LATIN_NUM_FONT }}
         >
           {cleanSet}
         </div>
-        <div className="flex-1 flex flex-col items-center justify-around py-1 bg-neutral-100 gap-1">
+        <div className="flex-1 flex flex-col items-center justify-center py-2 bg-neutral-100 gap-2.5">
           {setOptions.map((s) => (
             <div
               key={s}
@@ -376,8 +378,8 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
               data-omr-label="Set"
               data-omr-value={s}
               data-omr-dir="vertical"
-              className="rounded-full border-[1.3px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
-              style={{ width: cellSize, height: cellSize, fontSize: 9.5 }}
+              className="omr-latin-num rounded-full border-[1.35px] border-black bg-white flex items-center justify-center font-bold text-black leading-none"
+              style={{ width: cellSize, height: cellSize, fontSize: 9.5, fontFamily: LATIN_NUM_FONT }}
             >
               {s}
             </div>
@@ -418,14 +420,20 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
             return (
               <div
                 key={qNum}
-                className={`flex items-center px-1.5 py-[1.5px] ${
+                className={`flex items-center px-2 py-[2px] ${
                   isStripe ? "bg-neutral-100" : "bg-white"
-                } ${idx % 5 === 4 && qNum < endQ ? "border-b border-black/30" : ""}`}
+                } ${
+                  idx % 5 === 4 && qNum < endQ
+                    ? "border-b-[1.3px] border-black/60"
+                    : qNum < endQ
+                    ? "border-b border-black/15"
+                    : ""
+                }`}
               >
-                <div className="w-7 text-center font-extrabold text-[11px] text-black border-r border-black/25 pr-1 leading-none">
+                <div className="w-7 text-center font-extrabold text-[11px] text-black border-r border-black/30 pr-1 leading-none">
                   {isBangla ? toBengaliNumerals(qNum) : qNum}
                 </div>
-                <div className="flex-1 flex items-center justify-around pl-1">
+                <div className="flex-1 flex items-center justify-evenly pl-1">
                   {activeOptions.map((opt) => (
                     <div
                       key={opt}
@@ -490,29 +498,47 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       </div>
 
       {/* HEADER: Official Board Monochrome Layout */}
-      <header className="relative border-b-[1.8px] border-black pb-2 mb-2 px-2">
-        {/* Top-Left Institute Logo (Grayscale B&W) */}
-        {logoUrl && !hideInstitute && (
-          <div className="absolute left-1 top-0 w-[48px] h-[48px] border border-black/30 rounded bg-white p-0.5 flex items-center justify-center">
+      <header className="relative border-b-[1.8px] border-black pb-2 mb-2.5 px-6">
+        {/* Top-Left Institute Logo (or Symmetric B&W Set Badge when no logo) */}
+        {logoUrl && !hideInstitute ? (
+          <div className="absolute left-5 top-0 w-[50px] h-[50px] border border-black/40 rounded-xs bg-white p-0.5 flex items-center justify-center">
             <img
               src={logoUrl}
               alt="Logo"
               className="max-w-full max-h-full object-contain grayscale contrast-125"
             />
           </div>
+        ) : (
+          <div
+            className="omr-latin-num absolute left-5 top-0 w-[56px] h-[56px] border-[1.5px] border-black bg-white flex flex-col items-center justify-center text-center"
+            style={{ fontFamily: LATIN_NUM_FONT }}
+          >
+            <span className="text-[7px] font-bold uppercase tracking-wider text-neutral-700 leading-none">
+              SET CODE
+            </span>
+            <span className="text-[22px] font-black text-black leading-none mt-0.5">
+              {cleanSet}
+            </span>
+            <span className="text-[6.5px] font-bold text-black border-t border-black/30 w-full mt-0.5 pt-0.5 leading-none">
+              MCQ OMR
+            </span>
+          </div>
         )}
 
-        {/* Top-Right Universal OMR QR Badge */}
-        <div className="absolute right-1 top-0 border-[1.3px] border-black bg-white p-1 rounded-sm text-center">
+        {/* Top-Right Universal OMR QR Badge (Cleanly Clear of Fiducial & Timing Track) */}
+        <div className="absolute right-5 top-0 border-[1.4px] border-black bg-white p-1 rounded-xs text-center">
           <QRCode value={qrPayloadString} size={46} level="M" />
-          <div className="text-[7.5px] font-mono font-bold text-black mt-0.5 leading-none">
+          <div
+            className="omr-latin-num text-[7.5px] font-bold text-black mt-0.5 leading-none"
+            style={{ fontFamily: LATIN_NUM_FONT }}
+          >
             SET-{cleanSet}
           </div>
         </div>
 
-        <div className="text-center px-14">
+        <div className="text-center px-16">
           {!hideInstitute && instituteName && (
-            <div className="text-[15px] font-black tracking-tight text-black leading-tight">
+            <div className="text-[16px] font-black tracking-tight text-black leading-tight">
               {instituteName}
             </div>
           )}
@@ -535,11 +561,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           </div>
 
           {/* Metadata Strip */}
-          <div className="mt-1.5 flex items-center justify-between border border-black bg-neutral-100 px-2 py-0.5 text-[9px] font-bold text-black">
+          <div className="mt-1.5 flex items-center justify-between border border-black bg-neutral-100 px-2.5 py-0.5 text-[9px] font-bold text-black">
             <span>
               {isBangla ? "বিষয়:" : "Subject:"} {subjectName || ".................."}
             </span>
-            <span>
+            <span className="omr-latin-num" style={{ fontFamily: LATIN_NUM_FONT }}>
               {isBangla ? "সেট:" : "Set:"} {cleanSet}
             </span>
             {objectiveTime && objectiveTime > 0 ? (
@@ -559,30 +585,53 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
       {/* BODY: Split Board Layout (<=50Q) OR Stacked Admission Layout (>50Q) */}
       {isSplitLayout ? (
-        <div className="flex-1 grid grid-cols-12 gap-2.5 min-h-0 px-2">
-          {/* Left Side: Questions Columns */}
+        <div className="flex-1 grid grid-cols-12 gap-3 min-h-0 px-3">
+          {/* Left Side: Questions Columns (Tighter 5-col proportion for 25Q, 6-col for 50Q) */}
           <div
-            className="col-span-6 grid gap-2 h-full"
+            className={`${numColumns === 1 ? "col-span-5" : "col-span-6"} grid gap-2 h-full`}
             style={{ gridTemplateColumns: `repeat(${numColumns}, 1fr)` }}
           >
             {Array.from({ length: numColumns }).map((_, c) => renderQuestionColumn(c))}
           </div>
 
-          {/* Right Side: Roll, Set, Registration, Subject Code, Signatures & Rules */}
-          <div className="col-span-6 flex flex-col justify-between gap-2 h-full">
-            {/* Top Row: Roll + Set + Invigilator Sign */}
-            <div className="flex items-stretch gap-1.5">
+          {/* Right Side: Student Info, Roll, Set, Registration, Subject Code, Signatures & Rules */}
+          <div className={`${numColumns === 1 ? "col-span-7" : "col-span-6"} flex flex-col gap-2.5 h-full`}>
+            {/* Compact Candidate Particulars Box (Eliminates Empty White Space & Aids Verification) */}
+            <div className="border-[1.4px] border-black bg-white">
+              <div className="bg-black text-white text-center font-bold py-0.5 px-2 text-[9px] tracking-wide">
+                {isBangla ? "পরীক্ষার্থীর তথ্য (CANDIDATE INFORMATION)" : "CANDIDATE INFORMATION"}
+              </div>
+              <div className="p-2 space-y-1.5 text-[9.5px] font-bold text-black">
+                <div className="flex items-end gap-1.5">
+                  <span className="shrink-0">{isBangla ? "নাম:" : "Name:"}</span>
+                  <div className="flex-1 border-b border-dotted border-black h-3.5" />
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1 flex items-end gap-1.5">
+                    <span className="shrink-0">{isBangla ? "শ্রেণি:" : "Class:"}</span>
+                    <div className="flex-1 border-b border-dotted border-black h-3.5" />
+                  </div>
+                  <div className="flex-1 flex items-end gap-1.5">
+                    <span className="shrink-0">{isBangla ? "শাখা:" : "Sec:"}</span>
+                    <div className="flex-1 border-b border-dotted border-black h-3.5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Row: Roll (4 Digits English) + Set + Invigilator Sign */}
+            <div className="flex items-stretch gap-2">
               <div className="flex-1">
                 {renderDigitGrid(isBangla ? "রোল নম্বর (ROLL)" : "ROLL NUMBER", "Roll", "roll", rollDigits)}
               </div>
               {renderSetCodeGrid()}
-              <div className="w-[82px] flex flex-col justify-between gap-1.5">
-                <div className="flex-1 border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+              <div className="w-[86px] flex flex-col justify-between gap-2">
+                <div className="flex-1 border-[1.35px] border-black bg-white flex flex-col justify-end p-1">
                   <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
                     {isBangla ? "কক্ষ পরিদর্শকের স্বাক্ষর" : "Invigilator Sign"}
                   </span>
                 </div>
-                <div className="h-[52px] border-[1.3px] border-black bg-white flex flex-col justify-end p-1">
+                <div className="h-[56px] border-[1.35px] border-black bg-white flex flex-col justify-end p-1">
                   <span className="text-[7.5px] font-bold text-center border-t border-black/40 pt-0.5">
                     {isBangla ? "তারিখ" : "Date"}
                   </span>
@@ -590,8 +639,8 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
               </div>
             </div>
 
-            {/* Middle Row: 10-Digit Registration + 3-Digit Subject Code */}
-            <div className="flex items-stretch gap-1.5">
+            {/* Middle Row: 6-Digit Registration + 3-Digit Subject Code */}
+            <div className="flex items-stretch gap-2">
               <div className="flex-1">
                 {renderDigitGrid(
                   isBangla ? "রেজিস্ট্রেশন নম্বর (REG)" : "REGISTRATION NO",
@@ -600,32 +649,40 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
                   regDigits
                 )}
               </div>
-              <div className="w-[74px]">
+              <div className="w-[82px]">
                 {renderDigitGrid(isBangla ? "বিষয় কোড" : "SUB CODE", "SubjectCode", "sub", 3)}
               </div>
             </div>
 
             {/* Candidate Signature & Serial Strip */}
             <div className="flex items-stretch gap-2">
-              <div className="flex-1 border-[1.3px] border-black bg-white h-[44px] flex flex-col justify-end p-1">
+              <div className="flex-1 border-[1.35px] border-black bg-white h-[48px] flex flex-col justify-end p-1">
                 <span className="text-[8px] font-bold text-center border-t border-black/40 pt-0.5">
                   {isBangla ? "পরীক্ষার্থীর পূর্ণ স্বাক্ষর ও তারিখ" : "Candidate's Full Signature & Date"}
                 </span>
               </div>
-              <div className="w-[125px] border-[1.3px] border-black bg-neutral-100 p-1 flex flex-col justify-center items-center">
-                <span className="text-[7.5px] font-bold uppercase tracking-wider">OMR SERIAL ID</span>
-                <span className="text-[10px] font-mono font-black tracking-tight">
+              <div className="w-[136px] border-[1.35px] border-black bg-neutral-100 p-1 flex flex-col justify-center items-center">
+                <span
+                  className="omr-latin-num text-[7.5px] font-bold uppercase tracking-wider"
+                  style={{ fontFamily: LATIN_NUM_FONT }}
+                >
+                  OMR SERIAL ID
+                </span>
+                <span
+                  className="omr-latin-num text-[10px] font-black tracking-tight mt-0.5"
+                  style={{ fontFamily: LATIN_NUM_FONT }}
+                >
                   {(uniqueCode || "OMR2026001").slice(0, 12).toUpperCase()}
                 </span>
               </div>
             </div>
 
-            {/* Official Board Monochrome Fill Rules */}
-            <div className="border-[1.4px] border-black bg-white p-2 text-[8.5px] leading-snug">
-              <div className="text-center font-black border-b border-black pb-0.5 mb-1 text-[9.5px]">
+            {/* Official Board Monochrome Fill Rules (Anchored cleanly to bottom) */}
+            <div className="mt-auto border-[1.4px] border-black bg-white p-2.5 text-[8.5px] leading-snug">
+              <div className="text-center font-black border-b border-black pb-0.5 mb-1.5 text-[9.5px]">
                 {isBangla ? "বৃত্ত ভরাটের নিয়মাবলী (ভুল হলে উত্তর বাতিল হবে)" : "IMPORTANT MARKING INSTRUCTIONS"}
               </div>
-              <div className="flex items-center justify-between bg-neutral-100 border border-black/30 px-2 py-1 mb-1">
+              <div className="flex items-center justify-between bg-neutral-100 border border-black/30 px-2.5 py-1 mb-1.5">
                 <div className="flex items-center gap-1.5 font-bold">
                   <span>{isBangla ? "সঠিক পদ্ধতি:" : "CORRECT:"}</span>
                   <span className="inline-block w-3.5 h-3.5 rounded-full bg-black border border-black" />
@@ -638,8 +695,8 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
                   <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-black text-[8px]">◐</span>
                 </div>
               </div>
-              <ol className="list-decimal pl-3.5 space-y-0.5 font-medium text-neutral-900">
-                <li>{isBangla ? "রোল নম্বর, রেজিস্ট্রেশন নম্বর ও সেট কোড সঠিকভাবে ইংরেজি/বাংলা সংখ্যায় লিখে নিচের বৃত্ত ভরাট করুন।" : "Write Roll, Registration & Set Code accurately and darken bubbles completely."}</li>
+              <ol className="list-decimal pl-3.5 space-y-1 font-medium text-neutral-900">
+                <li>{isBangla ? "রোল নম্বর (৪ ডিজিট), রেজিস্ট্রেশন নম্বর (৬ ডিজিট) ও সেট কোড ইংরেজি সংখ্যায় লিখে নিচের বৃত্ত সম্পূর্ণ ভরাট করুন।" : "Write Roll (4 digits), Registration (6 digits) & Set Code accurately and darken bubbles completely."}</li>
                 <li>{isBangla ? "এক প্রশ্নে একাধিক বৃত্ত ভরাট করলে বা ঘষাঘষি করলে উত্তর বাতিল গণ্য হবে।" : "Multiple marks or incomplete erasures invalidate the answer."}</li>
                 <li>{isBangla ? "উত্তরপত্র ভাঁজ করবেন না এবং নির্ধারিত স্থান ব্যতীত কোনো দাগ দেবেন না।" : "Do not fold, staple, or make stray marks outside the bubbles."}</li>
               </ol>

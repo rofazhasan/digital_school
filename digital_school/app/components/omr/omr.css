@@ -185,6 +185,17 @@
   box-sizing: border-box;
 }
 
+/* Force true Latin/English 0-9 numerals (overrides NikoshBAN ASCII-to-Bengali glyph mapping) */
+.omr-latin-num,
+.omr-latin-num *,
+.bd-omr-printable-sheet .omr-latin-num,
+.bd-omr-printable-sheet .omr-latin-num *,
+.bd-cq-3part-sheet .omr-latin-num,
+.bd-cq-3part-sheet .omr-latin-num * {
+  font-family: 'Inter', 'Helvetica Neue', Arial, Helvetica, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 4 Corner High-Precision Optical Registration Markers */
 .fiducial-marker {
   position: absolute;
@@ -579,6 +590,8 @@
   padding: 4px 0;
 }
 
+.bd-omr-printable-sheet .matrix-bubble,
+.bd-omr-printable-sheet .matrix-bubble span,
 .matrix-bubble {
   width: 16px;
   height: 16px;
@@ -587,11 +600,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Inter', 'Helvetica Neue', Arial, Helvetica, sans-serif !important;
   font-size: 10px;
   font-weight: 700;
   color: var(--omr-theme);
   background: #fff;
   line-height: 1;
+}
+
+.bd-omr-printable-sheet .matrix-bubble span {
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent;
+}
+
+.bd-omr-printable-sheet .matrix-bubble.set-bubble,
+.bd-omr-printable-sheet .matrix-bubble.set-bubble span,
+.matrix-bubble.set-bubble {
+  font-family: 'NikoshBAN', 'Hind Siliguri', 'Inter', Arial, sans-serif !important;
 }
 
 .matrix-bubble.set-bubble {
@@ -1343,18 +1370,27 @@
 .cq-part-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 
 .cq-part-container.part-1-student {
-  padding-bottom: 0.25rem;
+  padding: 0;
 }
 .cq-part-container.part-2-examiner {
-  padding-top: 0.1rem;
-  padding-bottom: 0.25rem;
+  padding: 0;
 }
 .cq-part-container.part-3-script {
-  padding-top: 0.1rem;
+  padding-top: 2px;
+}
+
+/* Dedicated Detachable Optical Scan Box with Guaranteed Quiet Zones around Corner Fiducials */
+.cq-strip-scan-box {
+  position: relative;
+  padding: 6px 24px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  box-sizing: border-box;
 }
 
 /* Formal Double-Line Header (Aligned 2-Line Architecture Across All 3 Parts) */
@@ -1679,12 +1715,13 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1px solid var(--cq-border, #be185d);
+  border: 1.2px solid var(--cq-border, #be185d);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
-  font-weight: 600;
+  font-family: 'Inter', 'Helvetica Neue', Arial, Helvetica, sans-serif !important;
+  font-size: 0.62rem;
+  font-weight: 700;
   color: var(--cq-border, #be185d);
   background: #ffffff;
   line-height: 1;
@@ -1728,29 +1765,53 @@
   margin-top: 2px;
 }
 
-/* Perforation Divider */
+/* Perforation Divider — Crisp Full-Width Cut Guide Between Detachable Strips */
 .cq-perforation-divider {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 3px 0;
+  gap: 8px;
+  margin: 7px -18px;
+  padding: 3px 18px;
   position: relative;
+  background: #ffffff;
+  z-index: 20;
+}
+
+.cq-perforation-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1.8px dashed #111827;
+  z-index: 0;
 }
 
 .cq-scissor-icon {
-  font-size: 0.85rem;
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
 }
 
 .cq-perforation-label {
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: #64748b;
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  padding: 0 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 .cq-dashed-line {
   flex: 1;
-  border-bottom: 2px dashed #94a3b8;
 }
 
 /* ==========================================================================
@@ -1766,7 +1827,7 @@
 
 .cq-p2-grid-layout {
   display: grid;
-  grid-template-columns: 70px 90px 90px 60px 90px 115px 1fr;
+  grid-template-columns: 64px 82px 82px 54px 78px 104px 1fr;
   gap: 4px;
   align-items: stretch;
 }

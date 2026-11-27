@@ -9,10 +9,10 @@ import { saveCalibratedTemplateLocal } from '@/lib/omr/presetTemplates';
 const StripCornerFiducials = ({ prefix }: { prefix: string }) => (
   <>
     {[
-      { id: `${prefix}_TL`, style: { top: 3, left: 3 } },
-      { id: `${prefix}_TR`, style: { top: 3, right: 3 } },
-      { id: `${prefix}_BL`, style: { bottom: 14, left: 3 } },
-      { id: `${prefix}_BR`, style: { bottom: 14, right: 3 } },
+      { id: `${prefix}_TL`, style: { top: 2, left: 2 } },
+      { id: `${prefix}_TR`, style: { top: 2, right: 2 } },
+      { id: `${prefix}_BL`, style: { bottom: 2, left: 2 } },
+      { id: `${prefix}_BR`, style: { bottom: 2, right: 2 } },
     ].map((m) => (
       <div
         key={m.id}
@@ -36,6 +36,16 @@ const StripCornerFiducials = ({ prefix }: { prefix: string }) => (
       </div>
     ))}
   </>
+);
+
+const CrispScissorIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <line x1="20" y1="4" x2="8.12" y2="15.88" />
+    <line x1="14.47" y1="14.48" x2="20" y2="20" />
+    <line x1="8.12" y1="8.12" x2="12" y2="12" />
+  </svg>
 );
 
 export interface BangladeshBoardCQ3PartSheetProps {
@@ -149,8 +159,8 @@ export function BangladeshBoardCQ3PartSheet({
     border: '#be185d',
   };
 
-  const part1Ref = useRef<HTMLElement>(null);
-  const part2Ref = useRef<HTMLElement>(null);
+  const part1Ref = useRef<HTMLDivElement>(null);
+  const part2Ref = useRef<HTMLDivElement>(null);
 
   // Auto-calibrate BOTH detachable strips (Part 1 Student & Part 2 Examiner) strictly relative to each strip's OWN 4 fiducials
   useEffect(() => {
@@ -262,31 +272,6 @@ export function BangladeshBoardCQ3PartSheet({
         '--cq-border': themePalette.border,
       } as React.CSSProperties}
     >
-      {/* 4 High-Contrast Solid Pro Concentric Bullseye Fiducials (Optimal for Phone & Flatbed Scan) */}
-      {[
-        { pos: 'top-left', id: 'TL' },
-        { pos: 'top-right', id: 'TR' },
-        { pos: 'bottom-left', id: 'BL' },
-        { pos: 'bottom-right', id: 'BR' },
-      ].map((m) => (
-        <div key={m.id} className={`cq-crosshair ${m.pos}`} data-omr-fiducial={m.id}>
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              border: '3px solid #000000',
-              background: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxSizing: 'border-box',
-            }}
-          >
-            <div style={{ width: 10, height: 10, background: '#000000' }} />
-          </div>
-        </div>
-      ))}
-
       {/* Lateral Continuous Timing Tracks (Left & Right) */}
       <div className="cq-side-timing left">
         {[...Array(40)].map((_, i) => <div key={i} className="cq-sync-block"></div>)}
@@ -298,7 +283,8 @@ export function BangladeshBoardCQ3PartSheet({
       {/* ========================================================================= */}
       {/* PART 1: পরীক্ষার্থীর অংশ (Detachable Student Identification Strip)        */}
       {/* ========================================================================= */}
-      <section ref={part1Ref} className="cq-part-container part-1-student" style={{ position: 'relative' }}>
+      <section className="cq-part-container part-1-student">
+        <div ref={part1Ref as React.RefObject<HTMLDivElement>} className="cq-strip-scan-box">
         <StripCornerFiducials prefix="P1" />
         <div className="cq-part-header formal-double-line">
           {/* Left Tag */}
@@ -327,7 +313,7 @@ export function BangladeshBoardCQ3PartSheet({
 
           {/* Right: Tracking Box */}
           <div className="cq-header-side right">
-            <div className="cq-serial-number">{effectiveSerial}</div>
+            <div className="cq-serial-number omr-latin-num">{effectiveSerial}</div>
             <div className="cq-qr-wrapper">
               <QRCodeSVG
                 value={JSON.stringify({
@@ -389,7 +375,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="Roll" data-omr-label={`roll${colIdx + 1}`} data-omr-value={String(d)}>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="Roll" data-omr-label={`roll${colIdx + 1}`} data-omr-value={String(d)}>
                       <span>{d}</span>
                     </div>
                   ))}
@@ -408,7 +394,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(6)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="Registration" data-omr-label={`reg${colIdx + 1}`} data-omr-value={String(d)}>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="Registration" data-omr-label={`reg${colIdx + 1}`} data-omr-value={String(d)}>
                       <span>{d}</span>
                     </div>
                   ))}
@@ -427,7 +413,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="SubjectCode" data-omr-label={`sub${colIdx + 1}`} data-omr-value={String(d)}>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="SubjectCode" data-omr-label={`sub${colIdx + 1}`} data-omr-value={String(d)}>
                       <span>{d}</span>
                     </div>
                   ))}
@@ -446,7 +432,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(2)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExtraScripts" data-omr-label={`extra${colIdx + 1}`} data-omr-value={String(d)}>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="ExtraScripts" data-omr-label={`extra${colIdx + 1}`} data-omr-value={String(d)}>
                       <span>{d}</span>
                     </div>
                   ))}
@@ -472,18 +458,21 @@ export function BangladeshBoardCQ3PartSheet({
           </div>
         </div>
 
-        {/* Bottom Perforation Marker for Part 1 */}
+        </div>
+        {/* Bottom Perforation Cut Guide — Strictly Outside Part 1 & Part 2 Scan Boxes */}
         <div className="cq-perforation-divider">
-          <span className="cq-scissor-icon">✂️</span>
-          <span className="cq-perforation-label">পরীক্ষক / প্র: পরীক্ষকের অংশ</span>
+          <span className="cq-scissor-icon"><CrispScissorIcon /></span>
+          <span className="cq-perforation-label">এখান থেকে কাটুন (CUT HERE — পরীক্ষার্থীর অংশ বিচ্ছিন্ন করুন)</span>
           <div className="cq-dashed-line"></div>
+          <span className="cq-scissor-icon"><CrispScissorIcon /></span>
         </div>
       </section>
 
       {/* ========================================================================= */}
       {/* PART 2: পরীক্ষক ও প্রধান পরীক্ষকের অংশ (Detachable Blind-Grading Strip)   */}
       {/* ========================================================================= */}
-      <section ref={part2Ref} className="cq-part-container part-2-examiner" style={{ position: 'relative' }}>
+      <section className="cq-part-container part-2-examiner">
+        <div ref={part2Ref as React.RefObject<HTMLDivElement>} className="cq-strip-scan-box">
         <StripCornerFiducials prefix="P2" />
         <div className="cq-part-header formal-double-line">
           {/* Left Tag */}
@@ -512,7 +501,7 @@ export function BangladeshBoardCQ3PartSheet({
 
           {/* Right: Tracking QR & Shared Serial Number for Detached Blind-Grading Pairing */}
           <div className="cq-header-side right">
-            <div className="cq-serial-number" style={{ fontSize: '9px' }}>{effectiveSerial}</div>
+            <div className="cq-serial-number omr-latin-num" style={{ fontSize: '9px' }}>{effectiveSerial}</div>
             <div className="cq-qr-wrapper sm">
               <QRCodeSVG
                 value={JSON.stringify({
@@ -557,7 +546,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="SubjectCodePart2" data-omr-label={`subP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="SubjectCodePart2" data-omr-label={`subP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -574,7 +563,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExaminerCode" data-omr-label={`exCode${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="ExaminerCode" data-omr-label={`exCode${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -591,7 +580,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ScriptSerial" data-omr-label={`serial${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="ScriptSerial" data-omr-label={`serial${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -608,7 +597,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(2)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExtraScriptsPart2" data-omr-label={`extraP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="ExtraScriptsPart2" data-omr-label={`extraP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -625,7 +614,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ObtainedMarks" data-omr-label={`marks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="ObtainedMarks" data-omr-label={`marks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -642,7 +631,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="HeadExaminerMarks" data-omr-label={`headMarks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
+                    <div key={d} className="cq-bubble-item omr-latin-num" data-omr-bubble="1" data-omr-block="HeadExaminerMarks" data-omr-label={`headMarks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
@@ -674,11 +663,13 @@ export function BangladeshBoardCQ3PartSheet({
           </div>
         </div>
 
-        {/* Perforation Line for Part 2 */}
+        </div>
+        {/* Perforation Cut Guide Between Part 2 & Part 3 */}
         <div className="cq-perforation-divider">
-          <span className="cq-scissor-icon">✂️</span>
-          <span className="cq-perforation-label">উত্তরপত্রের অংশ</span>
+          <span className="cq-scissor-icon"><CrispScissorIcon /></span>
+          <span className="cq-perforation-label">এখান থেকে কাটুন (CUT HERE — উত্তরপত্রের অংশ)</span>
           <div className="cq-dashed-line"></div>
+          <span className="cq-scissor-icon"><CrispScissorIcon /></span>
         </div>
       </section>
 
