@@ -887,12 +887,35 @@ export default function PrintExamPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Build clean PDF filename: "<Exam Name>_<Class>"
+  const printPdfTitle = useMemo(() => {
+    const rawExam = String(examData?.examInfo?.title || examData?.examInfo?.name || 'Exam').trim();
+    const rawClass = String(
+      examData?.examInfo?.className ||
+        examData?.examInfo?.class?.name ||
+        examData?.examInfo?.class ||
+        examData?.examInfo?.subject ||
+        ''
+    ).trim();
+    const combined = rawClass ? `${rawExam}_${rawClass}` : rawExam;
+    return combined.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim() || 'exam-print';
+  }, [examData]);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined' && printPdfTitle) {
+      document.title = printPdfTitle;
+    }
+  }, [printPdfTitle]);
+
   // --- THE CORE PRINTING LOGIC ---
   // @ts-ignore: react-to-print typing issue, content is valid
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: examData?.examInfo?.title || "exam-print",
+    documentTitle: printPdfTitle,
     onBeforeGetContent: async () => {
+      if (typeof document !== 'undefined' && printPdfTitle) {
+        document.title = printPdfTitle;
+      }
       setIsPrinting(true);
       if (isMathJaxReady) {
         return;

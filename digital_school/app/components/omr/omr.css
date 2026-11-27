@@ -957,12 +957,10 @@
     overflow: visible !important;
   }
 
-  /* Hide interactive UI elements */
+  /* Hide interactive UI elements (scoped so OMRSheet/QuestionPaper <header> elements are NEVER hidden!) */
   .no-print,
-  header,
   nav,
   .enterprise-nav,
-  .header,
   .status-badge,
   .preset-selector,
   .studio-header,
@@ -970,14 +968,15 @@
   .generator-sidebar,
   .sheet-zoom-ribbon,
   .modal-actions-bar,
-  button {
+  .bangladesh-omr-generator button {
     display: none !important;
     visibility: hidden !important;
   }
 
-  /* Hide everything by default, then reveal ONLY the printable sheets */
-  body * {
-    visibility: hidden;
+  /* Scope print isolation strictly to BangladeshOMRGenerator — NEVER hide body * globally
+     because /exams/[id]/print uses react-to-print for QuestionPaper, OMRSheet & CQ Top Cover! */
+  .bangladesh-omr-generator .no-print {
+    display: none !important;
   }
 
   .bd-omr-printable-sheet,

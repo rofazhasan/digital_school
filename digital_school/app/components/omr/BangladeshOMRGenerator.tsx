@@ -855,12 +855,20 @@ export function BangladeshOMRGenerator({
       })
       .join('\n');
 
+    const pdfFileName = [examTitleBangla || 'OMR_Sheet', metaClass || '']
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join('_')
+      .replace(/[\\/:*?"<>|]+/g, '');
+    const prevDocTitle = document.title;
+    if (pdfFileName) document.title = pdfFileName;
+
     doc.open();
     doc.write(`<!doctype html>
       <html lang="bn">
         <head>
           <meta charset="utf-8" />
-          <title>${examTitleBangla || 'OMR Sheet'}</title>
+          <title>${pdfFileName || 'OMR_Sheet'}</title>
           ${headStyles}
           <style>
             @page {
@@ -940,7 +948,10 @@ export function BangladeshOMRGenerator({
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
       } finally {
-        setTimeout(() => iframe.remove(), 2500);
+        setTimeout(() => {
+          iframe.remove();
+          document.title = prevDocTitle;
+        }, 2500);
       }
     }, 350);
   };
