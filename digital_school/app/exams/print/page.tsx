@@ -13,6 +13,7 @@ import {
   Search,
 } from 'lucide-react';
 import { BangladeshOMRGenerator, type PresetType } from '@/app/components/omr/BangladeshOMRGenerator';
+import { ExamOMRPackGenerator } from '@/app/components/omr/ExamOMRPackGenerator';
 
 export default function ExamPrintHubPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function ExamPrintHubPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'blank_omr' | 'select_exam'>('blank_omr');
   const [selectedPreset, setSelectedPreset] = useState<PresetType>('medical_100');
+  const [selectedExamForOmrPack, setSelectedExamForOmrPack] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadRecentExams() {
@@ -175,6 +177,12 @@ export default function ExamPrintHubPage() {
         </div>
 
         {activeTab === 'select_exam' ? (
+          selectedExamForOmrPack ? (
+            <ExamOMRPackGenerator
+              examId={selectedExamForOmrPack}
+              onBack={() => setSelectedExamForOmrPack(null)}
+            />
+          ) : (
           <div>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
@@ -227,20 +235,28 @@ export default function ExamPrintHubPage() {
                       </p>
                     </div>
 
-                    <div className="flex gap-2 pt-2 border-t border-slate-800/80">
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedExamForOmrPack(exam.id)}
+                        className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition-colors shadow-sm cursor-pointer"
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>সেট OMR + CQ কভার</span>
+                      </button>
                       <Link
                         href={`/exams/${exam.id}/print`}
-                        className="flex-1 py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        className="py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition-colors shadow-sm"
                       >
                         <Printer className="w-3.5 h-3.5" />
-                        <span>প্রিন্ট করুন</span>
+                        <span>প্রশ্ন</span>
                       </Link>
                       <Link
                         href={`/exams/${exam.id}/omr-scan`}
-                        className="py-1.5 px-3 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                        className="py-1.5 px-2.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1 transition-colors"
                       >
                         <ScanLine className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>OMR স্ক্যান</span>
+                        <span>স্ক্যান</span>
                       </Link>
                     </div>
                   </div>
@@ -248,6 +264,7 @@ export default function ExamPrintHubPage() {
               </div>
             )}
           </div>
+          )
         ) : (
           <div>
             {/* Interactive Quick Master Preset Selector Cards */}

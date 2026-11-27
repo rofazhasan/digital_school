@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest, hasPermission } from '@/lib/auth';
 import { calculateGrade } from '@/lib/utils';
+import {
+  buildRosterIndex,
+  matchStudentByRollOrReg,
+  sanitizeNumericId,
+} from '@/lib/omr/studentIdentityMatcher';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
@@ -51,6 +56,10 @@ const omrScanItemSchema = z.object({
 
 const omrBatchPayloadSchema = z.object({
   scans: z.array(omrScanItemSchema).min(1, 'At least one scan result must be provided in payload'),
+  /** When true, publishes Results immediately to Student Dashboard (/exams/online). When false, holds in /exams/evaluations for Superadmin Release. */
+  autoRelease: z.boolean().optional().default(false),
+  /** For 500+ chunked uploads: set true on intermediate chunks, false on final chunk so DENSE_RANK runs once atomically. */
+  skipRanking: z.boolean().optional().default(false),
 });
 
 const BN_TO_EN_OPTION: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D', 'ঙ': 'E' };
@@ -105,7 +114,7 @@ export async function POST(
       );
     }
 
-    const { scans } = validation.data;
+    const { scans, autoRelease, skipRanking } = validation.data;
 
     // 1. Fetch exam + sets + negative marking config
     const exam = await prismadb.exam.findUnique({
@@ -151,27 +160,35 @@ export async function POST(
       });
     }
 
-    // 3. Batch pre-fetch candidate profiles + existing Results (for seamless CQ + MCQ score merging!)
+    // 3. Pre-fetch full class roster + matching roll/reg profiles for fault-tolerant Roll/Reg recovery
     const rollVariants = new Set<string>();
     scans.forEach((scan) => {
-      const rawRoll = String(scan.rollNumber || '').trim();
-      const englishRoll = rawRoll.replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
-      const strippedRoll = String(parseInt(englishRoll, 10) || englishRoll);
-      rollVariants.add(rawRoll);
-      rollVariants.add(englishRoll);
-      rollVariants.add(strippedRoll);
-      if (strippedRoll.length <= 7) {
-        rollVariants.add(strippedRoll.padStart(6, '0'));
-        rollVariants.add(strippedRoll.padStart(7, '0'));
+      const rInfo = sanitizeNumericId(scan.rollNumber);
+      const regInfo = sanitizeNumericId(scan.registrationNo);
+      if (rInfo.digits) {
+        rollVariants.add(rInfo.digits);
+        rollVariants.add(rInfo.stripped);
+        if (rInfo.stripped.length <= 7) {
+          rollVariants.add(rInfo.stripped.padStart(6, '0'));
+          rollVariants.add(rInfo.stripped.padStart(7, '0'));
+        }
       }
-      if (scan.registrationNo) rollVariants.add(scan.registrationNo.trim());
+      if (regInfo.digits) {
+        rollVariants.add(regInfo.digits);
+        rollVariants.add(regInfo.stripped);
+      }
     });
 
     const candidateProfiles = await prismadb.studentProfile.findMany({
       where: {
         OR: [
-          { roll: { in: Array.from(rollVariants) } },
-          { registrationNo: { in: Array.from(rollVariants) } },
+          ...(exam.classId ? [{ classId: exam.classId }] : []),
+          ...(rollVariants.size > 0
+            ? [
+                { roll: { in: Array.from(rollVariants) } },
+                { registrationNo: { in: Array.from(rollVariants) } },
+              ]
+            : []),
         ],
       },
       select: {
@@ -183,14 +200,7 @@ export async function POST(
       },
     });
 
-    const studentMap = new Map<string, any>();
-    candidateProfiles.forEach((sp) => {
-      if (sp.roll) {
-        studentMap.set(sp.roll, sp);
-        studentMap.set(String(parseInt(sp.roll, 10) || sp.roll), sp);
-      }
-      if (sp.registrationNo) studentMap.set(sp.registrationNo, sp);
-    });
+    const rosterIndex = buildRosterIndex(candidateProfiles);
 
     const existingResults = await prismadb.result.findMany({
       where: { examId: exam.id },
@@ -222,35 +232,35 @@ export async function POST(
         }
       } catch {}
 
-      const rawRoll = String(scan.rollNumber || '').trim();
-      const englishRoll = rawRoll.replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
-      const strippedRoll = String(parseInt(englishRoll, 10) || englishRoll);
-      const cleanRoll = englishRoll;
+      // Strict numeric-only Roll & Registration sanitization + 3-tier fault-tolerant recovery
+      const matchRes = matchStudentByRollOrReg(rosterIndex, scan.rollNumber, scan.registrationNo);
+      const cleanRoll = matchRes.sanitizedRoll || '000000';
+      const cleanReg = matchRes.sanitizedReg || undefined;
 
       const rawSet = String(scan.examSet || 'A').trim().toUpperCase();
       const cleanSet = rawSet.replace(/^(set|সেট)\s*[-:]?\s*/i, '').trim();
       const normSetLetter = normalizeOptionLetter(cleanSet) || cleanSet;
 
-      let student: any =
-        studentMap.get(cleanRoll) ||
-        studentMap.get(strippedRoll) ||
-        studentMap.get(rawRoll) ||
-        (scan.registrationNo ? studentMap.get(scan.registrationNo.trim()) : null);
+      let student: any = matchRes.student;
+      let resolvedMatchMethod: string = matchRes.matchMethod;
 
       if (!student && scan.allowCreateMissingStudent !== false) {
         try {
-          const dummyReg = scan.registrationNo?.trim() || `AUTO_OMR_${cleanRoll}_${Date.now().toString().slice(-4)}`;
+          const numericRollForCreate = cleanRoll.replace(/\D/g, '') || String(Date.now()).slice(-6);
+          const numericRegForCreate =
+            (cleanReg && cleanReg.replace(/\D/g, '')) ||
+            `${new Date().getFullYear()}${numericRollForCreate.padStart(6, '0')}`;
           const created: any = await prismadb.studentProfile.create({
             data: {
-              roll: strippedRoll || cleanRoll || '000000',
-              registrationNo: dummyReg,
+              roll: numericRollForCreate,
+              registrationNo: numericRegForCreate,
               guardianName: 'Guardian',
               guardianPhone: '01700000000',
               class: { connect: { id: exam.classId } },
               user: {
                 create: {
-                  name: `Student Roll ${strippedRoll || cleanRoll || 'Unknown'}`,
-                  email: `student_${cleanRoll || uuidv4().slice(0, 6)}@school.local`,
+                  name: `Student Roll ${numericRollForCreate}`,
+                  email: `student_${numericRollForCreate}_${uuidv4().slice(0, 4)}@school.local`,
                   role: 'STUDENT' as any,
                   password: '$2a$10$dummyHashPlaceholderPasswordForOMRScanOnly',
                 },
@@ -259,8 +269,9 @@ export async function POST(
             include: { user: { select: { id: true, name: true, email: true } } },
           });
           student = created;
-          studentMap.set(cleanRoll, created);
-          studentMap.set(strippedRoll, created);
+          resolvedMatchMethod = 'AUTO_CREATED';
+          rosterIndex.byRollExact.set(numericRollForCreate, created);
+          rosterIndex.byRegExact.set(numericRegForCreate, created);
         } catch (createErr) {
           console.error(`[OMR Batch] Could not auto-create student for roll ${cleanRoll}:`, createErr);
         }
@@ -493,6 +504,13 @@ export async function POST(
         sqMarks: nextSqMarks,
       });
 
+      const submissionNote = [
+        isCQSheet ? 'OMR_OFFLINE_CQ_SCAN' : 'OMR_OFFLINE_MCQ_SCAN',
+        matchRes.note ? `| ${matchRes.note}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
       const submission = await prismadb.examSubmission.upsert({
         where: { studentId_examId: { studentId: student.id, examId: exam.id } },
         update: {
@@ -501,6 +519,7 @@ export async function POST(
           examSetId: matchedSet?.id || undefined,
           status: 'SUBMITTED',
           evaluatedAt: new Date(),
+          evaluatorNotes: submissionNote,
           ...(isCQSheet
             ? { cqSqStatus: 'SUBMITTED', cqSqSubmittedAt: new Date() }
             : { objectiveStatus: 'SUBMITTED', objectiveSubmittedAt: new Date() }),
@@ -513,6 +532,7 @@ export async function POST(
           score: combinedTotal,
           status: 'SUBMITTED',
           evaluatedAt: new Date(),
+          evaluatorNotes: submissionNote,
           ...(isCQSheet
             ? { cqSqStatus: 'SUBMITTED', cqSqSubmittedAt: new Date() }
             : { objectiveStatus: 'SUBMITTED', objectiveSubmittedAt: new Date() }),
@@ -528,8 +548,8 @@ export async function POST(
           total: combinedTotal,
           percentage: combinedPct,
           grade,
-          isPublished: true,
-          publishedAt: new Date(),
+          isPublished: autoRelease,
+          publishedAt: autoRelease ? new Date() : null,
           examSubmissionId: submission.id,
           omrScanId: omrScan?.id || null,
         },
@@ -542,8 +562,8 @@ export async function POST(
           total: combinedTotal,
           percentage: combinedPct,
           grade,
-          isPublished: true,
-          publishedAt: new Date(),
+          isPublished: autoRelease,
+          publishedAt: autoRelease ? new Date() : null,
           examSubmissionId: submission.id,
           omrScanId: omrScan?.id || null,
         },
@@ -559,6 +579,9 @@ export async function POST(
       successCount++;
       savedResults.push({
         rollNumber: cleanRoll,
+        registrationNo: cleanReg || student.registrationNo || null,
+        matchMethod: resolvedMatchMethod,
+        matchNote: matchRes.note || null,
         studentId: student.id,
         studentName: student.user?.name || `Roll ${cleanRoll}`,
         mcqMarks: nextMcqMarks,
@@ -566,26 +589,29 @@ export async function POST(
         score: combinedTotal,
         percentage: combinedPct,
         grade,
+        isPublished: autoRelease,
         submissionId: submission.id,
         resultId: result.id,
       });
     }
 
-    // 5. Atomic Cohort Ranking via PostgreSQL DENSE_RANK
-    try {
-      await prismadb.$executeRaw`
-        WITH ranked AS (
-          SELECT id, DENSE_RANK() OVER (ORDER BY total DESC) as calc_rank
-          FROM results
-          WHERE "examId" = ${exam.id}
-        )
-        UPDATE results r
-        SET rank = ranked.calc_rank
-        FROM ranked
-        WHERE r.id = ranked.id;
-      `;
-    } catch (rankErr) {
-      console.warn('Could not execute atomic cohort ranking:', rankErr);
+    // 5. Atomic Cohort Ranking via PostgreSQL DENSE_RANK (run once on final chunk for 500+ speed)
+    if (!skipRanking) {
+      try {
+        await prismadb.$executeRaw`
+          WITH ranked AS (
+            SELECT id, DENSE_RANK() OVER (ORDER BY total DESC) as calc_rank
+            FROM results
+            WHERE "examId" = ${exam.id}
+          )
+          UPDATE results r
+          SET rank = ranked.calc_rank
+          FROM ranked
+          WHERE r.id = ranked.id;
+        `;
+      } catch (rankErr) {
+        console.warn('Could not execute atomic cohort ranking:', rankErr);
+      }
     }
 
     // 6. Finalize OMRScanSession
@@ -594,11 +620,11 @@ export async function POST(
         where: { id: session.id },
         data: {
           processedFiles: successCount,
-          publishedCount: successCount,
-          status: 'PUBLISHED',
+          publishedCount: autoRelease ? successCount : 0,
+          status: autoRelease ? 'PUBLISHED' : 'EVALUATED',
           isCompleted: true,
           completedAt: new Date(),
-          publishedAt: new Date(),
+          publishedAt: autoRelease ? new Date() : null,
         },
       }).catch(() => {});
     }
@@ -607,8 +633,11 @@ export async function POST(
       success: true,
       count: successCount,
       processedCount: successCount,
+      autoRelease,
       results: savedResults,
-      message: `সফলভাবে ${successCount} টি OMR খাতার মূল্যায়ন সম্পন্ন ও ডাটাবেসে প্রকাশিত হয়েছে!`,
+      message: autoRelease
+        ? `সফলভাবে ${successCount} টি OMR খাতার ফলাফল প্রকাশিত (Auto-Released) হয়েছে — শিক্ষার্থীরা এখন /exams/online-এ দেখতে পারবে!`
+        : `সফলভাবে ${successCount} টি OMR সাবমিশন সংরক্ষিত হয়েছে — সুপারঅ্যাডমিন /exams/evaluations থেকে রিলিজ করতে পারবেন!`,
     });
   } catch (error: any) {
     console.error('POST /api/exams/[id]/omr-batch-submit Error:', error);

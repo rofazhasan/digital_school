@@ -58,6 +58,11 @@ import { StudentOMRReportCardModal } from '@/app/components/omr/StudentOMRReport
 import { MeritListModal } from '@/app/components/omr/MeritListModal';
 import { streamPdfPages } from '@/lib/omr/pdfLoader';
 import { isNativeCapacitorRuntime, captureWithNativeDocumentScanner } from '@/lib/omr/nativeScanner';
+import {
+  buildRosterIndex,
+  matchStudentByRollOrReg,
+  sanitizeNumericId,
+} from '@/lib/omr/studentIdentityMatcher';
 
 interface ExamMetadata {
   id: string;
@@ -103,6 +108,11 @@ export default function UniversalOMRScannerPage() {
   const [isNativeApp, setIsNativeApp] = useState<boolean>(false);
   const [scannedMasterKeys, setScannedMasterKeys] = useState<Record<string, Record<string, string>>>({});
   const [masterKeySetTarget, setMasterKeySetTarget] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [autoReleaseResults, setAutoReleaseResults] = useState<boolean>(false);
+  const [syncChunkProgress, setSyncChunkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [scanPhase, setScanPhase] = useState<'mcq' | 'cq'>('mcq');
+  const [scanSpeedSps, setScanSpeedSps] = useState<number>(0);
+  const cancelBatchRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsNativeApp(isNativeCapacitorRuntime());
@@ -515,22 +525,39 @@ export default function UniversalOMRScannerPage() {
       scanRes.flags
     );
 
-    // Populate dynamic Registration & QR fallback Roll (for pre-filled student sheets)
-    if (!card.registrationNo) {
-      const regVal = scanRes.concatenatedResponses['Registration'] || scanRes.concatenatedResponses['Reg'];
-      if (regVal) card.registrationNo = regVal;
-    }
+    // Enforce strict numeric-only Roll & Registration + 3-tier fault-tolerant student recovery
+    const rawReg = card.registrationNo || scanRes.concatenatedResponses['Registration'] || scanRes.concatenatedResponses['Reg'] || '';
     const qrRoll = qr.found && qr.parsedPayload?.rollNumber ? String(qr.parsedPayload.rollNumber) : '';
-    if ((!card.rollNumber || card.rollNumber === 'UNKNOWN' || card.rollNumber === 'N/A') && qrRoll) {
-      card.rollNumber = qrRoll;
-    }
+    const rawRoll =
+      card.rollNumber && card.rollNumber !== 'UNKNOWN' && card.rollNumber !== 'N/A'
+        ? card.rollNumber
+        : qrRoll;
 
-    const rollStr = card.rollNumber || '';
-    const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
-    const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
-    if (matched) {
-      card.studentId = matched.id;
-      card.studentName = matched.name;
+    const rollSan = sanitizeNumericId(rawRoll);
+    const regSan = sanitizeNumericId(rawReg);
+    if (rollSan.digits) card.rollNumber = rollSan.digits;
+    if (regSan.digits) card.registrationNo = regSan.digits;
+
+    if (examInfo?.exam?.students && examInfo.exam.students.length > 0) {
+      const rosterIdx = buildRosterIndex(examInfo.exam.students);
+      const matchRes = matchStudentByRollOrReg(rosterIdx, card.rollNumber, card.registrationNo);
+      if (matchRes.student) {
+        card.studentId = matchRes.student.id;
+        card.studentName = matchRes.student.user?.name || `Roll ${matchRes.sanitizedRoll}`;
+        if (matchRes.sanitizedRoll) card.rollNumber = matchRes.sanitizedRoll;
+        if (matchRes.sanitizedReg) card.registrationNo = matchRes.sanitizedReg;
+        if (matchRes.note) {
+          card.flags = [...(card.flags || []), matchRes.note];
+        }
+      }
+    } else {
+      const rollStr = card.rollNumber || '';
+      const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
+      const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
+      if (matched) {
+        card.studentId = matched.id;
+        card.studentName = matched.name;
+      }
     }
 
     (card as any).examId = targetExamId;
@@ -566,11 +593,20 @@ export default function UniversalOMRScannerPage() {
     let failCount = 0;
     let processedSoFar = 0;
     let estimatedTotal = files.length;
+    cancelBatchRef.current = false;
+    const batchStartMs = performance.now();
 
     const processSingleCanvasItem = async (canvas: HTMLCanvasElement, name: string) => {
+      if (cancelBatchRef.current) {
+        canvas.width = 0;
+        canvas.height = 0;
+        return;
+      }
       processedSoFar++;
       setProgress({ current: processedSoFar, total: Math.max(estimatedTotal, processedSoFar) });
-      await new Promise((r) => setTimeout(r, 6));
+      const elapsedSec = Math.max(0.1, (performance.now() - batchStartMs) / 1000);
+      setScanSpeedSps(parseFloat((processedSoFar / elapsedSec).toFixed(1)));
+      await new Promise((r) => setTimeout(r, 4));
       try {
         const res = await ingestSingleSheetCanvas(canvas, name);
         if (res) {
@@ -1001,20 +1037,29 @@ export default function UniversalOMRScannerPage() {
    */
   const handleSaveMetaOverride = async () => {
     if (!selectedScoreCard) return;
+    const cleanDraftRoll = sanitizeNumericId(draftRoll).digits;
+    const cleanDraftReg = sanitizeNumericId(draftReg).digits;
+    if (!cleanDraftRoll) {
+      alert('রোল নম্বর অবশ্যই শুধুমাত্র সংখ্যা (0-9) হতে হবে!');
+      return;
+    }
+    if (cleanDraftRoll !== draftRoll) setDraftRoll(cleanDraftRoll);
+    if (cleanDraftReg !== draftReg) setDraftReg(cleanDraftReg);
+
     const sheetId = selectedScoreCard.sheetId;
     const targetExamId = (selectedScoreCard as any).examId || selectedExamId;
     const examInfo = await getExamData(targetExamId);
 
     const newLogs: AuditLogEntry[] = [...(correctionLogs[sheetId] || [])];
-    if (draftRoll !== selectedScoreCard.rollNumber) {
+    if (cleanDraftRoll !== selectedScoreCard.rollNumber) {
       newLogs.push({
         id: `corr_${Date.now()}_roll`,
         timestamp: Date.now(),
         sheetId,
         field: 'Roll',
         previousValue: selectedScoreCard.rollNumber,
-        newValue: draftRoll,
-        reason: 'Manual HITL Roll correction',
+        newValue: cleanDraftRoll,
+        reason: 'Manual HITL numeric Roll correction',
         operator: 'Teacher',
       });
     }
@@ -1261,15 +1306,29 @@ export default function UniversalOMRScannerPage() {
       groups[eid].push(c);
     });
 
+    const CHUNK_SIZE = 25; // Scales smoothly to 500–2,000+ sheets with zero serverless timeout or 413 errors
+    const totalChunksAll = Object.values(groups).reduce(
+      (sum, arr) => sum + Math.ceil(arr.length / CHUNK_SIZE),
+      0
+    );
+    let completedChunks = 0;
+    setSyncChunkProgress({ current: 0, total: totalChunksAll });
+
     let totalSaved = 0;
     let anyError = '';
-    const syncedSheetIds: string[] = [];
 
     for (const [eId, cards] of Object.entries(groups)) {
       if (!eId) continue;
-      try {
+      const totalExamChunks = Math.ceil(cards.length / CHUNK_SIZE);
+
+      for (let chunkIdx = 0; chunkIdx < totalExamChunks; chunkIdx++) {
+        const chunkCards = cards.slice(chunkIdx * CHUNK_SIZE, (chunkIdx + 1) * CHUNK_SIZE);
+        const isFinalChunkForExam = chunkIdx === totalExamChunks - 1;
+
         const payload = {
-          scans: cards.map((c) => {
+          autoRelease: autoReleaseResults,
+          skipRanking: !isFinalChunkForExam,
+          scans: chunkCards.map((c) => {
             const rawScan = scanResults[c.sheetId];
             const rawAns: Record<string, any> = {};
             if (c.questionVerdicts) {
@@ -1284,12 +1343,19 @@ export default function UniversalOMRScannerPage() {
             return {
               sheetId: c.sheetId,
               idempotencyKey: `${eId}:${c.sheetId}:${(correctionLogs[c.sheetId] || []).length}`,
-              rollNumber: c.rollNumber || '000000',
-              registrationNo: c.registrationNo || rawScan?.concatenatedResponses?.['Registration'] || undefined,
+              rollNumber: sanitizeNumericId(c.rollNumber).digits || '000000',
+              registrationNo:
+                sanitizeNumericId(c.registrationNo || rawScan?.concatenatedResponses?.['Registration']).digits ||
+                undefined,
               examSet: c.examSet || 'A',
               totalScore: c.totalScore,
               maxScore: c.maxScore || 100,
-              isCQScript: Boolean(c.isCQScript || cqObtained !== undefined || tplId === 'bangladesh_board_cq_top_sheet'),
+              isCQScript: Boolean(
+                scanPhase === 'cq' ||
+                c.isCQScript ||
+                cqObtained !== undefined ||
+                tplId === 'bangladesh_board_cq_top_sheet'
+              ),
               obtainedMarksCQ: cqObtained,
               rawAnswers: rawAns,
               evaluatedAnswers: c.questionVerdicts || {},
@@ -1310,36 +1376,52 @@ export default function UniversalOMRScannerPage() {
           }),
         };
 
-        const res = await fetch(`/api/exams/${eId}/omr-batch-submit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        // Resilient chunk POST with up to 2 automatic retries
+        let chunkOk = false;
+        for (let attempt = 0; attempt < 3 && !chunkOk; attempt++) {
+          try {
+            const res = await fetch(`/api/exams/${eId}/omr-batch-submit`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || `HTTP ${res.status}`);
+            }
+
+            const data = await res.json();
+            totalSaved += data.count || chunkCards.length;
+            await OmrOfflineStore.markSynced(chunkCards.map((c) => c.sheetId));
+            chunkOk = true;
+          } catch (err: any) {
+            if (attempt === 2) {
+              console.error(`Sync chunk ${chunkIdx + 1}/${totalExamChunks} failed for exam ${eId}:`, err);
+              anyError = err.message;
+            } else {
+              await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+            }
+          }
         }
 
-        const data = await res.json();
-        totalSaved += data.count || cards.length;
-        cards.forEach((c) => syncedSheetIds.push(c.sheetId));
-      } catch (err: any) {
-        console.error(`Sync error for exam ${eId}:`, err);
-        anyError = err.message;
+        completedChunks++;
+        setSyncChunkProgress({ current: completedChunks, total: totalChunksAll });
       }
     }
 
-    if (syncedSheetIds.length > 0) {
-      await OmrOfflineStore.markSynced(syncedSheetIds);
+    if (totalSaved > 0 && !anyError) {
       setOfflineRestoredCount(0);
     }
 
+    setSyncChunkProgress(null);
     setIsSyncing(false);
     if (totalSaved > 0) {
       setSyncStatus({
         success: true,
-        message: `সফলভাবে ${totalSaved} টি খাতার ফলাফল (MCQ/CQ মার্জ ও কোয়ালিটি লগসহ) ডাটাবেসে প্রকাশিত হয়েছে!`,
+        message: autoReleaseResults
+          ? `সফলভাবে ${totalSaved} টি খাতা ডাটাবেসে সাবমিট ও Auto-Release হয়েছে! শিক্ষার্থীরা এখন /exams/online-এ ফলাফল দেখতে পারবে।`
+          : `সফলভাবে ${totalSaved} টি খাতার ExamSubmission তৈরি হয়েছে! সুপারঅ্যাডমিন /exams/evaluations থেকে রিভিউ ও রিলিজ করতে পারবেন।`,
       });
     } else {
       setSyncStatus({
@@ -1453,6 +1535,19 @@ export default function UniversalOMRScannerPage() {
                 <span>CSV</span>
               </button>
 
+              <label
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-200 cursor-pointer select-none"
+                title="চালু করলে ফলাফল সরাসরি /exams/online-এ প্রকাশিত হবে; বন্ধ থাকলে সুপারঅ্যাডমিন /exams/evaluations থেকে রিভিউ করে রিলিজ করবেন"
+              >
+                <input
+                  type="checkbox"
+                  checked={autoReleaseResults}
+                  onChange={(e) => setAutoReleaseResults(e.target.checked)}
+                  className="accent-emerald-500"
+                />
+                <span>{autoReleaseResults ? 'অটো-রিলিজ: চালু' : 'সুপারঅ্যাডমিন রিভিউ'}</span>
+              </label>
+
               <button
                 type="button"
                 onClick={syncCohortToDatabase}
@@ -1462,12 +1557,20 @@ export default function UniversalOMRScannerPage() {
                 {isSyncing ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>সিঙ্ক হচ্ছে...</span>
+                    <span>
+                      {syncChunkProgress
+                        ? `সিঙ্ক ${syncChunkProgress.current}/${syncChunkProgress.total} চাঙ্ক...`
+                        : 'সিঙ্ক হচ্ছে...'}
+                    </span>
                   </>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>ডাটাবেসে পাবলিশ ({scoreCards.length})</span>
+                    <span>
+                      {autoReleaseResults
+                        ? `পাবলিশ ও রিলিজ (${scoreCards.length})`
+                        : `সাবমিশন পাঠান (${scoreCards.length})`}
+                    </span>
                   </>
                 )}
               </button>
@@ -1509,9 +1612,19 @@ export default function UniversalOMRScannerPage() {
             )}
             <span>{syncStatus.message}</span>
           </div>
-          <button onClick={() => setSyncStatus(null)} className="text-slate-400 hover:text-white text-xs cursor-pointer">
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {syncStatus.success && (
+              <Link
+                href={autoReleaseResults ? '/exams/online' : '/exams/evaluations'}
+                className="px-2.5 py-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-[11px] font-bold"
+              >
+                {autoReleaseResults ? 'ফলাফল দেখুন (/exams/online)' : 'ইভ্যালুয়েশন খুলুন (/exams/evaluations)'}
+              </Link>
+            )}
+            <button onClick={() => setSyncStatus(null)} className="text-slate-400 hover:text-white text-xs cursor-pointer">
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -1626,6 +1739,49 @@ export default function UniversalOMRScannerPage() {
           </div>
         </div>
 
+        {/* 2-Phase Guided Workflow Bar: Phase 1 (MCQ OMR) → Phase 2 (CQ/SQ Top Cover Merge) */}
+        <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400">স্ক্যান ধাপ (Workflow):</span>
+            <button
+              type="button"
+              onClick={() => {
+                setScanPhase('mcq');
+                if (selectedPresetId === 'bangladesh_board_cq_top_sheet') {
+                  handlePresetChange('bangladesh_board_hsc');
+                }
+              }}
+              className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                scanPhase === 'mcq'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              ১. MCQ OMR স্ক্যান
+            </button>
+            <span className="text-slate-600">→</span>
+            <button
+              type="button"
+              onClick={() => {
+                setScanPhase('cq');
+                handlePresetChange('bangladesh_board_cq_top_sheet');
+              }}
+              className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                scanPhase === 'cq'
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/30'
+              }`}
+            >
+              ২. CQ/SQ টপ-কভার শিট স্ক্যান (মার্জ)
+            </button>
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {scanPhase === 'cq'
+              ? 'CQ কভার স্ক্যান করলে একই শিক্ষার্থীর MCQ নম্বরের সাথে CQ নম্বর স্বয়ংক্রিয়ভাবে যোগ হবে।'
+              : 'রোল বা রেজি যেকোনো একটি সঠিক হলেই শিক্ষার্থী অটো-ম্যাচ হবে (শুধু সংখ্যা অনুমোদিত)।'}
+          </div>
+        </div>
+
         {/* Tab 1: Batch Upload */}
         {activeTab === 'upload' && (
           <div className="space-y-6">
@@ -1737,10 +1893,11 @@ export default function UniversalOMRScannerPage() {
 
               {isProcessing && (
                 <div className="mt-6 w-full max-w-md space-y-2">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>{statusMessage}</span>
-                    <span>
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="truncate">{statusMessage}</span>
+                    <span className="font-mono font-bold shrink-0 ml-2">
                       {progress.current} / {progress.total}
+                      {scanSpeedSps > 0 ? ` (${scanSpeedSps} শিট/সে.)` : ''}
                     </span>
                   </div>
                   <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -1750,6 +1907,18 @@ export default function UniversalOMRScannerPage() {
                         width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
                       }}
                     />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cancelBatchRef.current = true;
+                        setStatusMessage('ব্যাচ স্ক্যান থামানো হচ্ছে — ইতিমধ্যে স্ক্যান করা খাতাগুলো সংরক্ষিত থাকবে...');
+                      }}
+                      className="px-2.5 py-1 rounded-md bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[11px] font-bold cursor-pointer"
+                    >
+                      থামান (Stop Queue)
+                    </button>
                   </div>
                 </div>
               )}
