@@ -343,7 +343,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
                     fontSize: compact ? 8.5 : 9.5,
                   }}
                 >
-                  {isBangla ? toBengaliNumerals(d) : d}
+                  {d}
                 </div>
               ))}
             </div>

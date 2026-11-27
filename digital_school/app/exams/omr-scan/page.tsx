@@ -63,6 +63,10 @@ import {
   matchStudentByRollOrReg,
   sanitizeNumericId,
 } from '@/lib/omr/studentIdentityMatcher';
+import {
+  registerCqPart1Student,
+  registerCqPart2Marks,
+} from '@/lib/omr/cqSerialLinker';
 
 interface ExamMetadata {
   id: string;
@@ -568,6 +572,56 @@ export default function UniversalOMRScannerPage() {
       if (matched) {
         card.studentId = matched.id;
         card.studentName = matched.name;
+      }
+    }
+
+    // Detached CQ Top-Cover Blind-Grading Serial Pairing (Part 1 ↔ Part 2)
+    const qrPayload = qr.found ? qr.parsedPayload : null;
+    const qrSerial = String(qrPayload?.serial || qrPayload?.sn || '').trim();
+    const sheetType = String(qrPayload?.sheetType || qrPayload?.part || '').toUpperCase();
+    const isPart1Strip = sheetType === 'CQ_PART1_STUDENT' || sheetType === 'P1_STUDENT' || effectivePresetId === 'cq_part1_student_strip';
+    const isPart2Strip = sheetType === 'CQ_PART2_MARKS' || sheetType === 'P2_EXAMINER' || effectivePresetId === 'cq_part2_examiner_strip';
+
+    if (qrSerial && isPart1Strip) {
+      const { record, isPaired } = registerCqPart1Student({
+        serial: qrSerial,
+        examId: targetExamId,
+        rollNumber: card.rollNumber,
+        registrationNo: card.registrationNo,
+        studentId: card.studentId,
+        studentName: card.studentName,
+      });
+      (card as any).cqSerial = qrSerial;
+      card.isCQScript = true;
+      if (isPaired && record.obtainedMarksCQ !== undefined) {
+        card.totalScore = record.obtainedMarksCQ;
+        card.flags = [...(card.flags || []), `Paired with CQ Part 2 (SL: ${qrSerial}) — CQ Marks: ${record.obtainedMarksCQ}`];
+      } else {
+        card.flags = [...(card.flags || []), `CQ Part 1 saved (SL: ${qrSerial}) — scan Part 2 marks strip to auto-link.`];
+      }
+    } else if (qrSerial && isPart2Strip) {
+      const rawMarks = sanitizeNumericId(scanRes.concatenatedResponses['ObtainedMarks']).digits;
+      const rawHead = sanitizeNumericId(scanRes.concatenatedResponses['HeadExaminerMarks']).digits;
+      const cqScore = rawHead && Number(rawHead) > 0 ? Number(rawHead) : Number(rawMarks || 0);
+      const { record, isPaired } = registerCqPart2Marks({
+        serial: qrSerial,
+        examId: targetExamId,
+        obtainedMarksCQ: cqScore,
+        headExaminerMarks: rawHead ? Number(rawHead) : undefined,
+        examinerCode: sanitizeNumericId(scanRes.concatenatedResponses['ExaminerCode']).digits || undefined,
+      });
+      (card as any).cqSerial = qrSerial;
+      card.isCQScript = true;
+      card.totalScore = record.obtainedMarksCQ ?? cqScore;
+      if (isPaired && record.rollNumber) {
+        card.rollNumber = record.rollNumber;
+        card.registrationNo = record.registrationNo;
+        card.studentId = record.studentId;
+        card.studentName = record.studentName;
+        card.flags = [...(card.flags || []), `Auto-linked to Student Roll ${record.rollNumber} via SL: ${qrSerial}`];
+      } else {
+        card.needsReview = true;
+        card.flags = [...(card.flags || []), `CQ Part 2 Marks (${cqScore}) saved (SL: ${qrSerial}) — scan Part 1 student strip to auto-link.`];
       }
     }
 

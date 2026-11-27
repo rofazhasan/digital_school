@@ -1,8 +1,42 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toBengaliNumerals as toBanglaNumber, generateBoardCQSerial } from '@/utils/numeralConverter';
+import type { FieldBlock, Template } from '@/lib/omr/types';
+import { saveCalibratedTemplateLocal } from '@/lib/omr/presetTemplates';
+
+const StripCornerFiducials = ({ prefix }: { prefix: string }) => (
+  <>
+    {[
+      { id: `${prefix}_TL`, style: { top: 3, left: 3 } },
+      { id: `${prefix}_TR`, style: { top: 3, right: 3 } },
+      { id: `${prefix}_BL`, style: { bottom: 14, left: 3 } },
+      { id: `${prefix}_BR`, style: { bottom: 14, right: 3 } },
+    ].map((m) => (
+      <div
+        key={m.id}
+        data-cq-fiducial={m.id}
+        style={{
+          position: 'absolute',
+          ...m.style,
+          width: 16,
+          height: 16,
+          border: '2.5px solid #000000',
+          background: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+          zIndex: 15,
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ width: 7, height: 7, background: '#000000' }} />
+      </div>
+    ))}
+  </>
+);
 
 export interface BangladeshBoardCQ3PartSheetProps {
   serialNumber?: string;
@@ -115,6 +149,109 @@ export function BangladeshBoardCQ3PartSheet({
     border: '#be185d',
   };
 
+  const part1Ref = useRef<HTMLElement>(null);
+  const part2Ref = useRef<HTMLElement>(null);
+
+  // Auto-calibrate BOTH detachable strips (Part 1 Student & Part 2 Examiner) strictly relative to each strip's OWN 4 fiducials
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const calibrateStrip = (
+      sectionEl: HTMLElement | null,
+      prefix: string,
+      templateId: string,
+      pageW: number,
+      pageH: number
+    ) => {
+      if (!sectionEl) return;
+      const tl = sectionEl.querySelector<HTMLElement>(`[data-cq-fiducial="${prefix}_TL"]`);
+      const tr = sectionEl.querySelector<HTMLElement>(`[data-cq-fiducial="${prefix}_TR"]`);
+      const bl = sectionEl.querySelector<HTMLElement>(`[data-cq-fiducial="${prefix}_BL"]`);
+      const br = sectionEl.querySelector<HTMLElement>(`[data-cq-fiducial="${prefix}_BR"]`);
+      if (!tl || !tr || !bl || !br) return;
+
+      const bubbles = Array.from(sectionEl.querySelectorAll<HTMLElement>('[data-omr-bubble="1"]'));
+      if (bubbles.length < 10) return;
+
+      const fidX = 24;
+      const fidY = 24;
+      const rTL = tl.getBoundingClientRect();
+      const rTR = tr.getBoundingClientRect();
+      const rBL = bl.getBoundingClientRect();
+      const rBR = br.getBoundingClientRect();
+      const refL = (rTL.left + rTL.width / 2 + rBL.left + rBL.width / 2) / 2;
+      const refR = (rTR.left + rTR.width / 2 + rBR.left + rBR.width / 2) / 2;
+      const refT = (rTL.top + rTL.height / 2 + rTR.top + rTR.height / 2) / 2;
+      const refB = (rBL.top + rBL.height / 2 + rBR.top + rBR.height / 2) / 2;
+      if (refR - refL < 80 || refB - refT < 40) return;
+
+      const sx = (pageW - 1 - 2 * fidX) / (refR - refL);
+      const sy = (pageH - 1 - 2 * fidY) / (refB - refT);
+
+      type MB = { block: string; label: string; value: string; x: number; y: number; w: number; h: number };
+      const grouped: Record<string, MB[]> = {};
+      let sumW = 0, sumH = 0;
+      for (const el of bubbles) {
+        const r = el.getBoundingClientRect();
+        const block = el.dataset.omrBlock || 'Block';
+        const label = el.dataset.omrLabel || '';
+        const value = el.dataset.omrValue || '';
+        const x = fidX + (r.left - refL) * sx;
+        const y = fidY + (r.top - refT) * sy;
+        const w = r.width * sx;
+        const h = r.height * sy;
+        sumW += w; sumH += h;
+        if (!grouped[block]) grouped[block] = [];
+        grouped[block].push({ block, label, value, x, y, w, h });
+      }
+
+      const avgW = Math.max(14, Math.round(sumW / bubbles.length));
+      const avgH = Math.max(14, Math.round(sumH / bubbles.length));
+      const fieldBlocks: Record<string, FieldBlock> = {};
+      const customLabels: Record<string, string[]> = {};
+
+      for (const [bName, items] of Object.entries(grouped)) {
+        const labelOrder: string[] = [];
+        const byLabel: Record<string, MB[]> = {};
+        for (const it of items) {
+          if (!byLabel[it.label]) { byLabel[it.label] = []; labelOrder.push(it.label); }
+          byLabel[it.label].push(it);
+        }
+        const first = byLabel[labelOrder[0]];
+        if (!first || first.length === 0) continue;
+        const originX = Math.round(first[0].x);
+        const originY = Math.round(first[0].y);
+        const bGap = first.length > 1 ? Number(((first[first.length - 1].y - first[0].y) / (first.length - 1)).toFixed(2)) : 24;
+        const lGap = labelOrder.length > 1 ? Number(((byLabel[labelOrder[labelOrder.length - 1]][0].x - first[0].x) / (labelOrder.length - 1)).toFixed(2)) : 24;
+        fieldBlocks[bName] = {
+          origin: [originX, originY],
+          bubblesGap: bGap,
+          labelsGap: lGap,
+          direction: 'vertical',
+          fieldLabels: labelOrder,
+          bubbleValues: first.map((b) => b.value),
+          section: bName,
+        };
+        customLabels[bName] = labelOrder;
+      }
+
+      const tpl: Template = {
+        pageDimensions: [pageW, pageH],
+        bubbleDimensions: [avgW, avgH],
+        fiducialInset: [fidX, fidY],
+        preProcessors: [{ name: 'CropOnMarkers' }],
+        fieldBlocks,
+        customLabels,
+      };
+      saveCalibratedTemplateLocal(templateId, tpl);
+    };
+
+    const timer = window.setTimeout(() => {
+      calibrateStrip(part1Ref.current, 'P1', 'cq_part1_student_strip', 1240, 620);
+      calibrateStrip(part2Ref.current, 'P2', 'cq_part2_examiner_strip', 1240, 620);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [examId, effectiveSerial]);
+
   return (
     <div 
       className="bd-cq-3part-sheet print-break-after"
@@ -159,9 +296,10 @@ export function BangladeshBoardCQ3PartSheet({
       </div>
 
       {/* ========================================================================= */}
-      {/* PART 1: পরীক্ষার্থীর অংশ (Student Identification Section)                 */}
+      {/* PART 1: পরীক্ষার্থীর অংশ (Detachable Student Identification Strip)        */}
       {/* ========================================================================= */}
-      <section className="cq-part-container part-1-student">
+      <section ref={part1Ref} className="cq-part-container part-1-student" style={{ position: 'relative' }}>
+        <StripCornerFiducials prefix="P1" />
         <div className="cq-part-header formal-double-line">
           {/* Left Tag */}
           <div className="cq-header-side left">
@@ -194,9 +332,10 @@ export function BangladeshBoardCQ3PartSheet({
               <QRCodeSVG
                 value={JSON.stringify({
                   part: 'P1_STUDENT',
-                  sheetType: 'CQ_COVER',
-                  template: 'bangladesh_board_cq_top_sheet',
+                  sheetType: 'CQ_PART1_STUDENT',
+                  template: 'cq_part1_student_strip',
                   examId: examId,
+                  serial: effectiveSerial,
                   sn: effectiveSerial,
                   ex: examId,
                   b: instituteName,
@@ -240,7 +379,7 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 2. Roll Number (4 Digits) */}
+          {/* 2. Roll Number (4 Digits - English 0-9) */}
           <div className="cq-field-column roll-col">
             <div className="cq-column-title">রোল নম্বর (৪ ডিজিট)</div>
             <div className="cq-write-boxes-row">
@@ -250,8 +389,8 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item">
-                      <span>{toBanglaNumber(d)}</span>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="Roll" data-omr-label={`roll${colIdx + 1}`} data-omr-value={String(d)}>
+                      <span>{d}</span>
                     </div>
                   ))}
                 </div>
@@ -259,7 +398,7 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 3. Registration Number (6 Digits) */}
+          {/* 3. Registration Number (6 Digits - English 0-9) */}
           <div className="cq-field-column reg-col">
             <div className="cq-column-title">রেজিস্ট্রেশন নম্বর (৬ ডিজিট)</div>
             <div className="cq-write-boxes-row">
@@ -269,8 +408,8 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(6)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item">
-                      <span>{toBanglaNumber(d)}</span>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="Registration" data-omr-label={`reg${colIdx + 1}`} data-omr-value={String(d)}>
+                      <span>{d}</span>
                     </div>
                   ))}
                 </div>
@@ -278,7 +417,7 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 4. Subject Code (3 Digits) */}
+          {/* 4. Subject Code (3 Digits - English 0-9) */}
           <div className="cq-field-column sub-col">
             <div className="cq-column-title">বিষয় কোড</div>
             <div className="cq-write-boxes-row">
@@ -288,8 +427,8 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item">
-                      <span>{toBanglaNumber(d)}</span>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="SubjectCode" data-omr-label={`sub${colIdx + 1}`} data-omr-value={String(d)}>
+                      <span>{d}</span>
                     </div>
                   ))}
                 </div>
@@ -297,7 +436,7 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 5. Extra Script Count (2 Digits) */}
+          {/* 5. Extra Script Count (2 Digits - English 0-9) */}
           <div className="cq-field-column extra-col">
             <div className="cq-column-title">অতিরিক্ত<br />উত্তরপত্রের সংখ্যা</div>
             <div className="cq-write-boxes-row">
@@ -307,8 +446,8 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(2)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item">
-                      <span>{toBanglaNumber(d)}</span>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExtraScripts" data-omr-label={`extra${colIdx + 1}`} data-omr-value={String(d)}>
+                      <span>{d}</span>
                     </div>
                   ))}
                 </div>
@@ -342,9 +481,10 @@ export function BangladeshBoardCQ3PartSheet({
       </section>
 
       {/* ========================================================================= */}
-      {/* PART 2: পরীক্ষক ও প্রধান পরীক্ষকের অংশ (Examiner Evaluation Section)       */}
+      {/* PART 2: পরীক্ষক ও প্রধান পরীক্ষকের অংশ (Detachable Blind-Grading Strip)   */}
       {/* ========================================================================= */}
-      <section className="cq-part-container part-2-examiner">
+      <section ref={part2Ref} className="cq-part-container part-2-examiner" style={{ position: 'relative' }}>
+        <StripCornerFiducials prefix="P2" />
         <div className="cq-part-header formal-double-line">
           {/* Left Tag */}
           <div className="cq-header-side left">
@@ -370,16 +510,21 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* Right: Tracking QR */}
+          {/* Right: Tracking QR & Shared Serial Number for Detached Blind-Grading Pairing */}
           <div className="cq-header-side right">
+            <div className="cq-serial-number" style={{ fontSize: '9px' }}>{effectiveSerial}</div>
             <div className="cq-qr-wrapper sm">
               <QRCodeSVG
                 value={JSON.stringify({
                   part: 'P2_EXAMINER',
+                  sheetType: 'CQ_PART2_MARKS',
+                  template: 'cq_part2_examiner_strip',
+                  examId: examId,
+                  serial: effectiveSerial,
                   sn: effectiveSerial,
                   v: 1
                 })}
-                size={34}
+                size={36}
                 level="M"
                 includeMargin={false}
               />
@@ -402,7 +547,7 @@ export function BangladeshBoardCQ3PartSheet({
 
         {/* Examiner OMR Matrix */}
         <div className="cq-p2-grid-layout">
-          {/* 1. Subject Code (3 Digits) */}
+          {/* 1. Subject Code (3 Digits - English 0-9) */}
           <div className="cq-field-column">
             <div className="cq-column-title">বিষয় কোড</div>
             <div className="cq-write-boxes-row">
@@ -412,14 +557,14 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="SubjectCodePart2" data-omr-label={`subP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 2. Examiner Code (4 Digits) */}
+          {/* 2. Examiner Code (4 Digits - English 0-9) */}
           <div className="cq-field-column">
             <div className="cq-column-title">পরীক্ষক কোড</div>
             <div className="cq-write-boxes-row">
@@ -429,14 +574,14 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExaminerCode" data-omr-label={`exCode${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 3. Script Serial Number (4 Digits) */}
+          {/* 3. Script Serial Number (4 Digits - English 0-9) */}
           <div className="cq-field-column">
             <div className="cq-column-title">উত্তরপত্রের ক্রমিক নম্বর</div>
             <div className="cq-write-boxes-row">
@@ -446,14 +591,14 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ScriptSerial" data-omr-label={`serial${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 4. Extra Scripts (2 Digits) */}
+          {/* 4. Extra Scripts (2 Digits - English 0-9) */}
           <div className="cq-field-column">
             <div className="cq-column-title">অতিরিক্ত<br />উত্তরপত্রের সংখ্যা</div>
             <div className="cq-write-boxes-row">
@@ -463,14 +608,14 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(2)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ExtraScriptsPart2" data-omr-label={`extraP2_${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 5. Obtained Marks (প্রাপ্ত নম্বর - 3 Digits: শতক, দশক, একক) */}
+          {/* 5. Obtained Marks (প্রাপ্ত নম্বর - 3 Digits - English 0-9) */}
           <div className="cq-field-column highlight-marks">
             <div className="cq-column-title">প্রাপ্ত নম্বর</div>
             <div className="cq-write-boxes-row">
@@ -480,14 +625,14 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="ObtainedMarks" data-omr-label={`marks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 6. Head Examiner Marks (3 Digits) */}
+          {/* 6. Head Examiner Marks (3 Digits - English 0-9) */}
           <div className="cq-field-column">
             <div className="cq-column-title sm">প্রধান পরীক্ষক কর্তৃক পরিবর্তনের পর প্রাপ্ত মোট নম্বর</div>
             <div className="cq-write-boxes-row">
@@ -497,7 +642,7 @@ export function BangladeshBoardCQ3PartSheet({
               {[...Array(3)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
-                    <div key={d} className="cq-bubble-item"><span>{toBanglaNumber(d)}</span></div>
+                    <div key={d} className="cq-bubble-item" data-omr-bubble="1" data-omr-block="HeadExaminerMarks" data-omr-label={`headMarks${colIdx + 1}`} data-omr-value={String(d)}><span>{d}</span></div>
                   ))}
                 </div>
               ))}

@@ -2292,7 +2292,7 @@ export function BangladeshOMRGenerator({
                                       data-omr-value={String(digit)}
                                       data-omr-dir="vertical"
                                     >
-                                      <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                      <span>{digit}</span>
                                     </div>
                                   );
                                 })}
@@ -2388,7 +2388,7 @@ export function BangladeshOMRGenerator({
                                         data-omr-value={String(digit)}
                                         data-omr-dir="vertical"
                                       >
-                                        <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                        <span>{digit}</span>
                                       </div>
                                     );
                                   })}
@@ -2434,7 +2434,7 @@ export function BangladeshOMRGenerator({
                                         data-omr-value={String(digit)}
                                         data-omr-dir="vertical"
                                       >
-                                        <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
+                                        <span>{digit}</span>
                                       </div>
                                     );
                                   })}
