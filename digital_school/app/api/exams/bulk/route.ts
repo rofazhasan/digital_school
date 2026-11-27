@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
         if (!auth || !auth.user) {
             return createApiResponse(null, "Not authenticated", 401);
         }
+        if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+            return createApiResponse(null, "Forbidden: Staff role required", 403);
+        }
 
         const json = await request.json();
         const validation = bulkCreateSchema.safeParse(Array.isArray(json) ? json : json?.exams || []);

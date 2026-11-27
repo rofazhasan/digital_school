@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTokenFromRequest } from '@/lib/auth';
 import { dataRecoveryEngine } from '@/lib/data-engineering/data-recovery';
 import { dataWarehouseEngine } from '@/lib/data-engineering/warehouse';
 import { aiDatasetPipeline } from '@/lib/data-engineering/ai-dataset-pipeline';
 import { lakehouseEngine } from '@/lib/data-engineering/lakehouse';
+
+const ALLOWED_ROLES = ['SUPER_USER', 'ADMIN'];
 
 /**
  * Superadmin Data Engineering & Lakehouse Management API
@@ -12,6 +15,10 @@ import { lakehouseEngine } from '@/lib/data-engineering/lakehouse';
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await getTokenFromRequest(req);
+    if (!auth?.user || !ALLOWED_ROLES.includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: auth?.user ? 403 : 401 });
+    }
     const { searchParams } = new URL(req.url);
     const action = searchParams.get('action') || 'warehouse';
     const table = searchParams.get('table') || 'Question';
@@ -50,6 +57,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getTokenFromRequest(req);
+    if (!auth?.user || !ALLOWED_ROLES.includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: auth?.user ? 403 : 401 });
+    }
     const body = await req.json();
     const { action, tables } = body;
 

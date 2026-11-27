@@ -10,6 +10,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     if (!auth || !auth.user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
+    if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: 403 });
+    }
     const { params } = context;
     const { id: examId } = await params;
     const body = await request.json();
@@ -63,9 +66,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   }
 }
 
-// GET: Fetch all sets for an exam
+// GET: Fetch all sets for an exam (staff only — contains confidential answer keys)
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await getTokenFromRequest(request);
+    if (!auth?.user || !['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: auth?.user ? 403 : 401 });
+    }
     const { params } = context;
     const { id: examId } = await params;
     const sets = await prismadb.examSet.findMany({
@@ -93,6 +100,9 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const auth = await getTokenFromRequest(request);
     if (!auth || !auth.user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+    if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: 403 });
     }
     const { params } = context;
     const { id: examId } = await params;

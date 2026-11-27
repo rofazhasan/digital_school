@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/db";
+import { getTokenFromRequest } from "@/lib/auth";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string; studentId: string }> }) {
+    const auth = await getTokenFromRequest(req);
+    if (!auth?.user) {
+        return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
     const { id: examId, studentId } = await params;
+
+    if (auth.user.role === "STUDENT") {
+        const ownProfile = await prisma.studentProfile.findUnique({
+            where: { userId: auth.user.id },
+            select: { id: true },
+        });
+        if (!ownProfile || ownProfile.id !== studentId) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+    }
 
     if (!examId || !studentId) {
         return NextResponse.json({ error: "Missing examId or studentId" }, { status: 400 });

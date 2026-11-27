@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from "@/lib/db";
+import { getTokenFromRequest } from '@/lib/auth';
 import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 import { parseDescriptiveSubQuestion } from '@/utils/descriptive-parser';
 import { s, n, getValue } from '@/utils/parser-utils';
@@ -422,6 +423,10 @@ async function validateAndMapRow(rawRow: any, classes: any[]) {
 
 export async function POST(req: NextRequest) {
     try {
+        const auth = await getTokenFromRequest(req);
+        if (!auth?.user || !['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+            return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: auth?.user ? 403 : 401 });
+        }
         const contentType = req.headers.get("content-type") || "";
 
         // Common data fetch

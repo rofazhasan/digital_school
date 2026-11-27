@@ -1,48 +1,23 @@
 // In app/api/question-bank/manage/route.ts
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/db';
+import { getTokenFromRequest } from '@/lib/auth';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
-
-// --- Helper function to get a valid user for development ---
-// This ensures a valid user exists before any operation that needs one.
-const getDeveloperUserId = async () => {
-    // SECURITY: Only allow dummy user creation in development
-    if (process.env.NODE_ENV === 'production') {
-        throw new Error('Operation not allowed in production: No valid user context found.');
-    }
-
-    const email = 'developer@example.com';
-    let user = await prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-        console.log("Creating a dummy developer user for testing...");
-        user = await prisma.user.create({
-            data: {
-                email: email,
-                name: 'Developer User',
-                password: 'a-secure-password-for-dev', // This is required by your schema
-                role: 'ADMIN',
-            },
-        });
-    }
-    return user.id;
-};
 
 const createBankSchema = z.object({
     name: z.string().min(1, "Bank name is required"),
     subject: z.string().min(1, "Subject is required"),
     chapter: z.string().optional(),
-    // NOTE: createdById is now handled by the server
 });
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        // FIX: Get a guaranteed valid user ID from the database on the server
-        const developerUserId = await getDeveloperUserId();
+        const auth = await getTokenFromRequest(request);
+        if (!auth?.user || !['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+            return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: auth?.user ? 403 : 401 });
+        }
 
+        const body = await request.json();
         const validation = createBankSchema.safeParse(body);
 
         if (!validation.success) {
@@ -52,7 +27,7 @@ export async function POST(request: Request) {
         const newBank = await prisma.questionBank.create({
             data: {
                 ...validation.data,
-                createdById: developerUserId, // Use the valid ID
+                createdById: auth.user.id,
             },
         });
 

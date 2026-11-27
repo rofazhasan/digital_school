@@ -1,11 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTokenFromRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { localSLMService, StudentMistakeContext } from '@/lib/ai/local-slm-service';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getTokenFromRequest(req);
+    if (!auth?.user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { studentId, examId } = body;
+    let { studentId, examId } = body;
+
+    // Prevent IDOR: students can only analyze their own submissions
+    if (auth.user.role === 'STUDENT') {
+      const ownProfile = await prisma.studentProfile.findUnique({
+        where: { userId: auth.user.id },
+        select: { id: true },
+      });
+      if (!ownProfile) {
+        return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
+      }
+      if (studentId && studentId !== ownProfile.id) {
+        return NextResponse.json({ error: 'Forbidden: Cannot analyze another student' }, { status: 403 });
+      }
+      studentId = ownProfile.id;
+    }
 
     if (!studentId) {
       return NextResponse.json({ error: 'studentId is required' }, { status: 400 });

@@ -71,6 +71,10 @@ const ROUTE_PERMISSIONS = {
     '/teacher',
     '/teacher/dashboard',
     '/teacher/questions',
+    '/question-bank',
+    '/question-bank/*',
+    '/create-question',
+    '/ai-question-generator',
     '/exams',
     '/exams/*',
     '/teacher/evaluations',
@@ -111,27 +115,16 @@ const ROUTE_PERMISSIONS = {
     '/exams/evaluations/*/print/*',
   ],
 
-  // Shared routes (accessible by authenticated users)
+  // Shared routes (accessible by all authenticated users, including STUDENT)
   shared: [
     '/profile',
     '/settings',
     '/logout',
-    '/question-bank',
-    '/create-question',
-    '/ai-question-generator',
-    '/omr_scanner',
-    '/scanner',
     '/api/user',
     '/api/profile',
     '/api/settings',
     '/api/institute',
     '/api/stats',
-    '/api/questions',
-    '/api/questions/bulk',
-    '/api/questions/bulk-delete',
-    '/api/questions/export',
-    '/api/questions/*',
-    '/api/ai/generate-questions',
     '/api/results',
     '/api/results/*',
     '/api/exam-submissions',
@@ -275,7 +268,6 @@ export async function middleware(request: NextRequest) {
 
   // Get user token and role using JWT verification only
   const userData = await getTokenFromRequest(request);
-  console.log('[MIDDLEWARE] user role:', userData?.role, 'path:', pathname);
 
   // Handle public routes
   const isPublicRoute = ROUTE_PERMISSIONS.public.some(route => pathMatches(route, pathname));

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
+import { getTokenFromRequest } from '@/lib/auth';
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 
@@ -15,6 +16,10 @@ function shuffleArray<T>(array: T[]): T[] {
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await getTokenFromRequest(request);
+    if (!auth?.user || !['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Staff access required to print exam papers' }, { status: auth?.user ? 403 : 401 });
+    }
     const params = await props.params;
     const { id: examId } = params;
     // Fetch exam with sets and questionsJson

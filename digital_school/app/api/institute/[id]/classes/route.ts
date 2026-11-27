@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
+import { getTokenFromRequest } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -51,6 +52,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getTokenFromRequest(request);
+    if (!auth?.user || !['SUPER_USER', 'ADMIN'].includes(auth.user.role)) {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: auth?.user ? 403 : 401 });
+    }
     const { id: instituteId } = await params;
     const body = await request.json();
     const { name, section } = body;

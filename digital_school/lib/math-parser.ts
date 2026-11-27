@@ -870,8 +870,21 @@ export function evaluateExpressionAtSample(expr: string, vars: Record<string, nu
       return null;
     }
 
+    // Strict identifier allowlist to prevent prototype/constructor gadget execution
+    const ALLOWED_IDENTIFIERS = new Set([
+      'Math', 'pow', 'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+      'sinh', 'cosh', 'tanh', 'exp', 'log', 'log10', 'abs', 'PI', 'E',
+      '_calcBinom', '_calcPerm', '_calcFactorial',
+    ]);
+    const tokens = norm.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
+    for (const tok of tokens) {
+      if (!ALLOWED_IDENTIFIERS.has(tok) && !/^[eE]$/.test(tok)) {
+        return null;
+      }
+    }
+
     // Function constructor safe evaluation
-    const evalFunc = new Function('_calcBinom', '_calcPerm', '_calcFactorial', `return ${norm};`);
+    const evalFunc = new Function('_calcBinom', '_calcPerm', '_calcFactorial', `"use strict"; return (${norm});`);
     const res = Number(evalFunc(_calcBinom, _calcPerm, _calcFactorial));
     return isFinite(res) && !isNaN(res) ? res : null;
   } catch {

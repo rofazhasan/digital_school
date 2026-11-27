@@ -300,6 +300,9 @@ export async function POST(request: NextRequest) {
     if (!auth || !auth.user) {
       return createApiResponse(null, 'Not authenticated', 401);
     }
+    if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return createApiResponse(null, 'Forbidden: Staff role required', 403);
+    }
 
     const body = await request.json().catch(() => ({}));
 
@@ -428,6 +431,9 @@ export async function PATCH(request: NextRequest) {
     if (!auth || !auth.user) {
       return createApiResponse(null, 'Not authenticated', 401);
     }
+    if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return createApiResponse(null, 'Forbidden: Staff role required', 403);
+    }
 
     const url = new URL(request.url);
     const queryId = url.searchParams.get('id');
@@ -511,6 +517,9 @@ export async function DELETE(request: NextRequest) {
     const auth = await getTokenFromRequest(request);
     if (!auth || !auth.user) {
       return createApiResponse(null, 'Not authenticated', 401);
+    }
+    if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+      return createApiResponse(null, 'Forbidden: Staff role required', 403);
     }
 
     const url = new URL(request.url);

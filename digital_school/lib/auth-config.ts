@@ -1,5 +1,11 @@
 export const getJwtSecretKey = () => {
-    const secret = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not configured in production.');
+        }
+        return new TextEncoder().encode('dev-only-local-jwt-secret-do-not-use-in-prod');
+    }
     return new TextEncoder().encode(secret);
 };
 

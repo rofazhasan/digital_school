@@ -1,16 +1,21 @@
 // In app/api/question-bank/route.ts
-import { NextResponse } from 'next/server';
-import { PrismaClient, QuestionType, Difficulty } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+import { QuestionType, Difficulty } from '@prisma/client';
+import prisma from '@/lib/db';
+import { getTokenFromRequest } from '@/lib/auth';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
+const STAFF_ROLES = ['SUPER_USER', 'ADMIN', 'TEACHER'];
 
-// --- Helper function to get a valid user for development ---
-async function getDeveloperUserId() {
-    // Get the first user in the database (or throw if none found)
-    const user = await prisma.user.findFirst();
-    if (!user) throw new Error('No user found in the database. Please seed a user.');
-    return user.id;
+async function requireStaffAuth(request: Request) {
+    const auth = await getTokenFromRequest(request as NextRequest);
+    if (!auth?.user) {
+        return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+    }
+    if (!STAFF_ROLES.includes(auth.user.role)) {
+        return { error: NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: 403 }) };
+    }
+    return { user: auth.user };
 }
 
 // --- Updated Schema ---
@@ -75,14 +80,16 @@ const aiGenerationSchema = z.object({
 
 export async function POST(request: Request) {
     try {
+        const authCheck = await requireStaffAuth(request);
+        if (authCheck.error) return authCheck.error;
+
         const body = await request.json();
 
         if (body.action === 'generate-with-ai') {
             return handleAIGeneration(body);
         }
 
-        // FIX: Get a guaranteed valid user ID on the server
-        const developerUserId = await getDeveloperUserId();
+        const developerUserId = authCheck.user!.id;
 
         const validation = questionSchema.safeParse(body);
         if (!validation.success) {
@@ -162,6 +169,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+    const authCheck = await requireStaffAuth(request);
+    if (authCheck.error) return authCheck.error;
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
 
@@ -200,6 +209,8 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
     try {
+        const authCheck = await requireStaffAuth(request);
+        if (authCheck.error) return authCheck.error;
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         if (!id) return NextResponse.json({ error: "Question ID is required" }, { status: 400 });
@@ -235,6 +246,8 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
     try {
+        const authCheck = await requireStaffAuth(request);
+        if (authCheck.error) return authCheck.error;
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         const ids = searchParams.get('ids');
@@ -261,6 +274,8 @@ export async function DELETE(request: Request) {
 
 export async function PATCH(request: Request) {
     try {
+        const authCheck = await requireStaffAuth(request);
+        if (authCheck.error) return authCheck.error;
         const body = await request.json();
         const { ids, isForPractice } = body;
 

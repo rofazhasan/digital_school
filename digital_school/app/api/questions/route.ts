@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/db';
+import { getTokenFromRequest } from '@/lib/auth';
 
-const prisma = new PrismaClient();
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
+        const auth = await getTokenFromRequest(request);
+        if (!auth?.user || !['SUPER_USER', 'ADMIN', 'TEACHER'].includes(auth.user.role)) {
+            return NextResponse.json({ error: 'Forbidden: Staff role required' }, { status: auth?.user ? 403 : 401 });
+        }
         const questions = await prisma.question.findMany({
             include: {
                 createdBy: {
