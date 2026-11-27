@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
             instituteId: authData.user.instituteId,
             studentProfile: role === 'STUDENT' && classId ? {
               create: {
-                roll: `ROLL${Date.now()}`,
-                registrationNo: `REG${Date.now()}`,
+                roll: await (await import('@/lib/studentIdGenerator')).generateNext4DigitRoll(classId, user.roll),
+                registrationNo: await (await import('@/lib/studentIdGenerator')).generateNext6DigitReg(user.registrationNo),
                 guardianName: name,
                 guardianPhone: email,
                 class: { connect: { id: classId } },
@@ -298,21 +298,25 @@ export async function PATCH(request: NextRequest) {
       }
 
       const existingProfile = await prismadb.studentProfile.findUnique({ where: { userId: id } });
+      const { generateNext4DigitRoll, generateNext6DigitReg, normalizeTo4DigitRoll } = await import('@/lib/studentIdGenerator');
       if (existingProfile) {
+        const normRoll = roll !== undefined ? normalizeTo4DigitRoll(roll) || existingProfile.roll : existingProfile.roll;
         await prismadb.studentProfile.update({
           where: { userId: id },
           data: {
             classId: classId || existingProfile.classId,
-            roll: roll !== undefined ? roll : existingProfile.roll,
+            roll: normRoll,
           }
         });
       } else if (classId) {
+        const nextRoll = await generateNext4DigitRoll(classId, roll);
+        const nextReg = await generateNext6DigitReg();
         await prismadb.studentProfile.create({
           data: {
             userId: id,
             classId,
-            roll: roll || `ROLL${Date.now()}`,
-            registrationNo: `REG${Date.now()}`,
+            roll: nextRoll,
+            registrationNo: nextReg,
             guardianName: name || userToEdit.name,
             guardianPhone: targetPhone || targetEmail || '',
           }

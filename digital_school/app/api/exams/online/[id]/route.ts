@@ -49,11 +49,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       try {
         const targetClassId = exam.classId || (await prisma.class.findFirst())?.id;
         if (targetClassId) {
+          const { generateNext4DigitRoll, generateNext6DigitReg } = await import('@/lib/studentIdGenerator');
+          const nextRoll = await generateNext4DigitRoll(targetClassId, '0001');
+          const nextReg = await generateNext6DigitReg();
           studentProfile = await prisma.studentProfile.create({
             data: {
               userId: user.id,
-              roll: "01",
-              registrationNo: `REG-${user.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+              roll: nextRoll,
+              registrationNo: nextReg,
               guardianName: user.name || "Self",
               guardianPhone: user.phone || "01700000000",
               classId: targetClassId

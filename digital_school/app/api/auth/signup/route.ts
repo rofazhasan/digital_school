@@ -123,12 +123,16 @@ export async function POST(request: NextRequest) {
                     });
                 }
 
+                const { generateNext4DigitRoll, generateNext6DigitReg } = await import('@/lib/studentIdGenerator');
+                const nextRoll = await generateNext4DigitRoll(classRecord.id, validatedData.roll);
+                const nextReg = await generateNext6DigitReg();
+
                 userData.studentProfile = {
                     create: {
-                        roll: validatedData.roll!.toString(), // Convert to string as per schema
-                        registrationNo: `REG${Date.now()}`, // Generate a unique registration number
-                        guardianName: validatedData.name, // Use name as guardian name for now
-                        guardianPhone: validatedData.phone || validatedData.email || '', // Use phone or email as fallback
+                        roll: nextRoll,
+                        registrationNo: nextReg,
+                        guardianName: validatedData.name,
+                        guardianPhone: validatedData.phone || validatedData.email || '',
                         class: { connect: { id: classRecord.id } },
                     }
                 };

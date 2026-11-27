@@ -90,8 +90,8 @@ const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const OMRSheet: React.FC<OMRSheetProps> = ({
   questions,
   qrData,
-  rollDigits = 6,
-  regDigits = 10,
+  rollDigits = 4,
+  regDigits = 6,
   fontFamily = "'NikoshBAN', 'Hind Siliguri', 'SolaimanLipi', 'Noto Serif Bengali', serif",
   mcqOptionLabels = DEFAULT_BN_LABELS,
   mcqOptionsCount = 4,

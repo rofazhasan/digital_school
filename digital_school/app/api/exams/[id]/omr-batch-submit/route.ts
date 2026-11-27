@@ -246,10 +246,9 @@ export async function POST(
 
       if (!student && scan.allowCreateMissingStudent !== false) {
         try {
-          const numericRollForCreate = cleanRoll.replace(/\D/g, '') || String(Date.now()).slice(-6);
-          const numericRegForCreate =
-            (cleanReg && cleanReg.replace(/\D/g, '')) ||
-            `${new Date().getFullYear()}${numericRollForCreate.padStart(6, '0')}`;
+          const { generateNext4DigitRoll, generateNext6DigitReg } = await import('@/lib/studentIdGenerator');
+          const numericRollForCreate = await generateNext4DigitRoll(exam.classId, cleanRoll);
+          const numericRegForCreate = await generateNext6DigitReg(cleanReg);
           const created: any = await prismadb.studentProfile.create({
             data: {
               roll: numericRollForCreate,

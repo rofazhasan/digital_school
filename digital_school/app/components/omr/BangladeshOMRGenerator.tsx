@@ -115,11 +115,11 @@ export function BangladeshOMRGenerator({
   const [themeColor, setThemeColor] = useState<ThemeColor>('magenta');
   const [layoutMode, setLayoutMode] = useState<SheetLayoutMode>('split'); // 'split' for 50-Q board, 'stacked' for 100-Q admission
 
-  // Identification Fields
+  // Identification Fields (Standardized: 4-Digit Roll & 6-Digit Registration)
   const [showRollNumber, setShowRollNumber] = useState<boolean>(true);
-  const [rollDigits, setRollDigits] = useState<number>(6);
+  const [rollDigits, setRollDigits] = useState<number>(4);
   const [showRegNumber, setShowRegNumber] = useState<boolean>(true);
-  const [regDigits, setRegDigits] = useState<number>(10);
+  const [regDigits, setRegDigits] = useState<number>(6);
   const [showSubjectCode, setShowSubjectCode] = useState<boolean>(true);
   const [subjectCodeDigits, setSubjectCodeDigits] = useState<number>(3);
   const [showSetCode, setShowSetCode] = useState<boolean>(true);
@@ -157,7 +157,7 @@ export function BangladeshOMRGenerator({
   const [rosterText, setRosterText] = useState<string>('');
   const [preBubbleRoster, setPreBubbleRoster] = useState<boolean>(true);
   const [rosterPreviewIdx, setRosterPreviewIdx] = useState<number>(0);
-  const [rangeStartRoll, setRangeStartRoll] = useState<string>('261001');
+  const [rangeStartRoll, setRangeStartRoll] = useState<string>('1001');
   const [rangeCount, setRangeCount] = useState<number>(10);
 
   const parsedRoster = React.useMemo(() => {
@@ -228,9 +228,9 @@ export function BangladeshOMRGenerator({
       setNumberingLanguage('BANGLA');
       setThemeColor('magenta');
       setShowRollNumber(true);
-      setRollDigits(6);
+      setRollDigits(4);
       setShowRegNumber(true);
-      setRegDigits(10);
+      setRegDigits(6);
       setShowSubjectCode(true);
       setSubjectCodeDigits(3);
       setShowSetCode(true);
@@ -251,9 +251,9 @@ export function BangladeshOMRGenerator({
       setNumberingLanguage('ENGLISH');
       setThemeColor('blue');
       setShowRollNumber(true);
-      setRollDigits(6);
+      setRollDigits(4);
       setShowRegNumber(true);
-      setRegDigits(10);
+      setRegDigits(6);
       setShowSubjectCode(true);
       setSubjectCodeDigits(3);
       setShowSetCode(true);
@@ -273,9 +273,9 @@ export function BangladeshOMRGenerator({
       setNumberingLanguage('BANGLA');
       setThemeColor('magenta');
       setShowRollNumber(true);
-      setRollDigits(6);
+      setRollDigits(4);
       setShowRegNumber(true);
-      setRegDigits(10);
+      setRegDigits(6);
       setShowSubjectCode(true);
       setSubjectCodeDigits(3);
       setShowSetCode(true);
@@ -375,9 +375,9 @@ export function BangladeshOMRGenerator({
       setNumberingLanguage('BANGLA');
       setThemeColor('magenta');
       setShowRollNumber(true);
-      setRollDigits(6);
+      setRollDigits(4);
       setShowRegNumber(true);
-      setRegDigits(10);
+      setRegDigits(6);
       setShowSubjectCode(true);
       setSubjectCodeDigits(3);
       setShowSetCode(false);
@@ -1408,7 +1408,8 @@ export function BangladeshOMRGenerator({
                   onChange={(e) => setRollDigits(parseInt(e.target.value))}
                   className="input-field sm"
                 >
-                  <option value={6}>6 Digits (HSC/SSC Standard)</option>
+                  <option value={4}>4 Digits (School Standard)</option>
+                  <option value={6}>6 Digits (Board)</option>
                   <option value={7}>7 Digits (Medical/DU)</option>
                   <option value={8}>8 Digits</option>
                 </select>

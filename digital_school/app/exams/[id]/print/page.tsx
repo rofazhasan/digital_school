@@ -1839,8 +1839,8 @@ const OMRPage = ({
             setName: set.setName || 'A',
             title: examInfo.title || '',
           }}
-          rollDigits={6}
-          regDigits={10}
+          rollDigits={4}
+          regDigits={6}
           fontFamily={language === 'bn' ? "'NikoshBAN', 'Hind Siliguri', 'SolaimanLipi', 'Noto Serif Bengali', serif" : "'ExamFont', Times New Roman, serif"}
           mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
           mcqOptionsCount={mcqOptionsCount}

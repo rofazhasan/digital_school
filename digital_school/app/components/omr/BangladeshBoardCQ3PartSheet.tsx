@@ -240,14 +240,14 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 2. Roll Number (6 Digits) */}
+          {/* 2. Roll Number (4 Digits) */}
           <div className="cq-field-column roll-col">
-            <div className="cq-column-title">রোল নম্বর</div>
+            <div className="cq-column-title">রোল নম্বর (৪ ডিজিট)</div>
             <div className="cq-write-boxes-row">
-              {[...Array(6)].map((_, i) => <div key={i} className="cq-write-box"></div>)}
+              {[...Array(4)].map((_, i) => <div key={i} className="cq-write-box"></div>)}
             </div>
             <div className="cq-digits-matrix">
-              {[...Array(6)].map((_, colIdx) => (
+              {[...Array(4)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
                     <div key={d} className="cq-bubble-item">
@@ -259,14 +259,14 @@ export function BangladeshBoardCQ3PartSheet({
             </div>
           </div>
 
-          {/* 3. Registration Number (10 Digits) */}
+          {/* 3. Registration Number (6 Digits) */}
           <div className="cq-field-column reg-col">
-            <div className="cq-column-title">রেজিস্ট্রেশন নম্বর</div>
+            <div className="cq-column-title">রেজিস্ট্রেশন নম্বর (৬ ডিজিট)</div>
             <div className="cq-write-boxes-row">
-              {[...Array(10)].map((_, i) => <div key={i} className="cq-write-box"></div>)}
+              {[...Array(6)].map((_, i) => <div key={i} className="cq-write-box"></div>)}
             </div>
             <div className="cq-digits-matrix">
-              {[...Array(10)].map((_, colIdx) => (
+              {[...Array(6)].map((_, colIdx) => (
                 <div key={colIdx} className={`cq-digit-strip ${colIdx % 2 === 0 ? 'striped' : ''}`}>
                   {digits.map(d => (
                     <div key={d} className="cq-bubble-item">
