@@ -51,6 +51,7 @@ import {
   TorchController,
   DuplicateSuppressor,
 } from '@/lib/omr/streamAutoScanner';
+import { StudentOMRReportCardModal } from '@/app/components/omr/StudentOMRReportCardModal';
 
 interface ExamMetadata {
   id: string;
@@ -103,6 +104,7 @@ export default function UniversalOMRScannerPage() {
   const [draftRoll, setDraftRoll] = useState<string>('');
   const [draftReg, setDraftReg] = useState<string>('');
   const [draftSet, setDraftSet] = useState<string>('A');
+  const [printingCard, setPrintingCard] = useState<StudentScoreCard | null>(null);
   const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'results' | 'analytics'>('upload');
 
   // DB Sync state
@@ -121,8 +123,11 @@ export default function UniversalOMRScannerPage() {
   const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
   const [cameraMotionState, setCameraMotionState] = useState<'HAND_MOVING' | 'SETTLING' | 'STATIONARY'>('HAND_MOVING');
   const [sharpnessScore, setSharpnessScore] = useState<number>(0);
+  const [arCornersLocked, setArCornersLocked] = useState<number>(0);
   const [flashGlow, setFlashGlow] = useState<boolean>(false);
   const [recentCapturePill, setRecentCapturePill] = useState<{ roll: string; score: number; set: string } | null>(null);
+
+  const arCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const motionAnalyzerRef = useRef<StreamMotionAnalyzer>(new StreamMotionAnalyzer(160, 120));
   const duplicateSuppressorRef = useRef<DuplicateSuppressor>(new DuplicateSuppressor());
@@ -743,6 +748,45 @@ export default function UniversalOMRScannerPage() {
 
         setCameraMotionState(analysis.motionState);
         setSharpnessScore(analysis.sharpnessScore);
+        setArCornersLocked(analysis.cornersLocked || 0);
+
+        // Draw Live AR Corner-Lock Quad Overlay
+        if (arCanvasRef.current && videoRef.current) {
+          const arC = arCanvasRef.current;
+          const dw = videoRef.current.clientWidth || 640;
+          const dh = videoRef.current.clientHeight || 480;
+          if (arC.width !== dw || arC.height !== dh) {
+            arC.width = dw;
+            arC.height = dh;
+          }
+          const arCtx = arC.getContext('2d');
+          if (arCtx) {
+            arCtx.clearRect(0, 0, dw, dh);
+            if (analysis.paperQuadNorm && analysis.paperQuadNorm.length === 4) {
+              const pts = analysis.paperQuadNorm.map((p) => ({ x: p.x * dw, y: p.y * dh }));
+              arCtx.save();
+              arCtx.strokeStyle = analysis.isAutoCaptureReady ? '#34d399' : '#38bdf8';
+              arCtx.fillStyle = analysis.isAutoCaptureReady ? 'rgba(52, 211, 153, 0.12)' : 'rgba(56, 189, 248, 0.08)';
+              arCtx.lineWidth = 3;
+              arCtx.beginPath();
+              arCtx.moveTo(pts[0].x, pts[0].y);
+              for (let k = 1; k < 4; k++) arCtx.lineTo(pts[k].x, pts[k].y);
+              arCtx.closePath();
+              arCtx.fill();
+              arCtx.stroke();
+              pts.forEach((pt) => {
+                arCtx.beginPath();
+                arCtx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
+                arCtx.fillStyle = analysis.isAutoCaptureReady ? '#10b981' : '#38bdf8';
+                arCtx.fill();
+                arCtx.strokeStyle = '#ffffff';
+                arCtx.lineWidth = 2;
+                arCtx.stroke();
+              });
+              arCtx.restore();
+            }
+          }
+        }
 
         if (analysis.motionDelta > 16.0) {
           duplicateSuppressorRef.current.onMotionSpikeDetected();
@@ -1006,6 +1050,16 @@ export default function UniversalOMRScannerPage() {
       return;
     }
 
+    if (duplicateRolls.size > 0) {
+      const ok = confirm(
+        `সতর্কতা: ব্যাচে ${duplicateRolls.size} টি ডুপ্লিকেট রোল নম্বর পাওয়া গেছে (${Array.from(duplicateRolls).join(', ')})। সংশোধন না করে পাবলিশ করলে পূর্বের নম্বর ওভাররাইট হতে পারে। তবুও এগিয়ে যেতে চান?`
+      );
+      if (!ok) {
+        setActiveTab('results');
+        return;
+      }
+    }
+
     setIsSyncing(true);
     setSyncStatus(null);
 
@@ -1104,15 +1158,35 @@ export default function UniversalOMRScannerPage() {
     }
   };
 
+  // Duplicate-Roll Collision Detector
+  const duplicateRolls = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of scoreCards) {
+      const r = (c.rollNumber || '').trim();
+      if (r && r !== 'UNKNOWN' && r !== 'N/A') {
+        counts.set(r, (counts.get(r) || 0) + 1);
+      }
+    }
+    const dups = new Set<string>();
+    counts.forEach((cnt, r) => {
+      if (cnt > 1) dups.add(r);
+    });
+    return dups;
+  }, [scoreCards]);
+
   // Filtered Cards
   const flaggedCount = useMemo(
-    () => scoreCards.filter((c) => c.needsReview || (c.flags && c.flags.length > 0)).length,
-    [scoreCards]
+    () =>
+      scoreCards.filter(
+        (c) => c.needsReview || (c.flags && c.flags.length > 0) || duplicateRolls.has((c.rollNumber || '').trim())
+      ).length,
+    [scoreCards, duplicateRolls]
   );
 
   const filteredScoreCards = useMemo(() => {
     return scoreCards.filter((c) => {
-      if (reviewFilterOnly && !c.needsReview && (!c.flags || c.flags.length === 0)) {
+      const isDup = duplicateRolls.has((c.rollNumber || '').trim());
+      if (reviewFilterOnly && !c.needsReview && (!c.flags || c.flags.length === 0) && !isDup) {
         return false;
       }
       if (!searchFilter.trim()) return true;
@@ -1125,7 +1199,7 @@ export default function UniversalOMRScannerPage() {
         c.filename.toLowerCase().includes(q)
       );
     });
-  }, [scoreCards, reviewFilterOnly, searchFilter]);
+  }, [scoreCards, reviewFilterOnly, searchFilter, duplicateRolls]);
 
   const psychometrics = useMemo(() => AnalyticsEngine.computePsychometrics(scoreCards), [scoreCards]);
 
@@ -1434,6 +1508,11 @@ export default function UniversalOMRScannerPage() {
               }`}
             >
               <video ref={videoRef} playsInline muted className="w-full max-h-[560px] object-contain" />
+              {/* Live AR Corner-Lock Canvas HUD */}
+              <canvas
+                ref={arCanvasRef}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+              />
 
               <div className="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-auto">
                 <div className="flex items-center gap-2">
@@ -1466,6 +1545,10 @@ export default function UniversalOMRScannerPage() {
                         ? '⏳ স্থির হচ্ছে...'
                         : '🖐️ হাত নড়ছে'}
                     </span>
+                  </div>
+                  <div className="px-2.5 py-1.5 rounded-xl text-[11px] font-mono backdrop-blur border bg-slate-950/80 border-slate-700 text-slate-200 hidden md:flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${arCornersLocked === 4 ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                    <span>AR Lock: {arCornersLocked}/4</span>
                   </div>
                 </div>
 
@@ -1573,6 +1656,26 @@ export default function UniversalOMRScannerPage() {
 
         {/* Tab 3: Results Cohort & Visual HITL Quality Control */}
         {activeTab === 'results' && (
+          <div className="space-y-4">
+            {duplicateRolls.size > 0 && (
+              <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>
+                    ডুপ্লিকেট রোল কলিশন সতর্কতা: একই রোল নম্বর একাধিক শিটে পাওয়া গেছে —{' '}
+                    <strong className="font-mono text-white">{Array.from(duplicateRolls).join(', ')}</strong> (পাবলিশের আগে রোল সংশোধন করুন)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilterOnly(true)}
+                  className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] cursor-pointer"
+                >
+                  শুধু ফ্ল্যাগড দেখুন
+                </button>
+              </div>
+            )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Roster List */}
             <div className="lg:col-span-4 space-y-3">
@@ -1649,6 +1752,11 @@ export default function UniversalOMRScannerPage() {
                               <span className="px-1.5 py-0.5 bg-slate-800 text-[10px] text-slate-300 rounded">
                                 সেট {card.examSet || 'A'}
                               </span>
+                              {duplicateRolls.has((card.rollNumber || '').trim()) && (
+                                <span className="px-1.5 py-0.5 bg-rose-500/25 text-rose-300 border border-rose-500/40 rounded text-[9px] font-bold">
+                                  DUP
+                                </span>
+                              )}
                               {hasFlags && (
                                 <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px]">
                                   QC
@@ -1706,6 +1814,13 @@ export default function UniversalOMRScannerPage() {
                               className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                             >
                               <Edit3 className="w-3 h-3" /> রোল/সেট সংশোধন
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPrintingCard(selectedScoreCard)}
+                              className="px-2 py-0.5 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Printer className="w-3 h-3" /> স্কোরকার্ড প্রিন্ট
                             </button>
                           </div>
                           <p className="text-xs text-slate-400">
@@ -1911,6 +2026,7 @@ export default function UniversalOMRScannerPage() {
               )}
             </div>
           </div>
+          </div>
         )}
 
         {/* Tab 4: Cohort Psychometrics & Item Analysis */}
@@ -2016,6 +2132,18 @@ export default function UniversalOMRScannerPage() {
           </div>
         )}
       </div>
+
+      {/* Printable Individual Student OMR Report Card Modal */}
+      {printingCard && (
+        <StudentOMRReportCardModal
+          scoreCard={printingCard}
+          examName={
+            examsList.find((e) => e.id === ((printingCard as any).examId || selectedExamId))?.name ||
+            'অফিসিয়াল OMR মূল্যায়ন ফলাফল পত্র'
+          }
+          onClose={() => setPrintingCard(null)}
+        />
+      )}
     </div>
   );
 }

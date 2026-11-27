@@ -27,6 +27,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { BangladeshOMRGenerator, type PresetType } from '@/app/components/omr/BangladeshOMRGenerator';
+import { OMRCalibrationStudio } from '@/app/components/omr/OMRCalibrationStudio';
 import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import type { Template } from '@/lib/omr/types';
@@ -456,7 +457,7 @@ function RealisticPaperPreview({ item }: { item: TemplateCatalogItem }) {
 
 export default function OMRTemplatesPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'gallery' | 'studio'>('gallery');
+  const [activeTab, setActiveTab] = useState<'gallery' | 'studio' | 'calibrate'>('gallery');
   const [activePreset, setActivePreset] = useState<PresetType>('hsc_ssc_50');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'board' | 'admission' | 'cq' | 'model'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -670,14 +671,26 @@ export default function OMRTemplatesPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('studio')}
-                className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   activeTab === 'studio'
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                 }`}
               >
                 <Sliders className="w-4 h-4" />
-                <span>লাইভ কাস্টম স্টুডিও</span>
+                <span>কাস্টম স্টুডিও</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('calibrate')}
+                className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'calibrate'
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <ScanLine className="w-4 h-4" />
+                <span>ক্যালিব্রেশন</span>
               </button>
             </div>
             <span className="text-[11px] text-slate-400">
@@ -838,6 +851,13 @@ export default function OMRTemplatesPage() {
               </div>
             )}
           </div>
+        ) : activeTab === 'calibrate' ? (
+          /* TAB 3: VISUAL THIRD-PARTY SHEET CALIBRATION STUDIO */
+          <OMRCalibrationStudio
+            onApplyAndScan={(tpl) => {
+              handleUseInScanner('custom', tpl);
+            }}
+          />
         ) : (
           /* TAB 2: LIVE CUSTOMIZATION STUDIO */
           <div className="space-y-4">

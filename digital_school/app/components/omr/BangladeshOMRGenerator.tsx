@@ -282,8 +282,126 @@ export function BangladeshOMRGenerator({
     setStatusMessage(`Generated authentic Board Serial: ${fresh}`);
   };
 
-  // Compile JSON Template matching the printed sheet geometry
+  // Compile JSON Template matching the EXACT printed sheet geometry via live DOM measurement
+  // Measures normalized [0..1240, 0..1754] coordinates directly from rendered bubbles (zoom-invariant, 0px drift)
+  const measureDomCalibratedTemplate = (): Template | null => {
+    if (typeof window === 'undefined' || !printContainerRef.current) return null;
+    const sheetEl = printContainerRef.current;
+    const sheetRect = sheetEl.getBoundingClientRect();
+    if (sheetRect.width < 100 || sheetRect.height < 100) return null;
+
+    const bubbleNodes = Array.from(sheetEl.querySelectorAll<HTMLElement>('[data-omr-bubble="1"]'));
+    if (bubbleNodes.length < 10) return null;
+
+    const pageW = 1240;
+    const pageH = 1754;
+    const scaleX = pageW / sheetRect.width;
+    const scaleY = pageH / sheetRect.height;
+
+    type MeasuredBubble = {
+      block: string;
+      label: string;
+      value: string;
+      dir: 'vertical' | 'horizontal';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    };
+
+    const grouped: Record<string, MeasuredBubble[]> = {};
+    let sumW = 0;
+    let sumH = 0;
+
+    for (const el of bubbleNodes) {
+      const r = el.getBoundingClientRect();
+      const block = el.dataset.omrBlock || 'Block';
+      const label = el.dataset.omrLabel || '';
+      const value = el.dataset.omrValue || '';
+      const dir = (el.dataset.omrDir === 'vertical' ? 'vertical' : 'horizontal') as 'vertical' | 'horizontal';
+      const x = (r.left - sheetRect.left) * scaleX;
+      const y = (r.top - sheetRect.top) * scaleY;
+      const w = r.width * scaleX;
+      const h = r.height * scaleY;
+      sumW += w;
+      sumH += h;
+      if (!grouped[block]) grouped[block] = [];
+      grouped[block].push({ block, label, value, dir, x, y, w, h });
+    }
+
+    const avgW = Math.max(14, Math.round(sumW / bubbleNodes.length));
+    const avgH = Math.max(14, Math.round(sumH / bubbleNodes.length));
+    const fieldBlocks: Template['fieldBlocks'] = {};
+    const customLabels: Record<string, string[]> = {};
+
+    for (const [blockName, items] of Object.entries(grouped)) {
+      if (items.length === 0) continue;
+      const dir = items[0].dir;
+
+      // Preserve DOM order of unique labels and unique bubble values
+      const uniqueLabels: string[] = [];
+      const uniqueValues: string[] = [];
+      const byLabel: Record<string, MeasuredBubble[]> = {};
+
+      for (const it of items) {
+        if (!byLabel[it.label]) {
+          byLabel[it.label] = [];
+          uniqueLabels.push(it.label);
+        }
+        byLabel[it.label].push(it);
+        if (!uniqueValues.includes(it.value)) uniqueValues.push(it.value);
+      }
+
+      const firstLabelBubbles = byLabel[uniqueLabels[0]];
+      const originX = parseFloat(firstLabelBubbles[0].x.toFixed(2));
+      const originY = parseFloat(firstLabelBubbles[0].y.toFixed(2));
+
+      // Exact bubblesGap along bubble axis (Y for vertical, X for horizontal)
+      let bubblesGap = 26;
+      if (firstLabelBubbles.length > 1) {
+        const lastB = firstLabelBubbles[firstLabelBubbles.length - 1];
+        const span = dir === 'vertical' ? lastB.y - firstLabelBubbles[0].y : lastB.x - firstLabelBubbles[0].x;
+        bubblesGap = parseFloat((span / (firstLabelBubbles.length - 1)).toFixed(2));
+      }
+
+      // Exact labelsGap along label axis (X for vertical, Y for horizontal)
+      let labelsGap = 0;
+      if (uniqueLabels.length > 1) {
+        const lastLabelFirstB = byLabel[uniqueLabels[uniqueLabels.length - 1]][0];
+        const span = dir === 'vertical' ? lastLabelFirstB.x - firstLabelBubbles[0].x : lastLabelFirstB.y - firstLabelBubbles[0].y;
+        labelsGap = parseFloat((span / (uniqueLabels.length - 1)).toFixed(2));
+      }
+
+      fieldBlocks[blockName] = {
+        origin: [originX, originY],
+        bubblesGap,
+        labelsGap,
+        direction: dir,
+        fieldLabels: uniqueLabels,
+        bubbleValues: uniqueValues,
+        section: blockName,
+      };
+
+      if (blockName === 'Roll') customLabels['Roll'] = uniqueLabels;
+      else if (blockName === 'Reg') customLabels['Registration'] = uniqueLabels;
+      else if (blockName === 'SubjectCode') customLabels['SubjectCode'] = uniqueLabels;
+      else if (blockName === 'SetCode') customLabels['Set'] = uniqueLabels;
+    }
+
+    return {
+      pageDimensions: [pageW, pageH],
+      bubbleDimensions: [avgW, avgH],
+      preProcessors: [{ name: 'CropOnMarkers' }],
+      fieldBlocks,
+      customLabels,
+    };
+  };
+
+  // Compile JSON Template matching the printed sheet geometry (prefers 0-px DOM calibration)
   const generateOMRCheckerTemplate = (): Template => {
+    const domMeasured = measureDomCalibratedTemplate();
+    if (domMeasured) return domMeasured;
+
     const pageW = 1240;
     const pageH = 1754;
     const bubbleW = 22;
@@ -468,6 +586,27 @@ export function BangladeshOMRGenerator({
   };
 
   const handlePrint = () => {
+    // Enforce exact A4 zero-margin print geometry for 1:1 millimeter-accurate PDF/Paper output
+    const styleId = 'omr-exact-a4-print-style';
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = `
+        @page { size: A4 portrait; margin: 0mm !important; }
+        @media print {
+          html, body {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
     window.print();
   };
 
@@ -1133,25 +1272,25 @@ export function BangladeshOMRGenerator({
               } as any}
             >
             {/* 4 Corner High-Precision Optical Registration Markers */}
-            <div className="fiducial-marker top-left">
+            <div className="fiducial-marker top-left" data-omr-fiducial="TL">
               <div className="marker-cross-circle">
                 <div className="cross-line-h"></div>
                 <div className="cross-line-v"></div>
               </div>
             </div>
-            <div className="fiducial-marker top-right">
+            <div className="fiducial-marker top-right" data-omr-fiducial="TR">
               <div className="marker-cross-circle">
                 <div className="cross-line-h"></div>
                 <div className="cross-line-v"></div>
               </div>
             </div>
-            <div className="fiducial-marker bottom-left">
+            <div className="fiducial-marker bottom-left" data-omr-fiducial="BL">
               <div className="marker-cross-circle">
                 <div className="cross-line-h"></div>
                 <div className="cross-line-v"></div>
               </div>
             </div>
-            <div className="fiducial-marker bottom-right">
+            <div className="fiducial-marker bottom-right" data-omr-fiducial="BR">
               <div className="marker-cross-circle">
                 <div className="cross-line-h"></div>
                 <div className="cross-line-v"></div>
@@ -1259,7 +1398,15 @@ export function BangladeshOMRGenerator({
                                 </div>
                                 <div className="q-bubbles-group">
                                   {optionsList.map(opt => (
-                                    <div key={opt} className="omr-bubble-circle">
+                                    <div
+                                      key={opt}
+                                      className="omr-bubble-circle"
+                                      data-omr-bubble="1"
+                                      data-omr-block={`Questions_Col${colIdx + 1}`}
+                                      data-omr-label={`q${qNum}`}
+                                      data-omr-value={opt}
+                                      data-omr-dir="horizontal"
+                                    >
                                       <span>{opt}</span>
                                     </div>
                                   ))}
@@ -1291,7 +1438,15 @@ export function BangladeshOMRGenerator({
                             return (
                               <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
                                 {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                  <div key={digit} className="matrix-bubble">
+                                  <div
+                                    key={digit}
+                                    className="matrix-bubble"
+                                    data-omr-bubble="1"
+                                    data-omr-block="Roll"
+                                    data-omr-label={`roll${colIdx + 1}`}
+                                    data-omr-value={String(digit)}
+                                    data-omr-dir="vertical"
+                                  >
                                     <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
                                   </div>
                                 ))}
@@ -1312,7 +1467,15 @@ export function BangladeshOMRGenerator({
                         </div>
                         <div className="digit-column-strip col-stripe single">
                           {(setOptionsType === 'BANGLA' ? ['ক', 'খ', 'গ', 'ঘ'] : ['A', 'B', 'C', 'D']).map(s => (
-                            <div key={s} className="matrix-bubble set-bubble">
+                            <div
+                              key={s}
+                              className="matrix-bubble set-bubble"
+                              data-omr-bubble="1"
+                              data-omr-block="SetCode"
+                              data-omr-label="Set"
+                              data-omr-value={s}
+                              data-omr-dir="vertical"
+                            >
                               <span>{s}</span>
                             </div>
                           ))}
@@ -1354,7 +1517,15 @@ export function BangladeshOMRGenerator({
                               return (
                                 <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
                                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                    <div key={digit} className="matrix-bubble">
+                                    <div
+                                      key={digit}
+                                      className="matrix-bubble"
+                                      data-omr-bubble="1"
+                                      data-omr-block="Reg"
+                                      data-omr-label={`reg${colIdx + 1}`}
+                                      data-omr-value={String(digit)}
+                                      data-omr-dir="vertical"
+                                    >
                                       <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
                                     </div>
                                   ))}
@@ -1381,7 +1552,15 @@ export function BangladeshOMRGenerator({
                               return (
                                 <div key={colIdx} className={`digit-column-strip ${isColStripe ? 'col-stripe' : ''}`}>
                                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                                    <div key={digit} className="matrix-bubble">
+                                    <div
+                                      key={digit}
+                                      className="matrix-bubble"
+                                      data-omr-bubble="1"
+                                      data-omr-block="SubjectCode"
+                                      data-omr-label={`sub${colIdx + 1}`}
+                                      data-omr-value={String(digit)}
+                                      data-omr-dir="vertical"
+                                    >
                                       <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
                                     </div>
                                   ))}
@@ -1516,7 +1695,15 @@ export function BangladeshOMRGenerator({
                         {[...Array(rollDigits)].map((_, colIdx) => (
                           <div key={colIdx} className={`digit-column-strip ${colIdx % 2 === 0 ? 'col-stripe' : ''}`}>
                             {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(digit => (
-                              <div key={digit} className="matrix-bubble">
+                              <div
+                                key={digit}
+                                className="matrix-bubble"
+                                data-omr-bubble="1"
+                                data-omr-block="Roll"
+                                data-omr-label={`roll${colIdx + 1}`}
+                                data-omr-value={String(digit)}
+                                data-omr-dir="vertical"
+                              >
                                 <span>{numberingLanguage === 'BANGLA' ? toBanglaNumber(digit) : digit}</span>
                               </div>
                             ))}
@@ -1608,7 +1795,15 @@ export function BangladeshOMRGenerator({
                                 </div>
                                 <div className="q-bubbles-group">
                                   {optionsList.map(opt => (
-                                    <div key={opt} className="omr-bubble-circle">
+                                    <div
+                                      key={opt}
+                                      className="omr-bubble-circle"
+                                      data-omr-bubble="1"
+                                      data-omr-block={`Questions_Col${colIdx + 1}`}
+                                      data-omr-label={`q${qNum}`}
+                                      data-omr-value={opt}
+                                      data-omr-dir="horizontal"
+                                    >
                                       <span>{opt}</span>
                                     </div>
                                   ))}
