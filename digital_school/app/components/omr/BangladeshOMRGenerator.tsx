@@ -53,6 +53,7 @@ interface BangladeshOMRGeneratorProps {
 
 export type PresetType = 
   | 'hsc_ssc_50' 
+  | 'buet_iba_5opt_50'
   | 'hsc_ssc_25' 
   | 'medical_100' 
   | 'du_admission' 
@@ -221,6 +222,7 @@ export function BangladeshOMRGenerator({
       setExamTitleBangla('নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্র');
       setNumQuestions(50);
       setNumColumns(2);
+      setOptionsPerQuestion(4);
       setLayoutMode('split');
       setOptionLanguage('BANGLA');
       setNumberingLanguage('BANGLA');
@@ -238,6 +240,29 @@ export function BangladeshOMRGenerator({
       setShowBarcodeSecurity(true);
       setSerialNumber('HSC-2026-948120');
       setStatusMessage('Loaded official Bangladesh Board HSC/SSC 50-Question Preset');
+    } else if (preset === 'buet_iba_5opt_50') {
+      setInstituteNameBangla('BUET / IBA / BCS 5-Option Admission Board');
+      setExamTitleBangla('৫-অপশন নৈর্ব্যক্তিক উত্তরপত্র (A–E)');
+      setNumQuestions(50);
+      setNumColumns(2);
+      setOptionsPerQuestion(5);
+      setLayoutMode('split');
+      setOptionLanguage('ENGLISH');
+      setNumberingLanguage('ENGLISH');
+      setThemeColor('blue');
+      setShowRollNumber(true);
+      setRollDigits(6);
+      setShowRegNumber(true);
+      setRegDigits(10);
+      setShowSubjectCode(true);
+      setSubjectCodeDigits(3);
+      setShowSetCode(true);
+      setSetOptionsType('ENGLISH');
+      setShowSignatures(true);
+      setShowInstructions(true);
+      setShowBarcodeSecurity(true);
+      setSerialNumber('OMR5-2026-501120');
+      setStatusMessage('Loaded 5-Option (A–E) BUET / IBA / BCS 50-Question Preset');
     } else if (preset === 'hsc_ssc_25') {
       setInstituteNameBangla('মাধ্যমিক ও উচ্চ মাধ্যমিক শিক্ষা বোর্ড');
       setExamTitleBangla('নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্র (সংক্ষিপ্ত সিলেবাস)');
@@ -679,10 +704,13 @@ export function BangladeshOMRGenerator({
     };
   };
 
-  const activeQrTemplateId =
-    selectedPreset === 'custom'
-      ? `custom_${layoutMode}_${numQuestions}q_${numColumns}c_r${rollDigits}`
-      : selectedPreset;
+  const activeQrTemplateId = (() => {
+    const base =
+      selectedPreset === 'custom'
+        ? `custom_${layoutMode}_${numQuestions}q_${numColumns}c_r${rollDigits}`
+        : selectedPreset;
+    return optionsPerQuestion === 5 ? `${base}_5opt` : base;
+  })();
 
   const persistCalibratedTemplate = async (tmpl: Template) => {
     saveCalibratedTemplateLocal(activeQrTemplateId, tmpl);
@@ -1160,6 +1188,7 @@ export function BangladeshOMRGenerator({
             {[
               { id: 'board_cq_3part', label: '📝 CQ ৩-খণ্ড কভার' },
               { id: 'hsc_ssc_50', label: '🎓 HSC/SSC ৫০-প্রশ্ন' },
+              { id: 'buet_iba_5opt_50', label: '⭐ ৫-অপশন (A–E)' },
               { id: 'medical_100', label: '🩺 মেডিকেল ১০০-প্রশ্ন' },
               { id: 'du_admission', label: '🏛️ ঢাবি ৬০/১০০-প্রশ্ন' },
               { id: 'gst_cluster', label: '🌐 GST গুচ্ছ ১০০-প্রশ্ন' },

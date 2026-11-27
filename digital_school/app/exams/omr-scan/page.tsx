@@ -1104,7 +1104,10 @@ export default function UniversalOMRScannerPage() {
     const curVerdict = selectedScoreCard.questionVerdicts?.[qKey];
     if (!curVerdict) return;
 
-    const cycle = ['A', 'B', 'C', 'D', ''];
+    const hasFiveOptionBlock = Object.values(activeTemplate.fieldBlocks || {}).some(
+      (b) => b.fieldType === 'QTYPE_MCQ5' || b.fieldType === 'QTYPE_MCQ5_RTL' || (b.bubbleValues && b.bubbleValues.length === 5)
+    );
+    const cycle = hasFiveOptionBlock ? ['A', 'B', 'C', 'D', 'E', ''] : ['A', 'B', 'C', 'D', ''];
     const curAns = (curVerdict.studentAnswer || '').toUpperCase();
     const nextIdx = (cycle.indexOf(curAns) + 1) % cycle.length;
     const nextAns = cycle[nextIdx];
