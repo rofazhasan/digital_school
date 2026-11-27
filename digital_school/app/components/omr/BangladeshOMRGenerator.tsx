@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Template } from '@/lib/omr/types';
+import { saveCalibratedTemplateLocal } from '@/lib/omr/presetTemplates';
 import { toBengaliNumerals as toBanglaNumber, generateBoardCQSerial, incrementBoardSerial } from '@/utils/numeralConverter';
 import { BangladeshBoardCQ3PartSheet } from './BangladeshBoardCQ3PartSheet';
 import './omr.css';
@@ -371,7 +372,9 @@ export function BangladeshOMRGenerator({
   };
 
   // Compile JSON Template matching the EXACT printed sheet geometry via live DOM measurement
-  // Measures normalized [0..1240, 0..1754] coordinates directly from rendered bubbles (zoom-invariant, 0px drift)
+  // Maps every bubble STRICTLY relative to the 4 corner fiducial centers (TL, TR, BL, BR)
+  // into canonical [fidInset..pageW-1-fidInset, fidInset..pageH-1-fidInset] — 100% invariant
+  // to screen zoom, print scale, phone camera distance, or desk border crop (0.0px drift).
   const measureDomCalibratedTemplate = (): Template | null => {
     if (typeof window === 'undefined' || !printContainerRef.current) return null;
     const sheetEl = printContainerRef.current;
@@ -383,8 +386,49 @@ export function BangladeshOMRGenerator({
 
     const pageW = 1240;
     const pageH = 1754;
-    const scaleX = pageW / sheetRect.width;
-    const scaleY = pageH / sheetRect.height;
+    const fidInsetX = 30;
+    const fidInsetY = 30;
+
+    // Locate the 4 corner fiducial centers so coordinates match CropOnMarkers warp 1:1
+    const tlEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="TL"]');
+    const trEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="TR"]');
+    const blEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="BL"]');
+    const brEl = sheetEl.querySelector<HTMLElement>('[data-omr-fiducial="BR"]');
+
+    let refLeft = sheetRect.left;
+    let refTop = sheetRect.top;
+    let refW = sheetRect.width;
+    let refH = sheetRect.height;
+    let dstLeft = 0;
+    let dstTop = 0;
+    let dstW = pageW;
+    let dstH = pageH;
+    let hasFiducials = false;
+
+    if (tlEl && trEl && blEl && brEl) {
+      const rTL = tlEl.getBoundingClientRect();
+      const rTR = trEl.getBoundingClientRect();
+      const rBL = blEl.getBoundingClientRect();
+      const rBR = brEl.getBoundingClientRect();
+      const cxLeft = (rTL.left + rTL.width / 2 + rBL.left + rBL.width / 2) / 2;
+      const cxRight = (rTR.left + rTR.width / 2 + rBR.left + rBR.width / 2) / 2;
+      const cyTop = (rTL.top + rTL.height / 2 + rTR.top + rTR.height / 2) / 2;
+      const cyBot = (rBL.top + rBL.height / 2 + rBR.top + rBR.height / 2) / 2;
+      if (cxRight - cxLeft > 80 && cyBot - cyTop > 80) {
+        refLeft = cxLeft;
+        refTop = cyTop;
+        refW = cxRight - cxLeft;
+        refH = cyBot - cyTop;
+        dstLeft = fidInsetX;
+        dstTop = fidInsetY;
+        dstW = pageW - 1 - 2 * fidInsetX;
+        dstH = pageH - 1 - 2 * fidInsetY;
+        hasFiducials = true;
+      }
+    }
+
+    const scaleX = dstW / refW;
+    const scaleY = dstH / refH;
 
     type MeasuredBubble = {
       block: string;
@@ -407,8 +451,8 @@ export function BangladeshOMRGenerator({
       const label = el.dataset.omrLabel || '';
       const value = el.dataset.omrValue || '';
       const dir = (el.dataset.omrDir === 'vertical' ? 'vertical' : 'horizontal') as 'vertical' | 'horizontal';
-      const x = (r.left - sheetRect.left) * scaleX;
-      const y = (r.top - sheetRect.top) * scaleY;
+      const x = dstLeft + (r.left - refLeft) * scaleX;
+      const y = dstTop + (r.top - refTop) * scaleY;
       const w = r.width * scaleX;
       const h = r.height * scaleY;
       sumW += w;
@@ -479,6 +523,7 @@ export function BangladeshOMRGenerator({
     return {
       pageDimensions: [pageW, pageH],
       bubbleDimensions: [avgW, avgH],
+      ...(hasFiducials ? { fiducialInset: [fidInsetX, fidInsetY] as [number, number] } : {}),
       preProcessors: [{ name: 'CropOnMarkers' }],
       fieldBlocks,
       customLabels,
@@ -639,8 +684,8 @@ export function BangladeshOMRGenerator({
       ? `custom_${layoutMode}_${numQuestions}q_${numColumns}c_r${rollDigits}`
       : selectedPreset;
 
-  const handleSyncToScanner = async () => {
-    const tmpl = generateOMRCheckerTemplate();
+  const persistCalibratedTemplate = async (tmpl: Template) => {
+    saveCalibratedTemplateLocal(activeQrTemplateId, tmpl);
     try {
       await fetch('/api/omr-templates', {
         method: 'POST',
@@ -654,10 +699,15 @@ export function BangladeshOMRGenerator({
         }),
       });
     } catch {
-      // Offline or unauthenticated — localStorage fallback still works
+      // Offline or unauthenticated — localStorage calibrated cache is already saved
     }
+  };
+
+  const handleSyncToScanner = async () => {
+    const tmpl = generateOMRCheckerTemplate();
+    await persistCalibratedTemplate(tmpl);
     if (onApplyGeneratedTemplate) onApplyGeneratedTemplate(tmpl);
-    setStatusMessage('Sync complete! Template saved to Cloud DB & Scanner.');
+    setStatusMessage('Sync complete! Fiducial-calibrated template saved to Cloud DB & Scanner.');
     if (onNavigateToScanner) onNavigateToScanner();
   };
 
@@ -673,29 +723,166 @@ export function BangladeshOMRGenerator({
     setStatusMessage('Downloaded OMRChecker-compatible template.json');
   };
 
+  /**
+   * 100% Isolated Single-Page Borderless A4 Print Engine
+   * Renders ONLY the OMR sheet(s) into a clean dedicated print iframe with @page { size: A4 portrait; margin: 0mm }
+   * so Next.js navbars/sidebars/zoom wrappers NEVER push the sheet onto Page 2 or leave blank margins.
+   */
   const handlePrint = () => {
-    // Enforce exact A4 zero-margin print geometry for 1:1 millimeter-accurate PDF/Paper output
-    const styleId = 'omr-exact-a4-print-style';
-    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      styleEl.textContent = `
-        @page { size: A4 portrait; margin: 0mm !important; }
-        @media print {
-          html, body {
-            width: 210mm !important;
-            height: 297mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `;
-      document.head.appendChild(styleEl);
+    // Auto-sync the exact printed sheet's DOM-calibrated geometry to Scanner & Cloud DB
+    if (selectedPreset !== 'board_cq_3part') {
+      const tmpl = generateOMRCheckerTemplate();
+      void persistCalibratedTemplate(tmpl);
     }
-    window.print();
+
+    const viewportRoot = document.querySelector('.sheet-zoom-container');
+    if (!viewportRoot) {
+      window.print();
+      return;
+    }
+
+    // Collect either the batch .print-only sheets (when >1 page) or the single preview sheet
+    const batchContainer = viewportRoot.querySelector('.print-only');
+    let sheetNodes: HTMLElement[] = [];
+    if (batchContainer) {
+      sheetNodes = Array.from(
+        batchContainer.querySelectorAll<HTMLElement>('.bd-omr-printable-sheet, .bd-cq-3part-sheet')
+      );
+    }
+    if (sheetNodes.length === 0) {
+      sheetNodes = Array.from(
+        viewportRoot.querySelectorAll<HTMLElement>('.bd-omr-printable-sheet, .bd-cq-3part-sheet')
+      ).slice(0, 1);
+    }
+    if (sheetNodes.length === 0) {
+      window.print();
+      return;
+    }
+
+    // Remove any previous print iframe
+    const existingFrame = document.getElementById('omr-isolated-a4-print-frame');
+    if (existingFrame) existingFrame.remove();
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'omr-isolated-a4-print-frame';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      iframe.remove();
+      window.print();
+      return;
+    }
+
+    // Clone all active stylesheets and inline styles so fonts & OMR CSS match 100%
+    const headStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((node) => node.outerHTML)
+      .join('\n');
+
+    const pagesHtml = sheetNodes
+      .map((node) => {
+        const clone = node.cloneNode(true) as HTMLElement;
+        // Strip any non-printable overlays (like X-Ray SVG)
+        clone.querySelectorAll('.no-print, .omr-xray-overlay').forEach((el) => el.remove());
+        const isCq = clone.classList.contains('bd-cq-3part-sheet');
+        return `<div class="omr-a4-print-slot ${isCq ? 'is-cq' : 'is-mcq'}">${clone.outerHTML}</div>`;
+      })
+      .join('\n');
+
+    doc.open();
+    doc.write(`<!doctype html>
+      <html lang="bn">
+        <head>
+          <meta charset="utf-8" />
+          <title>${examTitleBangla || 'OMR Sheet'}</title>
+          ${headStyles}
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0mm !important;
+            }
+            *, *::before, *::after {
+              box-sizing: border-box !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 210mm !important;
+              background: #ffffff !important;
+              overflow: visible !important;
+            }
+            body * {
+              visibility: visible !important;
+            }
+            .omr-a4-print-slot {
+              width: 210mm !important;
+              height: 297mm !important;
+              max-height: 297mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              overflow: hidden !important;
+              position: relative !important;
+              background: #ffffff !important;
+              page-break-after: always !important;
+              break-after: page !important;
+              display: block !important;
+            }
+            .omr-a4-print-slot:last-child {
+              page-break-after: auto !important;
+              break-after: auto !important;
+            }
+            /* Scale exact 820x1160px A4 sheet cleanly into 210mm x 297mm (793.7x1122.5px) with zero clipping & zero border */
+            .omr-a4-print-slot.is-mcq > .bd-omr-printable-sheet {
+              width: 820px !important;
+              height: 1160px !important;
+              max-width: 820px !important;
+              max-height: 1160px !important;
+              margin: 0 !important;
+              padding: 16px 20px !important;
+              border: none !important;
+              box-shadow: none !important;
+              transform: scale(0.967) !important;
+              transform-origin: top left !important;
+              page-break-after: auto !important;
+              break-after: auto !important;
+            }
+            .omr-a4-print-slot.is-cq > .bd-cq-3part-sheet {
+              width: 210mm !important;
+              height: 297mm !important;
+              margin: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+              page-break-after: auto !important;
+              break-after: auto !important;
+            }
+            .no-print, .omr-xray-overlay {
+              display: none !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${pagesHtml}
+        </body>
+      </html>`);
+    doc.close();
+
+    // Wait briefly for fonts & SVGs inside iframe to settle, then print cleanly
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } finally {
+        setTimeout(() => iframe.remove(), 2500);
+      }
+    }, 350);
   };
 
   // Color mappings with rich authentic tones and alternating stripe fills

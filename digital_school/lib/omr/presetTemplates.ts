@@ -72,7 +72,8 @@ export const PRESET_TEMPLATES: PresetData[] = [
       'Official Bangladesh Education Board standard format with 6-digit Roll, 10-digit Registration, 3-digit Subject Code, Set Code (ক, খ, গ, ঘ) and 50 MCQs.',
     template: {
       pageDimensions: [1240, 1754],
-      bubbleDimensions: [22, 22],
+      bubbleDimensions: [24, 24],
+      fiducialInset: [30, 30],
       preProcessors: [{ name: 'CropOnMarkers' }],
       customLabels: {
         Roll: ['roll1..6'],
@@ -81,12 +82,12 @@ export const PRESET_TEMPLATES: PresetData[] = [
         Set: ['Set'],
       },
       fieldBlocks: {
-        Roll: { origin: [680, 260], bubblesGap: 28, labelsGap: 34, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['roll1..6'], section: 'Roll Number' },
-        SetCode: { origin: [920, 260], bubblesGap: 28, labelsGap: 0, bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], direction: 'horizontal', fieldLabels: ['Set'], section: 'Set Code' },
-        Registration: { origin: [680, 680], bubblesGap: 28, labelsGap: 32, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['reg1..10'], section: 'Registration Number' },
-        SubjectCode: { origin: [1020, 680], bubblesGap: 28, labelsGap: 34, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['sub1..3'], section: 'Subject Code' },
-        QuestionsCol1: { origin: [60, 220], bubblesGap: 32, labelsGap: 28, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q1..25'], bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], section: 'Part 1 (Questions 1-25)' },
-        QuestionsCol2: { origin: [340, 220], bubblesGap: 32, labelsGap: 28, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q26..50'], bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], section: 'Part 2 (Questions 26-50)' },
+        Roll: { origin: [736, 444], bubblesGap: 29, labelsGap: 27, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['roll1..6'], section: 'Roll Number' },
+        SetCode: { origin: [932, 444], bubblesGap: 32, labelsGap: 0, bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], direction: 'vertical', fieldLabels: ['Set'], section: 'Set Code' },
+        Registration: { origin: [736, 804], bubblesGap: 29, labelsGap: 27, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['reg1..10'], section: 'Registration Number' },
+        SubjectCode: { origin: [1038, 804], bubblesGap: 29, labelsGap: 27, fieldType: 'QTYPE_INT', direction: 'vertical', fieldLabels: ['sub1..3'], section: 'Subject Code' },
+        Questions_Col1: { origin: [212, 392], bubblesGap: 54, labelsGap: 52, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q1..25'], bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], section: 'Column 1 (Q1-25)' },
+        Questions_Col2: { origin: [506, 392], bubblesGap: 54, labelsGap: 52, fieldType: 'QTYPE_MCQ4', direction: 'horizontal', fieldLabels: ['q26..50'], bubbleValues: ['ক', 'খ', 'গ', 'ঘ'], section: 'Column 2 (Q26-50)' },
       },
     },
     evaluationConfig: {
@@ -293,11 +294,32 @@ export const PRESET_TEMPLATES: PresetData[] = [
 ];
 
 const remoteTemplateMemoryCache = new Map<string, Template>();
+const LOCAL_CALIBRATED_KEY = 'omr_calibrated_templates_v1';
 
 /**
- * Resolves a QR code template identifier (`qr.metadata.template`) to:
- * 1. Matching built-in preset (by `id` or generator `aliases` like `du_admission`, `hsc_ssc_50`, etc.)
- * 2. Custom template saved in PostgreSQL (`OMRTemplateDefinition`) via `/api/omr-templates?templateId=...`
+ * Persists a DOM-calibrated or visually-calibrated template in localStorage & memory cache
+ * so the scanner ALWAYS uses the exact printed coordinates before falling back to defaults.
+ */
+export function saveCalibratedTemplateLocal(templateId: string, template: Template): void {
+  const clean = templateId.trim();
+  if (!clean) return;
+  remoteTemplateMemoryCache.set(clean, template);
+  if (typeof window === 'undefined') return;
+  try {
+    const existingRaw = window.localStorage.getItem(LOCAL_CALIBRATED_KEY);
+    const existing: Record<string, Template> = existingRaw ? JSON.parse(existingRaw) : {};
+    existing[clean] = template;
+    window.localStorage.setItem(LOCAL_CALIBRATED_KEY, JSON.stringify(existing));
+  } catch {
+    // quota or private browsing
+  }
+}
+
+/**
+ * Resolves a QR code template identifier (`qr.metadata.template`) with STRICT CALIBRATION PRIORITY:
+ * 1. DOM-calibrated / Studio-calibrated template in localStorage or memory cache
+ * 2. Cloud PostgreSQL (`OMRTemplateDefinition`) via `/api/omr-templates?templateId=...`
+ * 3. Built-in `PRESET_TEMPLATES` fallback (by `id` or `aliases`)
  */
 export async function resolveTemplateByIdOrQR(
   templateTag?: string | null
@@ -306,29 +328,48 @@ export async function resolveTemplateByIdOrQR(
   const clean = templateTag.trim();
   if (!clean) return null;
 
-  const localMatch = PRESET_TEMPLATES.find(
-    (p) => p.id === clean || (p.aliases && p.aliases.includes(clean))
-  );
-  if (localMatch) {
-    return { presetId: localMatch.id, template: localMatch.template };
-  }
-
+  // 1. Memory cache (populated by Generator Sync / Print or previous DB fetch)
   if (remoteTemplateMemoryCache.has(clean)) {
     return { presetId: clean, template: remoteTemplateMemoryCache.get(clean)! };
   }
 
+  // 2. Local calibrated store (instant 0ms lookup from Generator or Calibration Studio)
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_CALIBRATED_KEY);
+      if (raw) {
+        const map = JSON.parse(raw) as Record<string, Template>;
+        if (map[clean]?.fieldBlocks) {
+          remoteTemplateMemoryCache.set(clean, map[clean]);
+          return { presetId: clean, template: map[clean] };
+        }
+      }
+    } catch {
+      // ignore malformed storage
+    }
+  }
+
+  // 3. Cloud PostgreSQL calibrated definition (overrides built-in defaults so printed sheets match 100%)
   try {
     const res = await fetch(`/api/omr-templates?templateId=${encodeURIComponent(clean)}`);
     if (res.ok) {
       const json = await res.json();
-      if (json?.template?.geometry) {
+      if (json?.template?.geometry?.fieldBlocks) {
         const tpl = json.template.geometry as Template;
         remoteTemplateMemoryCache.set(clean, tpl);
         return { presetId: clean, template: tpl };
       }
     }
   } catch {
-    // Offline or not found; caller falls back to activeTemplate
+    // Offline or not found; fall through to built-in presets
+  }
+
+  // 4. Built-in preset fallback
+  const localMatch = PRESET_TEMPLATES.find(
+    (p) => p.id === clean || (p.aliases && p.aliases.includes(clean))
+  );
+  if (localMatch) {
+    return { presetId: localMatch.id, template: localMatch.template };
   }
 
   return null;

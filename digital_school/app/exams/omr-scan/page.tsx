@@ -515,6 +515,16 @@ export default function UniversalOMRScannerPage() {
       scanRes.flags
     );
 
+    // Populate dynamic Registration & QR fallback Roll (for pre-filled student sheets)
+    if (!card.registrationNo) {
+      const regVal = scanRes.concatenatedResponses['Registration'] || scanRes.concatenatedResponses['Reg'];
+      if (regVal) card.registrationNo = regVal;
+    }
+    const qrRoll = qr.found && qr.parsedPayload?.rollNumber ? String(qr.parsedPayload.rollNumber) : '';
+    if ((!card.rollNumber || card.rollNumber === 'UNKNOWN' || card.rollNumber === 'N/A') && qrRoll) {
+      card.rollNumber = qrRoll;
+    }
+
     const rollStr = card.rollNumber || '';
     const strippedRoll = rollStr.replace(/^0+/, '') || rollStr;
     const matched = examInfo?.studentDir.get(rollStr) || examInfo?.studentDir.get(strippedRoll);
@@ -666,7 +676,7 @@ export default function UniversalOMRScannerPage() {
       let effectiveTemplate = activeTemplate;
       let effectiveBubbles = parsedBubbles;
       if (qr.found && qr.parsedPayload?.template) {
-        const resolved = resolveTemplateByIdOrQR(qr.parsedPayload.template);
+        const resolved = await resolveTemplateByIdOrQR(qr.parsedPayload.template);
         if (resolved) {
           effectiveTemplate = resolved.template;
           effectiveBubbles = parseTemplate(resolved.template).bubbles;

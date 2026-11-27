@@ -292,15 +292,25 @@ function extractFiducialMarkers(
   orientedSrc: any,
   cv: any
 ): { detected: boolean; method: 'FIDUCIAL_4PT' | 'FIDUCIAL_3PT_AFFINE' | 'NONE'; quads: MarkerQuad[] } {
-  const curW = orientedSrc.cols;
-  const curH = orientedSrc.rows;
+  const origW = orientedSrc.cols;
+  const origH = orientedSrc.rows;
+
+  // Downsample to <= 880px max dimension for 6x faster, sensor-noise-free fiducial locking,
+  // then scale exact sub-pixel centroids back to original resolution.
+  const maxDim = Math.max(origW, origH);
+  const dsScale = maxDim > 880 ? 880 / maxDim : 1.0;
+  const curW = Math.max(120, Math.round(origW * dsScale));
+  const curH = Math.max(120, Math.round(origH * dsScale));
+  const invScaleX = origW / curW;
+  const invScaleY = origH / curH;
+
   const imgArea = curW * curH;
   const diag = Math.hypot(curW, curH);
 
   const envX = curW * 0.34;
   const envY = curH * 0.34;
-  const minMarkerArea = Math.max(60, imgArea * 0.00007);
-  const maxMarkerArea = imgArea * 0.014;
+  const minMarkerArea = Math.max(36, imgArea * 0.00007);
+  const maxMarkerArea = imgArea * 0.016;
 
   const quads: MarkerQuad[] = [
     { name: 'TL', corner: { x: 0, y: 0 }, bestPt: null, bestScore: -Infinity, bestArea: 0 },
@@ -317,6 +327,7 @@ function extractFiducialMarkers(
   };
 
   let orientedGray = new cv.Mat();
+  let smallGray = new cv.Mat();
   const blurred = new cv.Mat();
   const thresh = new cv.Mat();
   let contours = new cv.MatVector();
@@ -328,10 +339,16 @@ function extractFiducialMarkers(
     } catch {
       orientedGray = orientedSrc.clone();
     }
-    cv.GaussianBlur(orientedGray, blurred, new cv.Size(3, 3), 0);
+    if (dsScale < 1.0) {
+      cv.resize(orientedGray, smallGray, new cv.Size(curW, curH), 0, 0, cv.INTER_AREA);
+    } else {
+      smallGray = orientedGray.clone();
+    }
+    cv.GaussianBlur(smallGray, blurred, new cv.Size(3, 3), 0);
 
-    const inspectContours = (cntList: any) => {
+    const inspectContours = (cntList: any, hierMat?: any) => {
       const n = cntList.size();
+      const hierData = hierMat && hierMat.data32S ? hierMat.data32S : null;
       for (let i = 0; i < n; ++i) {
         const cnt = cntList.get(i);
         try {
@@ -341,9 +358,28 @@ function extractFiducialMarkers(
           const rectArea = rect.width * rect.height;
           if (rectArea <= 0) continue;
           const aspectRatio = rect.width / rect.height;
-          if (aspectRatio < 0.50 || aspectRatio > 1.95) continue;
+          if (aspectRatio < 0.55 || aspectRatio > 1.80) continue;
           const solidity = area / rectArea;
-          if (solidity < 0.62) continue;
+          if (solidity < 0.52) continue;
+
+          // Check concentric bullseye nesting (RETR_TREE: [next, prev, firstChild, parent])
+          let hasConcentricChild = false;
+          let hasGrandChild = false;
+          let directChildren = 0;
+          if (hierData) {
+            const firstChild = hierData[i * 4 + 2];
+            if (firstChild >= 0) {
+              hasConcentricChild = true;
+              let cIdx = firstChild;
+              while (cIdx >= 0 && directChildren < 8) {
+                directChildren++;
+                if (hierData[cIdx * 4 + 2] >= 0) hasGrandChild = true;
+                cIdx = hierData[cIdx * 4];
+              }
+            }
+          }
+          // Reject QR codes (too many nested sub-contours)
+          if (directChildren > 5) continue;
 
           const peri = cv.arcLength(cnt, true);
           const approx = new cv.Mat();
@@ -354,7 +390,7 @@ function extractFiducialMarkers(
           } finally {
             approx.delete();
           }
-          if (polyRows < 4 || polyRows > 8) continue;
+          if (polyRows < 4 || polyRows > 10) continue;
 
           const M = cv.moments(cnt, false);
           const cx = M.m00 !== 0 ? M.m10 / M.m00 : rect.x + rect.width / 2;
@@ -362,10 +398,17 @@ function extractFiducialMarkers(
           const pt = { x: cx, y: cy };
 
           const squareness = 1.0 - Math.min(1.0, Math.abs(1.0 - aspectRatio));
+          // Concentric square-in-square bullseye gets massive priority over text/bars/noise
+          const bullseyeBonus = hasGrandChild ? 4.8 : hasConcentricChild ? 2.4 : 0;
           for (const q of quads) {
             if (!inZone(q, pt)) continue;
             const cornerDistNorm = dist2D(pt, q.corner) / diag;
-            const score = solidity * 2.2 + squareness * 1.4 - cornerDistNorm * 4.5 + Math.log1p(area) * 0.08;
+            const score =
+              bullseyeBonus +
+              solidity * 2.0 +
+              squareness * 1.6 -
+              cornerDistNorm * 4.2 +
+              Math.log1p(area) * 0.06;
             if (score > q.bestScore) {
               q.bestScore = score;
               q.bestPt = pt;
@@ -378,26 +421,74 @@ function extractFiducialMarkers(
       }
     };
 
-    cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    inspectContours(contours);
-
     const validateCurrent = (): 'FIDUCIAL_4PT' | 'FIDUCIAL_3PT_AFFINE' | 'NONE' => {
       const [tl, tr, bl, br] = quads.map((q) => q.bestPt);
-      if (tl && tr && bl && br && isValidFiducialQuad(tl, tr, br, bl, curW, curH)) return 'FIDUCIAL_4PT';
+      if (tl && tr && bl && br && isValidFiducialQuad(tl, tr, br, bl, curW, curH)) {
+        // Cross-corner scale consistency: all 4 fiducials should be roughly similar size
+        const areas = quads.map((q) => q.bestArea).sort((a, b) => a - b);
+        const medianArea = (areas[1] + areas[2]) / 2;
+        if (medianArea > 0 && areas[0] >= medianArea * 0.2 && areas[3] <= medianArea * 5.0) {
+          return 'FIDUCIAL_4PT';
+        }
+      }
       return 'NONE';
     };
 
+    // Pass 1: Otsu + RETR_TREE (locks concentric Solid Pro bullseyes & classic markers cleanly)
+    cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+    cv.findContours(thresh, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
+    inspectContours(contours, hierarchy);
     let method = validateCurrent();
+
+    // Pass 2: Adaptive Gaussian + RETR_TREE (handles uneven phone lighting & shadows)
     if (method === 'NONE') {
+      quads.forEach((q) => {
+        q.bestPt = null;
+        q.bestScore = -Infinity;
+        q.bestArea = 0;
+      });
       contours.delete();
       hierarchy.delete();
       contours = new cv.MatVector();
       hierarchy = new cv.Mat();
       cv.adaptiveThreshold(blurred, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 31, 10);
-      cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-      inspectContours(contours);
+      cv.findContours(thresh, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
+      inspectContours(contours, hierarchy);
       method = validateCurrent();
+    }
+
+    // Pass 3: Illumination-flattened background division + adaptive threshold (heavy phone glare/shadow recovery)
+    if (method === 'NONE') {
+      const bgBlur = new cv.Mat();
+      const g32 = new cv.Mat();
+      const bg32 = new cv.Mat();
+      const norm32 = new cv.Mat();
+      const normU8 = new cv.Mat();
+      try {
+        cv.GaussianBlur(smallGray, bgBlur, new cv.Size(21, 21), 0);
+        smallGray.convertTo(g32, cv.CV_32F);
+        bgBlur.convertTo(bg32, cv.CV_32F);
+        const floor = new cv.Mat(bg32.rows, bg32.cols, cv.CV_32F, new cv.Scalar(25));
+        cv.max(bg32, floor, bg32);
+        floor.delete();
+        cv.divide(g32, bg32, norm32, 255);
+        norm32.convertTo(normU8, cv.CV_8UC1);
+        cv.GaussianBlur(normU8, normU8, new cv.Size(3, 3), 0);
+        cv.adaptiveThreshold(normU8, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 21, 10);
+        contours.delete();
+        hierarchy.delete();
+        contours = new cv.MatVector();
+        hierarchy = new cv.Mat();
+        cv.findContours(thresh, contours, hierarchy, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE);
+        inspectContours(contours, hierarchy);
+        method = validateCurrent();
+      } finally {
+        bgBlur.delete();
+        g32.delete();
+        bg32.delete();
+        norm32.delete();
+        normU8.delete();
+      }
     }
 
     if (method === 'NONE') {
@@ -432,9 +523,19 @@ function extractFiducialMarkers(
       }
     }
 
+    // Scale detected fiducial coordinates back to original full resolution
+    if (dsScale < 1.0) {
+      for (const q of quads) {
+        if (q.bestPt) {
+          q.bestPt = { x: q.bestPt.x * invScaleX, y: q.bestPt.y * invScaleY };
+        }
+      }
+    }
+
     return { detected: method !== 'NONE', method, quads };
   } finally {
     orientedGray.delete();
+    smallGray.delete();
     blurred.delete();
     thresh.delete();
     contours.delete();
@@ -533,10 +634,18 @@ function alignDocument(
     skewAngle = parseFloat((Math.atan2(tr.y - tl.y, tr.x - tl.x) * (180 / Math.PI)).toFixed(2));
     if (Math.abs(skewAngle) > 45) skewAngle = 0;
 
-    const marginXRatio = (tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / (4 * curW);
-    const marginYRatio = (tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / (4 * curH);
-    const insetX = marginXRatio > 0.01 && marginXRatio < 0.12 ? Math.round(marginXRatio * targetW) : 0;
-    const insetY = marginYRatio > 0.01 && marginYRatio < 0.12 ? Math.round(marginYRatio * targetH) : 0;
+    // Fixed canonical fiducial inset makes perspective warp 100% invariant to phone camera distance/crop!
+    let insetX = 0;
+    let insetY = 0;
+    if (template.fiducialInset && template.fiducialInset.length === 2) {
+      insetX = Math.max(0, Math.round(template.fiducialInset[0]));
+      insetY = Math.max(0, Math.round(template.fiducialInset[1]));
+    } else {
+      const marginXRatio = (tl.x + (curW - tr.x) + bl.x + (curW - br.x)) / (4 * curW);
+      const marginYRatio = (tl.y + tr.y + (curH - bl.y) + (curH - br.y)) / (4 * curH);
+      insetX = marginXRatio > 0.01 && marginXRatio < 0.12 ? Math.round(marginXRatio * targetW) : 0;
+      insetY = marginYRatio > 0.01 && marginYRatio < 0.12 ? Math.round(marginYRatio * targetH) : 0;
+    }
 
     const srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
     const dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
@@ -853,7 +962,10 @@ export async function processOMR(
       bubblesBySection[sec].push(b);
     }
 
-    const maxBlockShift = alignmentMethod === 'DIRECT_PASS' ? 2 : Math.min(7, Math.max(3, Math.round(Math.min(bw, bh) * 0.30)));
+    const maxBlockShift =
+      alignmentMethod === 'DIRECT_PASS'
+        ? 2
+        : Math.min(10, Math.max(5, Math.round(Math.min(bw, bh) * 0.42)));
     const blockShifts: Record<string, { dx: number; dy: number }> = {};
     for (const [sec, secBubbles] of Object.entries(bubblesBySection)) {
       const shift = alignFieldBlockGrid(grayData, curW, curH, secBubbles, bw, bh, maxBlockShift);
@@ -868,7 +980,7 @@ export async function processOMR(
       const rx = Math.round(adjX);
       const ry = Math.round(adjY);
       if (rx >= 0 && ry >= 0 && rx + Math.round(bw) <= curW && ry + Math.round(bh) <= curH) {
-        const refined = refineBubbleCentroid(grayData, curW, curH, adjX, adjY, bw, bh, 2, 2.2);
+        const refined = refineBubbleCentroid(grayData, curW, curH, adjX, adjY, bw, bh, 3, 2.8);
         const metrics = sampleBubbleConcentric(grayData, curW, curH, refined.cx, refined.cy, bw, bh);
         const patch16 = extractNormalized16x16Patch(grayData, curW, curH, refined.cx, refined.cy, bw, bh);
         const neuralPred = predictBubbleNeural(patch16);
@@ -1059,6 +1171,30 @@ export async function processOMR(
     });
 
     const concatenatedResponses = resolveConcatenatedFields(responses, template.customLabels, template.emptyValue ?? '');
+
+    // Dynamic auto-concatenation for any Roll/Registration/SubjectCode/Serial digit columns (supports 4..12 digits)
+    const autoConcatGroups: Array<{ key: string; prefix: RegExp }> = [
+      { key: 'Roll', prefix: /^roll(\d+)$/i },
+      { key: 'Registration', prefix: /^reg(\d+)$/i },
+      { key: 'SubjectCode', prefix: /^sub(\d+)$/i },
+      { key: 'Serial', prefix: /^serial(\d+)$/i },
+    ];
+    for (const { key, prefix } of autoConcatGroups) {
+      if (!concatenatedResponses[key]) {
+        const matchedCols = Object.keys(bubblesByLabel)
+          .map((lbl) => {
+            const m = lbl.match(prefix);
+            return m ? { lbl, idx: parseInt(m[1], 10) } : null;
+          })
+          .filter((x): x is { lbl: string; idx: number } => x !== null)
+          .sort((a, b) => a.idx - b.idx);
+        if (matchedCols.length > 0) {
+          const val = matchedCols.map((c) => (responses[c.lbl] && responses[c.lbl][0]) || '').join('');
+          if (val) concatenatedResponses[key] = val;
+        }
+      }
+    }
+
     sm.dispatch('RESOLVE_METADATA_FIELDS', {
       roll: concatenatedResponses['Roll'] || concatenatedResponses['RollNo'] || concatenatedResponses['Stu'] || '',
       reg: concatenatedResponses['Reg'] || concatenatedResponses['Registration'] || '',

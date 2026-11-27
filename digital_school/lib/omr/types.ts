@@ -28,6 +28,12 @@ export interface TemplatePreprocessor {
 export interface Template {
   pageDimensions: [number, number];
   bubbleDimensions: [number, number];
+  /**
+   * Fixed canonical pixel inset [insetX, insetY] where the 4 corner fiducial centers
+   * are warped to: (insetX, insetY), (W-1-insetX, insetY), (W-1-insetX, H-1-insetY), (insetX, H-1-insetY).
+   * Makes perspective warp 100% invariant to phone camera distance and desk border size.
+   */
+  fiducialInset?: [number, number];
   fieldBlocks: Record<string, FieldBlock>;
   customLabels?: Record<string, string[]>;
   outputColumns?: string[];

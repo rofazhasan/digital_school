@@ -18,7 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Template, FieldBlock, ScanProcessingResult } from '@/lib/omr/types';
-import { PRESET_TEMPLATES } from '@/lib/omr/presetTemplates';
+import { PRESET_TEMPLATES, saveCalibratedTemplateLocal } from '@/lib/omr/presetTemplates';
 import { parseTemplate } from '@/lib/omr/templateParser';
 import { processOMR } from '@/lib/omr/omrEngine';
 import { loadOpenCV, isOpenCVLoaded } from '@/lib/omr/opencvLoader';
@@ -266,6 +266,7 @@ export function OMRCalibrationStudio({ onApplyAndScan }: OMRCalibrationStudioPro
   const handleSaveToCloudAndScan = async () => {
     setSavingDb(true);
     const tplId = `calibrated_${templateName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || Date.now()}`;
+    saveCalibratedTemplateLocal(tplId, template);
     try {
       await fetch('/api/omr-templates', {
         method: 'POST',
