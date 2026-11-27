@@ -297,14 +297,17 @@ export default function UniversalOMRScannerPage() {
     const extractAnswers = (qList: any[]) => {
       const map: Record<string, string> = {};
       if (!Array.isArray(qList)) return map;
-      qList.forEach((q: any, idx: number) => {
+      const mcqOnly = qList.filter(
+        (q: any) => !q?.type || ['MCQ', 'SMCQ'].includes(String(q.type).toUpperCase())
+      );
+      mcqOnly.forEach((q: any, idx: number) => {
         const qKey = `q${idx + 1}`;
         let letter = '';
         if (q.correctAnswer) {
           const c = String(q.correctAnswer).trim().toUpperCase();
           if (['A', 'B', 'C', 'D', 'E'].includes(c)) letter = c;
-          else if (['ক', 'খ', 'গ', 'ঘ'].includes(c)) {
-            const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D' };
+          else if (['ক', 'খ', 'গ', 'ঘ', 'ঙ'].includes(c)) {
+            const bnMap: Record<string, string> = { 'ক': 'A', 'খ': 'B', 'গ': 'C', 'ঘ': 'D', 'ঙ': 'E' };
             letter = bnMap[c] || '';
           }
         }
@@ -336,7 +339,8 @@ export default function UniversalOMRScannerPage() {
       Object.assign(defaultKey, extractAnswers(data.questions));
     }
 
-    const negMark = data.mcqNegativeMarking !== undefined ? Number(data.mcqNegativeMarking) : 0.25;
+    const rawNeg = data.mcqNegativeMarking !== undefined ? Math.abs(Number(data.mcqNegativeMarking)) : 0;
+    const negMark = rawNeg > 1 ? rawNeg / 100 : rawNeg;
 
     const config: EvaluationConfig = {
       examName: data.name || 'Exam',
@@ -546,6 +550,12 @@ export default function UniversalOMRScannerPage() {
         card.studentName = matchRes.student.user?.name || `Roll ${matchRes.sanitizedRoll}`;
         if (matchRes.sanitizedRoll) card.rollNumber = matchRes.sanitizedRoll;
         if (matchRes.sanitizedReg) card.registrationNo = matchRes.sanitizedReg;
+        if (matchRes.note) {
+          card.flags = [...(card.flags || []), matchRes.note];
+        }
+      } else if (matchRes.matchMethod === 'AMBIGUOUS_CANDIDATES' && matchRes.ambiguousCandidates?.length) {
+        (card as any).ambiguousCandidates = matchRes.ambiguousCandidates;
+        card.needsReview = true;
         if (matchRes.note) {
           card.flags = [...(card.flags || []), matchRes.note];
         }
@@ -1079,12 +1089,13 @@ export default function UniversalOMRScannerPage() {
     const rawScan = scanResults[sheetId];
     let updatedCard: StudentScoreCard = {
       ...selectedScoreCard,
-      rollNumber: draftRoll.trim(),
-      registrationNo: draftReg.trim() || undefined,
+      rollNumber: cleanDraftRoll,
+      registrationNo: cleanDraftReg || undefined,
       examSet: draftSet.trim().toUpperCase() || 'A',
       manualOverride: true,
       needsReview: false,
     };
+    delete (updatedCard as any).ambiguousCandidates;
 
     // Re-evaluate against new Set if exam config is loaded
     if (examInfo?.config && rawScan) {
@@ -1159,7 +1170,8 @@ export default function UniversalOMRScannerPage() {
 
     const targetExamId = (selectedScoreCard as any).examId || selectedExamId;
     const examInfo = await getExamData(targetExamId);
-    const negMark = Math.abs(Number(examInfo?.exam?.mcqNegativeMarking ?? 0.25));
+    const rawNegCycle = Math.abs(Number(examInfo?.exam?.mcqNegativeMarking ?? 0));
+    const negMark = rawNegCycle > 1 ? rawNegCycle / 100 : rawNegCycle;
 
     const correctStr = Array.isArray(curVerdict.correctAnswer)
       ? String(curVerdict.correctAnswer[0] || '')
@@ -2278,22 +2290,53 @@ export default function UniversalOMRScannerPage() {
                           <p className="text-xs text-slate-400">
                             ফাইল: {selectedScoreCard.filename} • মেধা ক্রম: #{selectedScoreCard.rank} • যেকোনো প্রশ্নের কার্ডে ক্লিক করে উত্তর ম্যানুয়ালি সংশোধন (HITL Override) করতে পারবেন
                           </p>
+                          {/* 1-Click Ambiguous Roll Disambiguation Bar */}
+                          {Array.isArray((selectedScoreCard as any).ambiguousCandidates) &&
+                            (selectedScoreCard as any).ambiguousCandidates.length > 0 && (
+                              <div className="mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 space-y-1.5">
+                                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>অস্পষ্ট রোল ({selectedScoreCard.rollNumber}) — নিচের সম্ভাব্য শিক্ষার্থী থেকে ১ ক্লিকে নির্বাচন করুন:</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(selectedScoreCard as any).ambiguousCandidates.map((cand: any) => (
+                                    <button
+                                      key={cand.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setDraftRoll(cand.roll || '');
+                                        setDraftReg(cand.registrationNo || '');
+                                        setDraftSet(selectedScoreCard.examSet || 'A');
+                                        setEditingMeta(true);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-amber-600/30 border border-amber-400/50 text-amber-100 text-[11px] font-bold transition cursor-pointer"
+                                    >
+                                      রোল {cand.roll} — {cand.user?.name || 'Student'} (রেজি: {cand.registrationNo || '—'})
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                         </>
                       ) : (
                         <div className="flex flex-wrap items-end gap-2 bg-slate-950 p-3 rounded-xl border border-indigo-500/40">
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">রোল নম্বর</label>
+                            <label className="block text-[10px] text-slate-400 mb-1">রোল নম্বর (৪ ডিজিট)</label>
                             <input
                               value={draftRoll}
-                              onChange={(e) => setDraftRoll(e.target.value)}
+                              inputMode="numeric"
+                              maxLength={6}
+                              onChange={(e) => setDraftRoll(e.target.value.replace(/\D/g, ''))}
                               className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white w-28 font-mono"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] text-slate-400 mb-1">রেজিস্ট্রেশন</label>
+                            <label className="block text-[10px] text-slate-400 mb-1">রেজিস্ট্রেশন (৬ ডিজিট)</label>
                             <input
                               value={draftReg}
-                              onChange={(e) => setDraftReg(e.target.value)}
+                              inputMode="numeric"
+                              maxLength={10}
+                              onChange={(e) => setDraftReg(e.target.value.replace(/\D/g, ''))}
                               className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white w-36 font-mono"
                             />
                           </div>

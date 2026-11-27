@@ -302,8 +302,14 @@ export async function POST(
 
       // 4.1 Authoritative Server-Side MCQ Re-Grading when ExamSet has questions
       const rawAns = scan.answers || scan.rawAnswers || {};
-      const setQuestions = Array.isArray(matchedSet?.questionsJson) ? (matchedSet.questionsJson as any[]) : [];
-      const negPenalty = Math.abs(Number(exam.mcqNegativeMarking ?? 0.25));
+      const allSetQuestions = Array.isArray(matchedSet?.questionsJson) ? (matchedSet.questionsJson as any[]) : [];
+      // Filter to MCQ/SMCQ questions only so mixed INT/CQ/SQ items never shift q1..qN indices!
+      const setQuestions = allSetQuestions.filter(
+        (q: any) => !q?.type || ['MCQ', 'SMCQ'].includes(String(q.type).toUpperCase())
+      );
+      // digital_school stores mcqNegativeMarking as percentage (e.g. 25 = 25% = 0.25 per mark)
+      const rawNeg = Math.abs(Number(exam.mcqNegativeMarking ?? 0));
+      const negRatio = rawNeg > 1 ? rawNeg / 100 : rawNeg;
 
       let authoritativeScore = Number(scan.totalScore) || 0;
       const perQuestionAnswerRows: Array<{
@@ -321,6 +327,8 @@ export async function POST(
         setQuestions.forEach((q: any, idx: number) => {
           const qNo = idx + 1;
           const qKey = `q${qNo}`;
+          const qMarks = Number(q.marks) || 1.0;
+          const qNegPenalty = parseFloat((qMarks * negRatio).toFixed(4));
           const correctOpt = extractQuestionCorrectOption(q);
           const rawStudentAns = rawAns[qKey] ?? rawAns[q.id] ?? rawAns[String(qNo)] ?? '';
           const strAns = Array.isArray(rawStudentAns) ? rawStudentAns.join('/') : String(rawStudentAns || '').trim();
@@ -336,15 +344,15 @@ export async function POST(
             isCorrect = null;
             status = 'UNMARKED';
           } else if (isMulti) {
-            marksObtained = -negPenalty;
+            marksObtained = -qNegPenalty;
             isCorrect = false;
             status = 'MULTI_SELECTED';
           } else if (correctOpt && normStudent === correctOpt) {
-            marksObtained = Number(q.marks) || 1.0;
+            marksObtained = qMarks;
             isCorrect = true;
             status = 'ONE_SELECTED';
           } else if (correctOpt) {
-            marksObtained = -negPenalty;
+            marksObtained = -qNegPenalty;
             isCorrect = false;
             status = 'ONE_SELECTED';
           }

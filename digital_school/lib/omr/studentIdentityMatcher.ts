@@ -23,6 +23,7 @@ export type StudentMatchMethod =
   | 'RECOVERED_BY_REG'
   | 'RECOVERED_BY_ROLL'
   | 'FUZZY_1DIGIT_ROLL'
+  | 'AMBIGUOUS_CANDIDATES'
   | 'UNMATCHED';
 
 export interface StudentMatchResult<T extends RosterStudentRecord = RosterStudentRecord> {
@@ -32,6 +33,7 @@ export interface StudentMatchResult<T extends RosterStudentRecord = RosterStuden
   sanitizedReg: string;
   hadNonNumericRoll: boolean;
   hadNonNumericReg: boolean;
+  ambiguousCandidates?: T[];
   note?: string;
 }
 
@@ -200,6 +202,21 @@ export function matchStudentByRollOrReg<T extends RosterStudentRecord>(
         hadNonNumericRoll: rollInfo.hadNonNumeric,
         hadNonNumericReg: regInfo.hadNonNumeric,
         note: `1-digit roll typo '${rollInfo.digits}' uniquely matched to '${trueRoll}'.`,
+      };
+    }
+    if (fuzzyHits.length > 1) {
+      return {
+        student: null,
+        matchMethod: 'AMBIGUOUS_CANDIDATES',
+        sanitizedRoll: rollInfo.digits,
+        sanitizedReg: regInfo.digits,
+        hadNonNumericRoll: rollInfo.hadNonNumeric,
+        hadNonNumericReg: regInfo.hadNonNumeric,
+        ambiguousCandidates: fuzzyHits.slice(0, 5),
+        note: `Ambiguous roll '${rollInfo.digits}' matches ${fuzzyHits.length} students (${fuzzyHits
+          .slice(0, 3)
+          .map((h) => `${h.roll} ${h.user?.name || ''}`.trim())
+          .join(', ')}) — select student manually.`,
       };
     }
   }

@@ -74,8 +74,12 @@ export async function POST(request: NextRequest) {
       exam.examSets[0] ||
       null;
 
-    const questions = Array.isArray(matchedSet?.questionsJson) ? (matchedSet.questionsJson as any[]) : [];
-    const negMark = Math.abs(Number(exam.mcqNegativeMarking ?? 0.25));
+    const allSetQs = Array.isArray(matchedSet?.questionsJson) ? (matchedSet.questionsJson as any[]) : [];
+    const questions = allSetQs.filter(
+      (q: any) => !q?.type || ['MCQ', 'SMCQ'].includes(String(q.type).toUpperCase())
+    );
+    const rawNeg = Math.abs(Number(exam.mcqNegativeMarking ?? 0));
+    const negMark = rawNeg > 1 ? rawNeg / 100 : rawNeg;
 
     let totalScore = 0;
     let maxScore = 0;
