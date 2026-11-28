@@ -113,10 +113,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Fetch exams with caching and bounded pagination (SWR)
-  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
-  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10) || 50));
+  // Fetch exams with caching and pagination (SWR)
   const summary = url.searchParams.get('summary') === 'true';
+  const maxLimit = summary ? 5000 : 2000;
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(url.searchParams.get('limit') || '1000', 10) || 1000));
   const skip = (page - 1) * limit;
 
   // Filter parameters

@@ -86,7 +86,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "name_asc", label: "Exam Title: A to Z" },
 ];
 
-const CACHE_KEY = "online_exams_portal_cache_v2";
+const CACHE_KEY = "online_exams_portal_cache_v3";
 
 function loadFromLocalCache() {
   if (typeof window === "undefined") return null;
@@ -115,7 +115,7 @@ const fetchUser = async () => {
 };
 
 const fetchExams = async () => {
-  const res = await fetch("/api/exams?summary=true&limit=500");
+  const res = await fetch("/api/exams?summary=true&limit=2000");
   if (!res.ok) return [];
   const result = await res.json();
   if (Array.isArray(result)) return result;
