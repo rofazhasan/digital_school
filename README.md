@@ -6,7 +6,7 @@
 
 **Production-grade Academic LMS, Online & Offline Exam Engine, and High-Precision Optical Mark Recognition (OMR) + Blind-Grading CQ Platform — built for schools, coaching centers, and university admission batches.**
 
-[![Live Platform](https://img.shields.io/badge/Live-rofazacademy.dev-6366f1?style=for-the-badge&logo=vercel)](https://rofazacademy.dev)
+[![Live Platform](https://img.shields.io/badge/Live-rofazacademy.dev-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](https://rofazacademy.dev)
 [![Next.js](https://img.shields.io/badge/Next.js-15.3-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Prisma](https://img.shields.io/badge/Prisma-6.10-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io)
@@ -44,7 +44,7 @@ flowchart LR
         OMRWorker["Client-Side OMR Engine<br/>OpenCV.js • jsQR • Multi-Worker Pool"]
     end
 
-    subgraph NextApp["Next.js 15 App Router (Vercel)"]
+    subgraph NextApp["Next.js 15 Standalone App (Microsoft Azure)"]
         MW["Edge Middleware<br/>Stateless JWT (jose) + RBAC"]
         API["115+ Hardened API Routes<br/>Zod Validation • Bounded Pagination"]
         AI["AI Services<br/>Gemini Question Gen • Mistake Analyzer"]
@@ -208,10 +208,19 @@ Run from `digital_school/digital_school`:
 
 ## 🚀 Deployment
 
-### Vercel (Recommended)
-1. Import `rofazhasan/digital_school` in [Vercel](https://vercel.com) and set the **Root Directory** to `digital_school`.
-2. Add `DATABASE_URL`, `JWT_SECRET`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL` under **Settings → Environment Variables**.
-3. Deploy — `prisma generate && next build` runs automatically on every push to `main`.
+### Microsoft Azure (Production)
+`next.config.ts` is configured with `output: 'standalone'` for fast, container-ready Azure App Service / Azure Container Apps deployments:
+
+1. Connect `rofazhasan/digital_school` (`main`) to your Azure App Service / GitHub Actions workflow (working directory: `digital_school`).
+2. Configure **Application Settings / Environment Variables** in Azure:
+   - `DATABASE_URL` — Neon PostgreSQL pooled connection string
+   - `JWT_SECRET` — 64-char random secret (**required** in production)
+   - `NEXTAUTH_SECRET` & `NEXTAUTH_URL` (`https://rofazacademy.dev`)
+3. Build & start commands:
+   ```bash
+   npm ci && npm run build
+   npm start
+   ```
 
 ---
 
