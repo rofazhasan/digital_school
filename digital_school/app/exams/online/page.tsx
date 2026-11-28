@@ -1072,6 +1072,19 @@ function ExamCard({
             {statusConfig.label}
           </span>
 
+          {/* Exam Mode Badge: clearly distinguishes Online vs Offline (OMR/CQ) */}
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+              exam.type === "OFFLINE" || Boolean((result as any)?.omrScanId)
+                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"
+                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800"
+            }`}
+          >
+            {exam.type === "OFFLINE" || Boolean((result as any)?.omrScanId)
+              ? "Offline (OMR/CQ)"
+              : "Online"}
+          </span>
+
           {submitted && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
               <CheckCircle2 className="w-3 h-3" /> Done
