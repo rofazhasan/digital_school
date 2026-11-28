@@ -534,11 +534,29 @@ export default function OnlineExamsPage() {
             return submitted ? 3 : 4;
           };
 
+          // For In Progress, Taken (completed), or Expired tabs — most recently ended exam comes FIRST
+          if (
+            statusFilter === "in_progress" ||
+            statusFilter === "completed" ||
+            statusFilter === "expired_not_taken"
+          ) {
+            if (endA !== endB) return endB - endA;
+            if (startA !== startB) return startB - startA;
+            return (a.name || "").localeCompare(b.name || "");
+          }
+
           const rankA = getStatusRank(a);
           const rankB = getStatusRank(b);
           if (rankA !== rankB) return rankA - rankB;
 
-          // Earliest start first (ascending) within each group
+          // Within Finished/Taken/Missed groups (rank >= 3), most recently ended comes FIRST
+          if (rankA >= 3) {
+            if (endA !== endB) return endB - endA;
+            if (startA !== startB) return startB - startA;
+            return (a.name || "").localeCompare(b.name || "");
+          }
+
+          // Within Live & Upcoming groups, earliest start first (ascending)
           if (startA !== startB) return startA - startB;
           if (endA !== endB) return endA - endB;
           return (a.name || "").localeCompare(b.name || "");
@@ -1032,34 +1050,112 @@ function ExamCard({
   const durationStr = getDurationText(start, end, exam.duration);
   const countdown = getLiveCountdown(start, end, now);
 
-  const statusConfig = {
-    active: {
-      label: "Live Now",
-      icon: Zap,
-      bar: "bg-indigo-500",
-      badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 ring-1 ring-indigo-300 dark:ring-indigo-700",
-      glow: "border-indigo-300 dark:border-indigo-800 shadow-indigo-500/10 shadow-lg",
-    },
-    upcoming: {
-      label: "Upcoming",
-      icon: Timer,
-      bar: "bg-amber-500",
-      badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-      glow: "",
-    },
-    finished: {
-      label: "Ended",
-      icon: Clock,
-      bar: "bg-slate-400",
-      badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-      glow: "",
-    },
-  }[status];
+  // Distinct color-coding per exam mode: Online (original palette unchanged), Offline (Purple/Violet), Mixed (Teal/Cyan)
+  const examMode: "ONLINE" | "OFFLINE" | "MIXED" =
+    exam.type === "OFFLINE" || Boolean((result as any)?.omrScanId)
+      ? "OFFLINE"
+      : exam.type === "MIXED"
+      ? "MIXED"
+      : "ONLINE";
 
+  const modePalettes = {
+    ONLINE: {
+      modeLabel: "Online",
+      modeBadge: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800",
+      cardBorder: "border-slate-200 dark:border-slate-800",
+      doneBadge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+      resumingBadge: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+      status: {
+        active: {
+          label: "Live Now",
+          icon: Zap,
+          bar: "bg-indigo-500",
+          badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 ring-1 ring-indigo-300 dark:ring-indigo-700",
+          glow: "border-indigo-300 dark:border-indigo-800 shadow-indigo-500/10 shadow-lg",
+        },
+        upcoming: {
+          label: "Upcoming",
+          icon: Timer,
+          bar: "bg-amber-500",
+          badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+          glow: "",
+        },
+        finished: {
+          label: "Ended",
+          icon: Clock,
+          bar: "bg-slate-400",
+          badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+          glow: "",
+        },
+      },
+    },
+    OFFLINE: {
+      modeLabel: "Offline (OMR/CQ)",
+      modeBadge: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-200 dark:border-purple-700",
+      cardBorder: "border-purple-200/80 dark:border-purple-900/60",
+      doneBadge: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200 ring-1 ring-violet-300 dark:ring-violet-700",
+      resumingBadge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200 ring-1 ring-rose-300 dark:ring-rose-700",
+      status: {
+        active: {
+          label: "Live Now",
+          icon: Zap,
+          bar: "bg-purple-600",
+          badge: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200 ring-1 ring-purple-300 dark:ring-purple-700",
+          glow: "border-purple-400 dark:border-purple-700 shadow-purple-500/15 shadow-lg",
+        },
+        upcoming: {
+          label: "Upcoming",
+          icon: Timer,
+          bar: "bg-fuchsia-500",
+          badge: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/35 dark:text-fuchsia-200",
+          glow: "",
+        },
+        finished: {
+          label: "Ended",
+          icon: Clock,
+          bar: "bg-purple-400/80",
+          badge: "bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300",
+          glow: "",
+        },
+      },
+    },
+    MIXED: {
+      modeLabel: "Mixed (Online + Offline)",
+      modeBadge: "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/40 dark:text-teal-200 dark:border-teal-700",
+      cardBorder: "border-teal-200/80 dark:border-teal-900/60",
+      doneBadge: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200 ring-1 ring-teal-300 dark:ring-teal-700",
+      resumingBadge: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 ring-1 ring-orange-300 dark:ring-orange-700",
+      status: {
+        active: {
+          label: "Live Now",
+          icon: Zap,
+          bar: "bg-teal-600",
+          badge: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-200 ring-1 ring-teal-300 dark:ring-teal-700",
+          glow: "border-teal-400 dark:border-teal-700 shadow-teal-500/15 shadow-lg",
+        },
+        upcoming: {
+          label: "Upcoming",
+          icon: Timer,
+          bar: "bg-cyan-500",
+          badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/35 dark:text-cyan-200",
+          glow: "",
+        },
+        finished: {
+          label: "Ended",
+          icon: Clock,
+          bar: "bg-teal-400/80",
+          badge: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
+          glow: "",
+        },
+      },
+    },
+  }[examMode];
+
+  const statusConfig = modePalettes.status[status];
   const Icon = statusConfig.icon;
 
   return (
-    <div className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col hover:-translate-y-1 ${status === "active" && !submitted ? statusConfig.glow : "border-slate-200 dark:border-slate-800"}`}>
+    <div className={`group bg-white dark:bg-slate-900 border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col hover:-translate-y-1 ${status === "active" && !submitted ? statusConfig.glow : modePalettes.cardBorder}`}>
       {/* Accent top bar */}
       <div className={`h-1.5 w-full ${statusConfig.bar}`} />
 
@@ -1072,27 +1168,19 @@ function ExamCard({
             {statusConfig.label}
           </span>
 
-          {/* Exam Mode Badge: clearly distinguishes Online vs Offline (OMR/CQ) */}
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-              exam.type === "OFFLINE" || Boolean((result as any)?.omrScanId)
-                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"
-                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800"
-            }`}
-          >
-            {exam.type === "OFFLINE" || Boolean((result as any)?.omrScanId)
-              ? "Offline (OMR/CQ)"
-              : "Online"}
+          {/* Exam Mode Badge: Online / Offline (OMR/CQ) / Mixed */}
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${modePalettes.modeBadge}`}>
+            {modePalettes.modeLabel}
           </span>
 
           {submitted && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${modePalettes.doneBadge}`}>
               <CheckCircle2 className="w-3 h-3" /> Done
             </span>
           )}
 
           {inProgress && !submitted && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 animate-pulse">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold animate-pulse ${modePalettes.resumingBadge}`}>
               <HourglassIcon className="w-3 h-3" /> Resuming
             </span>
           )}
